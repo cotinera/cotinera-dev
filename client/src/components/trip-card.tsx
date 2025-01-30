@@ -8,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { MapPin, Calendar, Users } from "lucide-react";
 import { ShareTripDialog } from "@/components/share-trip-dialog";
@@ -22,7 +22,9 @@ const THUMBNAILS = [
 ];
 
 interface TripCardProps {
-  trip: Trip;
+  trip: Trip & {
+    participants?: { userId: number; status: string }[];
+  };
 }
 
 export function TripCard({ trip }: TripCardProps) {
@@ -62,7 +64,7 @@ export function TripCard({ trip }: TripCardProps) {
               })}
             </span>
           </div>
-          {trip.participants && (
+          {trip.participants && trip.participants.length > 0 && (
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-muted-foreground" />
               <div className="flex -space-x-2">

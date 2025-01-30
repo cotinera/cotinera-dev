@@ -50,212 +50,182 @@ export function registerRoutes(app: Express): Server {
     res.json({ trip, accessLevel: shareLink.accessLevel });
   });
 
-  // Create share link
-  app.post("/api/trips/:tripId/share", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-
-    const tripId = parseInt(req.params.tripId);
-    const { expiresInDays = 7, accessLevel = "view" } = req.body;
-
-    // Verify trip ownership
-    const [trip] = await db
-      .select()
-      .from(trips)
-      .where(
-        and(
-          eq(trips.id, tripId),
-          eq(trips.ownerId, req.user.id)
-        )
-      )
-      .limit(1);
-
-    if (!trip) {
-      return res.status(404).send("Trip not found or unauthorized");
-    }
-
-    const expiresAt = expiresInDays ? addDays(new Date(), expiresInDays) : null;
-
-    const [shareLink] = await db
-      .insert(shareLinks)
-      .values({
-        tripId,
-        expiresAt,
-        accessLevel,
-      })
-      .returning();
-
-    res.json(shareLink);
-  });
-
-  // Revoke share link
-  app.delete("/api/trips/:tripId/share/:linkId", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-
-    const tripId = parseInt(req.params.tripId);
-    const linkId = parseInt(req.params.linkId);
-
-    // Verify trip ownership
-    const [trip] = await db
-      .select()
-      .from(trips)
-      .where(
-        and(
-          eq(trips.id, tripId),
-          eq(trips.ownerId, req.user.id)
-        )
-      )
-      .limit(1);
-
-    if (!trip) {
-      return res.status(404).send("Trip not found or unauthorized");
-    }
-
-    await db
-      .update(shareLinks)
-      .set({ isActive: false })
-      .where(
-        and(
-          eq(shareLinks.id, linkId),
-          eq(shareLinks.tripId, tripId)
-        )
-      );
-
-    res.json({ message: "Share link revoked" });
-  });
-
-  // Trips
+  // Get trips
   app.get("/api/trips", async (req, res) => {
-    // Bypass auth check temporarily for development
-    const userId = 1; // Default user ID for development
-
-    const userTrips = await db.query.trips.findMany({
-      where: eq(trips.ownerId, userId),
-      with: {
-        participants: true,
-        activities: true,
-        flights: true,
-        accommodations: true,
-      },
-    });
-
-    const participatingTrips = await db.query.trips.findMany({
-      where: eq(participants.userId, userId),
-      with: {
-        participants: {
-          where: eq(participants.userId, userId),
+    try {
+      // Get trips where user is owner
+      const ownedTrips = await db.query.trips.findMany({
+        where: eq(trips.ownerId, req.user?.id || 1), // Fallback for development
+        with: {
+          participants: true,
+          activities: true,
+          flights: true,
+          accommodations: true,
         },
-        activities: true,
-        flights: true,
-        accommodations: true,
-      },
-    });
+      });
 
-    res.json([...userTrips, ...participatingTrips]);
+      // Get trips where user is a participant via participants table
+      const participantTrips = await db.query.participants.findMany({
+        where: eq(participants.userId, req.user?.id || 1),
+        with: {
+          trip: {
+            with: {
+              participants: true,
+              activities: true,
+              flights: true,
+              accommodations: true,
+            }
+          }
+        }
+      });
+
+      // Extract the trips from participant records
+      const participatedTrips = participantTrips.map(p => p.trip);
+
+      res.json([...ownedTrips, ...participatedTrips]);
+    } catch (error) {
+      console.error('Error fetching trips:', error);
+      res.status(500).json({ error: 'Failed to fetch trips' });
+    }
   });
 
+  // Create trip
   app.post("/api/trips", async (req, res) => {
-    // Bypass auth check temporarily for development
-    const userId = 1; // Default user ID for development
+    try {
+      const [newTrip] = await db.insert(trips).values({
+        ...req.body,
+        ownerId: req.user?.id || 1, // Fallback for development
+      }).returning();
 
-    const newTrip = await db.insert(trips).values({
-      ...req.body,
-      ownerId: userId,
-    }).returning();
-
-    res.json(newTrip[0]);
+      res.json(newTrip);
+    } catch (error) {
+      console.error('Error creating trip:', error);
+      res.status(500).json({ error: 'Failed to create trip' });
+    }
   });
 
   // Get single trip
   app.get("/api/trips/:id", async (req, res) => {
-    const tripId = parseInt(req.params.id);
+    try {
+      const tripId = parseInt(req.params.id);
 
-    const trip = await db.query.trips.findFirst({
-      where: eq(trips.id, tripId),
-      with: {
-        participants: true,
-        activities: true,
-        flights: true,
-        accommodations: true,
-        checklist: true,
-      },
-    });
+      const trip = await db.query.trips.findFirst({
+        where: eq(trips.id, tripId),
+        with: {
+          participants: true,
+          activities: true,
+          flights: true,
+          accommodations: true,
+          checklist: true,
+        },
+      });
 
-    if (!trip) {
-      return res.status(404).send("Trip not found");
+      if (!trip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+
+      res.json(trip);
+    } catch (error) {
+      console.error('Error fetching trip:', error);
+      res.status(500).json({ error: 'Failed to fetch trip details' });
     }
-
-    res.json(trip);
   });
 
 
   // Flights
-  app.post("/api/trips/:tripId/flights", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
+  app.get("/api/trips/:tripId/flights", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const flightsList = await db.query.flights.findMany({
+        where: eq(flights.tripId, tripId),
+      });
+      res.json(flightsList);
+    } catch (error) {
+      console.error('Error fetching flights:', error);
+      res.status(500).json({ error: 'Failed to fetch flights' });
     }
+  });
 
-    const newFlight = await db.insert(flights).values({
-      ...req.body,
-      tripId: parseInt(req.params.tripId),
-    }).returning();
+  app.post("/api/trips/:tripId/flights", async (req, res) => {
+    try {
+      const [newFlight] = await db.insert(flights).values({
+        ...req.body,
+        tripId: parseInt(req.params.tripId),
+      }).returning();
 
-    res.json(newFlight[0]);
+      res.json(newFlight);
+    } catch (error) {
+      console.error('Error creating flight:', error);
+      res.status(500).json({ error: 'Failed to create flight' });
+    }
   });
 
   app.patch("/api/trips/:tripId/flights/:flightId", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-
-    const [flight] = await db
-      .update(flights)
-      .set(req.body)
-      .where(
-        and(
-          eq(flights.id, parseInt(req.params.flightId)),
-          eq(flights.tripId, parseInt(req.params.tripId))
+    try {
+      const [flight] = await db
+        .update(flights)
+        .set(req.body)
+        .where(
+          and(
+            eq(flights.id, parseInt(req.params.flightId)),
+            eq(flights.tripId, parseInt(req.params.tripId))
+          )
         )
-      )
-      .returning();
+        .returning();
 
-    res.json(flight);
+      res.json(flight);
+    } catch (error) {
+      console.error('Error updating flight:', error);
+      res.status(500).json({ error: 'Failed to update flight' });
+    }
   });
 
   // Accommodations
-  app.post("/api/trips/:tripId/accommodations", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
+  app.get("/api/trips/:tripId/accommodations", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const accommodationsList = await db.query.accommodations.findMany({
+        where: eq(accommodations.tripId, tripId),
+      });
+      res.json(accommodationsList);
+    } catch (error) {
+      console.error('Error fetching accommodations:', error);
+      res.status(500).json({ error: 'Failed to fetch accommodations' });
     }
+  });
 
-    const newAccommodation = await db.insert(accommodations).values({
-      ...req.body,
-      tripId: parseInt(req.params.tripId),
-    }).returning();
+  app.post("/api/trips/:tripId/accommodations", async (req, res) => {
+    try {
+      const [newAccommodation] = await db.insert(accommodations).values({
+        ...req.body,
+        tripId: parseInt(req.params.tripId),
+      }).returning();
 
-    res.json(newAccommodation[0]);
+      res.json(newAccommodation);
+    } catch (error) {
+      console.error('Error creating accommodation:', error);
+      res.status(500).json({ error: 'Failed to create accommodation' });
+    }
   });
 
   app.patch("/api/trips/:tripId/accommodations/:accommodationId", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
-
-    const [accommodation] = await db
-      .update(accommodations)
-      .set(req.body)
-      .where(
-        and(
-          eq(accommodations.id, parseInt(req.params.accommodationId)),
-          eq(accommodations.tripId, parseInt(req.params.tripId))
+    try {
+      const [accommodation] = await db
+        .update(accommodations)
+        .set(req.body)
+        .where(
+          and(
+            eq(accommodations.id, parseInt(req.params.accommodationId)),
+            eq(accommodations.tripId, parseInt(req.params.tripId))
+          )
         )
-      )
-      .returning();
+        .returning();
 
-    res.json(accommodation);
+      res.json(accommodation);
+    } catch (error) {
+      console.error('Error updating accommodation:', error);
+      res.status(500).json({ error: 'Failed to update accommodation' });
+    }
   });
 
   // Activities
