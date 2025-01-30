@@ -38,6 +38,9 @@ export function LocationAutocomplete({
 
     try {
       console.log("Initializing Places Autocomplete...");
+      console.log("API Key available:", !!apiKey);
+      console.log("Libraries loaded:", libraries);
+
       autocompleteRef.current = new google.maps.places.Autocomplete(
         inputRef.current,
         {
@@ -46,8 +49,11 @@ export function LocationAutocomplete({
         }
       );
 
+      console.log("Autocomplete instance created successfully");
+
       autocompleteRef.current.addListener("place_changed", () => {
         const place = autocompleteRef.current?.getPlace();
+        console.log("Place selected:", place);
         if (place?.formatted_address) {
           onChange(place.formatted_address);
           onPlaceSelected?.(place);
@@ -56,18 +62,19 @@ export function LocationAutocomplete({
 
       setIsInitialized(true);
       setError(null);
+      console.log("Places Autocomplete initialized successfully");
     } catch (err) {
       console.error("Failed to initialize Places Autocomplete:", err);
-      setError("Failed to initialize location search");
+      setError(`Failed to initialize location search: ${err instanceof Error ? err.message : String(err)}`);
     }
-  }, [isLoaded, onChange, onPlaceSelected, isInitialized]);
+  }, [isLoaded, onChange, onPlaceSelected, isInitialized, apiKey]);
 
   if (loadError) {
     console.error("Google Maps load error:", loadError);
     return (
       <Alert variant="destructive">
         <AlertDescription>
-          Error loading Google Maps API: {loadError.message}. Please make sure the Google Maps JavaScript API and Places API are enabled in your Google Cloud Console.
+          Error loading Google Maps API: {loadError.message}. Please make sure the Google Maps JavaScript API and Places API are enabled in your Google Cloud Console and that the API key is correct.
         </AlertDescription>
       </Alert>
     );
