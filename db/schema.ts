@@ -8,7 +8,8 @@ import {
   date,
   integer,
   uuid,
-  time
+  time,
+  numeric
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
@@ -29,6 +30,10 @@ export const trips = pgTable("trips", {
   title: text("title").notNull(),
   description: text("description"),
   location: text("location").notNull(),
+  coordinates: json("coordinates").$type<{
+    lat: number;
+    lng: number;
+  }>(),
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),
   thumbnail: text("thumbnail"),

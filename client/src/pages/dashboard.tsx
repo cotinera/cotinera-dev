@@ -28,6 +28,7 @@ export default function Dashboard() {
   const { logout } = useUser();
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [selectedPlace, setSelectedPlace] = useState<google.maps.places.PlaceResult | null>(null);
 
   const form = useForm({
     defaultValues: {
@@ -40,9 +41,20 @@ export default function Dashboard() {
 
   async function onCreateTrip(data: any) {
     try {
-      await createTrip(data);
+      // Include the full location data if available
+      const tripData = {
+        ...data,
+        location: selectedPlace?.formatted_address || data.location,
+        coordinates: selectedPlace?.geometry?.location ? {
+          lat: selectedPlace.geometry.location.lat(),
+          lng: selectedPlace.geometry.location.lng(),
+        } : undefined,
+      };
+
+      await createTrip(tripData);
       setIsCreateOpen(false);
       form.reset();
+      setSelectedPlace(null);
       toast({
         title: "Success",
         description: "Trip created successfully",
@@ -108,6 +120,10 @@ export default function Dashboard() {
                           <LocationAutocomplete
                             value={field.value}
                             onChange={field.onChange}
+                            onPlaceSelected={(place) => {
+                              setSelectedPlace(place);
+                              field.onChange(place.formatted_address || place.name || '');
+                            }}
                             placeholder="Search for a location..."
                           />
                         </FormControl>
