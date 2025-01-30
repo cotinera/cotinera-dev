@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useUser } from "@/hooks/use-user";
 import { useToast } from "@/hooks/use-toast";
-import { insertUserSchema } from "@db/schema";
+import { z } from "zod";
 import {
   Card,
   CardContent,
@@ -21,37 +21,45 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
+
+const authSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+type FormData = z.infer<typeof authSchema>;
 
 export default function AuthPage() {
   const { login, register } = useUser();
   const { toast } = useToast();
   const [isLogin, setIsLogin] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const form = useForm({
-    resolver: zodResolver(insertUserSchema),
+  const form = useForm<FormData>({
+    resolver: zodResolver(authSchema),
     defaultValues: {
       username: "",
       password: "",
     },
   });
 
-  async function onSubmit(data: { username: string; password: string }) {
+  async function onSubmit(data: FormData) {
     try {
-      const result = await (isLogin ? login(data) : register(data));
-      if (!result.ok) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: result.message,
-        });
-        return;
-      }
-    } catch (e) {
+      setIsLoading(true);
+      await (isLogin ? login(data) : register(data));
+      toast({
+        title: "Success",
+        description: isLogin ? "Welcome back!" : "Account created successfully",
+      });
+    } catch (e: any) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "An unexpected error occurred",
+        description: e.message || "Something went wrong",
       });
+    } finally {
+      setIsLoading(false);
     }
   }
 
@@ -96,7 +104,12 @@ export default function AuthPage() {
                 )}
               />
               <div className="space-y-2">
-                <Button type="submit" className="w-full">
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={isLoading}
+                >
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {isLogin ? "Login" : "Register"}
                 </Button>
                 <Button
@@ -104,6 +117,7 @@ export default function AuthPage() {
                   variant="ghost"
                   className="w-full"
                   onClick={() => setIsLogin(!isLogin)}
+                  disabled={isLoading}
                 >
                   {isLogin
                     ? "Need an account? Register"
