@@ -11,7 +11,7 @@ import { Loader2 } from "lucide-react";
 
 function Router() {
   const { user, isLoading } = useUser();
-  const [location, setLocation] = useLocation();
+  const [location] = useLocation();
 
   // Handle loading state
   if (isLoading) {
@@ -30,12 +30,6 @@ function Router() {
         <Route component={NotFound} />
       </Switch>
     );
-  }
-
-  // Redirect to dashboard if already logged in and trying to access auth page
-  if (user && location === "/auth") {
-    setLocation("/");
-    return null;
   }
 
   // Show auth page if not logged in
