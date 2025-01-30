@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useUser } from "@/hooks/use-user";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { useLocation } from "wouter";
 import {
   Card,
   CardContent,
@@ -35,6 +36,7 @@ export default function AuthPage() {
   const { toast } = useToast();
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [, setLocation] = useLocation();
 
   const form = useForm<FormData>({
     resolver: zodResolver(authSchema),
@@ -52,6 +54,7 @@ export default function AuthPage() {
         title: "Success",
         description: isLogin ? "Welcome back!" : "Account created successfully",
       });
+      setLocation("/");
     } catch (e: any) {
       toast({
         variant: "destructive",
