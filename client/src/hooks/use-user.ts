@@ -9,43 +9,6 @@ type UserResponse = {
   };
 };
 
-type RequestResult = {
-  ok: true;
-  data?: UserResponse;
-} | {
-  ok: false;
-  message: string;
-};
-
-async function handleRequest(
-  url: string,
-  method: string,
-  body?: { username: string; password: string; }
-): Promise<RequestResult> {
-  try {
-    const response = await fetch(url, {
-      method,
-      headers: body ? { "Content-Type": "application/json" } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
-      credentials: "include",
-    });
-
-    if (!response.ok) {
-      if (response.status >= 500) {
-        return { ok: false, message: response.statusText };
-      }
-
-      const message = await response.text();
-      return { ok: false, message };
-    }
-
-    const data = await response.json();
-    return { ok: true, data };
-  } catch (e: any) {
-    return { ok: false, message: e.toString() };
-  }
-}
-
 async function fetchUser(): Promise<User | null> {
   const response = await fetch('/api/user', {
     credentials: 'include'
@@ -74,11 +37,19 @@ export function useUser() {
 
   const loginMutation = useMutation({
     mutationFn: async (userData: { username: string; password: string; }) => {
-      const result = await handleRequest('/api/login', 'POST', userData);
-      if (!result.ok) {
-        throw new Error(result.message);
+      const response = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
       }
-      return result.data;
+
+      const data: UserResponse = await response.json();
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
@@ -87,11 +58,16 @@ export function useUser() {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      const result = await handleRequest('/api/logout', 'POST');
-      if (!result.ok) {
-        throw new Error(result.message);
+      const response = await fetch('/api/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
       }
-      return result.data;
+
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
@@ -100,11 +76,19 @@ export function useUser() {
 
   const registerMutation = useMutation({
     mutationFn: async (userData: { username: string; password: string; }) => {
-      const result = await handleRequest('/api/register', 'POST', userData);
-      if (!result.ok) {
-        throw new Error(result.message);
+      const response = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
       }
-      return result.data;
+
+      const data: UserResponse = await response.json();
+      return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/user'] });
