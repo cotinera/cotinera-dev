@@ -11,7 +11,7 @@ import { Loader2 } from "lucide-react";
 
 function Router() {
   const { user, isLoading } = useUser();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
 
   // Handle loading state
   if (isLoading) {
@@ -23,7 +23,7 @@ function Router() {
   }
 
   // Allow access to shared trips without authentication
-  if (window.location.pathname.startsWith("/share/")) {
+  if (location.startsWith("/share/")) {
     return (
       <Switch>
         <Route path="/share/:token" component={SharedTrip} />
@@ -33,7 +33,7 @@ function Router() {
   }
 
   // Redirect to dashboard if already logged in and trying to access auth page
-  if (user && window.location.pathname === "/auth") {
+  if (user && location === "/auth") {
     setLocation("/");
     return null;
   }

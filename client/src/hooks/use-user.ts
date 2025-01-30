@@ -27,9 +27,10 @@ async function fetchUser(): Promise<User | null> {
 
 export function useUser() {
   const queryClient = useQueryClient();
+  const USER_QUERY_KEY = ['/api/user'];
 
   const { data: user, error, isLoading } = useQuery<User | null>({
-    queryKey: ['/api/user'],
+    queryKey: USER_QUERY_KEY,
     queryFn: fetchUser,
     staleTime: Infinity,
     retry: false
@@ -48,11 +49,10 @@ export function useUser() {
         throw new Error(await response.text());
       }
 
-      const data: UserResponse = await response.json();
-      return data;
+      return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      queryClient.invalidateQueries({ queryKey: USER_QUERY_KEY });
     },
   });
 
@@ -70,7 +70,7 @@ export function useUser() {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      queryClient.invalidateQueries({ queryKey: USER_QUERY_KEY });
     },
   });
 
@@ -87,11 +87,10 @@ export function useUser() {
         throw new Error(await response.text());
       }
 
-      const data: UserResponse = await response.json();
-      return data;
+      return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/user'] });
+      queryClient.invalidateQueries({ queryKey: USER_QUERY_KEY });
     },
   });
 
