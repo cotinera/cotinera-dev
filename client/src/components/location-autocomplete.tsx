@@ -33,6 +33,11 @@ export function LocationAutocomplete({
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Handle manual input changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(e.target.value);
+  };
+
   useEffect(() => {
     if (!isLoaded || !inputRef.current || isInitialized) return;
 
@@ -56,15 +61,14 @@ export function LocationAutocomplete({
         const place = autocompleteRef.current?.getPlace();
         console.log("Place selected:", place);
 
-        // Update the input value with the selected place
         if (place?.formatted_address) {
+          // Update the parent component's state
           onChange(place.formatted_address);
           onPlaceSelected?.(place);
-
-          // Ensure the input field is updated with the selected value
-          if (inputRef.current) {
-            inputRef.current.value = place.formatted_address;
-          }
+        } else if (place?.name) {
+          // Fallback to place name if formatted address is not available
+          onChange(place.name);
+          onPlaceSelected?.(place);
         }
       });
 
@@ -120,7 +124,7 @@ export function LocationAutocomplete({
       ref={inputRef}
       type="text"
       value={value}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={handleInputChange}
       placeholder={placeholder}
       className={className}
     />
