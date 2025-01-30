@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations } from "@db/schema";
+import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations, chatMessages } from "@db/schema";
 import { eq, and } from "drizzle-orm";
 import { addDays } from "date-fns";
 
@@ -284,6 +284,50 @@ export function registerRoutes(app: Express): Server {
     }).returning();
 
     res.json(newDocument[0]);
+  });
+
+  // Chat Messages
+  app.get("/api/trips/:tripId/chat", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const messages = await db.query.chatMessages.findMany({
+        where: eq(chatMessages.tripId, tripId),
+        with: {
+          user: true,
+        },
+        orderBy: (messages, { desc }) => [desc(messages.createdAt)],
+      });
+      res.json(messages);
+    } catch (error) {
+      console.error('Error fetching chat messages:', error);
+      res.status(500).json({ error: 'Failed to fetch chat messages' });
+    }
+  });
+
+  app.post("/api/trips/:tripId/chat", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const [message] = await db.insert(chatMessages).values({
+        tripId: parseInt(req.params.tripId),
+        userId: req.user.id,
+        message: req.body.message,
+      }).returning();
+
+      const messageWithUser = await db.query.chatMessages.findFirst({
+        where: eq(chatMessages.id, message.id),
+        with: {
+          user: true,
+        },
+      });
+
+      res.json(messageWithUser);
+    } catch (error) {
+      console.error('Error creating chat message:', error);
+      res.status(500).json({ error: 'Failed to create chat message' });
+    }
   });
 
   const httpServer = createServer(app);
