@@ -50,7 +50,7 @@ export function LocationAutocomplete({
         inputRef.current,
         {
           types: ["(cities)"],
-          fields: ["formatted_address", "geometry", "name"],
+          fields: ["formatted_address", "geometry", "name", "place_id"],
         }
       );
 
@@ -61,14 +61,20 @@ export function LocationAutocomplete({
         const place = autocompleteRef.current?.getPlace();
         console.log("Place selected:", place);
 
-        if (place?.formatted_address) {
+        if (place?.formatted_address || place?.name) {
+          const locationText = place.formatted_address || place.name || '';
           // Update the parent component's state
-          onChange(place.formatted_address);
-          onPlaceSelected?.(place);
-        } else if (place?.name) {
-          // Fallback to place name if formatted address is not available
-          onChange(place.name);
-          onPlaceSelected?.(place);
+          onChange(locationText);
+
+          // Ensure the input value is updated
+          if (inputRef.current) {
+            inputRef.current.value = locationText;
+          }
+
+          // Notify parent of full place data if callback provided
+          if (onPlaceSelected && place) {
+            onPlaceSelected(place);
+          }
         }
       });
 
