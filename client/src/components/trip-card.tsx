@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { MapPin, Calendar, Users } from "lucide-react";
 import { ShareTripDialog } from "@/components/share-trip-dialog";
-import { useNavigate } from "wouter";
+import { useLocation } from "wouter";
 
 const THUMBNAILS = [
   "https://images.unsplash.com/photo-1605130284535-11dd9eedc58a",
@@ -26,7 +26,7 @@ interface TripCardProps {
 }
 
 export function TripCard({ trip }: TripCardProps) {
-  const navigate = useNavigate();
+  const [, setLocation] = useLocation();
   // Get a deterministic but random thumbnail based on trip ID
   const thumbnailIndex = trip.id % THUMBNAILS.length;
   const thumbnail = trip.thumbnail || THUMBNAILS[thumbnailIndex];
@@ -87,7 +87,7 @@ export function TripCard({ trip }: TripCardProps) {
         <Button 
           variant="outline" 
           className="w-full"
-          onClick={() => navigate(`/trips/${trip.id}`)}
+          onClick={() => setLocation(`/trips/${trip.id}`)}
         >
           View Details
         </Button>
