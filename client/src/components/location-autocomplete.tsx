@@ -33,20 +33,44 @@ export function LocationAutocomplete({
     if (!isLoaded || !inputRef.current) return;
 
     try {
+      // Create autocomplete instance
       autocompleteRef.current = new google.maps.places.Autocomplete(
         inputRef.current,
         {
           types: ["(cities)"],
-          fields: ["formatted_address", "geometry", "name", "place_id"],
+          fields: [
+            "formatted_address",
+            "geometry",
+            "name",
+            "place_id",
+            "address_components"
+          ],
         }
       );
 
-      autocompleteRef.current.addListener("place_changed", () => {
+      // Add place_changed event listener
+      const listener = autocompleteRef.current.addListener("place_changed", () => {
         const place = autocompleteRef.current?.getPlace();
-        if (place?.formatted_address) {
-          onChange(place.formatted_address, place);
+        console.log("Selected place:", place); // Debug log
+
+        if (!place?.geometry) {
+          console.warn("Place selected but no geometry found"); // Debug log
+          return;
+        }
+
+        const formattedAddress = place.formatted_address || place.name;
+        if (formattedAddress) {
+          console.log("Updating with address:", formattedAddress); // Debug log
+          onChange(formattedAddress, place);
         }
       });
+
+      // Cleanup listener on unmount
+      return () => {
+        if (google && listener) {
+          google.maps.event.removeListener(listener);
+        }
+      };
 
     } catch (err) {
       console.error("Failed to initialize Places Autocomplete:", err);
@@ -99,6 +123,7 @@ export function LocationAutocomplete({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       className={className}
+      autoComplete="off"
     />
   );
 }
