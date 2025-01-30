@@ -36,7 +36,7 @@ export default function AuthPage() {
   const { toast } = useToast();
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [, setLocation] = useLocation();
+  const [, navigate] = useLocation();
 
   const form = useForm<FormData>({
     resolver: zodResolver(authSchema),
@@ -49,12 +49,18 @@ export default function AuthPage() {
   async function onSubmit(data: FormData) {
     try {
       setIsLoading(true);
-      await (isLogin ? login(data) : register(data));
-      toast({
-        title: "Success",
-        description: isLogin ? "Welcome back!" : "Account created successfully",
-      });
-      setLocation("/");
+      const result = await (isLogin ? login(data) : register(data));
+
+      if (result.ok) {
+        toast({
+          title: "Success",
+          description: isLogin ? "Welcome back!" : "Account created successfully",
+        });
+        // Use navigate instead of setLocation for more reliable redirection
+        navigate("/");
+      } else {
+        throw new Error(result.message);
+      }
     } catch (e: any) {
       toast({
         variant: "destructive",
