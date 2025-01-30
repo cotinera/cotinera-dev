@@ -20,7 +20,7 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { LocationAutocomplete } from "@/components/location-autocomplete";
+import { MapPicker } from "@/components/map-picker";
 import { useForm } from "react-hook-form";
 
 interface TripFormData {
@@ -35,7 +35,7 @@ export default function Dashboard() {
   const { logout } = useUser();
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [selectedPlace, setSelectedPlace] = useState<google.maps.places.PlaceResult | null>(null);
+  const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
 
   const form = useForm<TripFormData>({
     defaultValues: {
@@ -48,33 +48,32 @@ export default function Dashboard() {
 
   async function onCreateTrip(data: TripFormData) {
     try {
-      if (!selectedPlace?.geometry?.location) {
+      if (!selectedCoordinates) {
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Please select a location from the dropdown",
+          description: "Please select a location from the map",
         });
         return;
       }
 
       const tripData = {
         ...data,
-        coordinates: {
-          lat: selectedPlace.geometry.location.lat(),
-          lng: selectedPlace.geometry.location.lng(),
-        },
+        coordinates: selectedCoordinates,
       };
 
+      console.log("Creating trip with data:", tripData); // Debug log
       await createTrip(tripData);
       setIsCreateOpen(false);
       form.reset();
-      setSelectedPlace(null);
+      setSelectedCoordinates(null);
 
       toast({
         title: "Success",
         description: "Trip created successfully",
       });
     } catch (error) {
+      console.error("Failed to create trip:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -132,13 +131,11 @@ export default function Dashboard() {
                       <FormItem>
                         <FormLabel>Location</FormLabel>
                         <FormControl>
-                          <LocationAutocomplete
+                          <MapPicker
                             value={field.value}
-                            onChange={(value, place) => {
-                              field.onChange(value);
-                              if (place) {
-                                setSelectedPlace(place);
-                              }
+                            onChange={(address, coordinates) => {
+                              field.onChange(address);
+                              setSelectedCoordinates(coordinates);
                             }}
                             placeholder="Search for a location..."
                           />

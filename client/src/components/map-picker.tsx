@@ -29,57 +29,70 @@ export function MapPicker({
     libraries,
   });
 
-  const geocodeCoordinates = useCallback(async (lat: number, lng: number) => {
-    try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${
-          import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-        }`
-      );
-      const data = await response.json();
-      
-      if (data.status === "OK" && data.results?.[0]) {
-        const address = data.results[0].formatted_address;
-        onChange(address, { lat, lng });
-      }
-    } catch (err) {
-      console.error("Geocoding error:", err);
-    }
-  }, [onChange]);
-
-  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
-    if (e.latLng) {
-      const lat = e.latLng.lat();
-      const lng = e.latLng.lng();
-      setCoordinates({ lat, lng });
-      geocodeCoordinates(lat, lng);
-    }
-  }, [geocodeCoordinates]);
-
+  // Function to geocode the entered address
   const handleSearch = async () => {
     if (!value) return;
-    
+
     setIsLoading(true);
+    setError(null);
+
     try {
       const response = await fetch(
         `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
           value
         )}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`
       );
+
+      if (!response.ok) {
+        throw new Error(`Geocoding failed: ${response.statusText}`);
+      }
+
       const data = await response.json();
+      console.log("Geocoding response:", data); // Debug log
 
       if (data.status === "OK" && data.results?.[0]?.geometry?.location) {
         const { lat, lng } = data.results[0].geometry.location;
         setCoordinates({ lat, lng });
         onChange(data.results[0].formatted_address, { lat, lng });
+      } else {
+        console.error("Geocoding error:", data);
+        setError(`Could not find location: ${data.status}`);
       }
     } catch (err) {
-      setError("Failed to find location");
+      console.error("Search error:", err);
+      setError(err instanceof Error ? err.message : "Failed to find location");
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Handle map clicks
+  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
+    if (!e.latLng) return;
+
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+
+    setCoordinates({ lat, lng });
+
+    // Reverse geocode the clicked location
+    fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${
+        import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+      }`
+    )
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.status === "OK" && data.results?.[0]) {
+          onChange(data.results[0].formatted_address, { lat, lng });
+        }
+      })
+      .catch((err) => {
+        console.error("Reverse geocoding error:", err);
+      });
+  }, [onChange]);
+
+  // Trigger search when value changes
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (value) {
@@ -91,10 +104,11 @@ export function MapPicker({
   }, [value]);
 
   if (loadError) {
+    console.error("Maps load error:", loadError);
     return (
       <Alert variant="destructive">
         <AlertDescription>
-          Error loading Google Maps API. Please check your API key configuration.
+          Error loading Google Maps. Please check your API key and ensure it has the correct permissions enabled.
         </AlertDescription>
       </Alert>
     );
