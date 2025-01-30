@@ -137,6 +137,13 @@ export const tripsRelations = relations(trips, ({ one, many }) => ({
   accommodations: many(accommodations),
 }));
 
+export const activitiesRelations = relations(activities, ({ one }) => ({
+  trip: one(trips, {
+    fields: [activities.tripId],
+    references: [trips.id],
+  }),
+}));
+
 export const flightsRelations = relations(flights, ({ one }) => ({
   trip: one(trips, {
     fields: [flights.tripId],

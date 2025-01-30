@@ -2,8 +2,6 @@ import { useTrips } from "@/hooks/use-trips";
 import { useUser } from "@/hooks/use-user";
 import { Button } from "@/components/ui/button";
 import { TripCard } from "@/components/trip-card";
-import { CalendarView } from "@/components/calendar-view";
-import { Checklist } from "@/components/checklist";
 import { Plus, LogOut } from "lucide-react";
 import { useState } from "react";
 import {
@@ -23,8 +21,6 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
-import { FlightBookings } from "@/components/flight-bookings";
-import { AccommodationBookings } from "@/components/accommodation-bookings";
 
 export default function Dashboard() {
   const { trips, createTrip } = useTrips();
@@ -45,6 +41,7 @@ export default function Dashboard() {
     try {
       await createTrip(data);
       setIsCreateOpen(false);
+      form.reset();
       toast({
         title: "Success",
         description: "Trip created successfully",
@@ -149,19 +146,11 @@ export default function Dashboard() {
           {trips.map((trip) => (
             <TripCard key={trip.id} trip={trip} />
           ))}
-        </div>
-
-        <div className="mt-8">
-          <CalendarView trips={trips} />
-        </div>
-
-        <div className="grid grid-cols-1 gap-8 mt-8">
-          <FlightBookings tripId={trips[0]?.id} />
-          <AccommodationBookings tripId={trips[0]?.id} />
-        </div>
-
-        <div className="mt-8">
-          <Checklist tripId={trips[0]?.id} />
+          {trips.length === 0 && (
+            <div className="col-span-full text-center py-8 text-muted-foreground">
+              No trips yet. Create one to get started!
+            </div>
+          )}
         </div>
       </main>
     </div>
