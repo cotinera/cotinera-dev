@@ -49,18 +49,12 @@ export default function AuthPage() {
   async function onSubmit(data: FormData) {
     try {
       setIsLoading(true);
-      const result = await (isLogin ? login(data) : register(data));
-
-      if (result.ok) {
-        toast({
-          title: "Success",
-          description: isLogin ? "Welcome back!" : "Account created successfully",
-        });
-        // Use navigate instead of setLocation for more reliable redirection
-        navigate("/");
-      } else {
-        throw new Error(result.message);
-      }
+      await (isLogin ? login(data) : register(data));
+      toast({
+        title: "Success",
+        description: isLogin ? "Welcome back!" : "Account created successfully",
+      });
+      navigate("/");
     } catch (e: any) {
       toast({
         variant: "destructive",
