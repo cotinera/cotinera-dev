@@ -51,12 +51,20 @@ export function LocationAutocomplete({
 
       console.log("Autocomplete instance created successfully");
 
+      // Add the place_changed listener
       autocompleteRef.current.addListener("place_changed", () => {
         const place = autocompleteRef.current?.getPlace();
         console.log("Place selected:", place);
+
+        // Update the input value with the selected place
         if (place?.formatted_address) {
           onChange(place.formatted_address);
           onPlaceSelected?.(place);
+
+          // Ensure the input field is updated with the selected value
+          if (inputRef.current) {
+            inputRef.current.value = place.formatted_address;
+          }
         }
       });
 
