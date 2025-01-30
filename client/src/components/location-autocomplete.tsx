@@ -4,13 +4,11 @@ import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
-// Define libraries array outside component to prevent recreation
 const libraries: ("places")[] = ["places"];
 
 interface LocationAutocompleteProps {
   value: string;
-  onChange: (value: string) => void;
-  onPlaceSelected?: (place: google.maps.places.PlaceResult) => void;
+  onChange: (value: string, place?: google.maps.places.PlaceResult) => void;
   placeholder?: string;
   className?: string;
 }
@@ -18,7 +16,6 @@ interface LocationAutocompleteProps {
 export function LocationAutocomplete({
   value,
   onChange,
-  onPlaceSelected,
   placeholder = "Enter a location",
   className,
 }: LocationAutocompleteProps) {
@@ -30,22 +27,12 @@ export function LocationAutocomplete({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Handle manual input changes
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    onChange(e.target.value);
-  };
-
   useEffect(() => {
-    if (!isLoaded || !inputRef.current || isInitialized) return;
+    if (!isLoaded || !inputRef.current) return;
 
     try {
-      console.log("Initializing Places Autocomplete...");
-      console.log("API Key available:", !!apiKey);
-      console.log("Libraries loaded:", libraries);
-
       autocompleteRef.current = new google.maps.places.Autocomplete(
         inputRef.current,
         {
@@ -54,45 +41,24 @@ export function LocationAutocomplete({
         }
       );
 
-      console.log("Autocomplete instance created successfully");
-
-      // Add the place_changed listener
       autocompleteRef.current.addListener("place_changed", () => {
         const place = autocompleteRef.current?.getPlace();
-        console.log("Place selected:", place);
-
-        if (place?.formatted_address || place?.name) {
-          const locationText = place.formatted_address || place.name || '';
-          // Update the parent component's state
-          onChange(locationText);
-
-          // Ensure the input value is updated
-          if (inputRef.current) {
-            inputRef.current.value = locationText;
-          }
-
-          // Notify parent of full place data if callback provided
-          if (onPlaceSelected && place) {
-            onPlaceSelected(place);
-          }
+        if (place?.formatted_address) {
+          onChange(place.formatted_address, place);
         }
       });
 
-      setIsInitialized(true);
-      setError(null);
-      console.log("Places Autocomplete initialized successfully");
     } catch (err) {
       console.error("Failed to initialize Places Autocomplete:", err);
       setError(`Failed to initialize location search: ${err instanceof Error ? err.message : String(err)}`);
     }
-  }, [isLoaded, onChange, onPlaceSelected, isInitialized, apiKey]);
+  }, [isLoaded, onChange]);
 
   if (loadError) {
-    console.error("Google Maps load error:", loadError);
     return (
       <Alert variant="destructive">
         <AlertDescription>
-          Error loading Google Maps API: {loadError.message}. Please make sure the Google Maps JavaScript API and Places API are enabled in your Google Cloud Console and that the API key is correct.
+          Error loading Google Maps API. Please check your API key configuration.
         </AlertDescription>
       </Alert>
     );
@@ -102,7 +68,7 @@ export function LocationAutocomplete({
     return (
       <Alert variant="destructive">
         <AlertDescription>
-          Google Maps API key is not configured. Please set VITE_GOOGLE_MAPS_API_KEY in your environment.
+          Google Maps API key is not configured.
         </AlertDescription>
       </Alert>
     );
@@ -130,7 +96,7 @@ export function LocationAutocomplete({
       ref={inputRef}
       type="text"
       value={value}
-      onChange={handleInputChange}
+      onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       className={className}
     />

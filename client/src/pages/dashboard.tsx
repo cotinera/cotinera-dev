@@ -23,6 +23,13 @@ import { Input } from "@/components/ui/input";
 import { LocationAutocomplete } from "@/components/location-autocomplete";
 import { useForm } from "react-hook-form";
 
+interface TripFormData {
+  title: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+}
+
 export default function Dashboard() {
   const { trips, createTrip } = useTrips();
   const { logout } = useUser();
@@ -30,7 +37,7 @@ export default function Dashboard() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedPlace, setSelectedPlace] = useState<google.maps.places.PlaceResult | null>(null);
 
-  const form = useForm({
+  const form = useForm<TripFormData>({
     defaultValues: {
       title: "",
       location: "",
@@ -39,27 +46,35 @@ export default function Dashboard() {
     },
   });
 
-  async function onCreateTrip(data: any) {
+  async function onCreateTrip(data: TripFormData) {
     try {
-      // Include the full location data if available
+      if (!selectedPlace?.geometry?.location) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Please select a location from the dropdown",
+        });
+        return;
+      }
+
       const tripData = {
         ...data,
-        location: selectedPlace?.formatted_address || data.location,
-        coordinates: selectedPlace?.geometry?.location ? {
+        coordinates: {
           lat: selectedPlace.geometry.location.lat(),
           lng: selectedPlace.geometry.location.lng(),
-        } : undefined,
+        },
       };
 
       await createTrip(tripData);
       setIsCreateOpen(false);
       form.reset();
       setSelectedPlace(null);
+
       toast({
         title: "Success",
         description: "Trip created successfully",
       });
-    } catch (e) {
+    } catch (error) {
       toast({
         variant: "destructive",
         title: "Error",
@@ -119,10 +134,11 @@ export default function Dashboard() {
                         <FormControl>
                           <LocationAutocomplete
                             value={field.value}
-                            onChange={field.onChange}
-                            onPlaceSelected={(place) => {
-                              setSelectedPlace(place);
-                              field.onChange(place.formatted_address || place.name || '');
+                            onChange={(value, place) => {
+                              field.onChange(value);
+                              if (place) {
+                                setSelectedPlace(place);
+                              }
                             }}
                             placeholder="Search for a location..."
                           />
