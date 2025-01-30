@@ -20,7 +20,7 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { LocationAutocomplete } from "@/components/location-autocomplete";
+import { LocationSearch } from "@/components/location-search";
 import { useForm } from "react-hook-form";
 
 interface TripFormData {
@@ -130,7 +130,7 @@ export default function Dashboard() {
                       <FormItem>
                         <FormLabel>Location</FormLabel>
                         <FormControl>
-                          <LocationAutocomplete
+                          <LocationSearch
                             value={field.value}
                             onChange={(address, coordinates) => {
                               field.onChange(address);
