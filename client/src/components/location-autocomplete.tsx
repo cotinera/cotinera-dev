@@ -2,6 +2,7 @@ import { useLoadScript } from "@react-google-maps/api";
 import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Define libraries array outside component to prevent recreation
 const libraries: ("places")[] = ["places"];
@@ -21,8 +22,9 @@ export function LocationAutocomplete({
   placeholder = "Enter a location",
   className,
 }: LocationAutocompleteProps) {
-  const { isLoaded } = useLoadScript({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+  const { isLoaded, loadError } = useLoadScript({
+    googleMapsApiKey: apiKey || "",
     libraries,
   });
 
@@ -51,6 +53,26 @@ export function LocationAutocomplete({
 
     setIsInitialized(true);
   }, [isLoaded, onChange, onPlaceSelected, isInitialized]);
+
+  if (loadError) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>
+          Error loading Google Maps API. Please check your API key configuration.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (!apiKey) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>
+          Google Maps API key is not configured. Please set VITE_GOOGLE_MAPS_API_KEY in your environment.
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   if (!isLoaded) {
     return (
