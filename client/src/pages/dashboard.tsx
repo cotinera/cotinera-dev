@@ -20,7 +20,7 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { LocationMapPicker } from "@/components/location-map-picker";
+import { LocationAutocomplete } from "@/components/location-autocomplete";
 import { useForm } from "react-hook-form";
 
 interface TripFormData {
@@ -52,7 +52,7 @@ export default function Dashboard() {
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Please select a location from the map or search",
+          description: "Please select a location from the suggestions",
         });
         return;
       }
@@ -130,11 +130,11 @@ export default function Dashboard() {
                       <FormItem>
                         <FormLabel>Location</FormLabel>
                         <FormControl>
-                          <LocationMapPicker
+                          <LocationAutocomplete
                             value={field.value}
                             onChange={(address, coordinates) => {
                               field.onChange(address);
-                              setSelectedCoordinates(coordinates);
+                              setSelectedCoordinates(coordinates || null);
                             }}
                             placeholder="Search for a location..."
                           />
@@ -142,30 +142,32 @@ export default function Dashboard() {
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="startDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Start Date</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="endDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>End Date</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="startDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Start Date</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="endDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>End Date</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <Button type="submit" className="w-full">
                     Create Trip
                   </Button>

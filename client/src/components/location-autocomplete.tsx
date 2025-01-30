@@ -8,7 +8,7 @@ const libraries: ("places")[] = ["places"];
 
 interface LocationAutocompleteProps {
   value: string;
-  onChange: (value: string, place?: google.maps.places.PlaceResult) => void;
+  onChange: (value: string, coordinates?: { lat: number; lng: number }) => void;
   placeholder?: string;
   className?: string;
 }
@@ -19,9 +19,8 @@ export function LocationAutocomplete({
   placeholder = "Enter a location",
   className,
 }: LocationAutocompleteProps) {
-  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
   const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: apiKey || "",
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     libraries,
   });
 
@@ -33,66 +32,47 @@ export function LocationAutocomplete({
     if (!isLoaded || !inputRef.current) return;
 
     try {
-      // Create autocomplete instance
       autocompleteRef.current = new google.maps.places.Autocomplete(
         inputRef.current,
         {
           types: ["(cities)"],
-          fields: [
-            "formatted_address",
-            "geometry",
-            "name",
-            "place_id",
-            "address_components"
-          ],
+          fields: ["formatted_address", "geometry", "name"],
         }
       );
 
-      // Add place_changed event listener
       const listener = autocompleteRef.current.addListener("place_changed", () => {
         const place = autocompleteRef.current?.getPlace();
-        console.log("Selected place:", place); // Debug log
 
-        if (!place?.geometry) {
-          console.warn("Place selected but no geometry found"); // Debug log
+        if (!place?.geometry?.location) {
+          console.warn("Place selected but no geometry found");
           return;
         }
 
-        const formattedAddress = place.formatted_address || place.name;
-        if (formattedAddress) {
-          console.log("Updating with address:", formattedAddress); // Debug log
-          onChange(formattedAddress, place);
-        }
+        const coordinates = {
+          lat: place.geometry.location.lat(),
+          lng: place.geometry.location.lng(),
+        };
+
+        const address = place.formatted_address || place.name || "";
+        onChange(address, coordinates);
       });
 
-      // Cleanup listener on unmount
       return () => {
         if (google && listener) {
           google.maps.event.removeListener(listener);
         }
       };
-
     } catch (err) {
       console.error("Failed to initialize Places Autocomplete:", err);
       setError(`Failed to initialize location search: ${err instanceof Error ? err.message : String(err)}`);
     }
   }, [isLoaded, onChange]);
 
-  if (loadError) {
+  if (loadError || !import.meta.env.VITE_GOOGLE_MAPS_API_KEY) {
     return (
       <Alert variant="destructive">
         <AlertDescription>
           Error loading Google Maps API. Please check your API key configuration.
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
-  if (!apiKey) {
-    return (
-      <Alert variant="destructive">
-        <AlertDescription>
-          Google Maps API key is not configured.
         </AlertDescription>
       </Alert>
     );
