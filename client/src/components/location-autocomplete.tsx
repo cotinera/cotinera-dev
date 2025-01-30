@@ -31,34 +31,43 @@ export function LocationAutocomplete({
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isLoaded || !inputRef.current || isInitialized) return;
 
-    autocompleteRef.current = new google.maps.places.Autocomplete(
-      inputRef.current,
-      {
-        types: ["(cities)"],
-        fields: ["formatted_address", "geometry", "name"],
-      }
-    );
+    try {
+      console.log("Initializing Places Autocomplete...");
+      autocompleteRef.current = new google.maps.places.Autocomplete(
+        inputRef.current,
+        {
+          types: ["(cities)"],
+          fields: ["formatted_address", "geometry", "name"],
+        }
+      );
 
-    autocompleteRef.current.addListener("place_changed", () => {
-      const place = autocompleteRef.current?.getPlace();
-      if (place?.formatted_address) {
-        onChange(place.formatted_address);
-        onPlaceSelected?.(place);
-      }
-    });
+      autocompleteRef.current.addListener("place_changed", () => {
+        const place = autocompleteRef.current?.getPlace();
+        if (place?.formatted_address) {
+          onChange(place.formatted_address);
+          onPlaceSelected?.(place);
+        }
+      });
 
-    setIsInitialized(true);
+      setIsInitialized(true);
+      setError(null);
+    } catch (err) {
+      console.error("Failed to initialize Places Autocomplete:", err);
+      setError("Failed to initialize location search");
+    }
   }, [isLoaded, onChange, onPlaceSelected, isInitialized]);
 
   if (loadError) {
+    console.error("Google Maps load error:", loadError);
     return (
       <Alert variant="destructive">
         <AlertDescription>
-          Error loading Google Maps API. Please check your API key configuration.
+          Error loading Google Maps API: {loadError.message}. Please make sure the Google Maps JavaScript API and Places API are enabled in your Google Cloud Console.
         </AlertDescription>
       </Alert>
     );
@@ -70,6 +79,14 @@ export function LocationAutocomplete({
         <AlertDescription>
           Google Maps API key is not configured. Please set VITE_GOOGLE_MAPS_API_KEY in your environment.
         </AlertDescription>
+      </Alert>
+    );
+  }
+
+  if (error) {
+    return (
+      <Alert variant="destructive">
+        <AlertDescription>{error}</AlertDescription>
       </Alert>
     );
   }
