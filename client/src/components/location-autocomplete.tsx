@@ -32,6 +32,7 @@ export function LocationAutocomplete({
     if (!isLoaded || !inputRef.current) return;
 
     try {
+      // Initialize autocomplete
       autocompleteRef.current = new google.maps.places.Autocomplete(
         inputRef.current,
         {
@@ -40,6 +41,13 @@ export function LocationAutocomplete({
         }
       );
 
+      // Style the autocomplete dropdown
+      const container = inputRef.current.parentElement;
+      if (container) {
+        container.style.position = 'relative';
+      }
+
+      // Add place_changed event listener
       const listener = autocompleteRef.current.addListener("place_changed", () => {
         const place = autocompleteRef.current?.getPlace();
 
@@ -96,14 +104,41 @@ export function LocationAutocomplete({
   }
 
   return (
-    <Input
-      ref={inputRef}
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className={className}
-      autoComplete="off"
-    />
+    <div className="relative">
+      <style jsx global>{`
+        .pac-container {
+          z-index: 1100;
+          border-radius: 0.5rem;
+          border: 1px solid var(--border);
+          background: var(--background);
+          color: var(--foreground);
+          box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+          margin-top: 4px;
+          padding: 0.5rem;
+        }
+        .pac-item {
+          padding: 0.5rem;
+          cursor: pointer;
+          border: none;
+          font-family: inherit;
+        }
+        .pac-item:hover {
+          background-color: var(--accent);
+        }
+        .pac-item-query {
+          font-size: inherit;
+          padding-right: 3px;
+        }
+      `}</style>
+      <Input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={className}
+        autoComplete="off"
+      />
+    </div>
   );
 }
