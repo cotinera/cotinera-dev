@@ -15,7 +15,7 @@ export default function TripDetail() {
   const tripId = params ? parseInt(params.id) : null;
   const [, setLocation] = useLocation();
 
-  const { data: trip, isLoading } = useQuery<Trip>({
+  const { data: trip, isLoading, error } = useQuery<Trip>({
     queryKey: ["/api/trips", tripId],
     queryFn: async () => {
       const res = await fetch(`/api/trips/${tripId}`);
@@ -31,6 +31,18 @@ export default function TripDetail() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-border" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Error loading trip</h1>
+          <p className="text-muted-foreground mb-4">{(error as Error).message}</p>
+          <Button onClick={() => setLocation("/")}>Back to Dashboard</Button>
+        </div>
       </div>
     );
   }

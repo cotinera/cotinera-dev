@@ -9,6 +9,48 @@ import { addDays } from "date-fns";
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
+  // Get single trip
+  app.get("/api/trips/:id", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.id);
+
+      // First get the trip without relations to check if it exists
+      const [trip] = await db
+        .select()
+        .from(trips)
+        .where(eq(trips.id, tripId))
+        .limit(1);
+
+      if (!trip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+
+      // Then fetch all related data separately
+      const [tripParticipants, tripActivities, tripFlights, tripAccommodations, tripChecklistItems] = await Promise.all([
+        db.select().from(participants).where(eq(participants.tripId, tripId)),
+        db.select().from(activities).where(eq(activities.tripId, tripId)),
+        db.select().from(flights).where(eq(flights.tripId, tripId)),
+        db.select().from(accommodations).where(eq(accommodations.tripId, tripId)),
+        db.select().from(checklist).where(eq(checklist.tripId, tripId))
+      ]);
+
+      // Combine all data
+      const tripWithDetails = {
+        ...trip,
+        participants: tripParticipants,
+        activities: tripActivities,
+        flights: tripFlights,
+        accommodations: tripAccommodations,
+        checklist: tripChecklistItems
+      };
+
+      res.json(tripWithDetails);
+    } catch (error) {
+      console.error('Error fetching trip:', error);
+      res.status(500).json({ error: 'Failed to fetch trip details' });
+    }
+  });
+
   // Get trip with share token
   app.get("/api/share/:token", async (req, res) => {
     const [shareLink] = await db
@@ -101,33 +143,6 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error creating trip:', error);
       res.status(500).json({ error: 'Failed to create trip' });
-    }
-  });
-
-  // Get single trip
-  app.get("/api/trips/:id", async (req, res) => {
-    try {
-      const tripId = parseInt(req.params.id);
-
-      const trip = await db.query.trips.findFirst({
-        where: eq(trips.id, tripId),
-        with: {
-          participants: true,
-          activities: true,
-          flights: true,
-          accommodations: true,
-          checklist: true,
-        },
-      });
-
-      if (!trip) {
-        return res.status(404).json({ error: "Trip not found" });
-      }
-
-      res.json(trip);
-    } catch (error) {
-      console.error('Error fetching trip:', error);
-      res.status(500).json({ error: 'Failed to fetch trip details' });
     }
   });
 
