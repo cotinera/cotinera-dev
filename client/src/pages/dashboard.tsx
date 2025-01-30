@@ -23,6 +23,8 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
+import { FlightBookings } from "@/components/flight-bookings";
+import { AccommodationBookings } from "@/components/accommodation-bookings";
 
 export default function Dashboard() {
   const { trips, createTrip } = useTrips();
@@ -151,6 +153,11 @@ export default function Dashboard() {
 
         <div className="mt-8">
           <CalendarView trips={trips} />
+        </div>
+
+        <div className="grid grid-cols-1 gap-8 mt-8">
+          <FlightBookings tripId={trips[0]?.id} />
+          <AccommodationBookings tripId={trips[0]?.id} />
         </div>
 
         <div className="mt-8">

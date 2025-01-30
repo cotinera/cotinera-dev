@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { trips, participants, activities, checklist, documents, shareLinks } from "@db/schema";
+import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations } from "@db/schema";
 import { eq, and } from "drizzle-orm";
 import { addDays } from "date-fns";
 
@@ -138,6 +138,8 @@ export function registerRoutes(app: Express): Server {
       with: {
         participants: true,
         activities: true,
+        flights: true,
+        accommodations: true,
       },
     });
 
@@ -146,6 +148,8 @@ export function registerRoutes(app: Express): Server {
       with: {
         participants: true,
         activities: true,
+        flights: true,
+        accommodations: true,
       },
     });
 
@@ -163,6 +167,72 @@ export function registerRoutes(app: Express): Server {
     }).returning();
 
     res.json(newTrip[0]);
+  });
+
+  // Flights
+  app.post("/api/trips/:tripId/flights", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const newFlight = await db.insert(flights).values({
+      ...req.body,
+      tripId: parseInt(req.params.tripId),
+    }).returning();
+
+    res.json(newFlight[0]);
+  });
+
+  app.patch("/api/trips/:tripId/flights/:flightId", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const [flight] = await db
+      .update(flights)
+      .set(req.body)
+      .where(
+        and(
+          eq(flights.id, parseInt(req.params.flightId)),
+          eq(flights.tripId, parseInt(req.params.tripId))
+        )
+      )
+      .returning();
+
+    res.json(flight);
+  });
+
+  // Accommodations
+  app.post("/api/trips/:tripId/accommodations", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const newAccommodation = await db.insert(accommodations).values({
+      ...req.body,
+      tripId: parseInt(req.params.tripId),
+    }).returning();
+
+    res.json(newAccommodation[0]);
+  });
+
+  app.patch("/api/trips/:tripId/accommodations/:accommodationId", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    const [accommodation] = await db
+      .update(accommodations)
+      .set(req.body)
+      .where(
+        and(
+          eq(accommodations.id, parseInt(req.params.accommodationId)),
+          eq(accommodations.tripId, parseInt(req.params.tripId))
+        )
+      )
+      .returning();
+
+    res.json(accommodation);
   });
 
   // Activities
