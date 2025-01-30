@@ -20,6 +20,7 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { LocationAutocomplete } from "@/components/location-autocomplete";
 import { useForm } from "react-hook-form";
 
 export default function Dashboard() {
@@ -104,7 +105,11 @@ export default function Dashboard() {
                       <FormItem>
                         <FormLabel>Location</FormLabel>
                         <FormControl>
-                          <Input placeholder="Paris, France" {...field} />
+                          <LocationAutocomplete
+                            value={field.value}
+                            onChange={field.onChange}
+                            placeholder="Search for a location..."
+                          />
                         </FormControl>
                       </FormItem>
                     )}
