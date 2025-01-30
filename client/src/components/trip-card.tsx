@@ -11,6 +11,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { MapPin, Calendar, Users } from "lucide-react";
+import { ShareTripDialog } from "@/components/share-trip-dialog";
 
 const THUMBNAILS = [
   "https://images.unsplash.com/photo-1605130284535-11dd9eedc58a",
@@ -38,11 +39,16 @@ export function TripCard({ trip }: TripCardProps) {
         />
       </div>
       <CardHeader>
-        <CardTitle>{trip.title}</CardTitle>
-        <CardDescription className="flex items-center gap-1">
-          <MapPin className="h-4 w-4" />
-          {trip.location}
-        </CardDescription>
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle>{trip.title}</CardTitle>
+            <CardDescription className="flex items-center gap-1">
+              <MapPin className="h-4 w-4" />
+              {trip.location}
+            </CardDescription>
+          </div>
+          <ShareTripDialog tripId={trip.id} />
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-2">

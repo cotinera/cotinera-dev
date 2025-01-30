@@ -6,7 +6,8 @@ import {
   boolean,
   json,
   date,
-  integer
+  integer,
+  uuid
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
@@ -33,6 +34,16 @@ export const trips = pgTable("trips", {
   ownerId: integer("owner_id").notNull().references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const shareLinks = pgTable("share_links", {
+  id: serial("id").primaryKey(),
+  tripId: integer("trip_id").notNull().references(() => trips.id),
+  token: uuid("token").notNull().defaultRandom(),
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at"),
+  isActive: boolean("is_active").default(true),
+  accessLevel: text("access_level").notNull().default('view'), // view, edit
 });
 
 export const participants = pgTable("participants", {
@@ -83,6 +94,14 @@ export const tripsRelations = relations(trips, ({ one, many }) => ({
   activities: many(activities),
   checklist: many(checklist),
   documents: many(documents),
+  shareLinks: many(shareLinks),
+}));
+
+export const shareLinksRelations = relations(shareLinks, ({ one }) => ({
+  trip: one(trips, {
+    fields: [shareLinks.tripId],
+    references: [trips.id],
+  }),
 }));
 
 export const participantsRelations = relations(participants, ({ one }) => ({
@@ -101,9 +120,12 @@ export const insertUserSchema = createInsertSchema(users);
 export const selectUserSchema = createSelectSchema(users);
 export const insertTripSchema = createInsertSchema(trips);
 export const selectTripSchema = createSelectSchema(trips);
+export const insertShareLinkSchema = createInsertSchema(shareLinks);
+export const selectShareLinkSchema = createSelectSchema(shareLinks);
 
 export type User = typeof users.$inferSelect;
 export type Trip = typeof trips.$inferSelect;
+export type ShareLink = typeof shareLinks.$inferSelect;
 export type Participant = typeof participants.$inferSelect;
 export type Activity = typeof activities.$inferSelect;
 export type ChecklistItem = typeof checklist.$inferSelect;

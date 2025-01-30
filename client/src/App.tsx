@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import AuthPage from "@/pages/auth-page";
+import SharedTrip from "@/pages/shared-trip";
 import { useUser } from "@/hooks/use-user";
 import { Loader2 } from "lucide-react";
 
@@ -16,6 +17,16 @@ function Router() {
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-border" />
       </div>
+    );
+  }
+
+  // Allow access to shared trips without authentication
+  if (window.location.pathname.startsWith("/share/")) {
+    return (
+      <Switch>
+        <Route path="/share/:token" component={SharedTrip} />
+        <Route component={NotFound} />
+      </Switch>
     );
   }
 
