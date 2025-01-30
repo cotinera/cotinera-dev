@@ -3,6 +3,9 @@ import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+// Define libraries array outside component to prevent recreation
+const libraries: ("places")[] = ["places"];
+
 interface LocationAutocompleteProps {
   value: string;
   onChange: (value: string) => void;
@@ -20,7 +23,7 @@ export function LocationAutocomplete({
 }: LocationAutocompleteProps) {
   const { isLoaded } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
-    libraries: ["places"],
+    libraries,
   });
 
   const inputRef = useRef<HTMLInputElement>(null);
