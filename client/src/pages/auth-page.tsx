@@ -21,7 +21,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 
 const authSchema = z.object({
@@ -32,11 +32,18 @@ const authSchema = z.object({
 type FormData = z.infer<typeof authSchema>;
 
 export default function AuthPage() {
-  const { login, register } = useUser();
+  const { login, register, user } = useUser();
   const { toast } = useToast();
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [, navigate] = useLocation();
+
+  useEffect(() => {
+    // If user becomes authenticated, redirect to dashboard
+    if (user) {
+      navigate("/");
+    }
+  }, [user, navigate]);
 
   const form = useForm<FormData>({
     resolver: zodResolver(authSchema),
@@ -50,11 +57,11 @@ export default function AuthPage() {
     try {
       setIsLoading(true);
       await (isLogin ? login(data) : register(data));
+      // Don't navigate here - let the useEffect handle it
       toast({
         title: "Success",
         description: isLogin ? "Welcome back!" : "Account created successfully",
       });
-      navigate("/");
     } catch (e: any) {
       toast({
         variant: "destructive",
