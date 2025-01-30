@@ -5,7 +5,7 @@ import { FlightBookings } from "@/components/flight-bookings";
 import { AccommodationBookings } from "@/components/accommodation-bookings";
 import { Checklist } from "@/components/checklist";
 import { CalendarView } from "@/components/calendar-view";
-import { MapView } from "@/components/map-view";
+import { MapPlaceholder } from "@/components/map-placeholder"; // Added import
 import { Loader2, ArrowLeft } from "lucide-react";
 import type { Trip } from "@db/schema";
 
@@ -62,7 +62,7 @@ export default function TripDetail() {
         <div className="grid gap-8">
           <section>
             <h2 className="text-xl font-semibold mb-4">Location</h2>
-            <MapView location={trip.location} />
+            <MapPlaceholder location={trip.location} />
           </section>
 
           <section>
