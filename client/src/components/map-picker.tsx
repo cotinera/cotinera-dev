@@ -29,7 +29,7 @@ export function MapPicker({
     libraries,
   });
 
-  // Function to geocode the entered address
+  // Function to handle search input changes and geocoding
   const handleSearch = async () => {
     if (!value) return;
 
@@ -48,14 +48,12 @@ export function MapPicker({
       }
 
       const data = await response.json();
-      console.log("Geocoding response:", data); // Debug log
 
       if (data.status === "OK" && data.results?.[0]?.geometry?.location) {
         const { lat, lng } = data.results[0].geometry.location;
         setCoordinates({ lat, lng });
         onChange(data.results[0].formatted_address, { lat, lng });
       } else {
-        console.error("Geocoding error:", data);
         setError(`Could not find location: ${data.status}`);
       }
     } catch (err) {
@@ -66,8 +64,8 @@ export function MapPicker({
     }
   };
 
-  // Handle map clicks
-  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
+  // Handle map click events
+  const handleMapClick = useCallback(async (e: google.maps.MapMouseEvent) => {
     if (!e.latLng) return;
 
     const lat = e.latLng.lat();
@@ -75,24 +73,24 @@ export function MapPicker({
 
     setCoordinates({ lat, lng });
 
-    // Reverse geocode the clicked location
-    fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${
-        import.meta.env.VITE_GOOGLE_MAPS_API_KEY
-      }`
-    )
-      .then((response) => response.json())
-      .then((data) => {
-        if (data.status === "OK" && data.results?.[0]) {
-          onChange(data.results[0].formatted_address, { lat, lng });
-        }
-      })
-      .catch((err) => {
-        console.error("Reverse geocoding error:", err);
-      });
+    try {
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${
+          import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+        }`
+      );
+
+      const data = await response.json();
+
+      if (data.status === "OK" && data.results?.[0]) {
+        onChange(data.results[0].formatted_address, { lat, lng });
+      }
+    } catch (err) {
+      console.error("Reverse geocoding error:", err);
+    }
   }, [onChange]);
 
-  // Trigger search when value changes
+  // Search when value changes (with debounce)
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (value) {
@@ -104,11 +102,10 @@ export function MapPicker({
   }, [value]);
 
   if (loadError) {
-    console.error("Maps load error:", loadError);
     return (
       <Alert variant="destructive">
         <AlertDescription>
-          Error loading Google Maps. Please check your API key and ensure it has the correct permissions enabled.
+          Error loading Google Maps. Please check your API key configuration.
         </AlertDescription>
       </Alert>
     );
@@ -134,7 +131,7 @@ export function MapPicker({
         />
         {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
       </div>
-      <div className="h-[300px] rounded-lg overflow-hidden border">
+      <div className="h-[300px] rounded-lg overflow-hidden border relative">
         <GoogleMap
           mapContainerStyle={{ width: "100%", height: "100%" }}
           zoom={13}

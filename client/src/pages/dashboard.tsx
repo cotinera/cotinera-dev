@@ -20,7 +20,7 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { LocationSearch } from "@/components/location-search";
+import { MapPicker } from "@/components/map-picker";
 import { useForm } from "react-hook-form";
 
 interface TripFormData {
@@ -52,7 +52,7 @@ export default function Dashboard() {
         toast({
           variant: "destructive",
           title: "Error",
-          description: "Please select a location from the suggestions",
+          description: "Please select a location from the map or search",
         });
         return;
       }
@@ -102,7 +102,7 @@ export default function Dashboard() {
                 New Trip
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
                 <DialogTitle>Create New Trip</DialogTitle>
               </DialogHeader>
@@ -130,11 +130,11 @@ export default function Dashboard() {
                       <FormItem>
                         <FormLabel>Location</FormLabel>
                         <FormControl>
-                          <LocationSearch
+                          <MapPicker
                             value={field.value}
                             onChange={(address, coordinates) => {
                               field.onChange(address);
-                              setSelectedCoordinates(coordinates || null);
+                              setSelectedCoordinates(coordinates);
                             }}
                             placeholder="Search for a location..."
                           />
