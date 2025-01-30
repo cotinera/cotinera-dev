@@ -6,14 +6,22 @@ import { AccommodationBookings } from "@/components/accommodation-bookings";
 import { Checklist } from "@/components/checklist";
 import { CalendarView } from "@/components/calendar-view";
 import { Loader2, ArrowLeft } from "lucide-react";
+import type { Trip } from "@db/schema";
 
 export default function TripDetail() {
   const [, params] = useRoute("/trips/:id");
   const tripId = params ? parseInt(params.id) : null;
   const [, setLocation] = useLocation();
 
-  const { data: trip, isLoading } = useQuery({
-    queryKey: [`/api/trips/${tripId}`],
+  const { data: trip, isLoading } = useQuery<Trip>({
+    queryKey: ["/api/trips", tripId],
+    queryFn: async () => {
+      const res = await fetch(`/api/trips/${tripId}`);
+      if (!res.ok) {
+        throw new Error("Failed to fetch trip");
+      }
+      return res.json();
+    },
     enabled: !!tripId,
   });
 
@@ -57,12 +65,12 @@ export default function TripDetail() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-4">Flights</h2>
+            <h2 className="text-xl font-semibold mb-4">Flight Bookings</h2>
             <FlightBookings tripId={trip.id} />
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold mb-4">Accommodations</h2>
+            <h2 className="text-xl font-semibold mb-4">Accommodation Bookings</h2>
             <AccommodationBookings tripId={trip.id} />
           </section>
 
