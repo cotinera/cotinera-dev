@@ -9,27 +9,31 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { format, addHours, parseISO } from "date-fns";
+import { format, addHours, parseISO, addDays, differenceInDays } from "date-fns";
 import { DndContext, DragEndEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import type { Trip } from "@db/schema";
 
 interface DayViewProps {
-  date: Date;
   trip: Trip;
 }
 
-interface Event {
+interface CalendarEvent {
   id: string;
   title: string;
-  startTime: string;
-  endTime: string;
+  startTime: Date;
+  endTime: Date;
 }
 
-export function DayView({ date, trip }: DayViewProps) {
-  const [events, setEvents] = useState<Event[]>([]);
+interface TimeSlot {
+  date: Date;
+  hour: number;
+}
+
+export function DayView({ trip }: DayViewProps) {
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [newEventTitle, setNewEventTitle] = useState("");
-  const [selectedHour, setSelectedHour] = useState<number | null>(null);
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const sensors = useSensors(
@@ -40,30 +44,41 @@ export function DayView({ date, trip }: DayViewProps) {
     })
   );
 
+  const tripStartDate = new Date(trip.startDate);
+  const tripEndDate = new Date(trip.endDate);
+  const numberOfDays = differenceInDays(tripEndDate, tripStartDate) + 1;
+
+  // Generate all dates for the trip duration
+  const dates = Array.from({ length: numberOfDays }, (_, i) => 
+    addDays(tripStartDate, i)
+  );
+
   // Generate hours for the day
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    
+
     if (!over) return;
 
     const eventId = active.id as string;
-    const newHour = parseInt(over.id as string);
-    
-    setEvents(currentEvents => 
-      currentEvents.map(evt => {
+    const [dateStr, hourStr] = (over.id as string).split('|');
+    const newHour = parseInt(hourStr);
+    const newDate = new Date(dateStr);
+
+    setEvents((currentEvents) => 
+      currentEvents.map((evt) => {
         if (evt.id === eventId) {
-          const startTime = new Date(evt.startTime);
-          const hourDiff = newHour - startTime.getHours();
-          
-          const newStartTime = addHours(startTime, hourDiff);
-          const newEndTime = addHours(parseISO(evt.endTime), hourDiff);
-          
+          const hourDiff = newHour - evt.startTime.getHours();
+          const dateDiff = differenceInDays(newDate, evt.startTime);
+
+          const newStartTime = addHours(addDays(evt.startTime, dateDiff), hourDiff);
+          const newEndTime = addHours(addDays(evt.endTime, dateDiff), hourDiff);
+
           return {
             ...evt,
-            startTime: newStartTime.toISOString(),
-            endTime: newEndTime.toISOString(),
+            startTime: newStartTime,
+            endTime: newEndTime,
           };
         }
         return evt;
@@ -72,99 +87,114 @@ export function DayView({ date, trip }: DayViewProps) {
   };
 
   const createEvent = () => {
-    if (!selectedHour || !newEventTitle) return;
+    if (!selectedTimeSlot || !newEventTitle) return;
 
-    const startTime = new Date(date);
-    startTime.setHours(selectedHour, 0, 0, 0);
-    
-    const endTime = new Date(startTime);
-    endTime.setHours(startTime.getHours() + 1);
+    const startTime = new Date(selectedTimeSlot.date);
+    startTime.setHours(selectedTimeSlot.hour, 0, 0, 0);
 
-    const newEvent: Event = {
-      id: Math.random().toString(36).substr(2, 9),
+    const endTime = addHours(startTime, 1);
+
+    const newEvent: CalendarEvent = {
+      id: crypto.randomUUID(),
       title: newEventTitle,
-      startTime: startTime.toISOString(),
-      endTime: endTime.toISOString(),
+      startTime,
+      endTime,
     };
 
-    setEvents([...events, newEvent]);
+    setEvents((prev) => [...prev, newEvent]);
     setNewEventTitle("");
-    setSelectedHour(null);
+    setSelectedTimeSlot(null);
     setIsDialogOpen(false);
   };
 
   return (
-    <Card className="p-4">
-      <h3 className="text-lg font-semibold mb-4">
-        {format(date, "EEEE, MMMM d, yyyy")}
-      </h3>
+    <div className="space-y-8">
+      {dates.map((date) => (
+        <Card key={date.toISOString()} className="p-4">
+          <h3 className="text-lg font-semibold mb-4">
+            {format(date, "EEEE, MMMM d, yyyy")}
+          </h3>
 
-      <DndContext
-        sensors={sensors}
-        modifiers={[restrictToVerticalAxis]}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="space-y-1">
-          {hours.map((hour) => {
-            const currentEvents = events.filter(
-              (event) =>
-                new Date(event.startTime).getHours() === hour &&
-                new Date(event.startTime).toDateString() === date.toDateString()
-            );
+          <DndContext
+            sensors={sensors}
+            modifiers={[restrictToVerticalAxis]}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="space-y-1">
+              {hours.map((hour) => {
+                const timeSlotEvents = events.filter(
+                  (event) => 
+                    event.startTime.getHours() === hour &&
+                    event.startTime.toDateString() === date.toDateString()
+                );
 
-            return (
-              <div
-                key={hour}
-                id={hour.toString()}
-                className="grid grid-cols-[100px,1fr] gap-4 group hover:bg-accent/50 p-2 rounded-lg"
-              >
-                <div className="text-sm text-muted-foreground">
-                  {format(new Date().setHours(hour, 0), "h:mm a")}
-                </div>
-                <div className="min-h-[2rem] relative">
-                  {currentEvents.map((event) => (
-                    <div
-                      key={event.id}
-                      className="absolute left-0 right-0 bg-primary/20 rounded-md p-2 cursor-move"
-                      draggable
-                    >
-                      {event.title}
+                const timeSlotId = `${date.toISOString()}|${hour}`;
+
+                return (
+                  <div
+                    key={timeSlotId}
+                    id={timeSlotId}
+                    className="grid grid-cols-[100px,1fr] gap-4 group hover:bg-accent/50 p-2 rounded-lg"
+                  >
+                    <div className="text-sm text-muted-foreground">
+                      {format(new Date().setHours(hour, 0), "h:mm a")}
                     </div>
-                  ))}
-                  {currentEvents.length === 0 && (
-                    <Dialog open={isDialogOpen && selectedHour === hour} onOpenChange={setIsDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="w-full h-full opacity-0 group-hover:opacity-100"
-                          onClick={() => setSelectedHour(hour)}
+                    <div className="min-h-[2rem] relative">
+                      {timeSlotEvents.map((event) => (
+                        <div
+                          key={event.id}
+                          id={event.id}
+                          className="absolute left-0 right-0 bg-primary/20 rounded-md p-2 cursor-move"
+                          draggable
                         >
-                          + Add Event
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Create New Event</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4 mt-4">
-                          <Input
-                            placeholder="Event title"
-                            value={newEventTitle}
-                            onChange={(e) => setNewEventTitle(e.target.value)}
-                          />
-                          <Button onClick={createEvent} className="w-full">
-                            Create Event
-                          </Button>
+                          <span className="font-medium">{event.title}</span>
+                          <span className="text-xs text-muted-foreground ml-2">
+                            {format(event.startTime, "h:mm a")} - {format(event.endTime, "h:mm a")}
+                          </span>
                         </div>
-                      </DialogContent>
-                    </Dialog>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </DndContext>
-    </Card>
+                      ))}
+                      {timeSlotEvents.length === 0 && (
+                        <Dialog 
+                          open={isDialogOpen && 
+                            selectedTimeSlot?.date.toDateString() === date.toDateString() && 
+                            selectedTimeSlot?.hour === hour
+                          } 
+                          onOpenChange={setIsDialogOpen}
+                        >
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              className="w-full h-full opacity-0 group-hover:opacity-100"
+                              onClick={() => setSelectedTimeSlot({ date, hour })}
+                            >
+                              + Add Event
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>Create New Event</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-4 mt-4">
+                              <Input
+                                placeholder="Event title"
+                                value={newEventTitle}
+                                onChange={(e) => setNewEventTitle(e.target.value)}
+                              />
+                              <Button onClick={createEvent} className="w-full">
+                                Create Event
+                              </Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </DndContext>
+        </Card>
+      ))}
+    </div>
   );
 }
