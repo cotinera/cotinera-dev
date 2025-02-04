@@ -8,6 +8,7 @@ import { CalendarView } from "@/components/calendar-view";
 import { MapView } from "@/components/map-view";
 import { ChatMessages } from "@/components/chat-messages";
 import { Loader2, ArrowLeft, Calendar, MapPin, Users } from "lucide-react";
+import { Calendar as CalendarIcon } from "lucide-react"; // Added import
 import type { Trip } from "@db/schema";
 import { format } from "date-fns";
 
@@ -82,11 +83,17 @@ export default function TripDetail() {
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">
-                {trip.participants?.length || 0} participants
-              </span>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">
+                  {trip.participants?.length || 0} participants
+                </span>
+              </div>
+              <Button onClick={() => setLocation(`/trips/${trip.id}/calendar`)}>
+                <CalendarIcon className="h-4 w-4 mr-2" />
+                View Calendar
+              </Button>
             </div>
           </div>
         </div>
@@ -115,11 +122,6 @@ export default function TripDetail() {
             <section>
               <h2 className="text-xl font-semibold mb-4">Group Chat</h2>
               <ChatMessages tripId={trip.id} />
-            </section>
-
-            <section>
-              <h2 className="text-xl font-semibold mb-4">Calendar</h2>
-              <CalendarView trips={[trip]} />
             </section>
 
             <section>
