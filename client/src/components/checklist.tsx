@@ -25,6 +25,13 @@ export function Checklist({ tripId }: ChecklistProps) {
 
   const { data: items = [] } = useQuery<ChecklistItem[]>({
     queryKey: [`/api/trips/${tripId}/checklist`],
+    queryFn: async () => {
+      const res = await fetch(`/api/trips/${tripId}/checklist`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch checklist items");
+      return res.json();
+    },
     enabled: !!tripId,
   });
 
@@ -99,6 +106,10 @@ export function Checklist({ tripId }: ChecklistProps) {
 
     try {
       await createItem.mutateAsync(newItemTitle);
+      toast({
+        title: "Success",
+        description: "Item added to checklist",
+      });
     } catch (error) {
       toast({
         variant: "destructive",
@@ -132,7 +143,7 @@ export function Checklist({ tripId }: ChecklistProps) {
             value={newItemTitle}
             onChange={(e) => setNewItemTitle(e.target.value)}
           />
-          <Button type="submit" size="icon">
+          <Button type="submit" size="icon" disabled={createItem.isPending}>
             <Plus className="h-4 w-4" />
           </Button>
         </form>
@@ -144,16 +155,18 @@ export function Checklist({ tripId }: ChecklistProps) {
               className="flex items-center gap-2 p-2 rounded-lg hover:bg-accent"
             >
               <Checkbox
+                id={`item-${item.id}`}
                 checked={item.completed}
                 onCheckedChange={() => toggleItem.mutate(item)}
               />
-              <span
-                className={`flex-1 ${
+              <label
+                htmlFor={`item-${item.id}`}
+                className={`flex-1 cursor-pointer ${
                   item.completed ? "line-through text-muted-foreground" : ""
                 }`}
               >
                 {item.title}
-              </span>
+              </label>
             </div>
           ))}
           {items.length === 0 && (
