@@ -41,9 +41,14 @@ interface TimeSlot {
   hour: number;
 }
 
-function DraggableEvent({ event, onEdit }: { 
-  event: CalendarEvent; 
+function DraggableEvent({ 
+  event, 
+  onEdit,
+  onDelete,
+}: { 
+  event: CalendarEvent;
   onEdit: () => void;
+  onDelete: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: event.id,
@@ -60,10 +65,6 @@ function DraggableEvent({ event, onEdit }: {
       {...listeners}
       style={style}
       className="absolute left-0 right-0 bg-primary/20 hover:bg-primary/30 rounded-md p-2 cursor-move group/event"
-      onClick={(e) => {
-        e.stopPropagation();
-        onEdit();
-      }}
     >
       <div className="flex items-center justify-between">
         <span className="font-medium">{event.title}</span>
@@ -78,6 +79,17 @@ function DraggableEvent({ event, onEdit }: {
             }}
           >
             <Pencil className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-destructive hover:text-destructive"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+          >
+            <Trash2 className="h-3 w-3" />
           </Button>
         </div>
       </div>
@@ -247,6 +259,10 @@ export function DayView({ trip }: DayViewProps) {
                             onEdit={() => {
                               setSelectedEvent(event);
                               setIsEditDialogOpen(true);
+                            }}
+                            onDelete={() => {
+                              setSelectedEvent(event);
+                              deleteEvent();
                             }}
                           />
                         ))}
