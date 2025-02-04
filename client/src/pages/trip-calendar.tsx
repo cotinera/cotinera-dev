@@ -2,9 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { DayView } from "@/components/calendar/day-view";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, MapPin, Calendar } from "lucide-react";
 import type { Trip } from "@db/schema";
 import { format } from "date-fns";
+import { ViewToggle } from "@/components/view-toggle";
 
 export default function TripCalendar() {
   const [, params] = useRoute("/trips/:id/calendar");
@@ -46,22 +47,34 @@ export default function TripCalendar() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4">
-          <Button
-            variant="ghost"
-            onClick={() => setLocation(`/trips/${trip.id}`)}
-            className="mb-4"
+      <header className="relative bg-gradient-to-r from-primary/10 to-primary/5 border-b">
+        <div className="container mx-auto px-4 py-8">
+          <Button 
+            variant="ghost" 
+            onClick={() => setLocation("/")} 
+            className="absolute left-4 top-8"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Trip Details
+            Back to Dashboard
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold">{trip.title} Calendar</h1>
-            <p className="text-muted-foreground mt-1">
-              {format(new Date(trip.startDate), "MMM d, yyyy")} -{" "}
-              {format(new Date(trip.endDate), "MMM d, yyyy")}
-            </p>
+
+          <div className="flex flex-col items-center gap-4">
+            <ViewToggle tripId={trip.id} />
+
+            <div>
+              <h1 className="text-3xl font-bold text-center">{trip.title}</h1>
+              <div className="flex items-center justify-center gap-2 text-muted-foreground mt-2">
+                <MapPin className="h-4 w-4" />
+                <span>{trip.location}</span>
+              </div>
+              <div className="flex items-center justify-center gap-2 text-muted-foreground mt-1">
+                <Calendar className="h-4 w-4" />
+                <span>
+                  {format(new Date(trip.startDate), "MMM d, yyyy")} -{" "}
+                  {format(new Date(trip.endDate), "MMM d, yyyy")}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </header>
