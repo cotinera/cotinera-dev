@@ -1,10 +1,44 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import express from "express";
 import { setupAuth } from "./auth";
 import { db } from "@db";
 import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations, chatMessages } from "@db/schema";
 import { eq, and } from "drizzle-orm";
 import { addDays } from "date-fns";
+
+// Configure multer for handling file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(process.cwd(), 'uploads');
+    // Create uploads directory if it doesn't exist
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) {
+      cb(new Error('Only images are allowed'));
+      return;
+    }
+    cb(null, true);
+  }
+});
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -122,8 +156,8 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).send("Trip not found");
       }
 
-      res.json({ 
-        trip, 
+      res.json({
+        trip,
         accessLevel: shareLink.accessLevel,
         isParticipant: req.user ? trip.participants.some(p => p.userId === req.user.id) : false
       });
@@ -461,6 +495,37 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error revoking share link:', error);
       res.status(500).json({ error: 'Failed to revoke share link' });
+    }
+  });
+
+  // Add static file serving for uploads
+  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+
+  // Handle image upload for trips
+  app.post("/api/trips/:tripId/image", upload.single('image'), async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).send("No image file uploaded");
+      }
+
+      const tripId = parseInt(req.params.tripId);
+      const imageUrl = `/uploads/${req.file.filename}`;
+
+      // Update trip with new image URL
+      const [updatedTrip] = await db
+        .update(trips)
+        .set({ thumbnail: imageUrl })
+        .where(eq(trips.id, tripId))
+        .returning();
+
+      if (!updatedTrip) {
+        return res.status(404).send("Trip not found");
+      }
+
+      res.json({ imageUrl });
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      res.status(500).json({ error: 'Failed to upload image' });
     }
   });
 

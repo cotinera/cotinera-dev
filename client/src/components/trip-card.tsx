@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { MapPin, Calendar, Users } from "lucide-react";
 import { ShareTripDialog } from "@/components/share-trip-dialog";
 import { useLocation } from "wouter";
+import { ImageUpload } from "@/components/image-upload";
+import { useState } from "react";
 
 const THUMBNAILS = [
   "https://images.unsplash.com/photo-1605130284535-11dd9eedc58a",
@@ -29,18 +31,27 @@ interface TripCardProps {
 
 export function TripCard({ trip }: TripCardProps) {
   const [, setLocation] = useLocation();
+  const [isEditingImage, setIsEditingImage] = useState(false);
   // Get a deterministic but random thumbnail based on trip ID
   const thumbnailIndex = trip.id % THUMBNAILS.length;
   const thumbnail = trip.thumbnail || THUMBNAILS[thumbnailIndex];
 
   return (
     <Card className="overflow-hidden">
-      <div className="relative h-48">
+      <div className="relative h-48 group">
         <img
           src={thumbnail}
           alt={trip.title}
           className="w-full h-full object-cover"
         />
+        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          <Button
+            variant="secondary"
+            onClick={() => setIsEditingImage(true)}
+          >
+            Change Image
+          </Button>
+        </div>
       </div>
       <CardHeader>
         <div className="flex justify-between items-start">
@@ -55,35 +66,45 @@ export function TripCard({ trip }: TripCardProps) {
         </div>
       </CardHeader>
       <CardContent>
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm">
-              {formatDistance(new Date(trip.startDate), new Date(), {
-                addSuffix: true,
-              })}
-            </span>
+        {isEditingImage ? (
+          <div className="mb-4">
+            <ImageUpload
+              tripId={trip.id}
+              currentImage={thumbnail}
+              onSuccess={() => setIsEditingImage(false)}
+            />
           </div>
-          {trip.participants && trip.participants.length > 0 && (
+        ) : (
+          <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-muted-foreground" />
-              <div className="flex -space-x-2">
-                {trip.participants.slice(0, 3).map((participant, i) => (
-                  <Avatar key={i} className="h-6 w-6 border-2 border-background">
-                    <AvatarFallback>
-                      {participant.userId.toString()[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                ))}
-                {trip.participants.length > 3 && (
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-muted text-xs">
-                    +{trip.participants.length - 3}
-                  </div>
-                )}
-              </div>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm">
+                {formatDistance(new Date(trip.startDate), new Date(), {
+                  addSuffix: true,
+                })}
+              </span>
             </div>
-          )}
-        </div>
+            {trip.participants && trip.participants.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <div className="flex -space-x-2">
+                  {trip.participants.slice(0, 3).map((participant, i) => (
+                    <Avatar key={i} className="h-6 w-6 border-2 border-background">
+                      <AvatarFallback>
+                        {participant.userId.toString()[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                  ))}
+                  {trip.participants.length > 3 && (
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-muted text-xs">
+                      +{trip.participants.length - 3}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </CardContent>
       <CardFooter>
         <Button 
