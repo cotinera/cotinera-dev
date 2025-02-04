@@ -2,13 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { FlightBookings } from "@/components/flight-bookings";
-import { AccommodationBookings } from "@/components/accommodation-bookings";
 import { Checklist } from "@/components/checklist";
 import { CalendarView } from "@/components/calendar-view";
 import { MapView } from "@/components/map-view";
 import { ChatMessages } from "@/components/chat-messages";
 import { Loader2, ArrowLeft, Calendar, MapPin, Users } from "lucide-react";
-import { Calendar as CalendarIcon } from "lucide-react"; // Added import
+import { Calendar as CalendarIcon } from "lucide-react";
 import type { Trip } from "@db/schema";
 import { format } from "date-fns";
 
@@ -110,11 +109,6 @@ export default function TripDetail() {
             <section>
               <h2 className="text-xl font-semibold mb-4">Flight Bookings</h2>
               <FlightBookings tripId={trip.id} />
-            </section>
-
-            <section>
-              <h2 className="text-xl font-semibold mb-4">Accommodation Bookings</h2>
-              <AccommodationBookings tripId={trip.id} />
             </section>
           </div>
 
