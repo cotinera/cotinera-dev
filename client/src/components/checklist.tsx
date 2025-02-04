@@ -23,13 +23,16 @@ export function Checklist({ tripId }: ChecklistProps) {
   const queryClient = useQueryClient();
   const [newItemTitle, setNewItemTitle] = useState("");
 
-  const { data: items = [] } = useQuery<ChecklistItem[]>({
+  const { data: items = [], isError } = useQuery<ChecklistItem[]>({
     queryKey: [`/api/trips/${tripId}/checklist`],
     queryFn: async () => {
       const res = await fetch(`/api/trips/${tripId}/checklist`, {
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Failed to fetch checklist items");
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || "Failed to fetch checklist items");
+      }
       return res.json();
     },
     enabled: !!tripId,
@@ -47,7 +50,8 @@ export function Checklist({ tripId }: ChecklistProps) {
       });
 
       if (!res.ok) {
-        throw new Error(await res.text());
+        const errorText = await res.text();
+        throw new Error(errorText || "Failed to create checklist item");
       }
 
       return res.json();
@@ -57,6 +61,17 @@ export function Checklist({ tripId }: ChecklistProps) {
         queryKey: [`/api/trips/${tripId}/checklist`],
       });
       setNewItemTitle("");
+      toast({
+        title: "Success",
+        description: "Item added to checklist",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to create checklist item",
+      });
     },
   });
 
@@ -72,7 +87,8 @@ export function Checklist({ tripId }: ChecklistProps) {
       });
 
       if (!res.ok) {
-        throw new Error(await res.text());
+        const errorText = await res.text();
+        throw new Error(errorText || "Failed to update checklist item");
       }
 
       return res.json();
@@ -82,10 +98,18 @@ export function Checklist({ tripId }: ChecklistProps) {
         queryKey: [`/api/trips/${tripId}/checklist`],
       });
     },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to update checklist item",
+      });
+    },
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!tripId) {
       toast({
         variant: "destructive",
@@ -104,19 +128,7 @@ export function Checklist({ tripId }: ChecklistProps) {
       return;
     }
 
-    try {
-      await createItem.mutateAsync(newItemTitle);
-      toast({
-        title: "Success",
-        description: "Item added to checklist",
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to create checklist item",
-      });
-    }
+    createItem.mutate(newItemTitle);
   };
 
   if (!tripId) {
@@ -125,6 +137,17 @@ export function Checklist({ tripId }: ChecklistProps) {
         <CardHeader>
           <CardTitle>Checklist</CardTitle>
           <CardDescription>Select a trip to view its checklist</CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Error</CardTitle>
+          <CardDescription>Failed to load checklist</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -156,7 +179,7 @@ export function Checklist({ tripId }: ChecklistProps) {
             >
               <Checkbox
                 id={`item-${item.id}`}
-                checked={item.completed}
+                checked={item.completed || false}
                 onCheckedChange={() => toggleItem.mutate(item)}
               />
               <label
