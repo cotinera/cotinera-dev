@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { formatDistance } from "date-fns";
 import { Send } from "lucide-react";
 import type { ChatMessage } from "@db/schema";
+import { useEffect, useRef } from "react";
 
 interface ChatMessagesProps {
   tripId: number;
@@ -18,6 +19,7 @@ interface ChatFormData {
 
 export function ChatMessages({ tripId }: ChatMessagesProps) {
   const queryClient = useQueryClient();
+  const scrollRef = useRef<HTMLDivElement>(null);
   const form = useForm<ChatFormData>({
     defaultValues: {
       message: "",
@@ -31,7 +33,7 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
       if (!res.ok) throw new Error("Failed to fetch messages");
       return res.json();
     },
-    refetchInterval: 5000, // Poll for new messages every 5 seconds
+    refetchInterval: 2000, // Poll every 2 seconds for new messages
   });
 
   const sendMessage = useMutation({
@@ -50,6 +52,13 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
     },
   });
 
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
   const onSubmit = (data: ChatFormData) => {
     if (!data.message.trim()) return;
     sendMessage.mutate(data);
@@ -57,18 +66,18 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
 
   return (
     <div className="flex flex-col h-[400px] border rounded-lg bg-background">
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         <div className="space-y-4">
           {messages.map((message) => (
             <div key={message.id} className="flex items-start gap-2">
               <Avatar className="h-8 w-8">
                 <AvatarFallback>
-                  {message.user.username[0].toUpperCase()}
+                  {message.user?.username?.[0].toUpperCase() || 'U'}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">{message.user.username}</span>
+                  <span className="font-medium">{message.user?.username || 'Unknown User'}</span>
                   <span className="text-xs text-muted-foreground">
                     {formatDistance(new Date(message.createdAt), new Date(), {
                       addSuffix: true,
