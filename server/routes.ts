@@ -53,43 +53,84 @@ export function registerRoutes(app: Express): Server {
 
   // Get trip with share token
   app.get("/api/share/:token", async (req, res) => {
-    const [shareLink] = await db
-      .select()
-      .from(shareLinks)
-      .where(
-        and(
-          eq(shareLinks.token, req.params.token),
-          eq(shareLinks.isActive, true)
+    try {
+      const [shareLink] = await db
+        .select()
+        .from(shareLinks)
+        .where(
+          and(
+            eq(shareLinks.token, req.params.token),
+            eq(shareLinks.isActive, true)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (!shareLink) {
-      return res.status(404).send("Share link not found or expired");
+      if (!shareLink) {
+        return res.status(404).send("Share link not found or expired");
+      }
+
+      if (shareLink.expiresAt && new Date(shareLink.expiresAt) < new Date()) {
+        await db
+          .update(shareLinks)
+          .set({ isActive: false })
+          .where(eq(shareLinks.id, shareLink.id));
+        return res.status(404).send("Share link expired");
+      }
+
+      // Add user as participant if authenticated
+      if (req.isAuthenticated() && req.user) {
+        const [existingParticipant] = await db
+          .select()
+          .from(participants)
+          .where(
+            and(
+              eq(participants.tripId, shareLink.tripId),
+              eq(participants.userId, req.user.id)
+            )
+          )
+          .limit(1);
+
+        if (!existingParticipant) {
+          await db.insert(participants).values({
+            tripId: shareLink.tripId,
+            userId: req.user.id,
+            status: shareLink.accessLevel === 'edit' ? 'collaborator' : 'viewer',
+          });
+        } else if (existingParticipant.status === 'viewer' && shareLink.accessLevel === 'edit') {
+          // Upgrade viewer to collaborator if share link grants edit access
+          await db
+            .update(participants)
+            .set({ status: 'collaborator' })
+            .where(eq(participants.id, existingParticipant.id));
+        }
+      }
+
+      const trip = await db.query.trips.findFirst({
+        where: eq(trips.id, shareLink.tripId),
+        with: {
+          participants: {
+            with: {
+              user: true,
+            },
+          },
+          activities: true,
+          checklist: true,
+        },
+      });
+
+      if (!trip) {
+        return res.status(404).send("Trip not found");
+      }
+
+      res.json({ 
+        trip, 
+        accessLevel: shareLink.accessLevel,
+        isParticipant: req.user ? trip.participants.some(p => p.userId === req.user.id) : false
+      });
+    } catch (error) {
+      console.error('Error handling share link:', error);
+      res.status(500).json({ error: 'Failed to process share link' });
     }
-
-    if (shareLink.expiresAt && new Date(shareLink.expiresAt) < new Date()) {
-      await db
-        .update(shareLinks)
-        .set({ isActive: false })
-        .where(eq(shareLinks.id, shareLink.id));
-      return res.status(404).send("Share link expired");
-    }
-
-    const trip = await db.query.trips.findFirst({
-      where: eq(trips.id, shareLink.tripId),
-      with: {
-        participants: true,
-        activities: true,
-        checklist: true,
-      },
-    });
-
-    if (!trip) {
-      return res.status(404).send("Trip not found");
-    }
-
-    res.json({ trip, accessLevel: shareLink.accessLevel });
   });
 
   // Get trips

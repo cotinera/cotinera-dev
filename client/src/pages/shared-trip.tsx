@@ -5,6 +5,7 @@ import { TripCard } from "@/components/trip-card";
 import { CalendarView } from "@/components/calendar-view";
 import { Checklist } from "@/components/checklist";
 import { Loader2, AlertCircle } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
 import {
   Card,
   CardContent,
@@ -16,10 +17,20 @@ import {
 export default function SharedTrip() {
   const [, params] = useRoute("/share/:token");
   const token = params?.token;
+  const { user } = useAuth();
 
   const { data, isLoading, error } = useQuery({
     queryKey: [`/api/share/${token}`],
     enabled: !!token,
+    queryFn: async () => {
+      const res = await fetch(`/api/share/${token}`, {
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      return res.json();
+    }
   });
 
   if (isLoading) {
@@ -50,16 +61,25 @@ export default function SharedTrip() {
     );
   }
 
-  const { trip, accessLevel } = data;
+  const { trip, accessLevel, isParticipant } = data;
 
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">Shared Trip Details</h1>
-          {accessLevel === "edit" && (
-            <Button variant="outline">Edit Mode</Button>
-          )}
+          <div className="flex items-center gap-4">
+            {user && isParticipant && (
+              <div className="text-sm text-muted-foreground">
+                {accessLevel === "edit" ? "You can edit this trip" : "View only access"}
+              </div>
+            )}
+            {!user && (
+              <Button variant="outline" asChild>
+                <a href="/auth">Sign in to collaborate</a>
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -74,9 +94,11 @@ export default function SharedTrip() {
           <CalendarView trips={[trip]} />
         </div>
 
-        <div className="mt-8">
-          <Checklist tripId={trip.id} />
-        </div>
+        {(user && accessLevel === "edit") && (
+          <div className="mt-8">
+            <Checklist tripId={trip.id} />
+          </div>
+        )}
       </main>
     </div>
   );
