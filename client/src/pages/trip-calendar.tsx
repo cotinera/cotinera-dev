@@ -1,15 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { CalendarView } from "@/components/calendar-view";
+import { MonthView } from "@/components/calendar/month-view";
+import { DayView } from "@/components/calendar/day-view";
 import { Loader2, ArrowLeft } from "lucide-react";
 import type { Trip } from "@db/schema";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
+import { useState } from "react";
 
 export default function TripCalendar() {
   const [, params] = useRoute("/trips/:id/calendar");
+  const [, dayParams] = useRoute("/trips/:id/calendar/day/:date");
   const tripId = params ? parseInt(params.id) : null;
   const [, setLocation] = useLocation();
+  const [currentDate, setCurrentDate] = useState(new Date());
 
   const { data: trip, isLoading, error } = useQuery<Trip>({
     queryKey: ["/api/trips", tripId],
@@ -44,6 +48,8 @@ export default function TripCalendar() {
     );
   }
 
+  const selectedDate = dayParams?.date ? parseISO(dayParams.date) : null;
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
@@ -68,7 +74,15 @@ export default function TripCalendar() {
 
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-8">
-          <CalendarView trips={[trip]} />
+          {selectedDate ? (
+            <DayView date={selectedDate} trip={trip} />
+          ) : (
+            <MonthView
+              currentDate={currentDate}
+              onDateChange={setCurrentDate}
+              trip={trip}
+            />
+          )}
         </div>
       </main>
     </div>
