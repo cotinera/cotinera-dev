@@ -257,18 +257,57 @@ export function registerRoutes(app: Express): Server {
     res.json(newActivity[0]);
   });
 
-  // Checklist
-  app.post("/api/trips/:tripId/checklist", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
+  // Checklist routes
+  app.get("/api/trips/:tripId/checklist", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const checklistItems = await db.query.checklist.findMany({
+        where: eq(checklist.tripId, tripId),
+      });
+      res.json(checklistItems);
+    } catch (error) {
+      console.error('Error fetching checklist:', error);
+      res.status(500).json({ error: 'Failed to fetch checklist items' });
     }
+  });
 
-    const newItem = await db.insert(checklist).values({
-      ...req.body,
-      tripId: parseInt(req.params.tripId),
-    }).returning();
+  app.post("/api/trips/:tripId/checklist", async (req, res) => {
+    try {
+      const [newItem] = await db.insert(checklist).values({
+        tripId: parseInt(req.params.tripId),
+        title: req.body.title,
+        completed: false,
+      }).returning();
 
-    res.json(newItem[0]);
+      res.json(newItem);
+    } catch (error) {
+      console.error('Error creating checklist item:', error);
+      res.status(500).json({ error: 'Failed to create checklist item' });
+    }
+  });
+
+  app.patch("/api/trips/:tripId/checklist/:itemId", async (req, res) => {
+    try {
+      const [updatedItem] = await db
+        .update(checklist)
+        .set({ completed: req.body.completed })
+        .where(
+          and(
+            eq(checklist.id, parseInt(req.params.itemId)),
+            eq(checklist.tripId, parseInt(req.params.tripId))
+          )
+        )
+        .returning();
+
+      if (!updatedItem) {
+        return res.status(404).json({ error: 'Checklist item not found' });
+      }
+
+      res.json(updatedItem);
+    } catch (error) {
+      console.error('Error updating checklist item:', error);
+      res.status(500).json({ error: 'Failed to update checklist item' });
+    }
   });
 
   // Documents
