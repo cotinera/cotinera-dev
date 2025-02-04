@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Plus } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface ChecklistProps {
@@ -22,6 +22,8 @@ export function Checklist({ tripId }: ChecklistProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [newItemTitle, setNewItemTitle] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingTitle, setEditingTitle] = useState("");
 
   const { data: items = [], isError } = useQuery<ChecklistItem[]>({
     queryKey: [`/api/trips/${tripId}/checklist`],
@@ -61,10 +63,6 @@ export function Checklist({ tripId }: ChecklistProps) {
         queryKey: [`/api/trips/${tripId}/checklist`],
       });
       setNewItemTitle("");
-      toast({
-        title: "Success",
-        description: "Item added to checklist",
-      });
     },
     onError: (error: Error) => {
       toast({
@@ -75,14 +73,14 @@ export function Checklist({ tripId }: ChecklistProps) {
     },
   });
 
-  const toggleItem = useMutation({
-    mutationFn: async (item: ChecklistItem) => {
-      const res = await fetch(`/api/trips/${tripId}/checklist/${item.id}`, {
+  const updateItem = useMutation({
+    mutationFn: async ({ id, title, completed }: Partial<ChecklistItem> & { id: number }) => {
+      const res = await fetch(`/api/trips/${tripId}/checklist/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ completed: !item.completed }),
+        body: JSON.stringify({ title, completed }),
         credentials: "include",
       });
 
@@ -97,6 +95,8 @@ export function Checklist({ tripId }: ChecklistProps) {
       queryClient.invalidateQueries({
         queryKey: [`/api/trips/${tripId}/checklist`],
       });
+      setEditingId(null);
+      setEditingTitle("");
     },
     onError: (error: Error) => {
       toast({
@@ -129,6 +129,18 @@ export function Checklist({ tripId }: ChecklistProps) {
     }
 
     createItem.mutate(newItemTitle);
+  };
+
+  const startEditing = (item: ChecklistItem) => {
+    setEditingId(item.id);
+    setEditingTitle(item.title);
+  };
+
+  const handleEditSubmit = (item: ChecklistItem) => {
+    if (editingTitle.trim() === "") {
+      return;
+    }
+    updateItem.mutate({ id: item.id, title: editingTitle, completed: item.completed });
   };
 
   if (!tripId) {
@@ -175,21 +187,50 @@ export function Checklist({ tripId }: ChecklistProps) {
           {items.map((item) => (
             <div
               key={item.id}
-              className="flex items-center gap-2 p-2 rounded-lg hover:bg-accent"
+              className="flex items-center gap-2 p-2 rounded-lg hover:bg-accent group"
             >
               <Checkbox
                 id={`item-${item.id}`}
                 checked={item.completed || false}
-                onCheckedChange={() => toggleItem.mutate(item)}
+                onCheckedChange={() =>
+                  updateItem.mutate({ id: item.id, completed: !item.completed })
+                }
               />
-              <label
-                htmlFor={`item-${item.id}`}
-                className={`flex-1 cursor-pointer ${
-                  item.completed ? "line-through text-muted-foreground" : ""
-                }`}
-              >
-                {item.title}
-              </label>
+              {editingId === item.id ? (
+                <form
+                  className="flex-1 flex gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleEditSubmit(item);
+                  }}
+                >
+                  <Input
+                    value={editingTitle}
+                    onChange={(e) => setEditingTitle(e.target.value)}
+                    onBlur={() => handleEditSubmit(item)}
+                    autoFocus
+                  />
+                </form>
+              ) : (
+                <>
+                  <label
+                    htmlFor={`item-${item.id}`}
+                    className={`flex-1 cursor-pointer ${
+                      item.completed ? "line-through text-muted-foreground" : ""
+                    }`}
+                  >
+                    {item.title}
+                  </label>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="opacity-0 group-hover:opacity-100 h-6 w-6"
+                    onClick={() => startEditing(item)}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                </>
+              )}
             </div>
           ))}
           {items.length === 0 && (

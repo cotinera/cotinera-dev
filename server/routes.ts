@@ -290,7 +290,10 @@ export function registerRoutes(app: Express): Server {
     try {
       const [updatedItem] = await db
         .update(checklist)
-        .set({ completed: req.body.completed })
+        .set({ 
+          ...(req.body.completed !== undefined && { completed: req.body.completed }),
+          ...(req.body.title !== undefined && { title: req.body.title })
+        })
         .where(
           and(
             eq(checklist.id, parseInt(req.params.itemId)),
