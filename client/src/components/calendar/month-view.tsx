@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { addDays, format, getDay, startOfMonth, endOfMonth, isSameMonth, isToday, isSameDay } from "date-fns";
+import { addDays, format, getDay, startOfMonth, endOfMonth, isSameMonth, isToday } from "date-fns";
 import type { Trip } from "@db/schema";
 import { useLocation } from "wouter";
 
@@ -20,7 +20,7 @@ export function MonthView({ currentDate, onDateChange, trip }: MonthViewProps) {
   // Get first day of the month
   const firstDayOfMonth = startOfMonth(currentDate);
   const lastDayOfMonth = endOfMonth(currentDate);
-  
+
   // Calculate days to display
   const startingDayOfWeek = getDay(firstDayOfMonth);
   const daysInMonth = [];
@@ -45,6 +45,11 @@ export function MonthView({ currentDate, onDateChange, trip }: MonthViewProps) {
 
   const isInTripRange = (date: Date) => {
     return date >= startDate && date <= endDate;
+  };
+
+  const handleDateClick = (date: Date) => {
+    if (!isInTripRange(date)) return;
+    setLocation(`/trips/${trip.id}/calendar/day/${format(date, 'yyyy-MM-dd')}`);
   };
 
   return (
@@ -94,9 +99,11 @@ export function MonthView({ currentDate, onDateChange, trip }: MonthViewProps) {
                 "h-12 w-full rounded-sm",
                 !isCurrentMonth && "text-muted-foreground opacity-50",
                 isCurrentDay && "bg-accent",
-                inTripRange && "bg-primary/10 hover:bg-primary/20"
+                inTripRange && "bg-primary/10 hover:bg-primary/20",
+                !inTripRange && "cursor-not-allowed"
               )}
-              onClick={() => setLocation(`/trips/${trip.id}/calendar/day/${format(date, "yyyy-MM-dd")}`)}
+              onClick={() => handleDateClick(date)}
+              disabled={!inTripRange}
             >
               <time dateTime={format(date, "yyyy-MM-dd")}>
                 {format(date, "d")}

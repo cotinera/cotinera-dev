@@ -14,6 +14,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/trips/:id" component={TripDetail} />
       <Route path="/trips/:id/calendar" component={TripCalendar} />
+      <Route path="/trips/:id/calendar/day/:date" component={TripCalendar} />
       <Route path="/share/:token" component={SharedTrip} />
       <Route component={NotFound} />
     </Switch>
