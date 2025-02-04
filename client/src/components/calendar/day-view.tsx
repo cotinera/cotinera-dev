@@ -11,10 +11,19 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { format, addHours, addDays, differenceInDays } from "date-fns";
-import { DndContext, DragEndEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
+import { 
+  DndContext, 
+  DragEndEvent,
+  useSensor, 
+  useSensors, 
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+} from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import type { Trip } from "@db/schema";
 import { Pencil, Trash2 } from "lucide-react";
+import { CSS } from "@dnd-kit/utilities";
 
 interface DayViewProps {
   trip: Trip;
@@ -30,6 +39,71 @@ interface CalendarEvent {
 interface TimeSlot {
   date: Date;
   hour: number;
+}
+
+function DraggableEvent({ event, onEdit }: { 
+  event: CalendarEvent; 
+  onEdit: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+    id: event.id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      style={style}
+      className="absolute left-0 right-0 bg-primary/20 hover:bg-primary/30 rounded-md p-2 cursor-move group/event"
+      onClick={(e) => {
+        e.stopPropagation();
+        onEdit();
+      }}
+    >
+      <div className="flex items-center justify-between">
+        <span className="font-medium">{event.title}</span>
+        <div className="hidden group-hover/event:flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+          >
+            <Pencil className="h-3 w-3" />
+          </Button>
+        </div>
+      </div>
+      <span className="text-xs text-muted-foreground">
+        {format(event.startTime, "h:mm a")} - {format(event.endTime, "h:mm a")}
+      </span>
+    </div>
+  );
+}
+
+function DroppableTimeSlot({ 
+  id, 
+  children,
+}: { 
+  id: string;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef } = useDroppable({
+    id,
+  });
+
+  return (
+    <div ref={setNodeRef} className="min-h-[2rem] relative">
+      {children}
+    </div>
+  );
 }
 
 export function DayView({ trip }: DayViewProps) {
@@ -160,58 +234,21 @@ export function DayView({ trip }: DayViewProps) {
                   return (
                     <div
                       key={timeSlotId}
-                      id={timeSlotId}
                       className="grid grid-cols-[80px,1fr] gap-4 group hover:bg-accent/50 p-2 rounded-lg"
                     >
                       <div className="text-sm text-muted-foreground">
                         {format(new Date().setHours(hour, 0), "h:mm a")}
                       </div>
-                      <div className="min-h-[2rem] relative">
+                      <DroppableTimeSlot id={timeSlotId}>
                         {timeSlotEvents.map((event) => (
-                          <div
+                          <DraggableEvent
                             key={event.id}
-                            id={event.id}
-                            className="absolute left-0 right-0 bg-primary/20 rounded-md p-2 cursor-move group/event"
-                            draggable
-                            onClick={(e) => {
-                              e.stopPropagation();
+                            event={event}
+                            onEdit={() => {
                               setSelectedEvent(event);
                               setIsEditDialogOpen(true);
                             }}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="font-medium">{event.title}</span>
-                              <div className="hidden group-hover/event:flex items-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedEvent(event);
-                                    setIsEditDialogOpen(true);
-                                  }}
-                                >
-                                  <Pencil className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 text-destructive"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedEvent(event);
-                                    deleteEvent();
-                                  }}
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </div>
-                            <span className="text-xs text-muted-foreground">
-                              {format(event.startTime, "h:mm a")} - {format(event.endTime, "h:mm a")}
-                            </span>
-                          </div>
+                          />
                         ))}
                         {timeSlotEvents.length === 0 && (
                           <Dialog 
@@ -247,7 +284,7 @@ export function DayView({ trip }: DayViewProps) {
                             </DialogContent>
                           </Dialog>
                         )}
-                      </div>
+                      </DroppableTimeSlot>
                     </div>
                   );
                 })}
