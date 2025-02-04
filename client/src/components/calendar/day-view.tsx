@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -9,10 +10,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { format, addHours, parseISO, addDays, differenceInDays } from "date-fns";
+import { format, addHours, addDays, differenceInDays } from "date-fns";
 import { DndContext, DragEndEvent, useSensor, useSensors, PointerSensor } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import type { Trip } from "@db/schema";
+import { Pencil, Trash2 } from "lucide-react";
 
 interface DayViewProps {
   trip: Trip;
@@ -34,7 +36,9 @@ export function DayView({ trip }: DayViewProps) {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [newEventTitle, setNewEventTitle] = useState("");
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -104,97 +108,189 @@ export function DayView({ trip }: DayViewProps) {
     setEvents((prev) => [...prev, newEvent]);
     setNewEventTitle("");
     setSelectedTimeSlot(null);
-    setIsDialogOpen(false);
+    setIsCreateDialogOpen(false);
+  };
+
+  const updateEvent = () => {
+    if (!selectedEvent) return;
+
+    setEvents((currentEvents) =>
+      currentEvents.map((evt) =>
+        evt.id === selectedEvent.id ? selectedEvent : evt
+      )
+    );
+    setSelectedEvent(null);
+    setIsEditDialogOpen(false);
+  };
+
+  const deleteEvent = () => {
+    if (!selectedEvent) return;
+
+    setEvents((currentEvents) =>
+      currentEvents.filter((evt) => evt.id !== selectedEvent.id)
+    );
+    setSelectedEvent(null);
+    setIsEditDialogOpen(false);
   };
 
   return (
-    <div className="space-y-8">
-      {dates.map((date) => (
-        <Card key={date.toISOString()} className="p-4">
-          <h3 className="text-lg font-semibold mb-4">
-            {format(date, "EEEE, MMMM d, yyyy")}
-          </h3>
+    <ScrollArea className="w-full whitespace-nowrap rounded-md border">
+      <div className="flex p-4">
+        {dates.map((date) => (
+          <Card key={date.toISOString()} className="flex-none w-[400px] p-4 mr-4 last:mr-0">
+            <h3 className="text-lg font-semibold mb-4">
+              {format(date, "EEEE, MMMM d, yyyy")}
+            </h3>
 
-          <DndContext
-            sensors={sensors}
-            modifiers={[restrictToVerticalAxis]}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="space-y-1">
-              {hours.map((hour) => {
-                const timeSlotEvents = events.filter(
-                  (event) => 
-                    event.startTime.getHours() === hour &&
-                    event.startTime.toDateString() === date.toDateString()
-                );
+            <DndContext
+              sensors={sensors}
+              modifiers={[restrictToVerticalAxis]}
+              onDragEnd={handleDragEnd}
+            >
+              <div className="space-y-1">
+                {hours.map((hour) => {
+                  const timeSlotEvents = events.filter(
+                    (event) => 
+                      event.startTime.getHours() === hour &&
+                      event.startTime.toDateString() === date.toDateString()
+                  );
 
-                const timeSlotId = `${date.toISOString()}|${hour}`;
+                  const timeSlotId = `${date.toISOString()}|${hour}`;
 
-                return (
-                  <div
-                    key={timeSlotId}
-                    id={timeSlotId}
-                    className="grid grid-cols-[100px,1fr] gap-4 group hover:bg-accent/50 p-2 rounded-lg"
-                  >
-                    <div className="text-sm text-muted-foreground">
-                      {format(new Date().setHours(hour, 0), "h:mm a")}
-                    </div>
-                    <div className="min-h-[2rem] relative">
-                      {timeSlotEvents.map((event) => (
-                        <div
-                          key={event.id}
-                          id={event.id}
-                          className="absolute left-0 right-0 bg-primary/20 rounded-md p-2 cursor-move"
-                          draggable
-                        >
-                          <span className="font-medium">{event.title}</span>
-                          <span className="text-xs text-muted-foreground ml-2">
-                            {format(event.startTime, "h:mm a")} - {format(event.endTime, "h:mm a")}
-                          </span>
-                        </div>
-                      ))}
-                      {timeSlotEvents.length === 0 && (
-                        <Dialog 
-                          open={isDialogOpen && 
-                            selectedTimeSlot?.date.toDateString() === date.toDateString() && 
-                            selectedTimeSlot?.hour === hour
-                          } 
-                          onOpenChange={setIsDialogOpen}
-                        >
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              className="w-full h-full opacity-0 group-hover:opacity-100"
-                              onClick={() => setSelectedTimeSlot({ date, hour })}
-                            >
-                              + Add Event
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Create New Event</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-4 mt-4">
-                              <Input
-                                placeholder="Event title"
-                                value={newEventTitle}
-                                onChange={(e) => setNewEventTitle(e.target.value)}
-                              />
-                              <Button onClick={createEvent} className="w-full">
-                                Create Event
-                              </Button>
+                  return (
+                    <div
+                      key={timeSlotId}
+                      id={timeSlotId}
+                      className="grid grid-cols-[80px,1fr] gap-4 group hover:bg-accent/50 p-2 rounded-lg"
+                    >
+                      <div className="text-sm text-muted-foreground">
+                        {format(new Date().setHours(hour, 0), "h:mm a")}
+                      </div>
+                      <div className="min-h-[2rem] relative">
+                        {timeSlotEvents.map((event) => (
+                          <div
+                            key={event.id}
+                            id={event.id}
+                            className="absolute left-0 right-0 bg-primary/20 rounded-md p-2 cursor-move group/event"
+                            draggable
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedEvent(event);
+                              setIsEditDialogOpen(true);
+                            }}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium">{event.title}</span>
+                              <div className="hidden group-hover/event:flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedEvent(event);
+                                    setIsEditDialogOpen(true);
+                                  }}
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 text-destructive"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedEvent(event);
+                                    deleteEvent();
+                                  }}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
                             </div>
-                          </DialogContent>
-                        </Dialog>
-                      )}
+                            <span className="text-xs text-muted-foreground">
+                              {format(event.startTime, "h:mm a")} - {format(event.endTime, "h:mm a")}
+                            </span>
+                          </div>
+                        ))}
+                        {timeSlotEvents.length === 0 && (
+                          <Dialog 
+                            open={isCreateDialogOpen && 
+                              selectedTimeSlot?.date.toDateString() === date.toDateString() && 
+                              selectedTimeSlot?.hour === hour
+                            } 
+                            onOpenChange={setIsCreateDialogOpen}
+                          >
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                className="w-full h-full opacity-0 group-hover:opacity-100"
+                                onClick={() => setSelectedTimeSlot({ date, hour })}
+                              >
+                                + Add Event
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Create New Event</DialogTitle>
+                              </DialogHeader>
+                              <div className="space-y-4 mt-4">
+                                <Input
+                                  placeholder="Event title"
+                                  value={newEventTitle}
+                                  onChange={(e) => setNewEventTitle(e.target.value)}
+                                />
+                                <Button onClick={createEvent} className="w-full">
+                                  Create Event
+                                </Button>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+            </DndContext>
+          </Card>
+        ))}
+      </div>
+      <ScrollBar orientation="horizontal" />
+
+      {/* Edit Event Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Event</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <Input
+              placeholder="Event title"
+              value={selectedEvent?.title || ""}
+              onChange={(e) =>
+                setSelectedEvent(
+                  selectedEvent
+                    ? { ...selectedEvent, title: e.target.value }
+                    : null
+                )
+              }
+            />
+            <div className="flex justify-between gap-4">
+              <Button
+                variant="destructive"
+                onClick={deleteEvent}
+                className="flex-1"
+              >
+                Delete
+              </Button>
+              <Button onClick={updateEvent} className="flex-1">
+                Update
+              </Button>
             </div>
-          </DndContext>
-        </Card>
-      ))}
-    </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </ScrollArea>
   );
 }
