@@ -290,7 +290,7 @@ export function registerRoutes(app: Express): Server {
     try {
       const [updatedItem] = await db
         .update(checklist)
-        .set({ 
+        .set({
           ...(req.body.completed !== undefined && { completed: req.body.completed }),
           ...(req.body.title !== undefined && { title: req.body.title })
         })
@@ -368,6 +368,58 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error creating chat message:', error);
       res.status(500).json({ error: 'Failed to create chat message' });
+    }
+  });
+
+  // Share Links
+  app.post("/api/trips/:tripId/share", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const { expiresInDays = 7, accessLevel = "view" } = req.body;
+
+      let expiresAt = null;
+      if (expiresInDays > 0) {
+        expiresAt = addDays(new Date(), expiresInDays);
+      }
+
+      const [shareLink] = await db
+        .insert(shareLinks)
+        .values({
+          tripId,
+          accessLevel,
+          expiresAt,
+          isActive: true,
+        })
+        .returning();
+
+      res.json(shareLink);
+    } catch (error) {
+      console.error('Error creating share link:', error);
+      res.status(500).json({ error: 'Failed to create share link' });
+    }
+  });
+
+  app.delete("/api/trips/:tripId/share/:linkId", async (req, res) => {
+    try {
+      const [revokedLink] = await db
+        .update(shareLinks)
+        .set({ isActive: false })
+        .where(
+          and(
+            eq(shareLinks.id, parseInt(req.params.linkId)),
+            eq(shareLinks.tripId, parseInt(req.params.tripId))
+          )
+        )
+        .returning();
+
+      if (!revokedLink) {
+        return res.status(404).json({ error: 'Share link not found' });
+      }
+
+      res.json(revokedLink);
+    } catch (error) {
+      console.error('Error revoking share link:', error);
+      res.status(500).json({ error: 'Failed to revoke share link' });
     }
   });
 
