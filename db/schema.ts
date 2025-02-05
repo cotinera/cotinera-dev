@@ -13,11 +13,16 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
+import * as z from 'zod';
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  username: text("username").unique().notNull(),
+  email: text("email").unique().notNull(),
   password: text("password").notNull(),
+  name: text("name"),
+  avatar: text("avatar"),
+  provider: text("provider").default("email"), // 'email', 'google', or 'apple'
+  providerId: text("provider_id"), // ID from the provider
   preferences: json("preferences").$type<{
     notifications: boolean;
     frequentDestinations: string[];
@@ -298,7 +303,13 @@ export const taskAssignmentsRelations = relations(taskAssignments, ({ one }) => 
   }),
 }));
 
-export const insertUserSchema = createInsertSchema(users);
+export const insertUserSchema = createInsertSchema(users, {
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  name: z.string().optional(),
+  provider: z.enum(["email", "google", "apple"]).default("email"),
+  providerId: z.string().optional(),
+});
 export const selectUserSchema = createSelectSchema(users);
 export const insertTripSchema = createInsertSchema(trips);
 export const selectTripSchema = createSelectSchema(trips);

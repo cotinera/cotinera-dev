@@ -17,12 +17,12 @@ type AuthContextType = {
 };
 
 type LoginData = {
-  username: string;
+  email: string;
   password: string;
 };
 
 type InsertUser = {
-  username: string;
+  email: string;
   password: string;
 };
 
