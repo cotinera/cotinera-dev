@@ -8,14 +8,17 @@ import Dashboard from "@/pages/dashboard";
 import SharedTrip from "@/pages/shared-trip";
 import TripDetail from "@/pages/trip-detail";
 import TripCalendar from "@/pages/trip-calendar";
+import AuthPage from "@/pages/auth-page";
+import { ProtectedRoute } from "./lib/protected-route";
 
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/trips/:id" component={TripDetail} />
-      <Route path="/trips/:id/calendar" component={TripCalendar} />
+      <Route path="/auth" component={AuthPage} />
       <Route path="/share/:token" component={SharedTrip} />
+      <ProtectedRoute path="/" component={Dashboard} />
+      <ProtectedRoute path="/trips/:id" component={TripDetail} />
+      <ProtectedRoute path="/trips/:id/calendar" component={TripCalendar} />
       <Route component={NotFound} />
     </Switch>
   );
