@@ -22,18 +22,19 @@ export function ViewToggle({ tripId }: ViewToggleProps) {
   };
 
   return (
-    <ToggleGroup
-      type="single"
-      value={isCalendarView ? "calendar" : "details"}
-      onValueChange={handleViewChange}
-      className="justify-center"
-    >
-      <ToggleGroupItem value="details" aria-label="View trip details">
-        <Layout className="h-4 w-4" />
-      </ToggleGroupItem>
-      <ToggleGroupItem value="calendar" aria-label="View trip calendar">
-        <Calendar className="h-4 w-4" />
-      </ToggleGroupItem>
-    </ToggleGroup>
+    <div className="inline-flex">
+      <ToggleGroup
+        type="single"
+        value={isCalendarView ? "calendar" : "details"}
+        onValueChange={handleViewChange}
+      >
+        <ToggleGroupItem value="details" aria-label="View trip details">
+          <Layout className="h-4 w-4" />
+        </ToggleGroupItem>
+        <ToggleGroupItem value="calendar" aria-label="View trip calendar">
+          <Calendar className="h-4 w-4" />
+        </ToggleGroupItem>
+      </ToggleGroup>
+    </div>
   );
 }

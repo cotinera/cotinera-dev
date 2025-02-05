@@ -49,20 +49,20 @@ export default function TripCalendar() {
     <div className="min-h-screen bg-background">
       <header className="relative bg-gradient-to-r from-primary/10 to-primary/5 border-b">
         <div className="container mx-auto px-4 py-8">
-          <Button 
-            variant="ghost" 
-            onClick={() => setLocation("/")} 
-            className="absolute left-4 top-8"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Dashboard
-          </Button>
+          <div className="relative flex flex-col items-center">
+            <Button 
+              variant="ghost" 
+              onClick={() => setLocation("/")} 
+              className="absolute left-4 top-0"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
 
-          <div className="flex flex-col items-center gap-4">
             <ViewToggle tripId={trip.id} />
 
-            <div>
-              <h1 className="text-3xl font-bold text-center">{trip.title}</h1>
+            <div className="mt-6 text-center">
+              <h1 className="text-3xl font-bold">{trip.title}</h1>
               <div className="flex items-center justify-center gap-2 text-muted-foreground mt-2">
                 <MapPin className="h-4 w-4" />
                 <span>{trip.location}</span>
