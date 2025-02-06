@@ -46,10 +46,11 @@ export function registerRoutes(app: Express): Server {
   // TEST ONLY: Create test user endpoint
   app.post("/api/test/create-user", async (req, res) => {
     try {
+      const hashedPassword = await crypto.hash("password123");
       const [user] = await db.insert(users).values({
         email: "test@example.com",
         name: "Test User",
-        password: "password123"
+        password: hashedPassword
       }).returning();
 
       res.json(user);
