@@ -22,17 +22,22 @@ export function ViewToggle({ tripId }: ViewToggleProps) {
   };
 
   return (
-    <div className="inline-flex rounded-lg border bg-card p-1 text-card-foreground shadow-sm">
+    <div className="relative inline-flex rounded-lg bg-muted p-1 text-muted-foreground shadow-sm">
       <ToggleGroup
         type="single"
         value={isCalendarView ? "calendar" : "details"}
         onValueChange={handleViewChange}
-        className="grid grid-cols-2 gap-1"
+        className="relative z-0 grid grid-cols-2"
       >
+        <div
+          className={`absolute inset-0 z-[-1] w-1/2 rounded-md bg-background shadow-sm transition-transform duration-200 ease-out ${
+            isCalendarView ? "translate-x-full" : ""
+          }`}
+        />
         <ToggleGroupItem 
           value="details" 
           aria-label="View trip details"
-          className="px-3 py-2 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+          className="rounded-md px-3 py-2 transition-colors duration-200 data-[state=on]:text-foreground"
         >
           <LayoutDashboard className="h-4 w-4 mr-2" />
           <span className="hidden sm:inline">Details</span>
@@ -40,7 +45,7 @@ export function ViewToggle({ tripId }: ViewToggleProps) {
         <ToggleGroupItem 
           value="calendar" 
           aria-label="View trip calendar"
-          className="px-3 py-2 data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
+          className="rounded-md px-3 py-2 transition-colors duration-200 data-[state=on]:text-foreground"
         >
           <CalendarDays className="h-4 w-4 mr-2" />
           <span className="hidden sm:inline">Calendar</span>
