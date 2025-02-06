@@ -1,3 +1,21 @@
+
+app.post("/api/test/create-user", async (req, res) => {
+  try {
+    const hashedPassword = await crypto.hash("password123");
+    const [user] = await db
+      .insert(users)
+      .values({
+        email: "test@example.com",
+        password: hashedPassword,
+        name: "Test User"
+      })
+      .returning();
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to create test user" });
+  }
+});
+
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
