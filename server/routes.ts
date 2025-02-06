@@ -1,21 +1,3 @@
-
-app.post("/api/test/create-user", async (req, res) => {
-  try {
-    const hashedPassword = await crypto.hash("password123");
-    const [user] = await db
-      .insert(users)
-      .values({
-        email: "test@example.com",
-        password: hashedPassword,
-        name: "Test User"
-      })
-      .returning();
-    res.json(user);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to create test user" });
-  }
-});
-
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
@@ -80,19 +62,12 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/trips/:id", async (req, res) => {
     try {
       const tripId = parseInt(req.params.id);
-
-      // First get the trip without relations to check if it exists
-      const [trip] = await db
-        .select()
-        .from(trips)
-        .where(eq(trips.id, tripId))
-        .limit(1);
+      const [trip] = await db.select().from(trips).where(eq(trips.id, tripId)).limit(1);
 
       if (!trip) {
         return res.status(404).json({ error: "Trip not found" });
       }
 
-      // Then fetch all related data separately
       const [tripParticipants, tripActivities, tripFlights, tripAccommodations, tripChecklistItems] = await Promise.all([
         db.select().from(participants).where(eq(participants.tripId, tripId)),
         db.select().from(activities).where(eq(activities.tripId, tripId)),
@@ -101,7 +76,6 @@ export function registerRoutes(app: Express): Server {
         db.select().from(checklist).where(eq(checklist.tripId, tripId))
       ]);
 
-      // Combine all data
       const tripWithDetails = {
         ...trip,
         participants: tripParticipants,
@@ -121,41 +95,19 @@ export function registerRoutes(app: Express): Server {
   // Get trip with share token
   app.get("/api/share/:token", async (req, res) => {
     try {
-      const [shareLink] = await db
-        .select()
-        .from(shareLinks)
-        .where(
-          and(
-            eq(shareLinks.token, req.params.token),
-            eq(shareLinks.isActive, true)
-          )
-        )
-        .limit(1);
+      const [shareLink] = await db.select().from(shareLinks).where(and(eq(shareLinks.token, req.params.token), eq(shareLinks.isActive, true))).limit(1);
 
       if (!shareLink) {
         return res.status(404).send("Share link not found or expired");
       }
 
       if (shareLink.expiresAt && new Date(shareLink.expiresAt) < new Date()) {
-        await db
-          .update(shareLinks)
-          .set({ isActive: false })
-          .where(eq(shareLinks.id, shareLink.id));
+        await db.update(shareLinks).set({ isActive: false }).where(eq(shareLinks.id, shareLink.id));
         return res.status(404).send("Share link expired");
       }
 
-      // Add user as participant if authenticated
       if (req.isAuthenticated() && req.user) {
-        const [existingParticipant] = await db
-          .select()
-          .from(participants)
-          .where(
-            and(
-              eq(participants.tripId, shareLink.tripId),
-              eq(participants.userId, req.user.id)
-            )
-          )
-          .limit(1);
+        const [existingParticipant] = await db.select().from(participants).where(and(eq(participants.tripId, shareLink.tripId), eq(participants.userId, req.user.id))).limit(1);
 
         if (!existingParticipant) {
           await db.insert(participants).values({
@@ -164,11 +116,7 @@ export function registerRoutes(app: Express): Server {
             status: shareLink.accessLevel === 'edit' ? 'collaborator' : 'viewer',
           });
         } else if (existingParticipant.status === 'viewer' && shareLink.accessLevel === 'edit') {
-          // Upgrade viewer to collaborator if share link grants edit access
-          await db
-            .update(participants)
-            .set({ status: 'collaborator' })
-            .where(eq(participants.id, existingParticipant.id));
+          await db.update(participants).set({ status: 'collaborator' }).where(eq(participants.id, existingParticipant.id));
         }
       }
 
@@ -203,9 +151,8 @@ export function registerRoutes(app: Express): Server {
   // Get trips
   app.get("/api/trips", async (req, res) => {
     try {
-      // Get trips where user is owner
       const ownedTrips = await db.query.trips.findMany({
-        where: eq(trips.ownerId, req.user?.id || 1), // Fallback for development
+        where: eq(trips.ownerId, req.user?.id || 1),
         with: {
           participants: true,
           activities: true,
@@ -214,7 +161,6 @@ export function registerRoutes(app: Express): Server {
         },
       });
 
-      // Get trips where user is a participant via participants table
       const participantTrips = await db.query.participants.findMany({
         where: eq(participants.userId, req.user?.id || 1),
         with: {
@@ -229,9 +175,7 @@ export function registerRoutes(app: Express): Server {
         }
       });
 
-      // Extract the trips from participant records
       const participatedTrips = participantTrips.map(p => p.trip);
-
       res.json([...ownedTrips, ...participatedTrips]);
     } catch (error) {
       console.error('Error fetching trips:', error);
@@ -244,7 +188,7 @@ export function registerRoutes(app: Express): Server {
     try {
       const [newTrip] = await db.insert(trips).values({
         ...req.body,
-        ownerId: req.user?.id || 1, // Fallback for development
+        ownerId: req.user?.id || 1,
       }).returning();
 
       res.json(newTrip);
@@ -253,7 +197,6 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: 'Failed to create trip' });
     }
   });
-
 
   // Flights
   app.get("/api/trips/:tripId/flights", async (req, res) => {
@@ -285,16 +228,7 @@ export function registerRoutes(app: Express): Server {
 
   app.patch("/api/trips/:tripId/flights/:flightId", async (req, res) => {
     try {
-      const [flight] = await db
-        .update(flights)
-        .set(req.body)
-        .where(
-          and(
-            eq(flights.id, parseInt(req.params.flightId)),
-            eq(flights.tripId, parseInt(req.params.tripId))
-          )
-        )
-        .returning();
+      const [flight] = await db.update(flights).set(req.body).where(and(eq(flights.id, parseInt(req.params.flightId)), eq(flights.tripId, parseInt(req.params.tripId)))).returning();
 
       res.json(flight);
     } catch (error) {
@@ -333,16 +267,7 @@ export function registerRoutes(app: Express): Server {
 
   app.patch("/api/trips/:tripId/accommodations/:accommodationId", async (req, res) => {
     try {
-      const [accommodation] = await db
-        .update(accommodations)
-        .set(req.body)
-        .where(
-          and(
-            eq(accommodations.id, parseInt(req.params.accommodationId)),
-            eq(accommodations.tripId, parseInt(req.params.tripId))
-          )
-        )
-        .returning();
+      const [accommodation] = await db.update(accommodations).set(req.body).where(and(eq(accommodations.id, parseInt(req.params.accommodationId)), eq(accommodations.tripId, parseInt(req.params.tripId)))).returning();
 
       res.json(accommodation);
     } catch (error) {
@@ -531,7 +456,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add static file serving for uploads
+  // Serve static files for uploads
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
   // Handle image upload for trips
@@ -544,12 +469,7 @@ export function registerRoutes(app: Express): Server {
       const tripId = parseInt(req.params.tripId);
       const imageUrl = `/uploads/${req.file.filename}`;
 
-      // Update trip with new image URL
-      const [updatedTrip] = await db
-        .update(trips)
-        .set({ thumbnail: imageUrl })
-        .where(eq(trips.id, tripId))
-        .returning();
+      const [updatedTrip] = await db.update(trips).set({ thumbnail: imageUrl }).where(eq(trips.id, tripId)).returning();
 
       if (!updatedTrip) {
         return res.status(404).send("Trip not found");
