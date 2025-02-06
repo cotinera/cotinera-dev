@@ -47,6 +47,13 @@ export function registerRoutes(app: Express): Server {
   // TEST ONLY: Create test user endpoint
   app.all("/api/test/create-user", async (req, res) => {
     try {
+      // Check if user already exists
+      const [existingUser] = await db.select().from(users).where(eq(users.email, "test@example.com")).limit(1);
+      
+      if (existingUser) {
+        return res.json(existingUser);
+      }
+
       const hashedPassword = await crypto.hash("password123");
       const [user] = await db.insert(users).values({
         email: "test@example.com",
@@ -56,7 +63,8 @@ export function registerRoutes(app: Express): Server {
 
       res.json(user);
     } catch (error) {
-      res.status(500).json({ error: "Failed to create test user" });
+      console.error('Test user creation error:', error);
+      res.status(500).json({ error: "Failed to create test user: " + error.message });
     }
   });
 
