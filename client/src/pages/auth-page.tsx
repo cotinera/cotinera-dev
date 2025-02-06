@@ -37,7 +37,7 @@ export default function AuthPage() {
   const { toast } = useToast();
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [, navigate] = useLocation();
+  const [isTestLoginLoading, setIsTestLoginLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -72,6 +72,37 @@ export default function AuthPage() {
       setIsLoading(false);
     }
   }
+
+  const handleTestLogin = async () => {
+    try {
+      setIsTestLoginLoading(true);
+      // Create/get test user
+      const testUserRes = await fetch('/api/test/create-user');
+      if (!testUserRes.ok) {
+        throw new Error('Failed to create test user');
+      }
+      const testUser = await testUserRes.json();
+
+      // Log in with test credentials
+      await login({
+        email: testUser.email,
+        password: "password123"
+      });
+
+      toast({
+        title: "Test Login Success",
+        description: "Logged in as test user",
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Test Login Failed",
+        description: error.message || "Failed to log in as test user",
+      });
+    } finally {
+      setIsTestLoginLoading(false);
+    }
+  };
 
   const handleSocialLogin = async (provider: 'google' | 'apple') => {
     try {
@@ -180,6 +211,20 @@ export default function AuthPage() {
                 ? "Need an account? Sign up"
                 : "Already have an account? Sign in"}
             </Button>
+
+            {/* Development Only Test Login Button */}
+            <div className="pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full bg-yellow-50 hover:bg-yellow-100 border-yellow-200"
+                onClick={handleTestLogin}
+                disabled={isTestLoginLoading}
+              >
+                {isTestLoginLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Developer: Quick Test Login
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
