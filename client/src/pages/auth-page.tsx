@@ -41,9 +41,10 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (user) {
-      navigate("/");
+      // Use window.location for a full page redirect
+      window.location.href = "/";
     }
-  }, [user, navigate]);
+  }, [user]);
 
   const form = useForm<FormData>({
     resolver: zodResolver(authSchema),

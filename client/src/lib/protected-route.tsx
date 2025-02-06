@@ -14,19 +14,26 @@ export function ProtectedRoute({
 
   if (isLoading) {
     return (
-      <Route path={path}>
-        <div className="flex items-center justify-center min-h-screen">
-          <Loader2 className="h-8 w-8 animate-spin text-border" />
-        </div>
-      </Route>
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-border" />
+      </div>
     );
   }
 
   if (!user) {
-    // Redirect to auth page if not logged in
-    setLocation("/auth");
-    return null;
+    // Instead of directly using setLocation in the render,
+    // we'll return a route that handles the redirect
+    return (
+      <Route path={path}>
+        {() => {
+          // Use window.location for a full page redirect to ensure clean state
+          window.location.href = "/auth";
+          return null;
+        }}
+      </Route>
+    );
   }
 
+  // If authenticated, render the protected component
   return <Route path={path} component={Component} />;
 }
