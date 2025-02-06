@@ -26,6 +26,21 @@ const storage = multer.diskStorage({
   }
 });
 
+// TEST ONLY: Create test user endpoint
+app.post("/api/test/create-user", async (req, res) => {
+  try {
+    const [user] = await db.insert(users).values({
+      email: "test@example.com",
+      name: "Test User",
+      password: "password123"
+    }).returning();
+    
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to create test user" });
+  }
+});
+
 const upload = multer({
   storage: storage,
   limits: {
