@@ -47,11 +47,13 @@ export function registerRoutes(app: Express): Server {
   // TEST ONLY: Create test user endpoint
   app.all("/api/test/create-user", async (req, res) => {
     try {
-      // Check if user already exists
-      const [existingUser] = await db.select().from(users).where(eq(users.email, "test@example.com")).limit(1);
+      const { eq } = await import('drizzle-orm');
       
-      if (existingUser) {
-        return res.json(existingUser);
+      // Check if user already exists
+      const existingUser = await db.select().from(users).where(eq(users.email, "test@example.com")).limit(1);
+      
+      if (existingUser.length > 0) {
+        return res.json(existingUser[0]);
       }
 
       const hashedPassword = await crypto.hash("password123");
