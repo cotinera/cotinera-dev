@@ -44,7 +44,7 @@ export function registerRoutes(app: Express): Server {
   setupAuth(app);
 
   // TEST ONLY: Create test user endpoint
-  app.post("/api/test/create-user", async (req, res) => {
+  app.all("/api/test/create-user", async (req, res) => {
     try {
       const hashedPassword = await crypto.hash("password123");
       const [user] = await db.insert(users).values({
