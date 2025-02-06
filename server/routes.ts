@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { crypto } from "./auth";
+import { crypto } from "./auth.js";
 import express from "express";
 import { setupAuth } from "./auth";
 import { db } from "@db";
