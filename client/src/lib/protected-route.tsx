@@ -10,7 +10,7 @@ export function ProtectedRoute({
   component: () => React.JSX.Element;
 }) {
   const { user, isLoading } = useAuth();
-  const [, setLocation] = useLocation();
+  const isDevelopmentBypass = localStorage.getItem("dev_bypass_auth") === "true";
 
   if (isLoading) {
     return (
@@ -20,13 +20,11 @@ export function ProtectedRoute({
     );
   }
 
-  if (!user) {
-    // Instead of directly using setLocation in the render,
-    // we'll return a route that handles the redirect
+  // Allow access if user is authenticated or if development bypass is active
+  if (!user && !isDevelopmentBypass) {
     return (
       <Route path={path}>
         {() => {
-          // Use window.location for a full page redirect to ensure clean state
           window.location.href = "/auth";
           return null;
         }}
@@ -34,6 +32,22 @@ export function ProtectedRoute({
     );
   }
 
-  // If authenticated, render the protected component
+  // If using development bypass, wrap the component with a warning banner
+  if (isDevelopmentBypass) {
+    return (
+      <Route path={path}>
+        {() => (
+          <>
+            <div className="bg-yellow-500 text-black px-4 py-1 text-sm text-center">
+              ⚠️ Development Mode: Authentication Bypassed
+            </div>
+            <Component />
+          </>
+        )}
+      </Route>
+    );
+  }
+
+  // Normal authenticated render
   return <Route path={path} component={Component} />;
 }

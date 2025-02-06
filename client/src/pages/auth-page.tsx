@@ -37,14 +37,22 @@ export default function AuthPage() {
   const { toast } = useToast();
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const [isTestLoginLoading, setIsTestLoginLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
-      // Use window.location for a full page redirect
       window.location.href = "/";
     }
   }, [user]);
+
+  // Add development bypass handler
+  const handleDevBypass = () => {
+    localStorage.setItem("dev_bypass_auth", "true");
+    toast({
+      title: "Development Mode Activated",
+      description: "Authentication has been bypassed for testing",
+    });
+    window.location.href = "/";
+  };
 
   const form = useForm<FormData>({
     resolver: zodResolver(authSchema),
@@ -72,37 +80,6 @@ export default function AuthPage() {
       setIsLoading(false);
     }
   }
-
-  const handleTestLogin = async () => {
-    try {
-      setIsTestLoginLoading(true);
-      // Create/get test user
-      const testUserRes = await fetch('/api/test/create-user');
-      if (!testUserRes.ok) {
-        throw new Error('Failed to create test user');
-      }
-      const testUser = await testUserRes.json();
-
-      // Log in with test credentials
-      await login({
-        email: testUser.email,
-        password: "password123"
-      });
-
-      toast({
-        title: "Test Login Success",
-        description: "Logged in as test user",
-      });
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Test Login Failed",
-        description: error.message || "Failed to log in as test user",
-      });
-    } finally {
-      setIsTestLoginLoading(false);
-    }
-  };
 
   const handleSocialLogin = async (provider: 'google' | 'apple') => {
     try {
@@ -132,16 +109,16 @@ export default function AuthPage() {
         <CardContent>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => handleSocialLogin('google')}
                 className="w-full"
               >
                 <SiGoogle className="mr-2 h-4 w-4" />
                 Google
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => handleSocialLogin('apple')}
                 className="w-full"
               >
@@ -212,17 +189,15 @@ export default function AuthPage() {
                 : "Already have an account? Sign in"}
             </Button>
 
-            {/* Development Only Test Login Button */}
+            {/* Development Bypass Button */}
             <div className="pt-4 border-t">
               <Button
                 type="button"
                 variant="outline"
                 className="w-full bg-yellow-50 hover:bg-yellow-100 border-yellow-200"
-                onClick={handleTestLogin}
-                disabled={isTestLoginLoading}
+                onClick={handleDevBypass}
               >
-                {isTestLoginLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Developer: Quick Test Login
+                Developer: Bypass Authentication
               </Button>
             </div>
           </div>
