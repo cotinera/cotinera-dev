@@ -14,6 +14,9 @@ type AuthContextType = {
   loginMutation: UseMutationResult<User, Error, LoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
   registerMutation: UseMutationResult<User, Error, InsertUser>;
+  login: (credentials: LoginData) => Promise<User>;
+  logout: () => Promise<void>;
+  register: (newUser: InsertUser) => Promise<User>;
 };
 
 type LoginData = {
@@ -118,6 +121,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loginMutation,
         logoutMutation,
         registerMutation,
+        login: loginMutation.mutateAsync,
+        logout: logoutMutation.mutateAsync,
+        register: registerMutation.mutateAsync,
       }}
     >
       {children}
