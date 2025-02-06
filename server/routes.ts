@@ -6,7 +6,7 @@ import fs from "fs";
 import express from "express";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations, chatMessages } from "@db/schema";
+import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations, chatMessages, users } from "@db/schema";
 import { eq, and } from "drizzle-orm";
 import { addDays } from "date-fns";
 
@@ -26,21 +26,6 @@ const storage = multer.diskStorage({
   }
 });
 
-// TEST ONLY: Create test user endpoint
-app.post("/api/test/create-user", async (req, res) => {
-  try {
-    const [user] = await db.insert(users).values({
-      email: "test@example.com",
-      name: "Test User",
-      password: "password123"
-    }).returning();
-    
-    res.json(user);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to create test user" });
-  }
-});
-
 const upload = multer({
   storage: storage,
   limits: {
@@ -57,6 +42,21 @@ const upload = multer({
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
+
+  // TEST ONLY: Create test user endpoint
+  app.post("/api/test/create-user", async (req, res) => {
+    try {
+      const [user] = await db.insert(users).values({
+        email: "test@example.com",
+        name: "Test User",
+        password: "password123"
+      }).returning();
+
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create test user" });
+    }
+  });
 
   // Get single trip
   app.get("/api/trips/:id", async (req, res) => {
