@@ -32,7 +32,7 @@ export function ViewToggle({ tripId }: ViewToggleProps) {
         <div
           className={`absolute inset-0 z-[-1] w-1/2 rounded-md bg-background 
             shadow-sm transition-all duration-500 ease-in-out transform 
-            ${isCalendarView ? "translate-x-full shadow-md" : "translate-x-0"}`}
+            ${isCalendarView ? "translate-x-full shadow-md" : ""}`}
         />
         <ToggleGroupItem 
           value="details" 
