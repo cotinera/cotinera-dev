@@ -22,7 +22,7 @@ export function ViewToggle({ tripId }: ViewToggleProps) {
   };
 
   return (
-    <div className="relative inline-flex rounded-lg bg-muted p-1 text-muted-foreground">
+    <div className="relative inline-flex rounded-lg bg-muted/50 p-1">
       <ToggleGroup
         type="single"
         value={isCalendarView ? "calendar" : "details"}
