@@ -16,6 +16,7 @@ import { Calendar, MapPin, Loader2 } from "lucide-react";
 import { ViewToggle } from "@/components/view-toggle";
 import type { Trip } from "@db/schema";
 import { insertTripSchema } from "@db/schema";
+import { useToast } from "@/hooks/use-toast";
 import * as z from "zod";
 
 const editTripSchema = insertTripSchema.pick({
@@ -35,6 +36,7 @@ interface TripHeaderEditProps {
 export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
   const [isEditing, setIsEditing] = useState(false);
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const form = useForm<EditTripData>({
     resolver: zodResolver(editTripSchema),
@@ -54,15 +56,28 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(data),
+        credentials: 'include'
       });
       if (!res.ok) {
         throw new Error(await res.text());
       }
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id] });
+    onSuccess: (updatedTrip) => {
+      queryClient.setQueryData(["/api/trips", trip.id], updatedTrip);
+      queryClient.invalidateQueries({ queryKey: ["/api/trips"] });
       setIsEditing(false);
+      toast({
+        title: "Success",
+        description: "Trip details updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to update trip details",
+      });
     },
   });
 
