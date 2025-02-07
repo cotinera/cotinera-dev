@@ -79,12 +79,19 @@ export function TripCard({ trip }: TripCardProps) {
       </CardHeader>
       <CardContent>
         {isEditingImage ? (
-          <div className="mb-4">
+          <div className="space-y-4">
             <ImageUpload
               tripId={trip.id}
               currentImage={thumbnail}
               onSuccess={() => setIsEditingImage(false)}
             />
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setIsEditingImage(false)}
+            >
+              Done
+            </Button>
           </div>
         ) : (
           <div className="space-y-2">
