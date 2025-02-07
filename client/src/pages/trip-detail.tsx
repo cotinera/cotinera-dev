@@ -67,9 +67,9 @@ export default function TripDetail() {
             className="absolute inset-0 bg-cover bg-center"
             style={{ 
               backgroundImage: `url(${trip.thumbnail})`,
-              filter: 'blur(40px)',
+              filter: 'blur(60px)',
               transform: 'scale(1.1)',
-              opacity: '0.6'
+              opacity: '0.8'
             }} 
           />
         )}
