@@ -22,7 +22,7 @@ export function ViewToggle({ tripId }: ViewToggleProps) {
   };
 
   return (
-    <div className="relative inline-flex rounded-lg bg-muted p-1 text-muted-foreground shadow-sm">
+    <div className="relative inline-flex rounded-lg bg-muted p-1 text-muted-foreground">
       <ToggleGroup
         type="single"
         value={isCalendarView ? "calendar" : "details"}
@@ -30,16 +30,15 @@ export function ViewToggle({ tripId }: ViewToggleProps) {
         className="relative z-0 grid grid-cols-2"
       >
         <div
-          className={`absolute inset-0 z-[-1] w-1/2 rounded-md bg-gray-700 
-            transition-all duration-500 ease-in-out transform 
-            ${isCalendarView ? "translate-x-full shadow-md" : ""}`}
+          className={`absolute inset-0 z-[-1] w-1/2 rounded-md bg-primary/10 backdrop-blur-sm
+            transition-transform duration-500 cubic-bezier(.65,.05,.36,1)
+            ${isCalendarView ? "translate-x-full" : ""}`}
         />
         <ToggleGroupItem 
           value="details" 
           aria-label="View trip details"
-          className="rounded-md px-3 py-2 transition-all duration-500 ease-in-out
-            data-[state=on]:text-foreground data-[state=off]:hover:text-foreground/80
-            focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/20"
+          className="rounded-md px-3 py-2 transition-colors duration-500 ease-in-out
+            data-[state=on]:text-foreground data-[state=off]:text-muted-foreground"
         >
           <LayoutDashboard className="h-4 w-4 mr-2" />
           <span className="hidden sm:inline">Details</span>
@@ -47,9 +46,8 @@ export function ViewToggle({ tripId }: ViewToggleProps) {
         <ToggleGroupItem 
           value="calendar" 
           aria-label="View trip calendar"
-          className="rounded-md px-3 py-2 transition-all duration-500 ease-in-out
-            data-[state=on]:text-foreground data-[state=off]:hover:text-foreground/80
-            focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/20"
+          className="rounded-md px-3 py-2 transition-colors duration-500 ease-in-out
+            data-[state=on]:text-foreground data-[state=off]:text-muted-foreground"
         >
           <CalendarDays className="h-4 w-4 mr-2" />
           <span className="hidden sm:inline">Calendar</span>
