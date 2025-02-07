@@ -210,6 +210,32 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Update trip
+  app.patch("/api/trips/:id", async (req, res) => {
+    try {
+      const [updatedTrip] = await db
+        .update(trips)
+        .set({
+          title: req.body.title,
+          location: req.body.location,
+          startDate: req.body.startDate,
+          endDate: req.body.endDate,
+        })
+        .where(eq(trips.id, parseInt(req.params.id)))
+        .returning();
+
+      if (!updatedTrip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+
+      res.json(updatedTrip);
+    } catch (error) {
+      console.error('Error updating trip:', error);
+      res.status(500).json({ error: 'Failed to update trip' });
+    }
+  });
+
+
   // Flights
   app.get("/api/trips/:tripId/flights", async (req, res) => {
     try {
