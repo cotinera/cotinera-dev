@@ -11,7 +11,7 @@ import {
   FormItem,
   FormMessage,
 } from "@/components/ui/form";
-import { format } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { Calendar, MapPin, Loader2 } from "lucide-react";
 import { ViewToggle } from "@/components/view-toggle";
 import type { Trip } from "@db/schema";
@@ -38,24 +38,20 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Ensure dates are in YYYY-MM-DD format for the form inputs
-  const formatDateForInput = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-CA'); // Returns YYYY-MM-DD format
-  };
-
+  // Initialize form with existing trip data
   const form = useForm<EditTripData>({
     resolver: zodResolver(editTripSchema),
     defaultValues: {
       title: trip.title,
       location: trip.location,
-      startDate: formatDateForInput(trip.startDate),
-      endDate: formatDateForInput(trip.endDate),
+      startDate: trip.startDate.split('T')[0], // Ensure we get just the date part
+      endDate: trip.endDate.split('T')[0],     // Ensure we get just the date part
     },
   });
 
   const updateTripMutation = useMutation({
     mutationFn: async (data: EditTripData) => {
+      console.log('Sending dates to server:', data.startDate, data.endDate); // Debug log
       const res = await fetch(`/api/trips/${trip.id}`, {
         method: "PATCH",
         headers: {
@@ -63,7 +59,7 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
         },
         body: JSON.stringify({
           ...data,
-          // Ensure dates are sent in YYYY-MM-DD format
+          // Send the dates exactly as they are in the form
           startDate: data.startDate,
           endDate: data.endDate,
         }),
@@ -72,7 +68,9 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
       if (!res.ok) {
         throw new Error(await res.text());
       }
-      return res.json();
+      const updatedTrip = await res.json();
+      console.log('Received updated trip:', updatedTrip); // Debug log
+      return updatedTrip;
     },
     onSuccess: (updatedTrip) => {
       // Update both the detailed trip view and the trips list cache

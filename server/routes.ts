@@ -48,10 +48,10 @@ export function registerRoutes(app: Express): Server {
   app.all("/api/test/create-user", async (req, res) => {
     try {
       const { eq } = await import('drizzle-orm');
-      
+
       // Check if user already exists
       const existingUser = await db.select().from(users).where(eq(users.email, "test@example.com")).limit(1);
-      
+
       if (existingUser.length > 0) {
         return res.json(existingUser[0]);
       }
@@ -213,13 +213,17 @@ export function registerRoutes(app: Express): Server {
   // Update trip
   app.patch("/api/trips/:id", async (req, res) => {
     try {
+      // For date-only fields, ensure they are stored at UTC midnight
+      const startDate = `${req.body.startDate}T00:00:00.000Z`;
+      const endDate = `${req.body.endDate}T00:00:00.000Z`;
+
       const [updatedTrip] = await db
         .update(trips)
         .set({
           title: req.body.title,
           location: req.body.location,
-          startDate: req.body.startDate,
-          endDate: req.body.endDate,
+          startDate,
+          endDate,
         })
         .where(eq(trips.id, parseInt(req.params.id)))
         .returning();
@@ -228,7 +232,14 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: "Trip not found" });
       }
 
-      res.json(updatedTrip);
+      // Format dates back to YYYY-MM-DD before sending to client
+      const formattedTrip = {
+        ...updatedTrip,
+        startDate: updatedTrip.startDate.split('T')[0],
+        endDate: updatedTrip.endDate.split('T')[0],
+      };
+
+      res.json(formattedTrip);
     } catch (error) {
       console.error('Error updating trip:', error);
       res.status(500).json({ error: 'Failed to update trip' });
