@@ -37,6 +37,7 @@ export function TripCard({ trip }: TripCardProps) {
 
   const handleNavigate = () => {
     setLocation(`/trips/${trip.id}`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
