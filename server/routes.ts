@@ -380,7 +380,13 @@ export function registerRoutes(app: Express): Server {
       const messages = await db.query.chatMessages.findMany({
         where: eq(chatMessages.tripId, tripId),
         with: {
-          user: true,
+          user: {
+            columns: {
+              id: true,
+              name: true,
+              avatar: true
+            }
+          }
         },
         orderBy: (messages, { desc }) => [desc(messages.createdAt)],
       });
