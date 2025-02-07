@@ -38,7 +38,6 @@ export function ViewToggle({ tripId }: ViewToggleProps) {
           value="details" 
           aria-label="View trip details"
           className="rounded-md px-3 py-2 transition-all duration-500 ease-in-out
-            hover:scale-105 hover:text-foreground/90 active:scale-95
             data-[state=on]:text-foreground data-[state=off]:hover:text-foreground/80
             focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/20"
         >
@@ -49,7 +48,6 @@ export function ViewToggle({ tripId }: ViewToggleProps) {
           value="calendar" 
           aria-label="View trip calendar"
           className="rounded-md px-3 py-2 transition-all duration-500 ease-in-out
-            hover:scale-105 hover:text-foreground/90 active:scale-95
             data-[state=on]:text-foreground data-[state=off]:hover:text-foreground/80
             focus:outline-none focus-visible:ring-1 focus-visible:ring-primary/20"
         >
