@@ -64,8 +64,15 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
       return res.json();
     },
     onSuccess: (updatedTrip) => {
+      // Update both the detailed trip view and the trips list cache
       queryClient.setQueryData(["/api/trips", trip.id], updatedTrip);
-      queryClient.invalidateQueries({ queryKey: ["/api/trips"] });
+
+      // Update the trip in the trips list cache
+      queryClient.setQueryData(["/api/trips"], (oldData: Trip[] | undefined) => {
+        if (!oldData) return oldData;
+        return oldData.map(t => t.id === trip.id ? updatedTrip : t);
+      });
+
       setIsEditing(false);
       toast({
         title: "Success",

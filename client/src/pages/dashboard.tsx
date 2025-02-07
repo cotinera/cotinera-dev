@@ -3,7 +3,7 @@ import { useUser } from "@/hooks/use-user";
 import { Button } from "@/components/ui/button";
 import { TripCard } from "@/components/trip-card";
 import { Plus, LogOut } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +36,19 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Sort trips by creation date (assuming trips have an id that increments with creation)
+  // and then alphabetically by title as a secondary sort
+  const sortedTrips = useMemo(() => {
+    return [...trips].sort((a, b) => {
+      // Primary sort by ID (creation order)
+      const idDiff = a.id - b.id;
+      if (idDiff !== 0) return idDiff;
+
+      // Secondary sort alphabetically by title
+      return a.title.localeCompare(b.title);
+    });
+  }, [trips]);
 
   const form = useForm<TripFormData>({
     defaultValues: {
@@ -178,7 +191,7 @@ export default function Dashboard() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {trips.map((trip) => (
+          {sortedTrips.map((trip) => (
             <TripCard key={trip.id} trip={trip} />
           ))}
           {trips.length === 0 && (
