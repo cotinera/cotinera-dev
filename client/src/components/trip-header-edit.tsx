@@ -18,6 +18,7 @@ import type { Trip } from "@db/schema";
 import { insertTripSchema } from "@db/schema";
 import { useToast } from "@/hooks/use-toast";
 import * as z from "zod";
+import { MapPicker } from "@/components/map-picker";
 
 const editTripSchema = insertTripSchema.pick({
   title: true,
@@ -35,6 +36,7 @@ interface TripHeaderEditProps {
 
 export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
   const [isEditing, setIsEditing] = useState(false);
+  const [coordinates, setCoordinates] = useState(trip.coordinates);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -59,7 +61,7 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
         },
         body: JSON.stringify({
           ...data,
-          // Send the dates exactly as they are in the form
+          coordinates,
           startDate: data.startDate,
           endDate: data.endDate,
         }),
@@ -152,10 +154,13 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
             render={({ field }) => (
               <FormItem>
                 <FormControl>
-                  <Input
-                    {...field}
-                    className="text-center"
-                    placeholder="Location"
+                  <MapPicker
+                    value={field.value}
+                    onChange={(address, coords) => {
+                      field.onChange(address);
+                      setCoordinates(coords);
+                    }}
+                    placeholder="Search for a location..."
                   />
                 </FormControl>
                 <FormMessage />
