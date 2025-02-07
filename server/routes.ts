@@ -213,13 +213,21 @@ export function registerRoutes(app: Express): Server {
   // Update trip
   app.patch("/api/trips/:id", async (req, res) => {
     try {
+      // Ensure dates are properly formatted without timezone offset
+      const startDate = new Date(req.body.startDate);
+      const endDate = new Date(req.body.endDate);
+
+      // Add timezone offset to compensate for UTC conversion
+      startDate.setMinutes(startDate.getMinutes() + startDate.getTimezoneOffset());
+      endDate.setMinutes(endDate.getMinutes() + endDate.getTimezoneOffset());
+
       const [updatedTrip] = await db
         .update(trips)
         .set({
           title: req.body.title,
           location: req.body.location,
-          startDate: req.body.startDate,
-          endDate: req.body.endDate,
+          startDate: startDate.toISOString().split('T')[0],
+          endDate: endDate.toISOString().split('T')[0],
         })
         .where(eq(trips.id, parseInt(req.params.id)))
         .returning();
