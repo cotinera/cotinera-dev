@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { MapPin, Calendar, Users } from "lucide-react";
+import { MapPin, Calendar, Users, ImageIcon } from "lucide-react";
 import { ShareTripDialog } from "@/components/share-trip-dialog";
 import { useLocation } from "wouter";
 import { ImageUpload } from "@/components/image-upload";
@@ -32,37 +32,48 @@ interface TripCardProps {
 export function TripCard({ trip }: TripCardProps) {
   const [, setLocation] = useLocation();
   const [isEditingImage, setIsEditingImage] = useState(false);
-  // Get a deterministic but random thumbnail based on trip ID
   const thumbnailIndex = trip.id % THUMBNAILS.length;
   const thumbnail = trip.thumbnail || THUMBNAILS[thumbnailIndex];
 
+  const handleNavigate = () => {
+    setLocation(`/trips/${trip.id}`);
+  };
+
   return (
     <Card className="overflow-hidden">
-      <div className="relative h-48 group">
+      <div 
+        className="relative h-48 cursor-pointer"
+        onClick={handleNavigate}
+      >
         <img
           src={thumbnail}
           alt={trip.title}
           className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <Button
-            variant="secondary"
-            onClick={() => setIsEditingImage(true)}
-          >
-            Change Image
-          </Button>
-        </div>
       </div>
       <CardHeader>
         <div className="flex justify-between items-start">
-          <div>
+          <div 
+            className="cursor-pointer"
+            onClick={handleNavigate}
+          >
             <CardTitle>{trip.title}</CardTitle>
             <CardDescription className="flex items-center gap-1">
               <MapPin className="h-4 w-4" />
               {trip.location}
             </CardDescription>
           </div>
-          <ShareTripDialog tripId={trip.id} />
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setIsEditingImage(true)}
+            >
+              <ImageIcon className="h-4 w-4" />
+            </Button>
+            <ShareTripDialog tripId={trip.id} />
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -110,7 +121,7 @@ export function TripCard({ trip }: TripCardProps) {
         <Button 
           variant="outline" 
           className="w-full"
-          onClick={() => setLocation(`/trips/${trip.id}`)}
+          onClick={handleNavigate}
         >
           View Details
         </Button>
