@@ -47,8 +47,20 @@ export default function TripCalendar() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="relative bg-gradient-to-r from-primary/10 to-primary/5 border-b">
-        <div className="container mx-auto px-4 py-8">
+      <header className="relative overflow-hidden border-b">
+        {trip.thumbnail && (
+          <div 
+            className="absolute inset-0 bg-cover bg-center"
+            style={{ 
+              backgroundImage: `url(${trip.thumbnail})`,
+              filter: 'blur(20px)',
+              transform: 'scale(1.1)',
+              opacity: '0.15'
+            }} 
+          />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-primary/5" />
+        <div className="container mx-auto px-4 py-8 relative">
           <Button 
             variant="ghost" 
             onClick={() => setLocation("/")} 
