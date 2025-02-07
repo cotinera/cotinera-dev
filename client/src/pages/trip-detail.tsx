@@ -10,6 +10,7 @@ import { Loader2, ArrowLeft, Calendar, MapPin, Users } from "lucide-react";
 import { ViewToggle } from "@/components/view-toggle";
 import type { Trip } from "@db/schema";
 import { format } from "date-fns";
+import { TripHeaderEdit } from "@/components/trip-header-edit"; // Added import statement
 
 export default function TripDetail() {
   const [, params] = useRoute("/trips/:id");
@@ -85,23 +86,10 @@ export default function TripDetail() {
               Back
             </Button>
 
-            <div className="text-center">
-              <h1 className="text-3xl font-bold mb-2">{trip.title}</h1>
-              <div className="flex items-center justify-center gap-2 text-muted-foreground mt-2">
-                <MapPin className="h-4 w-4" />
-                <span>{trip.location}</span>
-              </div>
-              <div className="flex items-center justify-center gap-2 text-muted-foreground mt-1">
-                <Calendar className="h-4 w-4" />
-                <span>
-                  {format(new Date(trip.startDate), "MMM d, yyyy")} -{" "}
-                  {format(new Date(trip.endDate), "MMM d, yyyy")}
-                </span>
-              </div>
-              <div className="mt-4">
-                <ViewToggle tripId={trip.id} />
-              </div>
-            </div>
+            <TripHeaderEdit 
+              trip={trip} 
+              onBack={() => setLocation("/")} 
+            />
           </div>
         </div>
       </header>
