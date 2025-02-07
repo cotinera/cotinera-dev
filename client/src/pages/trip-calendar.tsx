@@ -53,14 +53,14 @@ export default function TripCalendar() {
             className="absolute inset-0 bg-cover bg-center"
             style={{ 
               backgroundImage: `url(${trip.thumbnail})`,
-              filter: 'blur(20px)',
+              filter: 'blur(40px)',
               transform: 'scale(1.1)',
-              opacity: '0.15'
+              opacity: '0.6'
             }} 
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-primary/5" />
-        <div className="container mx-auto px-4 py-8 relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-background/70 to-background/50" />
+        <div className="container mx-auto px-4 py-8 relative z-10">
           <Button 
             variant="ghost" 
             onClick={() => setLocation("/")} 
@@ -71,7 +71,7 @@ export default function TripCalendar() {
           </Button>
 
           <div className="text-center">
-            <h1 className="text-3xl font-bold">{trip.title}</h1>
+            <h1 className="text-3xl font-bold mb-2">{trip.title}</h1>
             <div className="flex items-center justify-center gap-2 text-muted-foreground mt-2">
               <MapPin className="h-4 w-4" />
               <span>{trip.location}</span>
