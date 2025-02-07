@@ -38,13 +38,19 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  // Ensure dates are in YYYY-MM-DD format for the form inputs
+  const formatDateForInput = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-CA'); // Returns YYYY-MM-DD format
+  };
+
   const form = useForm<EditTripData>({
     resolver: zodResolver(editTripSchema),
     defaultValues: {
       title: trip.title,
       location: trip.location,
-      startDate: trip.startDate,
-      endDate: trip.endDate,
+      startDate: formatDateForInput(trip.startDate),
+      endDate: formatDateForInput(trip.endDate),
     },
   });
 
@@ -55,7 +61,12 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          // Ensure dates are sent in YYYY-MM-DD format
+          startDate: data.startDate,
+          endDate: data.endDate,
+        }),
         credentials: 'include'
       });
       if (!res.ok) {
@@ -191,8 +202,8 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
           </div>
 
           <div className="flex justify-center gap-2">
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               disabled={updateTripMutation.isPending}
             >
               {updateTripMutation.isPending && (
