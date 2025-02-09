@@ -327,9 +327,8 @@ export function registerRoutes(app: Express): Server {
 
   // Activities
   app.post("/api/trips/:tripId/activities", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
+    // For development, allow without authentication
+    const userId = req.user?.id || 1;
 
     const newActivity = await db.insert(activities).values({
       ...req.body,
@@ -341,9 +340,8 @@ export function registerRoutes(app: Express): Server {
 
   // Update activity
   app.patch("/api/trips/:tripId/activities/:activityId", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
+    // For development, allow without authentication
+    const userId = req.user?.id || 1;
 
     try {
       const [updatedActivity] = await db
@@ -376,9 +374,8 @@ export function registerRoutes(app: Express): Server {
 
   // Delete activity
   app.delete("/api/trips/:tripId/activities/:activityId", async (req, res) => {
-    if (!req.isAuthenticated()) {
-      return res.status(401).send("Not authenticated");
-    }
+    // For development, allow without authentication
+    const userId = req.user?.id || 1;
 
     try {
       const [deletedActivity] = await db

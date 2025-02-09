@@ -11,11 +11,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { format, addHours, addDays, differenceInDays } from "date-fns";
-import { 
-  DndContext, 
+import {
+  DndContext,
   DragEndEvent,
-  useSensor, 
-  useSensors, 
+  useSensor,
+  useSensors,
   PointerSensor,
   useDraggable,
   useDroppable,
@@ -36,11 +36,11 @@ interface TimeSlot {
   hour: number;
 }
 
-function DraggableEvent({ 
-  event, 
+function DraggableEvent({
+  event,
   onEdit,
   onDelete,
-}: { 
+}: {
   event: Activity;
   onEdit: () => void;
   onDelete: () => void;
@@ -59,7 +59,7 @@ function DraggableEvent({
       {...attributes}
       {...listeners}
       style={style}
-      className="absolute left-0 right-0 bg-primary/20 hover:bg-primary/30 rounded-md p-2 cursor-move group/event"
+      className="absolute inset-x-0 mx-2 bg-primary/20 hover:bg-primary/30 rounded-md p-2 cursor-move group/event"
     >
       <div className="flex items-center justify-between">
         <span className="font-medium">{event.title}</span>
@@ -89,16 +89,17 @@ function DraggableEvent({
         </div>
       </div>
       <span className="text-xs text-muted-foreground">
-        {format(new Date(event.startTime), "h:mm a")} - {format(new Date(event.endTime), "h:mm a")}
+        {format(new Date(event.startTime), "h:mm a")} -{" "}
+        {format(new Date(event.endTime), "h:mm a")}
       </span>
     </div>
   );
 }
 
-function DroppableTimeSlot({ 
-  id, 
+function DroppableTimeSlot({
+  id,
   children,
-}: { 
+}: {
   id: string;
   children: React.ReactNode;
 }) {
@@ -107,7 +108,7 @@ function DroppableTimeSlot({
   });
 
   return (
-    <div ref={setNodeRef} className="min-h-[2rem] relative">
+    <div ref={setNodeRef} className="min-h-[3rem] relative">
       {children}
     </div>
   );
@@ -135,7 +136,7 @@ export function DayView({ trip }: DayViewProps) {
   const numberOfDays = differenceInDays(tripEndDate, tripStartDate) + 1;
 
   // Generate all dates for the trip duration
-  const dates = Array.from({ length: numberOfDays }, (_, i) => 
+  const dates = Array.from({ length: numberOfDays }, (_, i) =>
     addDays(tripStartDate, i)
   );
 
@@ -206,9 +207,12 @@ export function DayView({ trip }: DayViewProps) {
   // Delete activity mutation
   const deleteActivityMutation = useMutation({
     mutationFn: async (activityId: number) => {
-      const res = await fetch(`/api/trips/${trip.id}/activities/${activityId}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/api/trips/${trip.id}/activities/${activityId}`,
+        {
+          method: "DELETE",
+        }
+      );
       if (!res.ok) throw new Error("Failed to delete activity");
       return res.json();
     },
@@ -232,18 +236,24 @@ export function DayView({ trip }: DayViewProps) {
     if (!over) return;
 
     const eventId = parseInt(active.id as string);
-    const [dateStr, hourStr] = (over.id as string).split('|');
+    const [dateStr, hourStr] = (over.id as string).split("|");
     const newHour = parseInt(hourStr);
     const newDate = new Date(dateStr);
 
-    const activityToUpdate = activities.find(a => a.id === eventId);
+    const activityToUpdate = activities.find((a) => a.id === eventId);
     if (!activityToUpdate) return;
 
     const hourDiff = newHour - new Date(activityToUpdate.startTime).getHours();
     const dateDiff = differenceInDays(newDate, new Date(activityToUpdate.startTime));
 
-    const newStartTime = addHours(addDays(new Date(activityToUpdate.startTime), dateDiff), hourDiff);
-    const newEndTime = addHours(addDays(new Date(activityToUpdate.endTime), dateDiff), hourDiff);
+    const newStartTime = addHours(
+      addDays(new Date(activityToUpdate.startTime), dateDiff),
+      hourDiff
+    );
+    const newEndTime = addHours(
+      addDays(new Date(activityToUpdate.endTime), dateDiff),
+      hourDiff
+    );
 
     updateActivityMutation.mutate({
       ...activityToUpdate,
@@ -314,11 +324,10 @@ export function DayView({ trip }: DayViewProps) {
                 <div>
                   {hours.map((hour) => {
                     const timeSlotEvents = activities.filter(
-                      (event) => {
-                        const eventStart = new Date(event.startTime);
-                        return eventStart.getHours() === hour &&
-                               eventStart.toDateString() === date.toDateString();
-                      }
+                      (event) =>
+                        new Date(event.startTime).getHours() === hour &&
+                        new Date(event.startTime).toDateString() ===
+                          date.toDateString()
                     );
 
                     const timeSlotId = `${date.toISOString()}|${hour}`;
@@ -326,7 +335,7 @@ export function DayView({ trip }: DayViewProps) {
                     return (
                       <div
                         key={timeSlotId}
-                        className="h-12 group hover:bg-accent/50 px-2"
+                        className="min-h-[3rem] relative group hover:bg-accent/50 px-2"
                       >
                         <DroppableTimeSlot id={timeSlotId}>
                           {timeSlotEvents.map((event) => (
@@ -344,11 +353,13 @@ export function DayView({ trip }: DayViewProps) {
                             />
                           ))}
                           {timeSlotEvents.length === 0 && (
-                            <Dialog 
-                              open={isCreateDialogOpen && 
-                                selectedTimeSlot?.date.toDateString() === date.toDateString() && 
+                            <Dialog
+                              open={
+                                isCreateDialogOpen &&
+                                selectedTimeSlot?.date.toDateString() ===
+                                  date.toDateString() &&
                                 selectedTimeSlot?.hour === hour
-                              } 
+                              }
                               onOpenChange={setIsCreateDialogOpen}
                             >
                               <DialogTrigger asChild>
