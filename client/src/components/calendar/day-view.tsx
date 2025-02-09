@@ -220,96 +220,105 @@ export function DayView({ trip }: DayViewProps) {
   };
 
   return (
-    <ScrollArea className="w-full whitespace-nowrap rounded-md border">
-      <div className="flex p-4">
-        {dates.map((date) => (
-          <Card key={date.toISOString()} className="flex-none w-[400px] p-4 mr-4 last:mr-0">
-            <h3 className="text-lg font-semibold mb-4">
-              {format(date, "EEEE, MMMM d, yyyy")}
-            </h3>
-
-            <DndContext
-              sensors={sensors}
-              modifiers={[restrictToVerticalAxis]}
-              onDragEnd={handleDragEnd}
-            >
-              <div className="space-y-1">
-                {hours.map((hour) => {
-                  const timeSlotEvents = events.filter(
-                    (event) => 
-                      event.startTime.getHours() === hour &&
-                      event.startTime.toDateString() === date.toDateString()
-                  );
-
-                  const timeSlotId = `${date.toISOString()}|${hour}`;
-
-                  return (
-                    <div
-                      key={timeSlotId}
-                      className="grid grid-cols-[80px,1fr] gap-4 group hover:bg-accent/50 p-2 rounded-lg"
-                    >
-                      <div className="text-sm text-muted-foreground">
-                        {format(new Date().setHours(hour, 0), "h:mm a")}
-                      </div>
-                      <DroppableTimeSlot id={timeSlotId}>
-                        {timeSlotEvents.map((event) => (
-                          <DraggableEvent
-                            key={event.id}
-                            event={event}
-                            onEdit={() => {
-                              setSelectedEvent(event);
-                              setIsEditDialogOpen(true);
-                            }}
-                            onDelete={() => {
-                              setSelectedEvent(event);
-                              deleteEvent();
-                            }}
-                          />
-                        ))}
-                        {timeSlotEvents.length === 0 && (
-                          <Dialog 
-                            open={isCreateDialogOpen && 
-                              selectedTimeSlot?.date.toDateString() === date.toDateString() && 
-                              selectedTimeSlot?.hour === hour
-                            } 
-                            onOpenChange={setIsCreateDialogOpen}
-                          >
-                            <DialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                className="w-full h-full opacity-0 group-hover:opacity-100"
-                                onClick={() => setSelectedTimeSlot({ date, hour })}
-                              >
-                                + Add Event
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Create New Event</DialogTitle>
-                              </DialogHeader>
-                              <div className="space-y-4 mt-4">
-                                <Input
-                                  placeholder="Event title"
-                                  value={newEventTitle}
-                                  onChange={(e) => setNewEventTitle(e.target.value)}
-                                />
-                                <Button onClick={createEvent} className="w-full">
-                                  Create Event
-                                </Button>
-                              </div>
-                            </DialogContent>
-                          </Dialog>
-                        )}
-                      </DroppableTimeSlot>
-                    </div>
-                  );
-                })}
-              </div>
-            </DndContext>
-          </Card>
+    <div className="flex border rounded-md">
+      {/* Fixed time column */}
+      <div className="w-24 flex-none border-r bg-muted/50">
+        {hours.map((hour) => (
+          <div key={hour} className="h-12 px-2 py-3 text-sm text-muted-foreground">
+            {format(new Date().setHours(hour, 0), "h:mm a")}
+          </div>
         ))}
       </div>
-      <ScrollBar orientation="horizontal" />
+
+      {/* Scrollable days */}
+      <ScrollArea className="w-full">
+        <div className="flex min-w-full">
+          {dates.map((date) => (
+            <Card key={date.toISOString()} className="flex-none w-[300px] border-r last:border-r-0">
+              <h3 className="text-lg font-semibold p-4 border-b sticky top-0 bg-background">
+                {format(date, "EEEE, MMMM d")}
+              </h3>
+
+              <DndContext
+                sensors={sensors}
+                modifiers={[restrictToVerticalAxis]}
+                onDragEnd={handleDragEnd}
+              >
+                <div>
+                  {hours.map((hour) => {
+                    const timeSlotEvents = events.filter(
+                      (event) => 
+                        event.startTime.getHours() === hour &&
+                        event.startTime.toDateString() === date.toDateString()
+                    );
+
+                    const timeSlotId = `${date.toISOString()}|${hour}`;
+
+                    return (
+                      <div
+                        key={timeSlotId}
+                        className="h-12 group hover:bg-accent/50 px-2"
+                      >
+                        <DroppableTimeSlot id={timeSlotId}>
+                          {timeSlotEvents.map((event) => (
+                            <DraggableEvent
+                              key={event.id}
+                              event={event}
+                              onEdit={() => {
+                                setSelectedEvent(event);
+                                setIsEditDialogOpen(true);
+                              }}
+                              onDelete={() => {
+                                setSelectedEvent(event);
+                                deleteEvent();
+                              }}
+                            />
+                          ))}
+                          {timeSlotEvents.length === 0 && (
+                            <Dialog 
+                              open={isCreateDialogOpen && 
+                                selectedTimeSlot?.date.toDateString() === date.toDateString() && 
+                                selectedTimeSlot?.hour === hour
+                              } 
+                              onOpenChange={setIsCreateDialogOpen}
+                            >
+                              <DialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  className="w-full h-full opacity-0 group-hover:opacity-100"
+                                  onClick={() => setSelectedTimeSlot({ date, hour })}
+                                >
+                                  + Add Event
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Create New Event</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4 mt-4">
+                                  <Input
+                                    placeholder="Event title"
+                                    value={newEventTitle}
+                                    onChange={(e) => setNewEventTitle(e.target.value)}
+                                  />
+                                  <Button onClick={createEvent} className="w-full">
+                                    Create Event
+                                  </Button>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          )}
+                        </DroppableTimeSlot>
+                      </div>
+                    );
+                  })}
+                </div>
+              </DndContext>
+            </Card>
+          ))}
+        </div>
+        <ScrollBar orientation="horizontal" />
+      </ScrollArea>
 
       {/* Edit Event Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -344,6 +353,6 @@ export function DayView({ trip }: DayViewProps) {
           </div>
         </DialogContent>
       </Dialog>
-    </ScrollArea>
+    </div>
   );
 }
