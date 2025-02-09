@@ -20,7 +20,8 @@ import {
   addDays,
   differenceInDays, 
   startOfDay, 
-  endOfDay 
+  endOfDay,
+  parseISO 
 } from "date-fns";
 import {
   DndContext,
@@ -60,16 +61,15 @@ function DraggableEvent({
     id: event.id.toString(),
   });
 
-  const style = {
+  const style = transform ? {
     transform: CSS.Transform.toString(transform),
-    width: isDragging ? 'calc(100% - 1rem)' : undefined,
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    margin: '0 0.5rem',
+    width: '100%',
+    position: 'relative',
+    backgroundColor: isDragging ? 'var(--primary-50)' : undefined,
+    boxShadow: isDragging ? 'var(--shadow-lg)' : undefined,
     opacity: isDragging ? 0.8 : 1,
-    zIndex: isDragging ? 50 : 'auto',
-  };
+    zIndex: isDragging ? 50 : 1,
+  } : undefined;
 
   return (
     <div
@@ -77,8 +77,8 @@ function DraggableEvent({
       {...attributes}
       {...listeners}
       style={style}
-      className={`bg-primary/20 hover:bg-primary/30 rounded-md p-2 cursor-move group/event transition-colors duration-200 ${
-        isDragging ? 'shadow-lg ring-2 ring-primary/50' : ''
+      className={`bg-primary/20 hover:bg-primary/30 rounded-md p-2 cursor-move group/event transition-all duration-200 ${
+        isDragging ? 'ring-2 ring-primary' : ''
       }`}
     >
       <div className="flex items-center justify-between">
@@ -146,7 +146,7 @@ export function DayView({ trip }: DayViewProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 4, // Reduce the drag activation distance for better responsiveness
       },
     })
   );
@@ -154,16 +154,9 @@ export function DayView({ trip }: DayViewProps) {
   const tripStartDate = new Date(trip.startDate);
   const tripEndDate = new Date(trip.endDate);
   const numberOfDays = differenceInDays(tripEndDate, tripStartDate) + 1;
-
-  // Generate all dates for the trip duration
-  const dates = Array.from({ length: numberOfDays }, (_, i) =>
-    addDays(tripStartDate, i)
-  );
-
-  // Generate hours for the day
+  const dates = Array.from({ length: numberOfDays }, (_, i) => addDays(tripStartDate, i));
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
-  // Fetch activities
   const { data: activities = [], isLoading } = useQuery<Activity[]>({
     queryKey: ["/api/trips", trip.id, "activities"],
     queryFn: async () => {
@@ -173,116 +166,26 @@ export function DayView({ trip }: DayViewProps) {
     },
   });
 
-  // Create activity mutation
-  const createActivityMutation = useMutation({
-    mutationFn: async (data: { title: string; startTime: string; endTime: string }) => {
-      const res = await fetch(`/api/trips/${trip.id}/activities`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(`Failed to create activity: ${errorText}`);
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
-      toast({ title: "Event created successfully" });
-      setIsCreateDialogOpen(false);
-      setNewEventTitle("");
-    },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Failed to create event",
-        description: error.message,
-      });
-    },
-  });
-
-  // Update activity mutation
-  const updateActivityMutation = useMutation({
-    mutationFn: async (data: Activity) => {
-      const res = await fetch(`/api/trips/${trip.id}/activities/${data.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          startTime: new Date(data.startTime).toISOString(),
-          endTime: new Date(data.endTime).toISOString(),
-        }),
-      });
-      if (!res.ok) throw new Error("Failed to update activity");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
-      toast({ title: "Event updated successfully" });
-      setIsEditDialogOpen(false);
-    },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Failed to update event",
-        description: error.message,
-      });
-    },
-  });
-
-  // Delete activity mutation
-  const deleteActivityMutation = useMutation({
-    mutationFn: async (activityId: number) => {
-      const res = await fetch(
-        `/api/trips/${trip.id}/activities/${activityId}`,
-        {
-          method: "DELETE",
-        }
-      );
-      if (!res.ok) throw new Error("Failed to delete activity");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
-      toast({ title: "Event deleted successfully" });
-      setIsEditDialogOpen(false);
-    },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Failed to delete event",
-        description: error.message,
-      });
-    },
-  });
-
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-
     if (!over) return;
 
     const eventId = parseInt(active.id as string);
     const [dateStr, hourStr] = (over.id as string).split("|");
-    const newHour = parseInt(hourStr);
     const newDate = new Date(dateStr);
+    const newHour = parseInt(hourStr);
 
     const activityToUpdate = activities.find((a) => a.id === eventId);
     if (!activityToUpdate) return;
 
-    // Calculate the duration between start and end times
     const startDate = new Date(activityToUpdate.startTime);
     const endDate = new Date(activityToUpdate.endTime);
     const durationMs = endDate.getTime() - startDate.getTime();
 
-    // Create new start time based on drop target
     const newStartTime = new Date(newDate);
     newStartTime.setHours(newHour, startDate.getMinutes(), 0, 0);
-
-    // Create new end time by adding the original duration
     const newEndTime = new Date(newStartTime.getTime() + durationMs);
 
-    // Validate against trip dates
     const tripStart = startOfDay(new Date(trip.startDate));
     const tripEnd = endOfDay(new Date(trip.endDate));
 
@@ -295,10 +198,29 @@ export function DayView({ trip }: DayViewProps) {
       return;
     }
 
-    updateActivityMutation.mutate({
-      ...activityToUpdate,
-      startTime: newStartTime.toISOString(),
-      endTime: newEndTime.toISOString(),
+    fetch(`/api/trips/${trip.id}/activities/${activityToUpdate.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...activityToUpdate,
+        startTime: newStartTime.toISOString(),
+        endTime: newEndTime.toISOString(),
+      }),
+    })
+    .then((res) => {
+      if (!res.ok) throw new Error("Failed to update activity");
+      return res.json();
+    })
+    .then(() => {
+      queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+      toast({ title: "Event updated successfully" });
+    })
+    .catch((error) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to update event",
+        description: error.message,
+      });
     });
   };
 
@@ -317,24 +239,54 @@ export function DayView({ trip }: DayViewProps) {
 
     const startTime = new Date(selectedTimeSlot.date);
     startTime.setHours(selectedTimeSlot.hour, 0, 0, 0);
-
     const endTime = addHours(startTime, 1);
 
-    createActivityMutation.mutate({
-      title: newEventTitle,
-      startTime: startTime.toISOString(),
-      endTime: endTime.toISOString(),
-    });
+    fetch(`/api/trips/${trip.id}/activities`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: newEventTitle,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+      }),
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to create activity");
+        return res.json();
+      })
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+        toast({ title: "Event created successfully" });
+        setIsCreateDialogOpen(false);
+        setNewEventTitle("");
+      })
+      .catch((error) => {
+        console.error('Failed to create event:', error);
+        toast({
+          variant: "destructive",
+          title: "Failed to create event",
+          description: error.message,
+        });
+      });
   };
 
-  const updateEvent = () => {
-    if (!selectedEvent) return;
-    updateActivityMutation.mutate(selectedEvent);
-  };
-
-  const deleteEvent = () => {
-    if (!selectedEvent) return;
-    deleteActivityMutation.mutate(selectedEvent.id);
+  const deleteEvent = (activityId: number) => {
+    fetch(`/api/trips/${trip.id}/activities/${activityId}`, { method: "DELETE" })
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to delete activity");
+        return res.json();
+      })
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+        toast({ title: "Event deleted successfully" });
+      })
+      .catch((error) => {
+        console.error('Failed to delete event:', error);
+        toast({
+          variant: "destructive",
+          title: "Failed to delete event",
+        });
+      });
   };
 
   if (isLoading) {
@@ -347,45 +299,44 @@ export function DayView({ trip }: DayViewProps) {
 
   return (
     <ScrollArea className="border rounded-md max-w-full">
-      <div className="min-w-fit">
-        {/* Header row with dates */}
-        <div className="flex border-b bg-muted/5">
-          <div className="w-24 flex-none border-r" />
-          {dates.map((date) => (
-            <div
-              key={date.toISOString()}
-              className="w-[300px] p-4 border-l first:border-l-0 font-semibold"
-            >
-              {format(date, "EEEE, MMMM d")}
-            </div>
-          ))}
-        </div>
-
-        {/* Time slots and events grid */}
-        <div className="flex">
-          {/* Time column */}
-          <div className="w-24 flex-none border-r">
-            {hours.map((hour) => (
+      <DndContext
+        sensors={sensors}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="min-w-fit">
+          {/* Header row with dates */}
+          <div className="flex border-b bg-muted/5">
+            <div className="w-24 flex-none border-r" />
+            {dates.map((date) => (
               <div
-                key={hour}
-                className="h-12 px-2 py-3 text-sm text-muted-foreground"
+                key={date.toISOString()}
+                className="w-[300px] p-4 border-l first:border-l-0 font-semibold"
               >
-                {format(new Date().setHours(hour, 0), "h:mm a")}
+                {format(date, "EEEE, MMMM d")}
               </div>
             ))}
           </div>
 
-          {/* Days columns */}
+          {/* Time slots and events grid */}
           <div className="flex">
-            {dates.map((date) => (
-              <div
-                key={date.toISOString()}
-                className="w-[300px] border-l first:border-l-0"
-              >
-                <DndContext
-                  sensors={sensors}
-                  modifiers={[restrictToVerticalAxis]}
-                  onDragEnd={handleDragEnd}
+            {/* Time column */}
+            <div className="w-24 flex-none border-r">
+              {hours.map((hour) => (
+                <div
+                  key={hour}
+                  className="h-12 px-2 py-3 text-sm text-muted-foreground"
+                >
+                  {format(new Date().setHours(hour, 0), "h:mm a")}
+                </div>
+              ))}
+            </div>
+
+            {/* Days columns */}
+            <div className="flex">
+              {dates.map((date) => (
+                <div
+                  key={date.toISOString()}
+                  className="w-[300px] border-l first:border-l-0"
                 >
                   {hours.map((hour) => {
                     const timeSlotEvents = getTimeSlotEvents(date, hour);
@@ -405,13 +356,7 @@ export function DayView({ trip }: DayViewProps) {
                                 setSelectedEvent(event);
                                 setIsEditDialogOpen(true);
                               }}
-                              onDelete={async () => {
-                                try {
-                                  await deleteActivityMutation.mutateAsync(event.id);
-                                } catch (error) {
-                                  console.error('Failed to delete event:', error);
-                                }
-                              }}
+                              onDelete={() => deleteEvent(event.id)}
                             />
                           ))}
                           {timeSlotEvents.length === 0 && (
@@ -446,11 +391,7 @@ export function DayView({ trip }: DayViewProps) {
                                   <Button
                                     onClick={createEvent}
                                     className="w-full"
-                                    disabled={createActivityMutation.isPending}
                                   >
-                                    {createActivityMutation.isPending && (
-                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    )}
                                     Create Event
                                   </Button>
                                 </div>
@@ -461,12 +402,12 @@ export function DayView({ trip }: DayViewProps) {
                       </div>
                     );
                   })}
-                </DndContext>
-              </div>
-            ))}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      </DndContext>
       <ScrollBar orientation="horizontal" />
 
       {/* Edit Event Dialog */}
@@ -492,29 +433,44 @@ export function DayView({ trip }: DayViewProps) {
                 variant="destructive"
                 onClick={() => {
                   if (selectedEvent) {
-                    deleteActivityMutation.mutate(selectedEvent.id);
+                    deleteEvent(selectedEvent.id);
                   }
                 }}
                 className="flex-1"
-                disabled={deleteActivityMutation.isPending}
               >
-                {deleteActivityMutation.isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
                 Delete
               </Button>
               <Button
                 onClick={() => {
                   if (selectedEvent) {
-                    updateActivityMutation.mutate(selectedEvent);
+                    fetch(`/api/trips/${trip.id}/activities/${selectedEvent.id}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(selectedEvent),
+                    })
+                      .then((res) => {
+                        if (!res.ok) throw new Error("Failed to update activity");
+                        return res.json();
+                      })
+                      .then(() => {
+                        queryClient.invalidateQueries({
+                          queryKey: ["/api/trips", trip.id, "activities"],
+                        });
+                        toast({ title: "Event updated successfully" });
+                        setIsEditDialogOpen(false);
+                      })
+                      .catch((error) => {
+                        console.error('Failed to update event:', error);
+                        toast({
+                          variant: "destructive",
+                          title: "Failed to update event",
+                          description: error.message,
+                        });
+                      });
                   }
                 }}
                 className="flex-1"
-                disabled={updateActivityMutation.isPending}
               >
-                {updateActivityMutation.isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
                 Update
               </Button>
             </div>
