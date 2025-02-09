@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { format, addHours, addDays, differenceInDays, parseISO, startOfDay } from "date-fns";
+import { format, addHours, differenceInDays, startOfDay, endOfDay } from "date-fns";
 import {
   DndContext,
   DragEndEvent,
@@ -55,8 +55,11 @@ function DraggableEvent({
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    width: 'calc(100% - 1rem)', // Maintain width during drag
-    height: 'auto', // Allow height to adjust based on content
+    width: isDragging ? 'calc(100% - 1rem)' : undefined,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    margin: '0 0.5rem',
     opacity: isDragging ? 0.8 : 1,
     zIndex: isDragging ? 50 : 'auto',
   };
@@ -67,7 +70,7 @@ function DraggableEvent({
       {...attributes}
       {...listeners}
       style={style}
-      className={`absolute inset-x-0 mx-2 bg-primary/20 hover:bg-primary/30 rounded-md p-2 cursor-move group/event transition-colors duration-200 ${
+      className={`bg-primary/20 hover:bg-primary/30 rounded-md p-2 cursor-move group/event transition-colors duration-200 ${
         isDragging ? 'shadow-lg ring-2 ring-primary/50' : ''
       }`}
     >
@@ -157,55 +160,33 @@ export function DayView({ trip }: DayViewProps) {
   const { data: activities = [], isLoading } = useQuery<Activity[]>({
     queryKey: ["/api/trips", trip.id, "activities"],
     queryFn: async () => {
-      try {
-        console.log('Fetching activities for trip:', trip.id);
-        const res = await fetch(`/api/trips/${trip.id}/activities`);
-        if (!res.ok) throw new Error("Failed to fetch activities");
-        const data = await res.json();
-        console.log('Fetched activities:', data);
-        return data;
-      } catch (error) {
-        console.error("Error fetching activities:", error);
-        throw error;
-      }
+      const res = await fetch(`/api/trips/${trip.id}/activities`);
+      if (!res.ok) throw new Error("Failed to fetch activities");
+      return res.json();
     },
   });
 
   // Create activity mutation
   const createActivityMutation = useMutation({
     mutationFn: async (data: { title: string; startTime: string; endTime: string }) => {
-      try {
-        console.log('Creating activity with data:', data);
-        const res = await fetch(`/api/trips/${trip.id}/activities`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data),
-        });
-        if (!res.ok) {
-          const errorText = await res.text();
-          throw new Error(`Failed to create activity: ${errorText}`);
-        }
-        const newActivity = await res.json();
-        console.log('Created activity:', newActivity);
-        return newActivity;
-      } catch (error) {
-        console.error("Error creating activity:", error);
-        throw error;
+      const res = await fetch(`/api/trips/${trip.id}/activities`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`Failed to create activity: ${errorText}`);
       }
+      return res.json();
     },
     onSuccess: () => {
-      // Force immediate query invalidation and refetch
-      console.log('Invalidating activities query');
-      queryClient.invalidateQueries({ 
-        queryKey: ["/api/trips", trip.id, "activities"],
-        exact: true,
-      });
+      queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
       toast({ title: "Event created successfully" });
       setIsCreateDialogOpen(false);
       setNewEventTitle("");
     },
     onError: (error: Error) => {
-      console.error("Create activity error:", error);
       toast({
         variant: "destructive",
         title: "Failed to create event",
@@ -217,22 +198,17 @@ export function DayView({ trip }: DayViewProps) {
   // Update activity mutation
   const updateActivityMutation = useMutation({
     mutationFn: async (data: Activity) => {
-      try {
-        const res = await fetch(`/api/trips/${trip.id}/activities/${data.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...data,
-            startTime: new Date(data.startTime).toISOString(),
-            endTime: new Date(data.endTime).toISOString(),
-          }),
-        });
-        if (!res.ok) throw new Error("Failed to update activity");
-        return res.json();
-      } catch (error) {
-        console.error("Error updating activity:", error);
-        throw error;
-      }
+      const res = await fetch(`/api/trips/${trip.id}/activities/${data.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...data,
+          startTime: new Date(data.startTime).toISOString(),
+          endTime: new Date(data.endTime).toISOString(),
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to update activity");
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
@@ -251,19 +227,14 @@ export function DayView({ trip }: DayViewProps) {
   // Delete activity mutation
   const deleteActivityMutation = useMutation({
     mutationFn: async (activityId: number) => {
-      try {
-        const res = await fetch(
-          `/api/trips/${trip.id}/activities/${activityId}`,
-          {
-            method: "DELETE",
-          }
-        );
-        if (!res.ok) throw new Error("Failed to delete activity");
-        return res.json();
-      } catch (error) {
-        console.error("Error deleting activity:", error);
-        throw error;
-      }
+      const res = await fetch(
+        `/api/trips/${trip.id}/activities/${activityId}`,
+        {
+          method: "DELETE",
+        }
+      );
+      if (!res.ok) throw new Error("Failed to delete activity");
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
@@ -292,27 +263,23 @@ export function DayView({ trip }: DayViewProps) {
     const activityToUpdate = activities.find((a) => a.id === eventId);
     if (!activityToUpdate) return;
 
-    // Create Date objects with timezone-safe comparisons
+    // Calculate the duration between start and end times
     const startDate = new Date(activityToUpdate.startTime);
     const endDate = new Date(activityToUpdate.endTime);
-    const durationHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60);
+    const durationMs = endDate.getTime() - startDate.getTime();
 
-    // Calculate new dates ensuring timezone consistency
+    // Create new start time based on drop target
     const newStartTime = new Date(newDate);
-    newStartTime.setHours(newHour, 0, 0, 0);
+    newStartTime.setHours(newHour, startDate.getMinutes(), 0, 0);
 
-    const newEndTime = new Date(newStartTime);
-    newEndTime.setHours(newStartTime.getHours() + durationHours);
+    // Create new end time by adding the original duration
+    const newEndTime = new Date(newStartTime.getTime() + durationMs);
 
-    // Compare dates using start of day to avoid timezone issues
+    // Validate against trip dates
     const tripStart = startOfDay(new Date(trip.startDate));
-    const tripEnd = startOfDay(new Date(trip.endDate));
-    tripEnd.setHours(23, 59, 59, 999); // End of the last day
+    const tripEnd = endOfDay(new Date(trip.endDate));
 
-    const moveStartDate = startOfDay(newStartTime);
-    const moveEndDate = startOfDay(newEndTime);
-
-    if (moveStartDate < tripStart || moveEndDate > tripEnd) {
+    if (newStartTime < tripStart || newEndTime > tripEnd) {
       toast({
         variant: "destructive",
         title: "Invalid move",
@@ -376,7 +343,7 @@ export function DayView({ trip }: DayViewProps) {
       <div className="min-w-fit">
         {/* Header row with dates */}
         <div className="flex border-b bg-muted/5">
-          <div className="w-24 flex-none border-r" /> {/* Empty space for time column */}
+          <div className="w-24 flex-none border-r" />
           {dates.map((date) => (
             <div
               key={date.toISOString()}
@@ -516,7 +483,11 @@ export function DayView({ trip }: DayViewProps) {
             <div className="flex justify-between gap-4">
               <Button
                 variant="destructive"
-                onClick={deleteEvent}
+                onClick={() => {
+                  if (selectedEvent) {
+                    deleteActivityMutation.mutate(selectedEvent.id);
+                  }
+                }}
                 className="flex-1"
                 disabled={deleteActivityMutation.isPending}
               >
@@ -526,7 +497,11 @@ export function DayView({ trip }: DayViewProps) {
                 Delete
               </Button>
               <Button
-                onClick={updateEvent}
+                onClick={() => {
+                  if (selectedEvent) {
+                    updateActivityMutation.mutate(selectedEvent);
+                  }
+                }}
                 className="flex-1"
                 disabled={updateActivityMutation.isPending}
               >
