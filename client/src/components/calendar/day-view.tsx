@@ -61,12 +61,22 @@ function DraggableEvent({
 
   const style = transform ? {
     transform: CSS.Transform.toString(transform),
-    width: '280px', // Fixed width to match the column width
-    backgroundColor: isDragging ? 'hsl(var(--primary))' : undefined,
-    boxShadow: isDragging ? 'var(--shadow-lg)' : undefined,
+    width: '280px',
+    height: '48px', // Fixed height to match time slot
+    position: 'absolute',
+    left: '8px', // Consistent padding from the left
+    top: '0',
+    backgroundColor: isDragging ? 'hsl(var(--primary)/0.2)' : undefined,
+    boxShadow: isDragging ? 'var(--shadow-md)' : undefined,
     opacity: isDragging ? 0.9 : 1,
     zIndex: isDragging ? 50 : 1,
-  } : undefined;
+  } : {
+    width: '280px',
+    height: '48px',
+    position: 'absolute',
+    left: '8px',
+    top: '0',
+  };
 
   return (
     <div
@@ -75,11 +85,11 @@ function DraggableEvent({
       {...listeners}
       style={style}
       className={`bg-primary/20 hover:bg-primary/30 rounded-md p-2 cursor-move group/event transition-all duration-200 ${
-        isDragging ? 'ring-2 ring-primary shadow-xl' : ''
+        isDragging ? 'ring-1 ring-primary/50' : ''
       }`}
     >
       <div className="flex items-center justify-between">
-        <span className="font-medium">{event.title}</span>
+        <span className="font-medium truncate">{event.title}</span>
         <div className="hidden group-hover/event:flex items-center gap-1">
           <Button
             variant="ghost"
@@ -129,8 +139,8 @@ function DroppableTimeSlot({
   return (
     <div 
       ref={setNodeRef} 
-      className={`min-h-[3rem] relative border-t first:border-t-0 transition-colors duration-200 ${
-        isOver ? 'bg-primary/10 ring-2 ring-primary/50 ring-inset' : ''
+      className={`h-12 relative transition-colors duration-200 ${
+        isOver ? 'bg-primary/10' : ''
       }`}
     >
       {children}
@@ -318,10 +328,10 @@ export function DayView({ trip }: { trip: Trip }) {
         onDragEnd={handleDragEnd}
         onDragOver={handleDragOver}
       >
-        <div className="min-w-fit">
+        <div className="min-w-fit relative">
           {/* Header row with dates */}
           <div className="flex border-b bg-muted/5">
-            <div className="w-24 flex-none border-r" />
+            <div className="w-24 flex-none border-r sticky left-0 z-20 bg-background" />
             {dates.map((date) => (
               <div
                 key={date.toISOString()}
@@ -335,11 +345,11 @@ export function DayView({ trip }: { trip: Trip }) {
           {/* Time slots and events grid */}
           <div className="flex">
             {/* Time column */}
-            <div className="w-24 flex-none border-r">
+            <div className="w-24 flex-none border-r sticky left-0 z-20 bg-background">
               {hours.map((hour) => (
                 <div
                   key={hour}
-                  className="h-12 px-2 py-3 text-sm text-muted-foreground"
+                  className="h-12 px-2 py-3 text-sm text-muted-foreground border-t first:border-t-0"
                 >
                   {format(new Date().setHours(hour, 0), "h:mm a")}
                 </div>
@@ -359,10 +369,7 @@ export function DayView({ trip }: { trip: Trip }) {
                     const isOver = activeDropId === timeSlotId;
 
                     return (
-                      <div
-                        key={timeSlotId}
-                        className="h-12 relative group hover:bg-accent/50 border-t first:border-t-0"
-                      >
+                      <div key={timeSlotId} className="relative border-t first:border-t-0">
                         <DroppableTimeSlot id={timeSlotId} isOver={isOver}>
                           {timeSlotEvents.map((event) => (
                             <DraggableEvent
