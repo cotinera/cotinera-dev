@@ -293,9 +293,6 @@ export function registerRoutes(app: Express): Server {
 
   // Update activity
   app.patch("/api/trips/:tripId/activities/:activityId", async (req, res) => {
-    // For development, allow without authentication
-    const userId = req.user?.id || 1;
-
     try {
       const [updatedActivity] = await db
         .update(activities)
@@ -303,8 +300,8 @@ export function registerRoutes(app: Express): Server {
           title: req.body.title,
           description: req.body.description,
           location: req.body.location,
-          startTime: req.body.startTime,
-          endTime: req.body.endTime,
+          startTime: new Date(req.body.startTime),
+          endTime: new Date(req.body.endTime),
         })
         .where(
           and(

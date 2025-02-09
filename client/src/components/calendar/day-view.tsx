@@ -215,7 +215,11 @@ export function DayView({ trip }: DayViewProps) {
         const res = await fetch(`/api/trips/${trip.id}/activities/${data.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data),
+          body: JSON.stringify({
+            ...data,
+            startTime: new Date(data.startTime).toISOString(),
+            endTime: new Date(data.endTime).toISOString(),
+          }),
         });
         if (!res.ok) throw new Error("Failed to update activity");
         return res.json();
@@ -282,8 +286,8 @@ export function DayView({ trip }: DayViewProps) {
     const activityToUpdate = activities.find((a) => a.id === eventId);
     if (!activityToUpdate) return;
 
-    const startDate = parseISO(activityToUpdate.startTime.toString());
-    const endDate = parseISO(activityToUpdate.endTime.toString());
+    const startDate = new Date(activityToUpdate.startTime);
+    const endDate = new Date(activityToUpdate.endTime);
 
     const hourDiff = newHour - startDate.getHours();
     const dateDiff = differenceInDays(newDate, startDate);
@@ -293,8 +297,8 @@ export function DayView({ trip }: DayViewProps) {
 
     updateActivityMutation.mutate({
       ...activityToUpdate,
-      startTime: newStartTime.toISOString(),
-      endTime: newEndTime.toISOString(),
+      startTime: newStartTime,
+      endTime: newEndTime,
     });
   };
 
@@ -375,7 +379,7 @@ export function DayView({ trip }: DayViewProps) {
                 >
                   {hours.map((hour) => {
                     const timeSlotEvents = activities.filter((event) => {
-                      const eventStart = parseISO(event.startTime.toString());
+                      const eventStart = new Date(event.startTime);
                       return (
                         eventStart.getHours() === hour &&
                         eventStart.toDateString() === date.toDateString()
