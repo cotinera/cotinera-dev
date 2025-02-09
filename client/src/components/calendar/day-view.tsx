@@ -38,7 +38,7 @@ import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import type { Trip, Activity } from "@db/schema";
 import { Pencil, Trash2, Loader2 } from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
 interface TimeSlot {
@@ -62,7 +62,6 @@ function DraggableEvent({
   const style = transform ? {
     transform: CSS.Transform.toString(transform),
     width: '280px', // Fixed width to match the column width
-    position: 'relative',
     backgroundColor: isDragging ? 'hsl(var(--primary))' : undefined,
     boxShadow: isDragging ? 'var(--shadow-lg)' : undefined,
     opacity: isDragging ? 0.9 : 1,
@@ -147,6 +146,7 @@ export function DayView({ trip }: { trip: Trip }) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [activeDropId, setActiveDropId] = useState<string | null>(null);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -175,7 +175,7 @@ export function DayView({ trip }: { trip: Trip }) {
     document.body.classList.add('select-none');
   };
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     document.body.classList.remove('select-none');
     setActiveDropId(null);
@@ -210,30 +210,28 @@ export function DayView({ trip }: { trip: Trip }) {
       return;
     }
 
-    fetch(`/api/trips/${trip.id}/activities/${activityToUpdate.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...activityToUpdate,
-        startTime: newStartTime.toISOString(),
-        endTime: newEndTime.toISOString(),
-      }),
-    })
-    .then((res) => {
+    try {
+      const res = await fetch(`/api/trips/${trip.id}/activities/${activityToUpdate.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...activityToUpdate,
+          startTime: newStartTime.toISOString(),
+          endTime: newEndTime.toISOString(),
+        }),
+      });
+
       if (!res.ok) throw new Error("Failed to update activity");
-      return res.json();
-    })
-    .then(() => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+
+      await queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
       toast({ title: "Event updated successfully" });
-    })
-    .catch((error) => {
+    } catch (error) {
       toast({
         variant: "destructive",
         title: "Failed to update event",
-        description: error.message,
+        description: error instanceof Error ? error.message : "An error occurred",
       });
-    });
+    }
   };
 
   const handleDragOver = (event: DragOverEvent) => {
@@ -251,58 +249,57 @@ export function DayView({ trip }: { trip: Trip }) {
     });
   };
 
-  const createEvent = () => {
+  const createEvent = async () => {
     if (!selectedTimeSlot || !newEventTitle) return;
 
     const startTime = new Date(selectedTimeSlot.date);
     startTime.setHours(selectedTimeSlot.hour, 0, 0, 0);
     const endTime = addHours(startTime, 1);
 
-    fetch(`/api/trips/${trip.id}/activities`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: newEventTitle,
-        startTime: startTime.toISOString(),
-        endTime: endTime.toISOString(),
-      }),
-    })
-    .then((res) => {
+    try {
+      const res = await fetch(`/api/trips/${trip.id}/activities`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: newEventTitle,
+          startTime: startTime.toISOString(),
+          endTime: endTime.toISOString(),
+        }),
+      });
+
       if (!res.ok) throw new Error("Failed to create activity");
-      return res.json();
-    })
-    .then(() => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+
+      await queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
       toast({ title: "Event created successfully" });
       setIsCreateDialogOpen(false);
       setNewEventTitle("");
-    })
-    .catch((error) => {
+    } catch (error) {
       toast({
         variant: "destructive",
         title: "Failed to create event",
-        description: error.message,
+        description: error instanceof Error ? error.message : "An error occurred",
       });
-    });
+    }
   };
 
-  const deleteEvent = (activityId: number) => {
-    fetch(`/api/trips/${trip.id}/activities/${activityId}`, { method: "DELETE" })
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to delete activity");
-        return res.json();
-      })
-      .then(() => {
-        queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
-        toast({ title: "Event deleted successfully" });
-        setIsEditDialogOpen(false);
-      })
-      .catch((error) => {
-        toast({
-          variant: "destructive",
-          title: "Failed to delete event",
-        });
+  const deleteEvent = async (activityId: number) => {
+    try {
+      const res = await fetch(`/api/trips/${trip.id}/activities/${activityId}`, { 
+        method: "DELETE" 
       });
+
+      if (!res.ok) throw new Error("Failed to delete activity");
+
+      await queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+      toast({ title: "Event deleted successfully" });
+      setIsEditDialogOpen(false);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Failed to delete event",
+        description: error instanceof Error ? error.message : "An error occurred",
+      });
+    }
   };
 
   if (isLoading) {
@@ -460,31 +457,29 @@ export function DayView({ trip }: { trip: Trip }) {
                 Delete
               </Button>
               <Button
-                onClick={() => {
+                onClick={async () => {
                   if (selectedEvent) {
-                    fetch(`/api/trips/${trip.id}/activities/${selectedEvent.id}`, {
-                      method: "PATCH",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify(selectedEvent),
-                    })
-                      .then((res) => {
-                        if (!res.ok) throw new Error("Failed to update activity");
-                        return res.json();
-                      })
-                      .then(() => {
-                        queryClient.invalidateQueries({
-                          queryKey: ["/api/trips", trip.id, "activities"],
-                        });
-                        toast({ title: "Event updated successfully" });
-                        setIsEditDialogOpen(false);
-                      })
-                      .catch((error) => {
-                        toast({
-                          variant: "destructive",
-                          title: "Failed to update event",
-                          description: error.message,
-                        });
+                    try {
+                      const res = await fetch(`/api/trips/${trip.id}/activities/${selectedEvent.id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(selectedEvent),
                       });
+
+                      if (!res.ok) throw new Error("Failed to update activity");
+
+                      await queryClient.invalidateQueries({
+                        queryKey: ["/api/trips", trip.id, "activities"],
+                      });
+                      toast({ title: "Event updated successfully" });
+                      setIsEditDialogOpen(false);
+                    } catch (error) {
+                      toast({
+                        variant: "destructive",
+                        title: "Failed to update event",
+                        description: error instanceof Error ? error.message : "An error occurred",
+                      });
+                    }
                   }
                 }}
                 className="flex-1"
