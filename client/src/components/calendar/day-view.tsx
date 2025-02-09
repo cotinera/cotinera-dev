@@ -38,7 +38,7 @@ import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import type { Trip, Activity } from "@db/schema";
 import { Pencil, Trash2, Loader2 } from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
 interface TimeSlot {
@@ -63,11 +63,10 @@ function DraggableEvent({
     transform: CSS.Transform.toString(transform),
     width: '280px', // Fixed width to match the column width
     position: 'relative',
-    backgroundColor: isDragging ? 'var(--primary)' : undefined,
+    backgroundColor: isDragging ? 'hsl(var(--primary))' : undefined,
     boxShadow: isDragging ? 'var(--shadow-lg)' : undefined,
     opacity: isDragging ? 0.9 : 1,
     zIndex: isDragging ? 50 : 1,
-    pointerEvents: isDragging ? 'none' : undefined,
   } : undefined;
 
   return (
@@ -131,8 +130,8 @@ function DroppableTimeSlot({
   return (
     <div 
       ref={setNodeRef} 
-      className={`min-h-[3rem] relative transition-colors duration-200 ${
-        isOver ? 'bg-primary/10' : ''
+      className={`min-h-[3rem] relative border-t first:border-t-0 transition-colors duration-200 ${
+        isOver ? 'bg-primary/10 ring-2 ring-primary/50 ring-inset' : ''
       }`}
     >
       {children}
@@ -148,7 +147,6 @@ export function DayView({ trip }: { trip: Trip }) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [activeDropId, setActiveDropId] = useState<string | null>(null);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -174,7 +172,6 @@ export function DayView({ trip }: { trip: Trip }) {
   });
 
   const handleDragStart = () => {
-    // Add a class to the body to prevent text selection during drag
     document.body.classList.add('select-none');
   };
 
@@ -208,7 +205,7 @@ export function DayView({ trip }: { trip: Trip }) {
       toast({
         variant: "destructive",
         title: "Invalid move",
-        description: "Event must stay within trip dates"
+        description: "Event must stay within trip dates",
       });
       return;
     }
@@ -270,23 +267,23 @@ export function DayView({ trip }: { trip: Trip }) {
         endTime: endTime.toISOString(),
       }),
     })
-      .then((res) => {
-        if (!res.ok) throw new Error("Failed to create activity");
-        return res.json();
-      })
-      .then(() => {
-        queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
-        toast({ title: "Event created successfully" });
-        setIsCreateDialogOpen(false);
-        setNewEventTitle("");
-      })
-      .catch((error) => {
-        toast({
-          variant: "destructive",
-          title: "Failed to create event",
-          description: error.message,
-        });
+    .then((res) => {
+      if (!res.ok) throw new Error("Failed to create activity");
+      return res.json();
+    })
+    .then(() => {
+      queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+      toast({ title: "Event created successfully" });
+      setIsCreateDialogOpen(false);
+      setNewEventTitle("");
+    })
+    .catch((error) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to create event",
+        description: error.message,
       });
+    });
   };
 
   const deleteEvent = (activityId: number) => {
