@@ -327,15 +327,28 @@ export function registerRoutes(app: Express): Server {
 
   // Activities
   app.post("/api/trips/:tripId/activities", async (req, res) => {
-    // For development, allow without authentication
-    const userId = req.user?.id || 1;
+    try {
+      // For development, allow without authentication
+      const userId = req.user?.id || 1;
 
-    const newActivity = await db.insert(activities).values({
-      ...req.body,
-      tripId: parseInt(req.params.tripId),
-    }).returning();
+      const [newActivity] = await db.insert(activities).values({
+        tripId: parseInt(req.params.tripId),
+        title: req.body.title,
+        startTime: new Date(req.body.startTime),
+        endTime: new Date(req.body.endTime),
+        description: req.body.description || null,
+        location: req.body.location || null,
+      }).returning();
 
-    res.json(newActivity[0]);
+      if (!newActivity) {
+        throw new Error("Failed to create activity");
+      }
+
+      res.json(newActivity);
+    } catch (error) {
+      console.error('Error creating activity:', error);
+      res.status(500).json({ error: 'Failed to create activity: ' + error.message });
+    }
   });
 
   // Update activity
