@@ -14,7 +14,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { format, addHours, differenceInDays, startOfDay, endOfDay } from "date-fns";
+import { 
+  format, 
+  addHours, 
+  addDays,
+  differenceInDays, 
+  startOfDay, 
+  endOfDay 
+} from "date-fns";
 import {
   DndContext,
   DragEndEvent,
