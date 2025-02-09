@@ -247,85 +247,20 @@ export function registerRoutes(app: Express): Server {
   });
 
 
-  // Flights
-  app.get("/api/trips/:tripId/flights", async (req, res) => {
-    try {
-      const tripId = parseInt(req.params.tripId);
-      const flightsList = await db.query.flights.findMany({
-        where: eq(flights.tripId, tripId),
-      });
-      res.json(flightsList);
-    } catch (error) {
-      console.error('Error fetching flights:', error);
-      res.status(500).json({ error: 'Failed to fetch flights' });
-    }
-  });
-
-  app.post("/api/trips/:tripId/flights", async (req, res) => {
-    try {
-      const [newFlight] = await db.insert(flights).values({
-        ...req.body,
-        tripId: parseInt(req.params.tripId),
-      }).returning();
-
-      res.json(newFlight);
-    } catch (error) {
-      console.error('Error creating flight:', error);
-      res.status(500).json({ error: 'Failed to create flight' });
-    }
-  });
-
-  app.patch("/api/trips/:tripId/flights/:flightId", async (req, res) => {
-    try {
-      const [flight] = await db.update(flights).set(req.body).where(and(eq(flights.id, parseInt(req.params.flightId)), eq(flights.tripId, parseInt(req.params.tripId)))).returning();
-
-      res.json(flight);
-    } catch (error) {
-      console.error('Error updating flight:', error);
-      res.status(500).json({ error: 'Failed to update flight' });
-    }
-  });
-
-  // Accommodations
-  app.get("/api/trips/:tripId/accommodations", async (req, res) => {
-    try {
-      const tripId = parseInt(req.params.tripId);
-      const accommodationsList = await db.query.accommodations.findMany({
-        where: eq(accommodations.tripId, tripId),
-      });
-      res.json(accommodationsList);
-    } catch (error) {
-      console.error('Error fetching accommodations:', error);
-      res.status(500).json({ error: 'Failed to fetch accommodations' });
-    }
-  });
-
-  app.post("/api/trips/:tripId/accommodations", async (req, res) => {
-    try {
-      const [newAccommodation] = await db.insert(accommodations).values({
-        ...req.body,
-        tripId: parseInt(req.params.tripId),
-      }).returning();
-
-      res.json(newAccommodation);
-    } catch (error) {
-      console.error('Error creating accommodation:', error);
-      res.status(500).json({ error: 'Failed to create accommodation' });
-    }
-  });
-
-  app.patch("/api/trips/:tripId/accommodations/:accommodationId", async (req, res) => {
-    try {
-      const [accommodation] = await db.update(accommodations).set(req.body).where(and(eq(accommodations.id, parseInt(req.params.accommodationId)), eq(accommodations.tripId, parseInt(req.params.tripId)))).returning();
-
-      res.json(accommodation);
-    } catch (error) {
-      console.error('Error updating accommodation:', error);
-      res.status(500).json({ error: 'Failed to update accommodation' });
-    }
-  });
-
   // Activities
+  app.get("/api/trips/:tripId/activities", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const activities = await db.query.activities.findMany({
+        where: eq(activities.tripId, tripId),
+      });
+      res.json(activities);
+    } catch (error) {
+      console.error('Error fetching activities:', error);
+      res.status(500).json({ error: 'Failed to fetch activities' });
+    }
+  });
+
   app.post("/api/trips/:tripId/activities", async (req, res) => {
     try {
       // For development, allow without authentication
