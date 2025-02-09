@@ -31,6 +31,8 @@ import {
   PointerSensor,
   useDraggable,
   useDroppable,
+  DragStartEvent,
+  DragOverEvent,
 } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import type { Trip, Activity } from "@db/schema";
@@ -38,10 +40,6 @@ import { Pencil, Trash2, Loader2 } from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-
-interface DayViewProps {
-  trip: Trip;
-}
 
 interface TimeSlot {
   date: Date;
@@ -63,12 +61,13 @@ function DraggableEvent({
 
   const style = transform ? {
     transform: CSS.Transform.toString(transform),
-    width: '100%',
+    width: '280px', // Fixed width to match the column width
     position: 'relative',
-    backgroundColor: isDragging ? 'var(--primary-50)' : undefined,
+    backgroundColor: isDragging ? 'var(--primary)' : undefined,
     boxShadow: isDragging ? 'var(--shadow-lg)' : undefined,
-    opacity: isDragging ? 0.8 : 1,
+    opacity: isDragging ? 0.9 : 1,
     zIndex: isDragging ? 50 : 1,
+    pointerEvents: isDragging ? 'none' : undefined,
   } : undefined;
 
   return (
@@ -78,7 +77,7 @@ function DraggableEvent({
       {...listeners}
       style={style}
       className={`bg-primary/20 hover:bg-primary/30 rounded-md p-2 cursor-move group/event transition-all duration-200 ${
-        isDragging ? 'ring-2 ring-primary' : ''
+        isDragging ? 'ring-2 ring-primary shadow-xl' : ''
       }`}
     >
       <div className="flex items-center justify-between">
@@ -118,9 +117,11 @@ function DraggableEvent({
 
 function DroppableTimeSlot({
   id,
+  isOver,
   children,
 }: {
   id: string;
+  isOver: boolean;
   children: React.ReactNode;
 }) {
   const { setNodeRef } = useDroppable({
@@ -128,25 +129,31 @@ function DroppableTimeSlot({
   });
 
   return (
-    <div ref={setNodeRef} className="min-h-[3rem] relative">
+    <div 
+      ref={setNodeRef} 
+      className={`min-h-[3rem] relative transition-colors duration-200 ${
+        isOver ? 'bg-primary/10' : ''
+      }`}
+    >
       {children}
     </div>
   );
 }
 
-export function DayView({ trip }: DayViewProps) {
+export function DayView({ trip }: { trip: Trip }) {
   const [newEventTitle, setNewEventTitle] = useState("");
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Activity | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [activeDropId, setActiveDropId] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 4, // Reduce the drag activation distance for better responsiveness
+        distance: 4,
       },
     })
   );
@@ -166,8 +173,16 @@ export function DayView({ trip }: DayViewProps) {
     },
   });
 
+  const handleDragStart = () => {
+    // Add a class to the body to prevent text selection during drag
+    document.body.classList.add('select-none');
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+    document.body.classList.remove('select-none');
+    setActiveDropId(null);
+
     if (!over) return;
 
     const eventId = parseInt(active.id as string);
@@ -224,6 +239,11 @@ export function DayView({ trip }: DayViewProps) {
     });
   };
 
+  const handleDragOver = (event: DragOverEvent) => {
+    const { over } = event;
+    setActiveDropId(over?.id as string || null);
+  };
+
   const getTimeSlotEvents = (date: Date, hour: number) => {
     return activities.filter((event) => {
       const eventStart = new Date(event.startTime);
@@ -261,7 +281,6 @@ export function DayView({ trip }: DayViewProps) {
         setNewEventTitle("");
       })
       .catch((error) => {
-        console.error('Failed to create event:', error);
         toast({
           variant: "destructive",
           title: "Failed to create event",
@@ -279,9 +298,9 @@ export function DayView({ trip }: DayViewProps) {
       .then(() => {
         queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
         toast({ title: "Event deleted successfully" });
+        setIsEditDialogOpen(false);
       })
       .catch((error) => {
-        console.error('Failed to delete event:', error);
         toast({
           variant: "destructive",
           title: "Failed to delete event",
@@ -301,7 +320,9 @@ export function DayView({ trip }: DayViewProps) {
     <ScrollArea className="border rounded-md max-w-full">
       <DndContext
         sensors={sensors}
+        onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        onDragOver={handleDragOver}
       >
         <div className="min-w-fit">
           {/* Header row with dates */}
@@ -341,13 +362,14 @@ export function DayView({ trip }: DayViewProps) {
                   {hours.map((hour) => {
                     const timeSlotEvents = getTimeSlotEvents(date, hour);
                     const timeSlotId = `${date.toISOString()}|${hour}`;
+                    const isOver = activeDropId === timeSlotId;
 
                     return (
                       <div
                         key={timeSlotId}
-                        className="h-12 relative group hover:bg-accent/50 px-2 border-t first:border-t-0"
+                        className="h-12 relative group hover:bg-accent/50 border-t first:border-t-0"
                       >
-                        <DroppableTimeSlot id={timeSlotId}>
+                        <DroppableTimeSlot id={timeSlotId} isOver={isOver}>
                           {timeSlotEvents.map((event) => (
                             <DraggableEvent
                               key={event.id}
@@ -460,7 +482,6 @@ export function DayView({ trip }: DayViewProps) {
                         setIsEditDialogOpen(false);
                       })
                       .catch((error) => {
-                        console.error('Failed to update event:', error);
                         toast({
                           variant: "destructive",
                           title: "Failed to update event",
