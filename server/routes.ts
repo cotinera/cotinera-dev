@@ -247,13 +247,15 @@ export function registerRoutes(app: Express): Server {
   });
 
 
-  // Activities
+  // Get all activities for a trip
   app.get("/api/trips/:tripId/activities", async (req, res) => {
     try {
       const tripId = parseInt(req.params.tripId);
+      console.log('Fetching activities for trip:', tripId);
       const activities = await db.query.activities.findMany({
         where: eq(activities.tripId, tripId),
       });
+      console.log('Found activities:', activities);
       res.json(activities);
     } catch (error) {
       console.error('Error fetching activities:', error);
@@ -261,8 +263,10 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Create a new activity
   app.post("/api/trips/:tripId/activities", async (req, res) => {
     try {
+      console.log('Creating activity with data:', req.body);
       // For development, allow without authentication
       const userId = req.user?.id || 1;
 
@@ -279,6 +283,7 @@ export function registerRoutes(app: Express): Server {
         throw new Error("Failed to create activity");
       }
 
+      console.log('Created new activity:', newActivity);
       res.json(newActivity);
     } catch (error) {
       console.error('Error creating activity:', error);

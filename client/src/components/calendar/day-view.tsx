@@ -152,9 +152,11 @@ export function DayView({ trip }: DayViewProps) {
     queryKey: ["/api/trips", trip.id, "activities"],
     queryFn: async () => {
       try {
+        console.log('Fetching activities for trip:', trip.id);
         const res = await fetch(`/api/trips/${trip.id}/activities`);
         if (!res.ok) throw new Error("Failed to fetch activities");
         const data = await res.json();
+        console.log('Fetched activities:', data);
         return data;
       } catch (error) {
         console.error("Error fetching activities:", error);
@@ -167,6 +169,7 @@ export function DayView({ trip }: DayViewProps) {
   const createActivityMutation = useMutation({
     mutationFn: async (data: { title: string; startTime: string; endTime: string }) => {
       try {
+        console.log('Creating activity with data:', data);
         const res = await fetch(`/api/trips/${trip.id}/activities`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -176,14 +179,21 @@ export function DayView({ trip }: DayViewProps) {
           const errorText = await res.text();
           throw new Error(`Failed to create activity: ${errorText}`);
         }
-        return res.json();
+        const newActivity = await res.json();
+        console.log('Created activity:', newActivity);
+        return newActivity;
       } catch (error) {
         console.error("Error creating activity:", error);
         throw error;
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+      // Force immediate query invalidation and refetch
+      console.log('Invalidating activities query');
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/trips", trip.id, "activities"],
+        exact: true,
+      });
       toast({ title: "Event created successfully" });
       setIsCreateDialogOpen(false);
       setNewEventTitle("");
@@ -325,8 +335,8 @@ export function DayView({ trip }: DayViewProps) {
     <ScrollArea className="border rounded-md max-w-full">
       <div className="min-w-fit">
         {/* Header row with dates */}
-        <div className="flex">
-          <div className="w-24 flex-none" /> {/* Empty space for time column */}
+        <div className="flex border-b bg-muted/5">
+          <div className="w-24 flex-none border-r" /> {/* Empty space for time column */}
           {dates.map((date) => (
             <div
               key={date.toISOString()}
@@ -340,7 +350,7 @@ export function DayView({ trip }: DayViewProps) {
         {/* Time slots and events grid */}
         <div className="flex">
           {/* Time column */}
-          <div className="w-24 flex-none">
+          <div className="w-24 flex-none border-r">
             {hours.map((hour) => (
               <div
                 key={hour}
