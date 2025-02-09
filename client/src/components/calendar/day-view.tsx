@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { format, addHours, addDays, differenceInDays, parseISO } from "date-fns";
+import { format, addHours, addDays, differenceInDays, parseISO, startOfDay } from "date-fns";
 import {
   DndContext,
   DragEndEvent,
@@ -49,12 +49,16 @@ function DraggableEvent({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: event.id.toString(),
   });
 
   const style = {
     transform: CSS.Transform.toString(transform),
+    width: 'calc(100% - 1rem)', // Maintain width during drag
+    height: 'auto', // Allow height to adjust based on content
+    opacity: isDragging ? 0.8 : 1,
+    zIndex: isDragging ? 50 : 'auto',
   };
 
   return (
@@ -63,7 +67,9 @@ function DraggableEvent({
       {...attributes}
       {...listeners}
       style={style}
-      className="absolute inset-x-0 mx-2 bg-primary/20 hover:bg-primary/30 rounded-md p-2 cursor-move group/event"
+      className={`absolute inset-x-0 mx-2 bg-primary/20 hover:bg-primary/30 rounded-md p-2 cursor-move group/event transition-colors duration-200 ${
+        isDragging ? 'shadow-lg ring-2 ring-primary/50' : ''
+      }`}
     >
       <div className="flex items-center justify-between">
         <span className="font-medium">{event.title}</span>
@@ -93,8 +99,8 @@ function DraggableEvent({
         </div>
       </div>
       <span className="text-xs text-muted-foreground">
-        {format(parseISO(event.startTime.toString()), "h:mm a")} -{" "}
-        {format(parseISO(event.endTime.toString()), "h:mm a")}
+        {format(new Date(event.startTime), "h:mm a")} -{" "}
+        {format(new Date(event.endTime), "h:mm a")}
       </span>
     </div>
   );
@@ -286,24 +292,27 @@ export function DayView({ trip }: DayViewProps) {
     const activityToUpdate = activities.find((a) => a.id === eventId);
     if (!activityToUpdate) return;
 
-    // Create Date objects once
+    // Create Date objects with timezone-safe comparisons
     const startDate = new Date(activityToUpdate.startTime);
     const endDate = new Date(activityToUpdate.endTime);
-
-    // Calculate duration to maintain it during drag
     const durationHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60);
 
-    // Calculate new dates
+    // Calculate new dates ensuring timezone consistency
     const newStartTime = new Date(newDate);
     newStartTime.setHours(newHour, 0, 0, 0);
 
     const newEndTime = new Date(newStartTime);
     newEndTime.setHours(newStartTime.getHours() + durationHours);
 
-    // Prevent invalid moves (e.g., before trip start or after trip end)
-    const tripStart = new Date(trip.startDate);
-    const tripEnd = new Date(trip.endDate);
-    if (newStartTime < tripStart || newEndTime > tripEnd) {
+    // Compare dates using start of day to avoid timezone issues
+    const tripStart = startOfDay(new Date(trip.startDate));
+    const tripEnd = startOfDay(new Date(trip.endDate));
+    tripEnd.setHours(23, 59, 59, 999); // End of the last day
+
+    const moveStartDate = startOfDay(newStartTime);
+    const moveEndDate = startOfDay(newEndTime);
+
+    if (moveStartDate < tripStart || moveEndDate > tripEnd) {
       toast({
         variant: "destructive",
         title: "Invalid move",
