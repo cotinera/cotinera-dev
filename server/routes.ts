@@ -252,11 +252,11 @@ export function registerRoutes(app: Express): Server {
     try {
       const tripId = parseInt(req.params.tripId);
       console.log('Fetching activities for trip:', tripId);
-      const activities = await db.query.activities.findMany({
-        where: eq(activities.tripId, tripId),
-      });
-      console.log('Found activities:', activities);
-      res.json(activities);
+
+      const tripActivities = await db.select().from(activities).where(eq(activities.tripId, tripId));
+
+      console.log('Found activities:', tripActivities);
+      res.json(tripActivities);
     } catch (error) {
       console.error('Error fetching activities:', error);
       res.status(500).json({ error: 'Failed to fetch activities' });
