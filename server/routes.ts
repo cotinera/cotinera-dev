@@ -339,6 +339,69 @@ export function registerRoutes(app: Express): Server {
     res.json(newActivity[0]);
   });
 
+  // Update activity
+  app.patch("/api/trips/:tripId/activities/:activityId", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const [updatedActivity] = await db
+        .update(activities)
+        .set({
+          title: req.body.title,
+          description: req.body.description,
+          location: req.body.location,
+          startTime: req.body.startTime,
+          endTime: req.body.endTime,
+        })
+        .where(
+          and(
+            eq(activities.id, parseInt(req.params.activityId)),
+            eq(activities.tripId, parseInt(req.params.tripId))
+          )
+        )
+        .returning();
+
+      if (!updatedActivity) {
+        return res.status(404).json({ error: "Activity not found" });
+      }
+
+      res.json(updatedActivity);
+    } catch (error) {
+      console.error('Error updating activity:', error);
+      res.status(500).json({ error: 'Failed to update activity' });
+    }
+  });
+
+  // Delete activity
+  app.delete("/api/trips/:tripId/activities/:activityId", async (req, res) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).send("Not authenticated");
+    }
+
+    try {
+      const [deletedActivity] = await db
+        .delete(activities)
+        .where(
+          and(
+            eq(activities.id, parseInt(req.params.activityId)),
+            eq(activities.tripId, parseInt(req.params.tripId))
+          )
+        )
+        .returning();
+
+      if (!deletedActivity) {
+        return res.status(404).json({ error: "Activity not found" });
+      }
+
+      res.json(deletedActivity);
+    } catch (error) {
+      console.error('Error deleting activity:', error);
+      res.status(500).json({ error: 'Failed to delete activity' });
+    }
+  });
+
   // Checklist routes
   app.get("/api/trips/:tripId/checklist", async (req, res) => {
     try {

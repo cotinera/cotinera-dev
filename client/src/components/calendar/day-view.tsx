@@ -21,19 +21,14 @@ import {
   useDroppable,
 } from "@dnd-kit/core";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
-import type { Trip } from "@db/schema";
-import { Pencil, Trash2 } from "lucide-react";
+import type { Trip, Activity } from "@db/schema";
+import { Pencil, Trash2, Loader2 } from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 interface DayViewProps {
   trip: Trip;
-}
-
-interface CalendarEvent {
-  id: string;
-  title: string;
-  startTime: Date;
-  endTime: Date;
 }
 
 interface TimeSlot {
@@ -46,12 +41,12 @@ function DraggableEvent({
   onEdit,
   onDelete,
 }: { 
-  event: CalendarEvent;
+  event: Activity;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: event.id,
+    id: event.id.toString(),
   });
 
   const style = {
@@ -94,7 +89,7 @@ function DraggableEvent({
         </div>
       </div>
       <span className="text-xs text-muted-foreground">
-        {format(event.startTime, "h:mm a")} - {format(event.endTime, "h:mm a")}
+        {format(new Date(event.startTime), "h:mm a")} - {format(new Date(event.endTime), "h:mm a")}
       </span>
     </div>
   );
@@ -119,12 +114,13 @@ function DroppableTimeSlot({
 }
 
 export function DayView({ trip }: DayViewProps) {
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [newEventTitle, setNewEventTitle] = useState("");
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | null>(null);
-  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<Activity | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -146,34 +142,114 @@ export function DayView({ trip }: DayViewProps) {
   // Generate hours for the day
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
+  // Fetch activities
+  const { data: activities = [], isLoading } = useQuery<Activity[]>({
+    queryKey: ["/api/trips", trip.id, "activities"],
+    queryFn: async () => {
+      const res = await fetch(`/api/trips/${trip.id}/activities`);
+      if (!res.ok) throw new Error("Failed to fetch activities");
+      return res.json();
+    },
+  });
+
+  // Create activity mutation
+  const createActivityMutation = useMutation({
+    mutationFn: async (data: Partial<Activity>) => {
+      const res = await fetch(`/api/trips/${trip.id}/activities`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to create activity");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["/api/trips", trip.id, "activities"]);
+      toast({ title: "Event created successfully" });
+      setIsCreateDialogOpen(false);
+      setNewEventTitle("");
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to create event",
+        description: error.message,
+      });
+    },
+  });
+
+  // Update activity mutation
+  const updateActivityMutation = useMutation({
+    mutationFn: async (data: Activity) => {
+      const res = await fetch(`/api/trips/${trip.id}/activities/${data.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to update activity");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["/api/trips", trip.id, "activities"]);
+      toast({ title: "Event updated successfully" });
+      setIsEditDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to update event",
+        description: error.message,
+      });
+    },
+  });
+
+  // Delete activity mutation
+  const deleteActivityMutation = useMutation({
+    mutationFn: async (activityId: number) => {
+      const res = await fetch(`/api/trips/${trip.id}/activities/${activityId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete activity");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries(["/api/trips", trip.id, "activities"]);
+      toast({ title: "Event deleted successfully" });
+      setIsEditDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Failed to delete event",
+        description: error.message,
+      });
+    },
+  });
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
     if (!over) return;
 
-    const eventId = active.id as string;
+    const eventId = parseInt(active.id as string);
     const [dateStr, hourStr] = (over.id as string).split('|');
     const newHour = parseInt(hourStr);
     const newDate = new Date(dateStr);
 
-    setEvents((currentEvents) => 
-      currentEvents.map((evt) => {
-        if (evt.id === eventId) {
-          const hourDiff = newHour - evt.startTime.getHours();
-          const dateDiff = differenceInDays(newDate, evt.startTime);
+    const activityToUpdate = activities.find(a => a.id === eventId);
+    if (!activityToUpdate) return;
 
-          const newStartTime = addHours(addDays(evt.startTime, dateDiff), hourDiff);
-          const newEndTime = addHours(addDays(evt.endTime, dateDiff), hourDiff);
+    const hourDiff = newHour - new Date(activityToUpdate.startTime).getHours();
+    const dateDiff = differenceInDays(newDate, new Date(activityToUpdate.startTime));
 
-          return {
-            ...evt,
-            startTime: newStartTime,
-            endTime: newEndTime,
-          };
-        }
-        return evt;
-      })
-    );
+    const newStartTime = addHours(addDays(new Date(activityToUpdate.startTime), dateDiff), hourDiff);
+    const newEndTime = addHours(addDays(new Date(activityToUpdate.endTime), dateDiff), hourDiff);
+
+    updateActivityMutation.mutate({
+      ...activityToUpdate,
+      startTime: newStartTime.toISOString(),
+      endTime: newEndTime.toISOString(),
+    });
   };
 
   const createEvent = () => {
@@ -184,40 +260,31 @@ export function DayView({ trip }: DayViewProps) {
 
     const endTime = addHours(startTime, 1);
 
-    const newEvent: CalendarEvent = {
-      id: crypto.randomUUID(),
+    createActivityMutation.mutate({
+      tripId: trip.id,
       title: newEventTitle,
-      startTime,
-      endTime,
-    };
-
-    setEvents((prev) => [...prev, newEvent]);
-    setNewEventTitle("");
-    setSelectedTimeSlot(null);
-    setIsCreateDialogOpen(false);
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString(),
+    });
   };
 
   const updateEvent = () => {
     if (!selectedEvent) return;
-
-    setEvents((currentEvents) =>
-      currentEvents.map((evt) =>
-        evt.id === selectedEvent.id ? selectedEvent : evt
-      )
-    );
-    setSelectedEvent(null);
-    setIsEditDialogOpen(false);
+    updateActivityMutation.mutate(selectedEvent);
   };
 
   const deleteEvent = () => {
     if (!selectedEvent) return;
-
-    setEvents((currentEvents) =>
-      currentEvents.filter((evt) => evt.id !== selectedEvent.id)
-    );
-    setSelectedEvent(null);
-    setIsEditDialogOpen(false);
+    deleteActivityMutation.mutate(selectedEvent.id);
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex border rounded-md">
@@ -246,10 +313,12 @@ export function DayView({ trip }: DayViewProps) {
               >
                 <div>
                   {hours.map((hour) => {
-                    const timeSlotEvents = events.filter(
-                      (event) => 
-                        event.startTime.getHours() === hour &&
-                        event.startTime.toDateString() === date.toDateString()
+                    const timeSlotEvents = activities.filter(
+                      (event) => {
+                        const eventStart = new Date(event.startTime);
+                        return eventStart.getHours() === hour &&
+                               eventStart.toDateString() === date.toDateString();
+                      }
                     );
 
                     const timeSlotId = `${date.toISOString()}|${hour}`;
@@ -301,7 +370,14 @@ export function DayView({ trip }: DayViewProps) {
                                     value={newEventTitle}
                                     onChange={(e) => setNewEventTitle(e.target.value)}
                                   />
-                                  <Button onClick={createEvent} className="w-full">
+                                  <Button
+                                    onClick={createEvent}
+                                    className="w-full"
+                                    disabled={createActivityMutation.isPending}
+                                  >
+                                    {createActivityMutation.isPending && (
+                                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    )}
                                     Create Event
                                   </Button>
                                 </div>
@@ -343,10 +419,21 @@ export function DayView({ trip }: DayViewProps) {
                 variant="destructive"
                 onClick={deleteEvent}
                 className="flex-1"
+                disabled={deleteActivityMutation.isPending}
               >
+                {deleteActivityMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 Delete
               </Button>
-              <Button onClick={updateEvent} className="flex-1">
+              <Button
+                onClick={updateEvent}
+                className="flex-1"
+                disabled={updateActivityMutation.isPending}
+              >
+                {updateActivityMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 Update
               </Button>
             </div>
