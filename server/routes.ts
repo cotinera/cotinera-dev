@@ -324,16 +324,16 @@ export function registerRoutes(app: Express): Server {
 
   // Delete activity
   app.delete("/api/trips/:tripId/activities/:activityId", async (req, res) => {
-    // For development, allow without authentication
-    const userId = req.user?.id || 1;
-
     try {
+      const tripId = parseInt(req.params.tripId);
+      const activityId = parseInt(req.params.activityId);
+
       const [deletedActivity] = await db
         .delete(activities)
         .where(
           and(
-            eq(activities.id, parseInt(req.params.activityId)),
-            eq(activities.tripId, parseInt(req.params.tripId))
+            eq(activities.id, activityId),
+            eq(activities.tripId, tripId)
           )
         )
         .returning();
@@ -342,6 +342,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: "Activity not found" });
       }
 
+      console.log('Successfully deleted activity:', deletedActivity);
       res.json(deletedActivity);
     } catch (error) {
       console.error('Error deleting activity:', error);

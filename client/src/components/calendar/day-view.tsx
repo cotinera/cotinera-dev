@@ -286,19 +286,46 @@ export function DayView({ trip }: DayViewProps) {
     const activityToUpdate = activities.find((a) => a.id === eventId);
     if (!activityToUpdate) return;
 
+    // Create Date objects once
     const startDate = new Date(activityToUpdate.startTime);
     const endDate = new Date(activityToUpdate.endTime);
 
-    const hourDiff = newHour - startDate.getHours();
-    const dateDiff = differenceInDays(newDate, startDate);
+    // Calculate duration to maintain it during drag
+    const durationHours = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60);
 
-    const newStartTime = addHours(addDays(startDate, dateDiff), hourDiff);
-    const newEndTime = addHours(addDays(endDate, dateDiff), hourDiff);
+    // Calculate new dates
+    const newStartTime = new Date(newDate);
+    newStartTime.setHours(newHour, 0, 0, 0);
+
+    const newEndTime = new Date(newStartTime);
+    newEndTime.setHours(newStartTime.getHours() + durationHours);
+
+    // Prevent invalid moves (e.g., before trip start or after trip end)
+    const tripStart = new Date(trip.startDate);
+    const tripEnd = new Date(trip.endDate);
+    if (newStartTime < tripStart || newEndTime > tripEnd) {
+      toast({
+        variant: "destructive",
+        title: "Invalid move",
+        description: "Event must stay within trip dates"
+      });
+      return;
+    }
 
     updateActivityMutation.mutate({
       ...activityToUpdate,
-      startTime: newStartTime,
-      endTime: newEndTime,
+      startTime: newStartTime.toISOString(),
+      endTime: newEndTime.toISOString(),
+    });
+  };
+
+  const getTimeSlotEvents = (date: Date, hour: number) => {
+    return activities.filter((event) => {
+      const eventStart = new Date(event.startTime);
+      return (
+        eventStart.getHours() === hour &&
+        eventStart.toDateString() === date.toDateString()
+      );
     });
   };
 
@@ -378,14 +405,7 @@ export function DayView({ trip }: DayViewProps) {
                   onDragEnd={handleDragEnd}
                 >
                   {hours.map((hour) => {
-                    const timeSlotEvents = activities.filter((event) => {
-                      const eventStart = new Date(event.startTime);
-                      return (
-                        eventStart.getHours() === hour &&
-                        eventStart.toDateString() === date.toDateString()
-                      );
-                    });
-
+                    const timeSlotEvents = getTimeSlotEvents(date, hour);
                     const timeSlotId = `${date.toISOString()}|${hour}`;
 
                     return (
@@ -402,9 +422,12 @@ export function DayView({ trip }: DayViewProps) {
                                 setSelectedEvent(event);
                                 setIsEditDialogOpen(true);
                               }}
-                              onDelete={() => {
-                                setSelectedEvent(event);
-                                deleteEvent();
+                              onDelete={async () => {
+                                try {
+                                  await deleteActivityMutation.mutateAsync(event.id);
+                                } catch (error) {
+                                  console.error('Failed to delete event:', error);
+                                }
                               }}
                             />
                           ))}
