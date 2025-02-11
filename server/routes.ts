@@ -576,17 +576,41 @@ export function registerRoutes(app: Express): Server {
             user = existingUser;
           } else {
             console.log('Creating new user');
-            const [newUser] = await db.insert(users).values({
-              email,
-              name,
-              password: await crypto.hash(Math.random().toString(36)),
-            }).returning();
-            user = newUser;
-            console.log('Created new user:', user.id);
+            // Generate a random password for the user
+            const randomPassword = Math.random().toString(36).slice(-8);
+            const hashedPassword = await crypto.hash(randomPassword);
+
+            try {
+              const [newUser] = await db.insert(users).values({
+                email,
+                name,
+                password: hashedPassword,
+                provider: 'email',
+              }).returning();
+
+              user = newUser;
+              console.log('Created new user:', user.id);
+            } catch (userError) {
+              console.error('Failed to create user:', userError);
+              // Only throw if it's not a duplicate email error
+              if (!userError.message.includes('duplicate key')) {
+                throw new Error('Failed to create user account');
+              }
+              // If it's a duplicate email, try to fetch the existing user again
+              const [retryUser] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+              if (retryUser) {
+                user = retryUser;
+              } else {
+                throw new Error('Failed to process user account');
+              }
+            }
           }
         } catch (error) {
           console.error('Error handling user:', error);
-          return res.status(500).json({ error: "Failed to process user" });
+          return res.status(500).json({ 
+            error: "Failed to process user account", 
+            details: error instanceof Error ? error.message : 'Unknown error' 
+          });
         }
       }
 
