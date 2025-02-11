@@ -117,12 +117,10 @@ export default function TripDetail() {
           <div className="grid gap-8 md:grid-cols-[2fr,1fr]">
             <div className="space-y-8">
               <section>
-                <h2 className="text-xl font-semibold mb-4">Trip Details</h2>
                 <TripParticipantDetails tripId={trip.id} />
               </section>
 
               <section>
-                <h2 className="text-xl font-semibold mb-4">Trip Route Overview</h2>
                 {destinations && destinations.length >= 2 ? (
                   <MapRouteView destinations={destinations} />
                 ) : (
@@ -133,12 +131,10 @@ export default function TripDetail() {
 
             <div className="space-y-8">
               <section>
-                <h2 className="text-xl font-semibold mb-4">Group Chat</h2>
                 <ChatMessages tripId={trip.id} />
               </section>
 
               <section>
-                <h2 className="text-xl font-semibold mb-4">Checklist</h2>
                 <Checklist tripId={trip.id} />
               </section>
             </div>
