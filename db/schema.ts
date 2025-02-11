@@ -175,7 +175,6 @@ export const activities = pgTable("activities", {
   location: text("location"),
   startTime: timestamp("start_time").notNull(),
   endTime: timestamp("end_time").notNull(),
-  participants: integer("participant_ids").array(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -219,13 +218,10 @@ export const checklistRelations = relations(checklist, ({ one }) => ({
   }),
 }));
 
-export const activitiesRelations = relations(activities, ({ one, many }) => ({
+export const activitiesRelations = relations(activities, ({ one }) => ({
   trip: one(trips, {
     fields: [activities.tripId],
     references: [trips.id],
-  }),
-  participants: many(participants, {
-    relationName: "activity_participants"
   }),
 }));
 

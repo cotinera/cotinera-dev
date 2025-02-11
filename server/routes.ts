@@ -167,18 +167,7 @@ export function registerRoutes(app: Express): Server {
         where: eq(trips.ownerId, req.user?.id || 1),
         with: {
           participants: true,
-          activities: {
-            columns: {
-              id: true,
-              title: true,
-              description: true,
-              location: true,
-              startTime: true,
-              endTime: true,
-              participants: true,
-              createdAt: true,
-            }
-          },
+          activities: true,
           flights: true,
           accommodations: true,
         },
@@ -190,18 +179,7 @@ export function registerRoutes(app: Express): Server {
           trip: {
             with: {
               participants: true,
-              activities: {
-                columns: {
-                  id: true,
-                  title: true,
-                  description: true,
-                  location: true,
-                  startTime: true,
-                  endTime: true,
-                  participants: true,
-                  createdAt: true,
-                }
-              },
+              activities: true,
               flights: true,
               accommodations: true,
             }
@@ -299,7 +277,6 @@ export function registerRoutes(app: Express): Server {
         endTime: new Date(req.body.endTime),
         description: req.body.description || null,
         location: req.body.location || null,
-        participants: req.body.participants || [],
       }).returning();
 
       if (!newActivity) {
@@ -325,7 +302,6 @@ export function registerRoutes(app: Express): Server {
           location: req.body.location,
           startTime: new Date(req.body.startTime),
           endTime: new Date(req.body.endTime),
-          participants: req.body.participants || [],
         })
         .where(
           and(
