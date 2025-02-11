@@ -161,7 +161,8 @@ export const shareLinks = pgTable("share_links", {
 export const participants = pgTable("participants", {
   id: serial("id").primaryKey(),
   tripId: integer("trip_id").notNull().references(() => trips.id),
-  userId: integer("user_id").notNull().references(() => users.id),
+  userId: integer("user_id").references(() => users.id),
+  name: text("name"),
   status: text("status").notNull(),
   arrivalDate: date("arrival_date"),
   departureDate: date("departure_date"),
