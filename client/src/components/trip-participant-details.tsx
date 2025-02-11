@@ -24,9 +24,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { useForm } from "react-hook-form";
 import { format } from "date-fns";
-import { CalendarDays, Hotel, Plane, Users } from "lucide-react";
+import { CalendarDays, Hotel, Plane, Users, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 
 interface TripParticipantDetailsProps {
   tripId: number;
@@ -38,16 +55,18 @@ interface ParticipantDetails extends Participant {
   user: User;
   flights?: Flight[];
   accommodation?: Accommodation;
-  flightStatus: BookingStatus;
-  hotelStatus: BookingStatus;
 }
 
 export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) {
   const queryClient = useQueryClient();
-  const [selectedParticipant, setSelectedParticipant] = useState<ParticipantDetails | null>(null);
+  const { toast } = useToast();
+  const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
 
-  // Fetch participants with their travel details
-  const { data: participants = [], isLoading } = useQuery<ParticipantDetails[]>({
+  // Fetch trip and participants with their travel details
+  const { data: tripDetails } = useQuery<{
+    participants: ParticipantDetails[];
+    owner: User;
+  }>({
     queryKey: [`/api/trips/${tripId}/participants`],
     queryFn: async () => {
       const res = await fetch(`/api/trips/${tripId}/participants`);
@@ -55,6 +74,40 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       return res.json();
     },
   });
+
+  const form = useForm({
+    defaultValues: {
+      email: "",
+      arrivalDate: "",
+      departureDate: "",
+    },
+  });
+
+  const onSubmit = async (data: { email: string; arrivalDate: string; departureDate: string }) => {
+    try {
+      const res = await fetch(`/api/trips/${tripId}/participants`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) throw new Error("Failed to add participant");
+
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      setIsAddParticipantOpen(false);
+      form.reset();
+      toast({
+        title: "Success",
+        description: "Participant added successfully",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to add participant",
+      });
+    }
+  };
 
   const updateBookingStatus = async (
     participantId: number,
@@ -70,12 +123,29 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
       if (!res.ok) throw new Error(`Failed to update ${type} status`);
 
-      // Invalidate participants query to refresh the data
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      toast({
+        title: "Success",
+        description: `${type.charAt(0).toUpperCase() + type.slice(1)} status updated`,
+      });
     } catch (error) {
-      console.error("Failed to update status:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : `Failed to update ${type} status`,
+      });
     }
   };
+
+  const participants = tripDetails?.participants || [];
+  const owner = tripDetails?.owner;
+
+  // Sort participants to show owner first
+  const sortedParticipants = [...participants].sort((a, b) => {
+    if (a.user.id === owner?.id) return -1;
+    if (b.user.id === owner?.id) return 1;
+    return 0;
+  });
 
   return (
     <Card>
@@ -85,6 +155,60 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
             <CardTitle>Trip Details</CardTitle>
             <CardDescription>Manage participant travel arrangements</CardDescription>
           </div>
+          <Dialog open={isAddParticipantOpen} onOpenChange={setIsAddParticipantOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Traveller
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Traveller</DialogTitle>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email</FormLabel>
+                        <FormControl>
+                          <Input type="email" placeholder="Enter email" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="arrivalDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Arrival Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="departureDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Departure Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="submit" className="w-full">Add Traveller</Button>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
         </div>
       </CardHeader>
       <CardContent>
@@ -99,10 +223,13 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
             </TableRow>
           </TableHeader>
           <TableBody>
-            {participants.map((participant) => (
+            {sortedParticipants.map((participant) => (
               <TableRow key={participant.id}>
                 <TableCell className="font-medium">
                   {participant.user.name}
+                  {participant.user.id === owner?.id && (
+                    <Badge variant="secondary" className="ml-2">Owner</Badge>
+                  )}
                 </TableCell>
                 <TableCell>
                   {participant.arrivalDate && participant.departureDate ? (
