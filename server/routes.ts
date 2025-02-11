@@ -607,9 +607,9 @@ export function registerRoutes(app: Express): Server {
           }
         } catch (error) {
           console.error('Error handling user:', error);
-          return res.status(500).json({ 
-            error: "Failed to process user account", 
-            details: error instanceof Error ? error.message : 'Unknown error' 
+          return res.status(500).json({
+            error: "Failed to process user account",
+            details: error instanceof Error ? error.message : 'Unknown error'
           });
         }
       }
@@ -706,7 +706,8 @@ export function registerRoutes(app: Express): Server {
         id: trips.id,
         owner: {
           id: users.id,
-          name: users.name
+          name: users.name,
+          email: users.email
         }
       })
         .from(trips)
@@ -718,31 +719,36 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: "Trip not found" });
       }
 
-      // Get all participants for the trip
-      const tripParticipants = await db.select({
-        id: participants.id,
-        tripId: participants.tripId,
-        name: participants.name,
-        status: participants.status,
-        arrivalDate: participants.arrivalDate,
-        departureDate: participants.departureDate,
-        flightStatus: participants.flightStatus,
-        hotelStatus: participants.hotelStatus,
-        user: {
-          id: users.id,
-          name: users.name,
-          email: users.email
+      // Get all participants with their related data
+      const tripParticipants = await db.query.participants.findMany({
+        where: eq(participants.tripId, tripId),
+        with: {
+          user: true,
+          trip: {
+            with: {
+              flights: true,
+              accommodations: true,
+            }
+          }
         }
-      })
-        .from(participants)
-        .where(eq(participants.tripId, tripId))
-        .leftJoin(users, eq(participants.userId, users.id));
+      });
 
-      console.log('Found participants:', tripParticipants);
+      const participantsWithDetails = tripParticipants.map(participant => ({
+        ...participant,
+        flights: participant.trip.flights,
+        accommodation: participant.trip.accommodations[0], // Assuming one accommodation per participant for now
+        user: participant.user ? {
+          id: participant.user.id,
+          name: participant.user.name,
+          email: participant.user.email
+        } : null
+      }));
+
+      console.log('Found participants with details:', participantsWithDetails);
 
       // Return both trip owner and participants
       res.json({
-        participants: tripParticipants,
+        participants: participantsWithDetails,
         owner: tripWithOwner[0].owner
       });
     } catch (error) {
