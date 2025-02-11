@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -175,20 +174,12 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   const participants = tripDetails?.participants || [];
   const owner = tripDetails?.owner;
 
-  // Sort participants to show owner first
-  const sortedParticipants = [...participants].sort((a, b) => {
-    if (a.user?.id === owner?.id) return -1;
-    if (b.user?.id === owner?.id) return 1;
-    return 0;
-  });
-
   return (
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center">
           <div>
-            <CardTitle>Trip Details</CardTitle>
-            <CardDescription>Manage participant travel arrangements</CardDescription>
+            <CardTitle>Travellers</CardTitle>
           </div>
           <Dialog open={isAddParticipantOpen} onOpenChange={setIsAddParticipantOpen}>
             <DialogTrigger asChild>
@@ -211,33 +202,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                         <FormLabel>Name*</FormLabel>
                         <FormControl>
                           <Input placeholder="Enter name" {...field} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email (Optional)</FormLabel>
-                        <FormControl>
-                          <Input type="email" placeholder="Enter email" {...field} />
-                        </FormControl>
-                        <FormDescription>
-                          Only required if the participant needs access to the trip details
-                        </FormDescription>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="passportNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Passport Number (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter passport number" {...field} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -323,18 +287,18 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead><Users className="h-4 w-4" /> Participant</TableHead>
+              <TableHead><Users className="h-4 w-4" /> Traveller</TableHead>
               <TableHead><CalendarDays className="h-4 w-4" /> Dates</TableHead>
               <TableHead><Hotel className="h-4 w-4" /> Accommodation</TableHead>
               <TableHead><Plane className="h-4 w-4" /> Flight</TableHead>
-              <TableHead>Booking Status</TableHead>
+              <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedParticipants.map((participant) => (
+            {participants.map((participant) => (
               <TableRow key={participant.id}>
                 <TableCell className="font-medium">
-                  {participant.name || participant.user?.name || "Unnamed Participant"}
+                  {participant.name}
                   {participant.user?.id === owner?.id && (
                     <Badge variant="secondary" className="ml-2">Owner</Badge>
                   )}
@@ -372,7 +336,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                 <TableCell>
                   <div className="flex gap-2">
                     <Select
-                      value={participant.flightStatus}
+                      value={participant.flightStatus || "pending"}
                       onValueChange={(value: BookingStatus) =>
                         updateBookingStatus(participant.id, "flight", value)
                       }
@@ -387,7 +351,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                       </SelectContent>
                     </Select>
                     <Select
-                      value={participant.hotelStatus}
+                      value={participant.hotelStatus || "pending"}
                       onValueChange={(value: BookingStatus) =>
                         updateBookingStatus(participant.id, "hotel", value)
                       }
