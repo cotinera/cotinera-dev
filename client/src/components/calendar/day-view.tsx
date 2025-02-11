@@ -21,6 +21,7 @@ import {
   differenceInDays,
   startOfDay,
   endOfDay,
+  differenceInMinutes,
 } from "date-fns";
 import {
   DndContext,
@@ -62,52 +63,70 @@ function DraggableEvent({
   const [isResizing, setIsResizing] = useState(false);
   const [resizeEdge, setResizeEdge] = useState<'top' | 'bottom' | null>(null);
   const elementRef = useRef<HTMLDivElement>(null);
+  const initialHeightRef = useRef<number | null>(null);
+  const initialEventRef = useRef<Activity>(event);
 
-  // Get the initial event times
+  // Calculate initial height once
   const eventStart = new Date(event.startTime);
   const eventEnd = new Date(event.endTime);
-  const durationInHours = (eventEnd.getTime() - eventStart.getTime()) / (1000 * 60 * 60);
-  const heightInPixels = durationInHours * 48; // 48px per hour
+  const durationInHours = differenceInMinutes(eventEnd, eventStart) / 60;
+  const heightInPixels = Math.max(durationInHours * 48, 48); // 48px per hour, minimum 1 hour
 
   const handleResizeStart = (e: React.MouseEvent, edge: 'top' | 'bottom') => {
     e.preventDefault();
     e.stopPropagation();
+    if (!elementRef.current) return;
+
     setIsResizing(true);
     setResizeEdge(edge);
+    initialHeightRef.current = elementRef.current.offsetHeight;
+    initialEventRef.current = event;
   };
 
   const handleResizeMove = (e: MouseEvent) => {
-    if (!isResizing || !resizeEdge || !elementRef.current) return;
+    if (!isResizing || !resizeEdge || !elementRef.current || !initialHeightRef.current) return;
 
     e.preventDefault();
     const rect = elementRef.current.getBoundingClientRect();
     const mouseY = e.clientY;
 
     if (resizeEdge === 'top') {
-      const originalBottom = rect.bottom;
-      const newTop = Math.min(Math.max(mouseY, rect.bottom - (24 * 48)), rect.bottom - 48); // Max 24 hours, min 1 hour
-      const newHeight = originalBottom - newTop;
+      // When dragging top edge, only modify start time
+      const maxDelta = rect.bottom - rect.top - 48; // Minimum 1 hour
+      const delta = Math.min(Math.max(mouseY - rect.top, -maxDelta), maxDelta);
+      const newHeight = initialHeightRef.current - delta;
 
-      const hoursDelta = (rect.top - newTop) / 48;
-      const newStartTime = new Date(eventStart);
-      newStartTime.setHours(eventStart.getHours() + hoursDelta);
+      if (newHeight >= 48) { // Minimum 1 hour
+        const hoursDelta = delta / 48;
+        const newStartTime = new Date(initialEventRef.current.startTime);
+        newStartTime.setHours(
+          eventStart.getHours() + Math.floor(hoursDelta),
+          eventStart.getMinutes() + ((hoursDelta % 1) * 60)
+        );
 
-      if (newStartTime < eventEnd) {
-        elementRef.current.style.height = `${newHeight}px`;
-        onResize('top', newStartTime);
+        if (newStartTime < eventEnd) {
+          elementRef.current.style.height = `${newHeight}px`;
+          onResize('top', newStartTime);
+        }
       }
     } else {
-      const originalTop = rect.top;
-      const newBottom = Math.max(Math.min(mouseY, rect.top + (24 * 48)), rect.top + 48); // Max 24 hours, min 1 hour
-      const newHeight = newBottom - originalTop;
+      // When dragging bottom edge, only modify end time
+      const maxDelta = (24 * 48) - (rect.bottom - rect.top); // Maximum 24 hours
+      const delta = Math.min(Math.max(mouseY - rect.bottom, -initialHeightRef.current + 48), maxDelta);
+      const newHeight = initialHeightRef.current + delta;
 
-      const hoursDelta = (newBottom - rect.bottom) / 48;
-      const newEndTime = new Date(eventEnd);
-      newEndTime.setHours(eventEnd.getHours() + hoursDelta);
+      if (newHeight >= 48) { // Minimum 1 hour
+        const hoursDelta = delta / 48;
+        const newEndTime = new Date(initialEventRef.current.endTime);
+        newEndTime.setHours(
+          eventEnd.getHours() + Math.floor(hoursDelta),
+          eventEnd.getMinutes() + ((hoursDelta % 1) * 60)
+        );
 
-      if (newEndTime > eventStart) {
-        elementRef.current.style.height = `${newHeight}px`;
-        onResize('bottom', newEndTime);
+        if (newEndTime > eventStart) {
+          elementRef.current.style.height = `${newHeight}px`;
+          onResize('bottom', newEndTime);
+        }
       }
     }
   };
@@ -115,6 +134,7 @@ function DraggableEvent({
   const handleResizeEnd = () => {
     setIsResizing(false);
     setResizeEdge(null);
+    initialHeightRef.current = null;
   };
 
   useEffect(() => {
@@ -144,12 +164,14 @@ function DraggableEvent({
     transition: isResizing ? 'none' : undefined,
   };
 
+  const combinedRef = (el: HTMLDivElement | null) => {
+    if (!isResizing) setNodeRef(el);
+    if (elementRef) elementRef.current = el;
+  };
+
   return (
     <div
-      ref={(el) => {
-        if (!isResizing) setNodeRef(el);
-        elementRef.current = el;
-      }}
+      ref={combinedRef}
       {...(!isResizing ? { ...attributes, ...listeners } : {})}
       style={style}
       className={`bg-primary/20 hover:bg-primary/30 rounded-md px-2 py-1 group/event ${
@@ -281,11 +303,13 @@ export function DayView({ trip }: { trip: Trip }) {
 
     const startDate = new Date(activityToUpdate.startTime);
     const endDate = new Date(activityToUpdate.endTime);
-    const durationMs = endDate.getTime() - startDate.getTime();
+    const durationMs = differenceInMinutes(endDate, startDate);
 
+    // Preserve exact duration when moving
     const newStartTime = new Date(newDate);
     newStartTime.setHours(newHour, startDate.getMinutes(), 0, 0);
-    const newEndTime = new Date(newStartTime.getTime() + durationMs);
+    const newEndTime = new Date(newStartTime);
+    newEndTime.setMinutes(newEndTime.getMinutes() + durationMs);
 
     // Validate that the new times are within trip dates
     const tripStart = startOfDay(new Date(trip.startDate));
@@ -318,7 +342,7 @@ export function DayView({ trip }: { trip: Trip }) {
         ["/api/trips", trip.id, "activities"],
         activities.map(activity =>
           activity.id === eventId
-            ? { ...activity, startTime: newStartTime, endTime: newEndTime }
+            ? { ...activity, startTime: newStartTime.toISOString(), endTime: newEndTime.toISOString() }
             : activity
         )
       );
@@ -411,11 +435,6 @@ export function DayView({ trip }: { trip: Trip }) {
       updatedActivity.startTime = newTime.toISOString();
     } else {
       updatedActivity.endTime = newTime.toISOString();
-    }
-
-    // Validate the new times
-    if (new Date(updatedActivity.startTime) >= new Date(updatedActivity.endTime)) {
-      return; // Invalid time range
     }
 
     try {
