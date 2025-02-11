@@ -22,6 +22,7 @@ import {
   startOfDay,
   endOfDay,
   differenceInMinutes,
+  setMinutes,
 } from "date-fns";
 import {
   DndContext,
@@ -37,8 +38,22 @@ import {
 import type { Trip, Activity } from "@db/schema";
 import { Pencil, Trash2, Loader2 } from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+
+// Helper function to snap time to nearest 15 minutes
+function snapToQuarterHour(date: Date): Date {
+  const minutes = date.getMinutes();
+  const snappedMinutes = Math.round(minutes / 15) * 15;
+  return new Date(date.setMinutes(snappedMinutes, 0, 0));
+}
+
+// Helper function to convert pixels to minutes (with 15-minute snapping)
+function pixelsToMinutes(pixels: number): number {
+  // 48px = 1 hour, so 12px = 15 minutes
+  const minutes = (pixels / 48) * 60;
+  return Math.round(minutes / 15) * 15;
+}
 
 interface TimeSlot {
   date: Date;
@@ -66,11 +81,11 @@ function DraggableEvent({
   const initialHeightRef = useRef<number | null>(null);
   const initialEventRef = useRef<Activity>(event);
 
-  // Calculate initial height once
+  // Calculate initial height
   const eventStart = new Date(event.startTime);
   const eventEnd = new Date(event.endTime);
-  const durationInHours = differenceInMinutes(eventEnd, eventStart) / 60;
-  const heightInPixels = Math.max(durationInHours * 48, 48); // 48px per hour, minimum 1 hour
+  const durationInMinutes = differenceInMinutes(eventEnd, eventStart);
+  const heightInPixels = Math.max((durationInMinutes / 60) * 48, 48); // 48px per hour, minimum 1 hour
 
   const handleResizeStart = (e: React.MouseEvent, edge: 'top' | 'bottom') => {
     e.preventDefault();
@@ -97,16 +112,15 @@ function DraggableEvent({
       const newHeight = initialHeightRef.current - delta;
 
       if (newHeight >= 48) { // Minimum 1 hour
-        const hoursDelta = delta / 48;
+        const minutesDelta = pixelsToMinutes(delta);
         const newStartTime = new Date(initialEventRef.current.startTime);
-        newStartTime.setHours(
-          eventStart.getHours() + Math.floor(hoursDelta),
-          eventStart.getMinutes() + ((hoursDelta % 1) * 60)
-        );
+        newStartTime.setMinutes(newStartTime.getMinutes() + minutesDelta);
+        const snappedStartTime = snapToQuarterHour(newStartTime);
 
-        if (newStartTime < eventEnd) {
-          elementRef.current.style.height = `${newHeight}px`;
-          onResize('top', newStartTime);
+        if (snappedStartTime < eventEnd) {
+          const newHeightAfterSnap = (differenceInMinutes(eventEnd, snappedStartTime) / 60) * 48;
+          elementRef.current.style.height = `${newHeightAfterSnap}px`;
+          onResize('top', snappedStartTime);
         }
       }
     } else {
@@ -116,16 +130,15 @@ function DraggableEvent({
       const newHeight = initialHeightRef.current + delta;
 
       if (newHeight >= 48) { // Minimum 1 hour
-        const hoursDelta = delta / 48;
+        const minutesDelta = pixelsToMinutes(delta);
         const newEndTime = new Date(initialEventRef.current.endTime);
-        newEndTime.setHours(
-          eventEnd.getHours() + Math.floor(hoursDelta),
-          eventEnd.getMinutes() + ((hoursDelta % 1) * 60)
-        );
+        newEndTime.setMinutes(newEndTime.getMinutes() + minutesDelta);
+        const snappedEndTime = snapToQuarterHour(newEndTime);
 
-        if (newEndTime > eventStart) {
-          elementRef.current.style.height = `${newHeight}px`;
-          onResize('bottom', newEndTime);
+        if (snappedEndTime > eventStart) {
+          const newHeightAfterSnap = (differenceInMinutes(snappedEndTime, eventStart) / 60) * 48;
+          elementRef.current.style.height = `${newHeightAfterSnap}px`;
+          onResize('bottom', snappedEndTime);
         }
       }
     }
@@ -148,7 +161,6 @@ function DraggableEvent({
     }
   }, [isResizing, resizeEdge]);
 
-  // Style for the event box
   const style: React.CSSProperties = {
     transform: !isResizing && transform ? CSS.Transform.toString(transform) : undefined,
     width: '280px',
@@ -166,7 +178,7 @@ function DraggableEvent({
 
   const combinedRef = (el: HTMLDivElement | null) => {
     if (!isResizing) setNodeRef(el);
-    if (elementRef) elementRef.current = el;
+    elementRef.current = el;
   };
 
   return (
