@@ -61,60 +61,53 @@ function DraggableEvent({
 
   const [isResizing, setIsResizing] = useState(false);
   const [resizeEdge, setResizeEdge] = useState<'top' | 'bottom' | null>(null);
-  const [startY, setStartY] = useState(0);
-  const [startHeight, setStartHeight] = useState(0);
   const elementRef = useRef<HTMLDivElement>(null);
 
-  const handleResizeStart = (e: React.MouseEvent, edge: 'top' | 'bottom') => {
-    e.stopPropagation();
-    if (!elementRef.current) return;
+  // Get the initial event times
+  const eventStart = new Date(event.startTime);
+  const eventEnd = new Date(event.endTime);
+  const durationInHours = (eventEnd.getTime() - eventStart.getTime()) / (1000 * 60 * 60);
+  const heightInPixels = durationInHours * 48; // 48px per hour
 
+  const handleResizeStart = (e: React.MouseEvent, edge: 'top' | 'bottom') => {
+    e.preventDefault();
+    e.stopPropagation();
     setIsResizing(true);
     setResizeEdge(edge);
-    setStartY(e.clientY);
-    setStartHeight(elementRef.current.offsetHeight);
-
-    // Calculate initial times
-    const eventStart = new Date(event.startTime);
-    const eventEnd = new Date(event.endTime);
-
-    // Store the opposite end time that won't change during resize
-    const fixedTime = edge === 'top' ? eventEnd : eventStart;
   };
 
   const handleResizeMove = (e: MouseEvent) => {
     if (!isResizing || !resizeEdge || !elementRef.current) return;
 
-    const currentY = e.clientY;
-    const deltaY = currentY - startY;
-
-    // Calculate new height (minimum 1 hour = 48px)
-    let newHeight = startHeight;
-    if (resizeEdge === 'top') {
-      newHeight = Math.max(48, startHeight - deltaY);
-    } else {
-      newHeight = Math.max(48, startHeight + deltaY);
-    }
-
-    // Update element height
-    elementRef.current.style.height = `${newHeight}px`;
-
-    // Calculate new time based on height change
-    const hourDelta = (newHeight - startHeight) / 48; // 48px per hour
-    const eventStart = new Date(event.startTime);
-    const eventEnd = new Date(event.endTime);
+    e.preventDefault();
+    const rect = elementRef.current.getBoundingClientRect();
+    const mouseY = e.clientY;
 
     if (resizeEdge === 'top') {
-      const newStart = new Date(eventStart);
-      newStart.setHours(eventStart.getHours() - hourDelta);
-      if (newStart < eventEnd) {
-        onResize('top', newStart);
+      const originalBottom = rect.bottom;
+      const newTop = Math.min(Math.max(mouseY, rect.bottom - (24 * 48)), rect.bottom - 48); // Max 24 hours, min 1 hour
+      const newHeight = originalBottom - newTop;
+
+      const hoursDelta = (rect.top - newTop) / 48;
+      const newStartTime = new Date(eventStart);
+      newStartTime.setHours(eventStart.getHours() + hoursDelta);
+
+      if (newStartTime < eventEnd) {
+        elementRef.current.style.height = `${newHeight}px`;
+        onResize('top', newStartTime);
       }
     } else {
-      const newEnd = new Date(eventEnd);
-      newEnd.setHours(eventEnd.getHours() + hourDelta);
-      if (newEnd > eventStart) {
-        onResize('bottom', newEnd);
+      const originalTop = rect.top;
+      const newBottom = Math.max(Math.min(mouseY, rect.top + (24 * 48)), rect.top + 48); // Max 24 hours, min 1 hour
+      const newHeight = newBottom - originalTop;
+
+      const hoursDelta = (newBottom - rect.bottom) / 48;
+      const newEndTime = new Date(eventEnd);
+      newEndTime.setHours(eventEnd.getHours() + hoursDelta);
+
+      if (newEndTime > eventStart) {
+        elementRef.current.style.height = `${newHeight}px`;
+        onResize('bottom', newEndTime);
       }
     }
   };
@@ -133,15 +126,11 @@ function DraggableEvent({
         window.removeEventListener('mouseup', handleResizeEnd);
       };
     }
-  }, [isResizing, startY, startHeight, resizeEdge]);
+  }, [isResizing, resizeEdge]);
 
-  const eventStart = new Date(event.startTime);
-  const eventEnd = new Date(event.endTime);
-  const durationInHours = (eventEnd.getTime() - eventStart.getTime()) / (1000 * 60 * 60);
-  const heightInPixels = durationInHours * 48; // 48px per hour
-
+  // Style for the event box
   const style: React.CSSProperties = {
-    transform: transform ? CSS.Transform.toString(transform) : undefined,
+    transform: !isResizing && transform ? CSS.Transform.toString(transform) : undefined,
     width: '280px',
     height: `${heightInPixels}px`,
     position: 'absolute',
@@ -150,19 +139,20 @@ function DraggableEvent({
     backgroundColor: isDragging ? 'hsl(var(--primary)/0.2)' : undefined,
     boxShadow: isDragging ? 'var(--shadow-md)' : undefined,
     opacity: isDragging ? 0.9 : 1,
-    zIndex: isDragging ? 50 : 1,
+    zIndex: isDragging || isResizing ? 50 : 1,
     cursor: isResizing ? 'ns-resize' : 'move',
+    transition: isResizing ? 'none' : undefined,
   };
 
   return (
     <div
       ref={(el) => {
-        setNodeRef(el);
-        if (elementRef) elementRef.current = el;
+        if (!isResizing) setNodeRef(el);
+        elementRef.current = el;
       }}
-      {...(isResizing ? {} : { ...attributes, ...listeners })}
+      {...(!isResizing ? { ...attributes, ...listeners } : {})}
       style={style}
-      className={`bg-primary/20 hover:bg-primary/30 rounded-md px-2 py-1 group/event transition-colors ${
+      className={`bg-primary/20 hover:bg-primary/30 rounded-md px-2 py-1 group/event ${
         isDragging ? 'ring-1 ring-primary/50' : ''
       }`}
     >
