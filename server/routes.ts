@@ -813,6 +813,36 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Update destination endpoint - add after the existing destination routes
+  app.patch("/api/trips/:tripId/destinations/:destinationId", async (req, res) => {
+    try {
+      const [updatedDestination] = await db
+        .update(destinations)
+        .set({
+          name: req.body.name,
+          startDate: new Date(req.body.startDate),
+          endDate: new Date(req.body.endDate),
+          coordinates: req.body.coordinates,
+        })
+        .where(
+          and(
+            eq(destinations.id, parseInt(req.params.destinationId)),
+            eq(destinations.tripId, parseInt(req.params.tripId))
+          )
+        )
+        .returning();
+
+      if (!updatedDestination) {
+        return res.status(404).json({ error: "Destination not found" });
+      }
+
+      res.json(updatedDestination);
+    } catch (error) {
+      console.error('Error updating destination:', error);
+      res.status(500).json({ error: 'Failed to update destination' });
+    }
+  });
+
   // Update destination order
   app.patch("/api/trips/:tripId/destinations/reorder", async (req, res) => {
     try {

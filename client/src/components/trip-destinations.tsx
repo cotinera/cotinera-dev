@@ -17,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { format } from "date-fns";
-import { Pin, Plus, ChevronDown } from "lucide-react";
+import { Pin, Plus, ChevronDown, Edit2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -44,12 +44,18 @@ interface AddDestinationForm {
   };
 }
 
+interface EditDestinationForm extends AddDestinationForm {
+  id: number;
+}
+
 export function TripDestinations({ tripId }: { tripId: number }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isAddDestinationOpen, setIsAddDestinationOpen] = useState(false);
+  const [isEditDestinationOpen, setIsEditDestinationOpen] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [editingDestination, setEditingDestination] = useState<Destination | null>(null);
 
   const { data: destinations, refetch } = useQuery<Destination[]>({
     queryKey: [`/api/trips/${tripId}/destinations`],
@@ -102,6 +108,47 @@ export function TripDestinations({ tripId }: { tripId: number }) {
     },
   });
 
+  const editDestinationMutation = useMutation({
+    mutationFn: async (data: EditDestinationForm) => {
+      const res = await fetch(`/api/trips/${tripId}/destinations/${data.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: data.name,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          coordinates: selectedCoordinates || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to update destination");
+      }
+
+      return res.json();
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
+      await refetch();
+      setIsEditDestinationOpen(false);
+      editForm.reset();
+      setSelectedCoordinates(null);
+      setEditingDestination(null);
+      toast({
+        title: "Success",
+        description: "Destination updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to update destination",
+      });
+    },
+  });
+
   const form = useForm<AddDestinationForm>({
     defaultValues: {
       name: "",
@@ -110,8 +157,33 @@ export function TripDestinations({ tripId }: { tripId: number }) {
     },
   });
 
+  const editForm = useForm<EditDestinationForm>({
+    defaultValues: {
+      id: 0,
+      name: "",
+      startDate: "",
+      endDate: "",
+    },
+  });
+
   const onSubmit = (data: AddDestinationForm) => {
     addDestinationMutation.mutate(data);
+  };
+
+  const onEdit = (destination: Destination) => {
+    setEditingDestination(destination);
+    setSelectedCoordinates(destination.coordinates);
+    editForm.reset({
+      id: destination.id,
+      name: destination.name,
+      startDate: format(new Date(destination.startDate), "yyyy-MM-dd"),
+      endDate: format(new Date(destination.endDate), "yyyy-MM-dd"),
+    });
+    setIsEditDestinationOpen(true);
+  };
+
+  const onEditSubmit = (data: EditDestinationForm) => {
+    editDestinationMutation.mutate(data);
   };
 
   const sortedDestinations = destinations?.sort((a, b) => a.order - b.order) || [];
@@ -158,9 +230,19 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                       {format(new Date(destination.endDate), "MMM d")}
                     </p>
                   </div>
-                  <Badge variant="outline" className="ml-2 text-xs">
-                    {index + 1}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => onEdit(destination)}
+                    >
+                      <Edit2 className="h-3 w-3" />
+                    </Button>
+                    <Badge variant="outline" className="text-xs">
+                      {index + 1}
+                    </Badge>
+                  </div>
                 </div>
               ))}
             </div>
@@ -233,6 +315,70 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                       disabled={addDestinationMutation.isPending}
                     >
                       {addDestinationMutation.isPending ? "Adding..." : "Add Destination"}
+                    </Button>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={isEditDestinationOpen} onOpenChange={setIsEditDestinationOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit Destination</DialogTitle>
+                </DialogHeader>
+                <Form {...editForm}>
+                  <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+                    <FormField
+                      control={editForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Location</FormLabel>
+                          <FormControl>
+                            <MapPicker
+                              value={field.value}
+                              onChange={(address, coordinates) => {
+                                field.onChange(address);
+                                setSelectedCoordinates(coordinates);
+                              }}
+                              placeholder="Search for a location..."
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={editForm.control}
+                        name="startDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Start Date</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={editForm.control}
+                        name="endDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>End Date</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={editDestinationMutation.isPending}
+                    >
+                      {editDestinationMutation.isPending ? "Updating..." : "Update Destination"}
                     </Button>
                   </form>
                 </Form>

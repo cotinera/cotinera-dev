@@ -12,6 +12,8 @@ import { TripHeaderEdit } from "@/components/trip-header-edit";
 import { TripParticipantDetails } from "@/components/trip-participant-details";
 import { TripDestinations } from "@/components/trip-destinations";
 import { TripTimeline } from "@/components/trip-timeline";
+import { MapRouteView } from "@/components/map-route-view";
+import type { Destination } from "@db/schema";
 
 export default function TripDetail() {
   const [, params] = useRoute("/trips/:id");
@@ -29,6 +31,17 @@ export default function TripDetail() {
     },
     enabled: !!tripId,
   });
+
+  const { data: destinations } = useQuery<Destination[]>({
+    queryKey: [`/api/trips/${tripId}/destinations`],
+    queryFn: async () => {
+      const res = await fetch(`/api/trips/${tripId}/destinations`);
+      if (!res.ok) throw new Error("Failed to fetch destinations");
+      return res.json();
+    },
+    enabled: !!tripId,
+  });
+
 
   if (isLoading) {
     return (
@@ -98,7 +111,6 @@ export default function TripDetail() {
 
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-8">
-          {/* Trip Timeline Section */}
           <section>
             <TripTimeline tripId={trip.id} />
           </section>
@@ -106,8 +118,12 @@ export default function TripDetail() {
           <div className="grid gap-8 md:grid-cols-[2fr,1fr]">
             <div className="space-y-8">
               <section>
-                <h2 className="text-xl font-semibold mb-4">Location Overview</h2>
-                <MapView location={trip.location || ""} />
+                <h2 className="text-xl font-semibold mb-4">Trip Route Overview</h2>
+                {destinations && destinations.length >= 2 ? (
+                  <MapRouteView destinations={destinations} />
+                ) : (
+                  <MapView location={trip.location || ""} />
+                )}
               </section>
 
               <section>
