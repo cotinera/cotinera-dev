@@ -678,6 +678,50 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Get participants for a trip
+  app.get("/api/trips/:tripId/participants", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+
+      // Get trip details with owner
+      const trip = await db.query.trips.findFirst({
+        where: eq(trips.id, tripId),
+        with: {
+          owner: true,
+        },
+      });
+
+      if (!trip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+
+      // Get all participants for the trip
+      const participants = await db.query.participants.findMany({
+        where: eq(participants.tripId, tripId),
+        with: {
+          user: {
+            columns: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      console.log('Found participants:', participants);
+
+      // Return both trip owner and participants
+      res.json({
+        participants,
+        owner: trip.owner,
+      });
+    } catch (error) {
+      console.error('Error fetching participants:', error);
+      res.status(500).json({ error: 'Failed to fetch participants' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
