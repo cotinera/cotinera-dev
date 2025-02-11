@@ -34,7 +34,7 @@ import {
   DragOverEvent,
 } from "@dnd-kit/core";
 import type { Trip, Activity } from "@db/schema";
-import { Pencil, Trash2, Loader2 } from "lucide-react";
+import { Pencil, Trash2, Loader2, GripVertical } from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -48,14 +48,57 @@ function DraggableEvent({
   event,
   onEdit,
   onDelete,
+  onResize,
 }: {
   event: Activity;
   onEdit: () => void;
   onDelete: () => void;
+  onResize: (edge: 'top' | 'bottom', newTime: Date) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: event.id.toString(),
   });
+
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeEdge, setResizeEdge] = useState<'top' | 'bottom' | null>(null);
+  const [startY, setStartY] = useState(0);
+  const [originalTime, setOriginalTime] = useState<Date | null>(null);
+
+  const handleResizeStart = (e: React.MouseEvent, edge: 'top' | 'bottom') => {
+    e.stopPropagation();
+    setIsResizing(true);
+    setResizeEdge(edge);
+    setStartY(e.clientY);
+    setOriginalTime(edge === 'top' ? new Date(event.startTime) : new Date(event.endTime));
+  };
+
+  const handleResizeMove = (e: MouseEvent) => {
+    if (!isResizing || !resizeEdge || !originalTime) return;
+
+    const deltaY = e.clientY - startY;
+    const hourDelta = Math.round(deltaY / 48); // 48px is the height of one hour slot
+    const newTime = new Date(originalTime);
+    newTime.setHours(originalTime.getHours() + hourDelta);
+
+    onResize(resizeEdge, newTime);
+  };
+
+  const handleResizeEnd = () => {
+    setIsResizing(false);
+    setResizeEdge(null);
+    setOriginalTime(null);
+  };
+
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener('mousemove', handleResizeMove);
+      window.addEventListener('mouseup', handleResizeEnd);
+      return () => {
+        window.removeEventListener('mousemove', handleResizeMove);
+        window.removeEventListener('mouseup', handleResizeEnd);
+      };
+    }
+  }, [isResizing, startY, originalTime, resizeEdge]);
 
   const style = {
     transform: transform ? CSS.Transform.toString(transform) : undefined,
@@ -80,6 +123,12 @@ function DraggableEvent({
         isDragging ? 'ring-1 ring-primary/50' : ''
       }`}
     >
+      {/* Top resize handle */}
+      <div
+        className="absolute top-0 left-0 w-full h-1 cursor-ns-resize hover:bg-primary/50 rounded-t-md"
+        onMouseDown={(e) => handleResizeStart(e, 'top')}
+      />
+
       <div className="flex items-center justify-between h-[18px]">
         <span className="font-medium text-sm truncate max-w-[180px]">{event.title}</span>
         <div className="hidden group-hover/event:flex items-center gap-1">
@@ -111,6 +160,12 @@ function DraggableEvent({
         {format(new Date(event.startTime), "h:mm a")} -{" "}
         {format(new Date(event.endTime), "h:mm a")}
       </span>
+
+      {/* Bottom resize handle */}
+      <div
+        className="absolute bottom-0 left-0 w-full h-1 cursor-ns-resize hover:bg-primary/50 rounded-b-md"
+        onMouseDown={(e) => handleResizeStart(e, 'bottom')}
+      />
     </div>
   );
 }
@@ -129,8 +184,8 @@ function DroppableTimeSlot({
   });
 
   return (
-    <div 
-      ref={setNodeRef} 
+    <div
+      ref={setNodeRef}
       className={`h-12 relative border-t ${
         isOver ? 'bg-primary/10' : ''
       }`}
@@ -297,8 +352,8 @@ export function DayView({ trip }: { trip: Trip }) {
 
   const deleteEvent = async (activityId: number) => {
     try {
-      const res = await fetch(`/api/trips/${trip.id}/activities/${activityId}`, { 
-        method: "DELETE" 
+      const res = await fetch(`/api/trips/${trip.id}/activities/${activityId}`, {
+        method: "DELETE"
       });
 
       if (!res.ok) throw new Error("Failed to delete activity");
@@ -310,6 +365,50 @@ export function DayView({ trip }: { trip: Trip }) {
       toast({
         variant: "destructive",
         title: "Failed to delete event",
+        description: error instanceof Error ? error.message : "An error occurred",
+      });
+    }
+  };
+
+  const handleResize = async (eventId: number, edge: 'top' | 'bottom', newTime: Date) => {
+    const activityToUpdate = activities.find((a) => a.id === eventId);
+    if (!activityToUpdate) return;
+
+    const updatedActivity = { ...activityToUpdate };
+    if (edge === 'top') {
+      updatedActivity.startTime = newTime.toISOString();
+    } else {
+      updatedActivity.endTime = newTime.toISOString();
+    }
+
+    // Validate the new times
+    if (new Date(updatedActivity.startTime) >= new Date(updatedActivity.endTime)) {
+      return; // Invalid time range
+    }
+
+    try {
+      const res = await fetch(`/api/trips/${trip.id}/activities/${eventId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedActivity),
+      });
+
+      if (!res.ok) throw new Error("Failed to update activity");
+
+      // Optimistically update the UI
+      queryClient.setQueryData(
+        ["/api/trips", trip.id, "activities"],
+        activities.map(activity =>
+          activity.id === eventId ? updatedActivity : activity
+        )
+      );
+
+      // Then refetch to ensure consistency
+      await queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Failed to update event",
         description: error instanceof Error ? error.message : "An error occurred",
       });
     }
@@ -382,6 +481,7 @@ export function DayView({ trip }: { trip: Trip }) {
                               setIsEditDialogOpen(true);
                             }}
                             onDelete={() => deleteEvent(event.id)}
+                            onResize={(edge, newTime) => handleResize(event.id, edge, newTime)}
                           />
                         ))}
                         {timeSlotEvents.length === 0 && (
