@@ -127,13 +127,13 @@ function DraggableEvent({
     boxShadow: isDragging ? 'var(--shadow-md)' : undefined,
     opacity: isDragging ? 0.9 : 1,
     zIndex: isDragging ? 50 : 1,
+    pointerEvents: isResizing ? 'none' : undefined,
   };
 
   return (
     <div
       ref={setNodeRef}
-      {...attributes}
-      {...listeners}
+      {...(isResizing ? {} : { ...attributes, ...listeners })}
       style={style}
       className={`bg-primary/20 hover:bg-primary/30 rounded-md px-2 py-1 cursor-move group/event transition-colors ${
         isDragging ? 'ring-1 ring-primary/50' : ''
