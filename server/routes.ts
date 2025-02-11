@@ -628,57 +628,42 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/trips/:tripId/participants", async (req, res) => {
     try {
       const tripId = parseInt(req.params.tripId);
+      console.log('Fetching participants for trip:', tripId);
 
-      // Get trip details with owner
-      const tripWithOwner = await db.select({
-        id: trips.id,
-        owner: {
-          id: users.id,
-          name: users.name,
-          email: users.email
-        }
+      const tripParticipants = await db.select({
+        id: participants.id,
+        name: participants.name,
+        tripId: participants.tripId,
+        arrivalDate: participants.arrivalDate,
+        departureDate: participants.departureDate,
+        flightStatus: participants.flightStatus,
+        hotelStatus: participants.hotelStatus,
       })
-        .from(trips)
-        .where(eq(trips.id, tripId))
-        .leftJoin(users, eq(trips.ownerId, users.id))
-        .limit(1);
+        .from(participants)
+        .where(eq(participants.tripId, tripId));
 
-      if (!tripWithOwner.length) {
-        return res.status(404).json({ error: "Trip not found" });
-      }
+      console.log('Found participants:', tripParticipants);
 
-      // Get all participants with their related data
-      const tripParticipants = await db.query.participants.findMany({
-        where: eq(participants.tripId, tripId),
-        with: {
-          user: true,
-          trip: {
-            with: {
-              flights: true,
-              accommodations: true,
-            }
-          }
-        }
-      });
+      // Fetch flights and accommodations for each participant
+      const participantsWithDetails = await Promise.all(
+        tripParticipants.map(async (participant) => {
+          const flights = await db.select().from(flights)
+            .where(eq(flights.tripId, tripId));
 
-      const participantsWithDetails = tripParticipants.map(participant => ({
-        ...participant,
-        flights: participant.trip.flights,
-        accommodation: participant.trip.accommodations[0], // Assuming one accommodation per participant for now
-        user: participant.user ? {
-          id: participant.user.id,
-          name: participant.user.name,
-          email: participant.user.email
-        } : null
-      }));
+          const [accommodation] = await db.select().from(accommodations)
+            .where(eq(accommodations.tripId, tripId))
+            .limit(1);
 
-      console.log('Found participants with details:', participantsWithDetails);
+          return {
+            ...participant,
+            flights,
+            accommodation
+          };
+        })
+      );
 
-      // Return both trip owner and participants
-      res.json({
-        participants: participantsWithDetails,
-        owner: tripWithOwner[0].owner
-      });
+      console.log('Returning participants with details:', participantsWithDetails);
+      res.json(participantsWithDetails);
     } catch (error) {
       console.error('Error fetching participants:', error);
       res.status(500).json({ error: 'Failed to fetch participants' });
