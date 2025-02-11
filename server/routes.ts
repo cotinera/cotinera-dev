@@ -699,11 +699,7 @@ export function registerRoutes(app: Express): Server {
       const tripId = parseInt(req.params.tripId);
       const participantId = parseInt(req.params.participantId);
 
-      // Delete associated flights and accommodations
-      await db.delete(flights).where(and(eq(flights.tripId, tripId), eq(flights.participantId, participantId)));
-      await db.delete(accommodations).where(and(eq(accommodations.tripId, tripId), eq(accommodations.participantId, participantId)));
-
-      // Delete the participant
+      // Delete the participant first since it's the main entity
       const [deletedParticipant] = await db.delete(participants)
         .where(and(eq(participants.id, participantId), eq(participants.tripId, tripId)))
         .returning();

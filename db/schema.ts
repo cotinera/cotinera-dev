@@ -257,13 +257,15 @@ export const flightsRelations = relations(flights, ({ one }) => ({
     fields: [flights.tripId],
     references: [trips.id],
   }),
+  participant: one(participants),
 }));
 
-export const accommodationsRelations = relations(accommodations, ({ one }) => ({
+export const accommodationsRelations = relations(accommodations, ({ one, many }) => ({
   trip: one(trips, {
     fields: [accommodations.tripId],
     references: [trips.id],
   }),
+  participants: many(participants),
 }));
 
 export const shareLinksRelations = relations(shareLinks, ({ one }) => ({
@@ -273,7 +275,7 @@ export const shareLinksRelations = relations(shareLinks, ({ one }) => ({
   }),
 }));
 
-export const participantsRelations = relations(participants, ({ one }) => ({
+export const participantsRelations = relations(participants, ({ one, many }) => ({
   trip: one(trips, {
     fields: [participants.tripId],
     references: [trips.id],
@@ -282,6 +284,8 @@ export const participantsRelations = relations(participants, ({ one }) => ({
     fields: [participants.userId],
     references: [users.id],
   }),
+  flights: many(flights),
+  accommodation: one(accommodations),
 }));
 
 export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
