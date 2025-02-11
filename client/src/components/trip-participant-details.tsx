@@ -93,11 +93,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         const res = await fetch(`/api/trips/${tripId}/participants`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...data,
-            arrivalDate: data.arrivalDate || null,
-            departureDate: data.departureDate || null,
-          }),
+          body: JSON.stringify(data),
         });
 
         if (!res.ok) {
@@ -338,7 +334,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
             {sortedParticipants.map((participant) => (
               <TableRow key={participant.id}>
                 <TableCell className="font-medium">
-                  {participant.name || participant.user?.name}
+                  {participant.name || participant.user?.name || "Unnamed Participant"}
                   {participant.user?.id === owner?.id && (
                     <Badge variant="secondary" className="ml-2">Owner</Badge>
                   )}
@@ -350,14 +346,14 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                       {format(new Date(participant.departureDate), "MMM d, yyyy")}
                     </span>
                   ) : (
-                    <Badge variant="outline">Dates not set</Badge>
+                    <Badge variant="outline">No dates set</Badge>
                   )}
                 </TableCell>
                 <TableCell>
-                  {participant.accommodation ? (
+                  {participant.accommodation?.name ? (
                     <span>{participant.accommodation.name}</span>
                   ) : (
-                    <Badge variant="outline">Not booked</Badge>
+                    <Badge variant="outline">Not specified</Badge>
                   )}
                 </TableCell>
                 <TableCell>
@@ -370,7 +366,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                       ))}
                     </div>
                   ) : (
-                    <Badge variant="outline">Not booked</Badge>
+                    <Badge variant="outline">Not specified</Badge>
                   )}
                 </TableCell>
                 <TableCell>
