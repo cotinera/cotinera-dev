@@ -50,6 +50,9 @@ interface AddParticipantForm {
   accommodation?: string;
 }
 
+const STATUS_CYCLE = ['pending', 'yes', 'no'] as const;
+type Status = typeof STATUS_CYCLE[number];
+
 export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -64,6 +67,32 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         throw new Error(error.message || "Failed to fetch participants");
       }
       return res.json();
+    },
+  });
+
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ participantId, status }: { participantId: number; status: Status }) => {
+      const res = await fetch(`/api/trips/${tripId}/participants/${participantId}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to update status");
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      toast({ title: "Success", description: "Status updated successfully" });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to update status",
+      });
     },
   });
 
@@ -131,6 +160,23 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       accommodation: "",
     },
   });
+
+  const handleStatusClick = (participantId: number, currentStatus: Status) => {
+    const currentIndex = STATUS_CYCLE.indexOf(currentStatus);
+    const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
+    updateStatusMutation.mutate({ participantId, status: nextStatus });
+  };
+
+  const getStatusBadgeVariant = (status: Status) => {
+    switch (status) {
+      case 'yes':
+        return 'default';
+      case 'no':
+        return 'destructive';
+      default:
+        return 'secondary';
+    }
+  };
 
   return (
     <Card>
@@ -257,11 +303,12 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">
-                      <Badge variant={participant.flightStatus === "yes" ? "default" : "secondary"}>
-                        {participant.flightStatus === "yes" ? "Booked" : "Pending"}
-                      </Badge>
-                      <Badge variant={participant.hotelStatus === "yes" ? "default" : "secondary"}>
-                        {participant.hotelStatus === "yes" ? "Paid" : "Pending"}
+                      <Badge
+                        variant={getStatusBadgeVariant(participant.status as Status)}
+                        className="cursor-pointer"
+                        onClick={() => handleStatusClick(participant.id, participant.status as Status)}
+                      >
+                        {participant.status === 'yes' ? 'Confirmed' : participant.status === 'no' ? 'Declined' : 'Pending'}
                       </Badge>
                       <Button
                         variant="ghost"

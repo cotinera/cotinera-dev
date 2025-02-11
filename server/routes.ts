@@ -668,17 +668,16 @@ export function registerRoutes(app: Express): Server {
   // Update participant status endpoint
   app.patch("/api/trips/:tripId/participants/:participantId/status", async (req, res) => {
     try {
-      const { type, status } = req.body;
-      if (!['flight', 'hotel'].includes(type) || !['yes', 'no', 'pending'].includes(status)) {
-        return res.status(400).json({ error: 'Invalid status update parameters' });
+      const { status } = req.body;
+      if (!['yes', 'no', 'pending'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid status' });
       }
 
       const participantId = parseInt(req.params.participantId);
-      const statusField = type === 'flight' ? 'flightStatus' : 'hotelStatus';
 
       const [updatedParticipant] = await db
         .update(participants)
-        .set({ [statusField]: status })
+        .set({ status })
         .where(eq(participants.id, participantId))
         .returning();
 
