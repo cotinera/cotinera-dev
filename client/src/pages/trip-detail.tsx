@@ -42,7 +42,6 @@ export default function TripDetail() {
     enabled: !!tripId,
   });
 
-
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -118,16 +117,17 @@ export default function TripDetail() {
           <div className="grid gap-8 md:grid-cols-[2fr,1fr]">
             <div className="space-y-8">
               <section>
+                <h2 className="text-xl font-semibold mb-4">Trip Details</h2>
+                <TripParticipantDetails tripId={trip.id} />
+              </section>
+
+              <section>
                 <h2 className="text-xl font-semibold mb-4">Trip Route Overview</h2>
                 {destinations && destinations.length >= 2 ? (
                   <MapRouteView destinations={destinations} />
                 ) : (
                   <MapView location={trip.location || ""} />
                 )}
-              </section>
-
-              <section>
-                <TripParticipantDetails tripId={trip.id} />
               </section>
             </div>
 
