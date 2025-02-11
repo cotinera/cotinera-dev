@@ -239,10 +239,12 @@ function DraggableEvent({
 function DroppableTimeSlot({
   id,
   isOver,
+  isDragging,
   children,
 }: {
   id: string;
   isOver: boolean;
+  isDragging: boolean;
   children: React.ReactNode;
 }) {
   const { setNodeRef } = useDroppable({
@@ -268,6 +270,7 @@ export function DayView({ trip }: { trip: Trip }) {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [activeDropId, setActiveDropId] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -295,6 +298,7 @@ export function DayView({ trip }: { trip: Trip }) {
   });
 
   const handleDragStart = () => {
+    setIsDragging(true);
     document.body.classList.add('select-none');
   };
 
@@ -336,14 +340,14 @@ export function DayView({ trip }: { trip: Trip }) {
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
+    setIsDragging(false);
     document.body.classList.remove('select-none');
     setActiveDropId(null);
 
-    if (!over) return;
+    if (!event.over) return;
 
-    const eventId = parseInt(active.id as string);
-    const [dateStr, hourStr] = (over.id as string).split("|");
+    const eventId = parseInt(event.active.id as string);
+    const [dateStr, hourStr] = (event.over.id as string).split("|");
     const newDate = new Date(dateStr);
     const newHour = parseInt(hourStr);
 
@@ -554,7 +558,7 @@ export function DayView({ trip }: { trip: Trip }) {
                     const isOver = activeDropId === timeSlotId;
 
                     return (
-                      <DroppableTimeSlot key={timeSlotId} id={timeSlotId} isOver={isOver}>
+                      <DroppableTimeSlot key={timeSlotId} id={timeSlotId} isOver={isOver} isDragging={isDragging}>
                         {timeSlotEvents.map((event) => (
                           <DraggableEvent
                             key={event.id}
@@ -567,7 +571,7 @@ export function DayView({ trip }: { trip: Trip }) {
                             onResize={(edge, newTime) => handleResize(event.id, edge, newTime)}
                           />
                         ))}
-                        {timeSlotEvents.length === 0 && (
+                        {timeSlotEvents.length === 0 && !isDragging && (
                           <Dialog
                             open={
                               isCreateDialogOpen &&
