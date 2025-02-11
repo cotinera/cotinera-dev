@@ -253,7 +253,7 @@ function DroppableTimeSlot({
     <div
       ref={setNodeRef}
       className={`h-12 relative border-t ${
-        isOver ? 'bg-primary/10' : ''
+        isOver ? 'bg-primary/20 transition-colors duration-75' : ''
       }`}
     >
       {children}
@@ -298,6 +298,43 @@ export function DayView({ trip }: { trip: Trip }) {
     document.body.classList.add('select-none');
   };
 
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    if (!over) return;
+
+    const eventId = parseInt(active.id as string);
+    const [dateStr, hourStr] = (over.id as string).split("|");
+    const newDate = new Date(dateStr);
+    const newHour = parseInt(hourStr);
+
+    const activityToUpdate = activities.find((a) => a.id === eventId);
+    if (!activityToUpdate) return;
+
+    const startDate = new Date(activityToUpdate.startTime);
+    const endDate = new Date(activityToUpdate.endTime);
+    const durationInMinutes = differenceInMinutes(endDate, startDate);
+
+    // Calculate preview position with 15-minute snapping
+    const newStartTime = snapToQuarterHour(new Date(newDate.setHours(newHour, 0, 0)));
+    const newEndTime = new Date(newStartTime);
+    newEndTime.setMinutes(newStartTime.getMinutes() + durationInMinutes);
+
+    // Update the preview position immediately
+    if (over) {
+      setActiveDropId(over.id as string);
+
+      // Optimistically update the UI to show where the event will land
+      queryClient.setQueryData(
+        ["/api/trips", trip.id, "activities"],
+        activities.map(activity =>
+          activity.id === eventId
+            ? { ...activity, startTime: newStartTime.toISOString(), endTime: newEndTime.toISOString() }
+            : activity
+        )
+      );
+    }
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
     document.body.classList.remove('select-none');
@@ -315,13 +352,12 @@ export function DayView({ trip }: { trip: Trip }) {
 
     const startDate = new Date(activityToUpdate.startTime);
     const endDate = new Date(activityToUpdate.endTime);
-    const durationMs = differenceInMinutes(endDate, startDate);
+    const durationInMinutes = differenceInMinutes(endDate, startDate);
 
-    // Preserve exact duration when moving
-    const newStartTime = new Date(newDate);
-    newStartTime.setHours(newHour, startDate.getMinutes(), 0, 0);
+    // Snap to 15-minute intervals
+    const newStartTime = snapToQuarterHour(new Date(newDate.setHours(newHour, 0, 0)));
     const newEndTime = new Date(newStartTime);
-    newEndTime.setMinutes(newEndTime.getMinutes() + durationMs);
+    newEndTime.setMinutes(newStartTime.getMinutes() + durationInMinutes);
 
     // Validate that the new times are within trip dates
     const tripStart = startOfDay(new Date(trip.startDate));
@@ -349,17 +385,6 @@ export function DayView({ trip }: { trip: Trip }) {
 
       if (!res.ok) throw new Error("Failed to update activity");
 
-      // Optimistically update the UI
-      queryClient.setQueryData(
-        ["/api/trips", trip.id, "activities"],
-        activities.map(activity =>
-          activity.id === eventId
-            ? { ...activity, startTime: newStartTime.toISOString(), endTime: newEndTime.toISOString() }
-            : activity
-        )
-      );
-
-      // Then refetch to ensure consistency
       await queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
     } catch (error) {
       toast({
@@ -368,11 +393,6 @@ export function DayView({ trip }: { trip: Trip }) {
         description: error instanceof Error ? error.message : "An error occurred",
       });
     }
-  };
-
-  const handleDragOver = (event: DragOverEvent) => {
-    const { over } = event;
-    setActiveDropId(over?.id as string || null);
   };
 
   const getTimeSlotEvents = (date: Date, hour: number) => {
