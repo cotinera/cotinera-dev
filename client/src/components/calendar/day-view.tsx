@@ -34,7 +34,7 @@ import {
   DragOverEvent,
 } from "@dnd-kit/core";
 import type { Trip, Activity } from "@db/schema";
-import { Pencil, Trash2, Loader2, GripVertical } from "lucide-react";
+import { Pencil, Trash2, Loader2 } from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -63,6 +63,7 @@ function DraggableEvent({
   const [resizeEdge, setResizeEdge] = useState<'top' | 'bottom' | null>(null);
   const [startY, setStartY] = useState(0);
   const [originalTime, setOriginalTime] = useState<Date | null>(null);
+  const [resizedHeight, setResizedHeight] = useState<number | null>(null);
 
   const handleResizeStart = (e: React.MouseEvent, edge: 'top' | 'bottom') => {
     e.stopPropagation();
@@ -80,6 +81,15 @@ function DraggableEvent({
     const newTime = new Date(originalTime);
     newTime.setHours(originalTime.getHours() + hourDelta);
 
+    // Update visual height during resize
+    const eventStart = new Date(event.startTime);
+    const eventEnd = new Date(event.endTime);
+    const duration = resizeEdge === 'top' 
+      ? (eventEnd.getTime() - newTime.getTime()) 
+      : (newTime.getTime() - eventStart.getTime());
+    const heightInHours = duration / (1000 * 60 * 60);
+    setResizedHeight(heightInHours * 48); // 48px per hour
+
     onResize(resizeEdge, newTime);
   };
 
@@ -87,6 +97,7 @@ function DraggableEvent({
     setIsResizing(false);
     setResizeEdge(null);
     setOriginalTime(null);
+    setResizedHeight(null);
   };
 
   useEffect(() => {
@@ -100,11 +111,16 @@ function DraggableEvent({
     }
   }, [isResizing, startY, originalTime, resizeEdge]);
 
+  const eventStart = new Date(event.startTime);
+  const eventEnd = new Date(event.endTime);
+  const durationInHours = (eventEnd.getTime() - eventStart.getTime()) / (1000 * 60 * 60);
+  const heightInPixels = resizedHeight ?? (durationInHours * 48); // 48px per hour
+
   const style = {
     transform: transform ? CSS.Transform.toString(transform) : undefined,
     width: '280px',
-    height: '3rem',
-    position: 'absolute',
+    height: `${heightInPixels}px`,
+    position: 'absolute' as const,
     left: '8px',
     top: '0',
     backgroundColor: isDragging ? 'hsl(var(--primary)/0.2)' : undefined,
