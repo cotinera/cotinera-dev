@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import type { Participant } from "@db/schema";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { Trip, Participant, Flight, Accommodation, User } from "@db/schema";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,6 +17,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -35,11 +42,20 @@ import {
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { format } from "date-fns";
-import { Users, Plus } from "lucide-react";
+import { CalendarDays, Hotel, Plane, Users, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
 interface TripParticipantDetailsProps {
   tripId: number;
+}
+
+type BookingStatus = "yes" | "no" | "pending";
+
+interface ParticipantDetails extends Participant {
+  user: User | null;
+  flights?: Flight[];
+  accommodation?: Accommodation;
 }
 
 interface AddParticipantForm {
@@ -48,13 +64,21 @@ interface AddParticipantForm {
   passportNumber?: string;
   arrivalDate?: string;
   departureDate?: string;
+  flightNumber?: string;
+  airline?: string;
+  accommodation?: string;
 }
 
 export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) {
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
 
-  const { data: participants, refetch } = useQuery({
+  // Fetch trip and participants with their travel details
+  const { data: tripDetails, refetch } = useQuery<{
+    participants: ParticipantDetails[];
+    owner: User;
+  }>({
     queryKey: [`/api/trips/${tripId}/participants`],
     queryFn: async () => {
       const res = await fetch(`/api/trips/${tripId}/participants`);
@@ -63,19 +87,28 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
   });
 
-  const addParticipantMutation = async (data: AddParticipantForm) => {
-    try {
-      const res = await fetch(`/api/trips/${tripId}/participants`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+  const addParticipantMutation = useMutation({
+    mutationFn: async (data: AddParticipantForm) => {
+      try {
+        const res = await fetch(`/api/trips/${tripId}/participants`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Failed to add participant");
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || "Failed to add participant");
+        }
+
+        return res.json();
+      } catch (error) {
+        console.error("Error adding participant:", error);
+        throw error;
       }
-
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
       await refetch();
       setIsAddParticipantOpen(false);
       form.reset();
@@ -83,14 +116,15 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         title: "Success",
         description: "Participant added successfully",
       });
-    } catch (error) {
+    },
+    onError: (error: Error) => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to add participant",
+        description: error.message || "Failed to add participant",
       });
-    }
-  };
+    },
+  });
 
   const form = useForm<AddParticipantForm>({
     defaultValues: {
@@ -99,35 +133,54 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       passportNumber: "",
       arrivalDate: "",
       departureDate: "",
+      flightNumber: "",
+      airline: "",
+      accommodation: "",
     },
   });
 
   const onSubmit = (data: AddParticipantForm) => {
-    addParticipantMutation(data);
+    addParticipantMutation.mutate(data);
   };
 
-  const updateBookingStatus = async (participantId: number, status: string) => {
+  const updateBookingStatus = async (
+    participantId: number,
+    type: "flight" | "hotel",
+    status: BookingStatus
+  ) => {
     try {
       const res = await fetch(`/api/trips/${tripId}/participants/${participantId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ type, status }),
       });
 
-      if (!res.ok) throw new Error("Failed to update status");
+      if (!res.ok) throw new Error(`Failed to update ${type} status`);
+
+      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
       await refetch();
       toast({
         title: "Success",
-        description: "Status updated successfully",
+        description: `${type.charAt(0).toUpperCase() + type.slice(1)} status updated`,
       });
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to update status",
+        description: error instanceof Error ? error.message : `Failed to update ${type} status`,
       });
     }
   };
+
+  const participants = tripDetails?.participants || [];
+  const owner = tripDetails?.owner;
+
+  // Sort participants to show owner first
+  const sortedParticipants = [...participants].sort((a, b) => {
+    if (a.user?.id === owner?.id) return -1;
+    if (b.user?.id === owner?.id) return 1;
+    return 0;
+  });
 
   return (
     <Card>
@@ -177,6 +230,18 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                       </FormItem>
                     )}
                   />
+                  <FormField
+                    control={form.control}
+                    name="passportNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Passport Number (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter passport number" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -203,11 +268,50 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                       )}
                     />
                   </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="airline"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Airline (Optional)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter airline" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="flightNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Flight # (Optional)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter flight number" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <FormField
+                    control={form.control}
+                    name="accommodation"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Accommodation (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter accommodation details" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
                   <Button
                     type="submit"
                     className="w-full"
+                    disabled={addParticipantMutation.isPending}
                   >
-                    Add Traveller
+                    {addParticipantMutation.isPending ? "Adding..." : "Add Traveller"}
                   </Button>
                 </form>
               </Form>
@@ -219,16 +323,21 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Participant</TableHead>
-              <TableHead>Dates</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead><Users className="h-4 w-4" /> Participant</TableHead>
+              <TableHead><CalendarDays className="h-4 w-4" /> Dates</TableHead>
+              <TableHead><Hotel className="h-4 w-4" /> Accommodation</TableHead>
+              <TableHead><Plane className="h-4 w-4" /> Flight</TableHead>
+              <TableHead>Booking Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {participants?.participants?.map((participant) => (
+            {sortedParticipants.map((participant) => (
               <TableRow key={participant.id}>
                 <TableCell className="font-medium">
-                  {participant.name}
+                  {participant.name || participant.user?.name || "Unnamed Participant"}
+                  {participant.user?.id === owner?.id && (
+                    <Badge variant="secondary" className="ml-2">Owner</Badge>
+                  )}
                 </TableCell>
                 <TableCell>
                   {participant.arrivalDate && participant.departureDate ? (
@@ -237,20 +346,62 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                       {format(new Date(participant.departureDate), "MMM d, yyyy")}
                     </span>
                   ) : (
-                    <span className="text-muted-foreground">No dates set</span>
+                    <Badge variant="outline">No dates set</Badge>
                   )}
                 </TableCell>
                 <TableCell>
-                  <Button
-                    variant={participant.status === "confirmed" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => updateBookingStatus(
-                      participant.id,
-                      participant.status === "confirmed" ? "pending" : "confirmed"
-                    )}
-                  >
-                    {participant.status === "confirmed" ? "Confirmed" : "Pending"}
-                  </Button>
+                  {participant.accommodation?.name ? (
+                    <span>{participant.accommodation.name}</span>
+                  ) : (
+                    <Badge variant="outline">Not specified</Badge>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {participant.flights?.length ? (
+                    <div className="flex flex-col gap-1">
+                      {participant.flights.map((flight) => (
+                        <div key={flight.id} className="text-sm">
+                          {flight.airline} {flight.flightNumber}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <Badge variant="outline">Not specified</Badge>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-2">
+                    <Select
+                      value={participant.flightStatus}
+                      onValueChange={(value: BookingStatus) =>
+                        updateBookingStatus(participant.id, "flight", value)
+                      }
+                    >
+                      <SelectTrigger className="w-[100px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yes">Flight ✓</SelectItem>
+                        <SelectItem value="no">Flight ✗</SelectItem>
+                        <SelectItem value="pending">Flight ?</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={participant.hotelStatus}
+                      onValueChange={(value: BookingStatus) =>
+                        updateBookingStatus(participant.id, "hotel", value)
+                      }
+                    >
+                      <SelectTrigger className="w-[100px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yes">Hotel ✓</SelectItem>
+                        <SelectItem value="no">Hotel ✗</SelectItem>
+                        <SelectItem value="pending">Hotel ?</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
