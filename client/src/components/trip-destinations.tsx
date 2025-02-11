@@ -19,7 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { format } from "date-fns";
-import { Map, Pin, Plus } from "lucide-react";
+import { Map, Pin, Plus, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -30,6 +30,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface TripDestinationsProps {
   tripId: number;
@@ -46,10 +51,11 @@ interface AddDestinationForm {
   };
 }
 
-export function TripDestinations({ tripId }: TripDestinationsProps) {
+export function TripDestinations({ tripId }: { tripId: number }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isAddDestinationOpen, setIsAddDestinationOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   const { data: destinations, refetch } = useQuery<Destination[]>({
     queryKey: [`/api/trips/${tripId}/destinations`],
@@ -110,120 +116,138 @@ export function TripDestinations({ tripId }: TripDestinationsProps) {
   const sortedDestinations = destinations?.sort((a, b) => a.order - b.order) || [];
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex justify-between items-center">
-          <div>
-            <CardTitle>Trip Destinations</CardTitle>
-            <CardDescription>Manage multiple destinations for this trip</CardDescription>
-          </div>
-          <Dialog open={isAddDestinationOpen} onOpenChange={setIsAddDestinationOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Destination
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Destination</DialogTitle>
-              </DialogHeader>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Location Name*</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter location name" {...field} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Enter destination description"
-                            {...field}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="startDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Start Date*</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="endDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>End Date*</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={addDestinationMutation.isPending}
-                  >
-                    {addDestinationMutation.isPending ? "Adding..." : "Add Destination"}
-                  </Button>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          {sortedDestinations.map((destination, index) => (
-            <Card key={destination.id}>
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-lg">
-                      <Pin className="h-4 w-4 inline mr-2" />
+    <Collapsible
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      className="w-[300px]"
+    >
+      <Card className="border shadow-sm">
+        <CollapsibleTrigger asChild>
+          <CardHeader className="p-3 cursor-pointer">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Pin className="h-4 w-4" />
+                <span className="font-medium">
+                  Destinations ({sortedDestinations.length})
+                </span>
+              </div>
+              <ChevronDown
+                className={`h-4 w-4 transition-transform duration-200 ${
+                  isOpen ? "transform rotate-180" : ""
+                }`}
+              />
+            </div>
+          </CardHeader>
+        </CollapsibleTrigger>
+
+        <CollapsibleContent>
+          <CardContent className="p-3 pt-0">
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {sortedDestinations.map((destination, index) => (
+                <div
+                  key={destination.id}
+                  className="flex items-center justify-between p-2 rounded-md bg-muted/50"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
                       {destination.name}
-                    </CardTitle>
-                    <CardDescription>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
                       {format(new Date(destination.startDate), "MMM d")} -{" "}
-                      {format(new Date(destination.endDate), "MMM d, yyyy")}
-                    </CardDescription>
+                      {format(new Date(destination.endDate), "MMM d")}
+                    </p>
                   </div>
-                  <Badge>{`Stop ${index + 1}`}</Badge>
+                  <Badge variant="outline" className="ml-2">
+                    {index + 1}
+                  </Badge>
                 </div>
-              </CardHeader>
-              {destination.description && (
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">{destination.description}</p>
-                </CardContent>
-              )}
-            </Card>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+              ))}
+            </div>
+
+            <Dialog open={isAddDestinationOpen} onOpenChange={setIsAddDestinationOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-3"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Stop
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Destination</DialogTitle>
+                </DialogHeader>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Location Name*</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter location name" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Enter destination description"
+                              {...field}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="startDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Start Date*</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="endDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>End Date*</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={addDestinationMutation.isPending}
+                    >
+                      {addDestinationMutation.isPending ? "Adding..." : "Add Destination"}
+                    </Button>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 }

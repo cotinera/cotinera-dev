@@ -11,7 +11,7 @@ import type { Trip } from "@db/schema";
 import { format } from "date-fns";
 import { TripHeaderEdit } from "@/components/trip-header-edit";
 import { TripParticipantDetails } from "@/components/trip-participant-details";
-import { TripDestinations } from "@/components/trip-destinations"; // Add this import
+import { TripDestinations } from "@/components/trip-destinations";
 
 export default function TripDetail() {
   const [, params] = useRoute("/trips/:id");
@@ -87,42 +87,38 @@ export default function TripDetail() {
               Back
             </Button>
 
+            <div className="absolute right-4 top-0">
+              <TripDestinations tripId={trip.id} />
+            </div>
+
             <TripHeaderEdit trip={trip} onBack={() => setLocation("/")} />
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="grid gap-8">
-          {/* Add Destinations Section at the top */}
-          <section className="border rounded-lg p-6 bg-card">
-            <h2 className="text-2xl font-semibold mb-6">Trip Destinations</h2>
-            <TripDestinations tripId={trip.id} />
-          </section>
+        <div className="grid gap-8 md:grid-cols-[2fr,1fr]">
+          <div className="space-y-8">
+            <section>
+              <h2 className="text-xl font-semibold mb-4">Location Overview</h2>
+              <MapView location={trip.location || ""} />
+            </section>
 
-          <div className="grid gap-8 md:grid-cols-[2fr,1fr]">
-            <div className="space-y-8">
-              <section>
-                <h2 className="text-xl font-semibold mb-4">Location Overview</h2>
-                <MapView location={trip.location || ""} />
-              </section>
+            <section>
+              <TripParticipantDetails tripId={trip.id} />
+            </section>
+          </div>
 
-              <section>
-                <TripParticipantDetails tripId={trip.id} />
-              </section>
-            </div>
+          <div className="space-y-8">
+            <section>
+              <h2 className="text-xl font-semibold mb-4">Group Chat</h2>
+              <ChatMessages tripId={trip.id} />
+            </section>
 
-            <div className="space-y-8">
-              <section>
-                <h2 className="text-xl font-semibold mb-4">Group Chat</h2>
-                <ChatMessages tripId={trip.id} />
-              </section>
-
-              <section>
-                <h2 className="text-xl font-semibold mb-4">Checklist</h2>
-                <Checklist tripId={trip.id} />
-              </section>
-            </div>
+            <section>
+              <h2 className="text-xl font-semibold mb-4">Checklist</h2>
+              <Checklist tripId={trip.id} />
+            </section>
           </div>
         </div>
       </main>
