@@ -5,13 +5,13 @@ import { Checklist } from "@/components/checklist";
 import { CalendarView } from "@/components/calendar-view";
 import { MapView } from "@/components/map-view";
 import { ChatMessages } from "@/components/chat-messages";
-import { Loader2, ArrowLeft, Calendar, MapPin, Users } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 import { ViewToggle } from "@/components/view-toggle";
 import type { Trip } from "@db/schema";
-import { format } from "date-fns";
 import { TripHeaderEdit } from "@/components/trip-header-edit";
 import { TripParticipantDetails } from "@/components/trip-participant-details";
 import { TripDestinations } from "@/components/trip-destinations";
+import { TripTimeline } from "@/components/trip-timeline";
 
 export default function TripDetail() {
   const [, params] = useRoute("/trips/:id");
@@ -97,28 +97,35 @@ export default function TripDetail() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="grid gap-8 md:grid-cols-[2fr,1fr]">
-          <div className="space-y-8">
-            <section>
-              <h2 className="text-xl font-semibold mb-4">Location Overview</h2>
-              <MapView location={trip.location || ""} />
-            </section>
+        <div className="space-y-8">
+          {/* Trip Timeline Section */}
+          <section>
+            <TripTimeline tripId={trip.id} />
+          </section>
 
-            <section>
-              <TripParticipantDetails tripId={trip.id} />
-            </section>
-          </div>
+          <div className="grid gap-8 md:grid-cols-[2fr,1fr]">
+            <div className="space-y-8">
+              <section>
+                <h2 className="text-xl font-semibold mb-4">Location Overview</h2>
+                <MapView location={trip.location || ""} />
+              </section>
 
-          <div className="space-y-8">
-            <section>
-              <h2 className="text-xl font-semibold mb-4">Group Chat</h2>
-              <ChatMessages tripId={trip.id} />
-            </section>
+              <section>
+                <TripParticipantDetails tripId={trip.id} />
+              </section>
+            </div>
 
-            <section>
-              <h2 className="text-xl font-semibold mb-4">Checklist</h2>
-              <Checklist tripId={trip.id} />
-            </section>
+            <div className="space-y-8">
+              <section>
+                <h2 className="text-xl font-semibold mb-4">Group Chat</h2>
+                <ChatMessages tripId={trip.id} />
+              </section>
+
+              <section>
+                <h2 className="text-xl font-semibold mb-4">Checklist</h2>
+                <Checklist tripId={trip.id} />
+              </section>
+            </div>
           </div>
         </div>
       </main>

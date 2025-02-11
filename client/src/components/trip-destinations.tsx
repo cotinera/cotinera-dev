@@ -27,7 +27,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Collapsible,
   CollapsibleContent,
@@ -37,7 +36,6 @@ import { MapPicker } from "@/components/map-picker";
 
 interface AddDestinationForm {
   name: string;
-  description?: string;
   startDate: string;
   endDate: string;
   coordinates?: {
@@ -107,7 +105,6 @@ export function TripDestinations({ tripId }: { tripId: number }) {
   const form = useForm<AddDestinationForm>({
     defaultValues: {
       name: "",
-      description: "",
       startDate: "",
       endDate: "",
     },
@@ -199,22 +196,6 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                                 setSelectedCoordinates(coordinates);
                               }}
                               placeholder="Search for a location..."
-                            />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="description"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Description</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              placeholder="Enter destination details"
-                              className="h-20"
-                              {...field}
                             />
                           </FormControl>
                         </FormItem>
