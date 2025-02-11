@@ -644,23 +644,18 @@ export function registerRoutes(app: Express): Server {
 
       console.log('Found participants:', tripParticipants);
 
-      // Fetch flights and accommodations for each participant
-      const participantsWithDetails = await Promise.all(
-        tripParticipants.map(async (participant) => {
-          const flights = await db.select().from(flights)
-            .where(eq(flights.tripId, tripId));
+      // Fetch all flights and accommodations for the trip
+      const [tripFlights, tripAccommodations] = await Promise.all([
+        db.select().from(flights).where(eq(flights.tripId, tripId)),
+        db.select().from(accommodations).where(eq(accommodations.tripId, tripId))
+      ]);
 
-          const [accommodation] = await db.select().from(accommodations)
-            .where(eq(accommodations.tripId, tripId))
-            .limit(1);
-
-          return {
-            ...participant,
-            flights,
-            accommodation
-          };
-        })
-      );
+      // Map the participants with their details
+      const participantsWithDetails = tripParticipants.map((participant) => ({
+        ...participant,
+        flights: tripFlights,
+        accommodation: tripAccommodations[0] // Using first accommodation for now
+      }));
 
       console.log('Returning participants with details:', participantsWithDetails);
       res.json(participantsWithDetails);
@@ -697,8 +692,6 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: 'Failed to update participant status' });
     }
   });
-
-  // Add these new endpoints after the existing trip routes
 
   // Get destinations for a trip
   app.get("/api/trips/:tripId/destinations", async (req, res) => {

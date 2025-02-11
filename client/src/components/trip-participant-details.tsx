@@ -95,26 +95,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
   });
 
-  const deleteParticipantMutation = useMutation({
-    mutationFn: async (participantId: number) => {
-      const res = await fetch(`/api/trips/${tripId}/participants/${participantId}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("Failed to delete participant");
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-      toast({ title: "Success", description: "Participant removed successfully" });
-    },
-    onError: () => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to remove participant",
-      });
-    },
-  });
-
   const form = useForm<AddParticipantForm>({
     defaultValues: {
       name: "",
@@ -160,32 +140,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="airline"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Airline</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter airline" {...field} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="flightNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Flight #</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter flight number" {...field} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
                       name="arrivalDate"
                       render={({ field }) => (
                         <FormItem>
@@ -211,12 +165,12 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   </div>
                   <FormField
                     control={form.control}
-                    name="accommodation"
+                    name="flightNumber"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Hotel</FormLabel>
+                        <FormLabel>Flight Number</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter hotel name" {...field} />
+                          <Input placeholder="Enter flight number" {...field} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -244,64 +198,64 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
             </TableRow>
           </TableHeader>
           <TableBody>
-            {participants.map((participant) => (
-              <TableRow key={participant.id}>
-                <TableCell>{participant.name}</TableCell>
-                <TableCell>
-                  {participant.arrivalDate ? (
-                    format(new Date(participant.arrivalDate), "dd/MM/yyyy")
-                  ) : (
-                    <Input className="w-32" type="date" placeholder="dd/mm/yyyy" />
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Input 
-                    className="w-40" 
-                    placeholder="Flight number & time"
-                    defaultValue={participant.flights?.[0]?.flightNumber || ""}
-                  />
-                </TableCell>
-                <TableCell>
-                  {participant.departureDate ? (
-                    format(new Date(participant.departureDate), "dd/MM/yyyy")
-                  ) : (
-                    <Input className="w-32" type="date" placeholder="dd/mm/yyyy" />
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Input 
-                    className="w-40" 
-                    placeholder="Flight number & time"
-                    defaultValue={participant.flights?.[1]?.flightNumber || ""}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Input 
-                    className="w-40" 
-                    placeholder="Hotel name"
-                    defaultValue={participant.accommodation?.name || ""}
-                  />
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-2">
-                    <Badge variant={participant.flightStatus === "yes" ? "default" : "secondary"}>
-                      {participant.flightStatus === "yes" ? "Booked" : "Pending"}
-                    </Badge>
-                    <Badge variant={participant.hotelStatus === "yes" ? "default" : "secondary"}>
-                      {participant.hotelStatus === "yes" ? "Paid" : "Pending"}
-                    </Badge>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                      onClick={() => deleteParticipantMutation.mutate(participant.id)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
+            {participants && participants.length > 0 ? (
+              participants.map((participant) => (
+                <TableRow key={participant.id}>
+                  <TableCell>{participant.name}</TableCell>
+                  <TableCell>
+                    {participant.arrivalDate && format(new Date(participant.arrivalDate), "dd/MM/yyyy")}
+                  </TableCell>
+                  <TableCell>
+                    <Input 
+                      className="w-40" 
+                      placeholder="Flight number & time"
+                      defaultValue={participant.flights?.[0]?.flightNumber || ""}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {participant.departureDate && format(new Date(participant.departureDate), "dd/MM/yyyy")}
+                  </TableCell>
+                  <TableCell>
+                    <Input 
+                      className="w-40" 
+                      placeholder="Flight number & time"
+                      defaultValue={participant.flights?.[1]?.flightNumber || ""}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Input 
+                      className="w-40" 
+                      placeholder="Hotel name"
+                      defaultValue={participant.accommodation?.name || ""}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Badge variant={participant.flightStatus === "yes" ? "default" : "secondary"}>
+                        {participant.flightStatus === "yes" ? "Booked" : "Pending"}
+                      </Badge>
+                      <Badge variant={participant.hotelStatus === "yes" ? "default" : "secondary"}>
+                        {participant.hotelStatus === "yes" ? "Paid" : "Pending"}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        onClick={() => deleteParticipantMutation.mutate(participant.id)}
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
+                  No travellers added yet
                 </TableCell>
               </TableRow>
-            ))}
+            )}
           </TableBody>
         </Table>
       </CardContent>
