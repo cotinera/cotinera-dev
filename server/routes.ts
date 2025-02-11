@@ -684,37 +684,48 @@ export function registerRoutes(app: Express): Server {
       const tripId = parseInt(req.params.tripId);
 
       // Get trip details with owner
-      const trip = await db.query.trips.findFirst({
-        where: eq(trips.id, tripId),
-        with: {
-          owner: true,
-        },
-      });
+      const tripWithOwner = await db.select({
+        id: trips.id,
+        owner: {
+          id: users.id,
+          name: users.name
+        }
+      })
+      .from(trips)
+      .where(eq(trips.id, tripId))
+      .leftJoin(users, eq(trips.ownerId, users.id))
+      .limit(1);
 
-      if (!trip) {
+      if (!tripWithOwner.length) {
         return res.status(404).json({ error: "Trip not found" });
       }
 
       // Get all participants for the trip
-      const participants = await db.query.participants.findMany({
-        where: eq(participants.tripId, tripId),
-        with: {
-          user: {
-            columns: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-        },
-      });
+      const tripParticipants = await db.select({
+        id: participants.id,
+        tripId: participants.tripId,
+        name: participants.name,
+        status: participants.status,
+        arrivalDate: participants.arrivalDate,
+        departureDate: participants.departureDate,
+        flightStatus: participants.flightStatus,
+        hotelStatus: participants.hotelStatus,
+        user: {
+          id: users.id,
+          name: users.name,
+          email: users.email
+        }
+      })
+      .from(participants)
+      .where(eq(participants.tripId, tripId))
+      .leftJoin(users, eq(participants.userId, users.id));
 
-      console.log('Found participants:', participants);
+      console.log('Found participants:', tripParticipants);
 
       // Return both trip owner and participants
       res.json({
-        participants,
-        owner: trip.owner,
+        participants: tripParticipants,
+        owner: tripWithOwner[0].owner
       });
     } catch (error) {
       console.error('Error fetching participants:', error);
