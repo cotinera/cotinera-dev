@@ -95,6 +95,26 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
   });
 
+  const deleteParticipantMutation = useMutation({
+    mutationFn: async (participantId: number) => {
+      const res = await fetch(`/api/trips/${tripId}/participants/${participantId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete participant");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      toast({ title: "Success", description: "Participant removed successfully" });
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to remove participant",
+      });
+    },
+  });
+
   const form = useForm<AddParticipantForm>({
     defaultValues: {
       name: "",
@@ -123,7 +143,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                 <DialogTitle>Add New Traveller</DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(data => addParticipantMutation.mutate(data))} 
+                <form onSubmit={form.handleSubmit(data => addParticipantMutation.mutate(data))}
                       className="space-y-4">
                   <FormField
                     control={form.control}
@@ -206,8 +226,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                     {participant.arrivalDate && format(new Date(participant.arrivalDate), "dd/MM/yyyy")}
                   </TableCell>
                   <TableCell>
-                    <Input 
-                      className="w-40" 
+                    <Input
+                      className="w-40"
                       placeholder="Flight number & time"
                       defaultValue={participant.flights?.[0]?.flightNumber || ""}
                     />
@@ -216,15 +236,15 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                     {participant.departureDate && format(new Date(participant.departureDate), "dd/MM/yyyy")}
                   </TableCell>
                   <TableCell>
-                    <Input 
-                      className="w-40" 
+                    <Input
+                      className="w-40"
                       placeholder="Flight number & time"
                       defaultValue={participant.flights?.[1]?.flightNumber || ""}
                     />
                   </TableCell>
                   <TableCell>
-                    <Input 
-                      className="w-40" 
+                    <Input
+                      className="w-40"
                       placeholder="Hotel name"
                       defaultValue={participant.accommodation?.name || ""}
                     />

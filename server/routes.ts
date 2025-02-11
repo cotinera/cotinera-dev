@@ -693,6 +693,32 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add this endpoint right after the other participant routes, before the destinations routes
+  app.delete("/api/trips/:tripId/participants/:participantId", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const participantId = parseInt(req.params.participantId);
+
+      // Delete associated flights and accommodations
+      await db.delete(flights).where(and(eq(flights.tripId, tripId), eq(flights.participantId, participantId)));
+      await db.delete(accommodations).where(and(eq(accommodations.tripId, tripId), eq(accommodations.participantId, participantId)));
+
+      // Delete the participant
+      const [deletedParticipant] = await db.delete(participants)
+        .where(and(eq(participants.id, participantId), eq(participants.tripId, tripId)))
+        .returning();
+
+      if (!deletedParticipant) {
+        return res.status(404).json({ error: "Participant not found" });
+      }
+
+      res.json(deletedParticipant);
+    } catch (error) {
+      console.error('Error deleting participant:', error);
+      res.status(500).json({ error: 'Failed to delete participant' });
+    }
+  });
+
   // Get destinations for a trip
   app.get("/api/trips/:tripId/destinations", async (req, res) => {
     try {
