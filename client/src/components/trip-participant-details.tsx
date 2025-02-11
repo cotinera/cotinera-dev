@@ -112,6 +112,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       }
     },
     onSuccess: async () => {
+      // Invalidate and refetch
       await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
       await refetch();
       setIsAddParticipantOpen(false);
@@ -161,8 +162,9 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
       if (!res.ok) throw new Error(`Failed to update ${type} status`);
 
+      // Invalidate and refetch
       await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-      await refetch(); // Force a refresh after status update
+      await refetch();
       toast({
         title: "Success",
         description: `${type.charAt(0).toUpperCase() + type.slice(1)} status updated`,
@@ -338,7 +340,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
             {sortedParticipants.map((participant) => (
               <TableRow key={participant.id}>
                 <TableCell className="font-medium">
-                  {participant.user ? participant.user.name : participant.name}
+                  {participant.name || participant.user?.name}
                   {participant.user?.id === owner?.id && (
                     <Badge variant="secondary" className="ml-2">Owner</Badge>
                   )}
