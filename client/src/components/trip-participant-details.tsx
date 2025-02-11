@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Trip, Participant, Flight, Accommodation, User } from "@db/schema";
 import { Button } from "@/components/ui/button";
 import {
@@ -75,7 +75,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
 
   // Fetch trip and participants with their travel details
-  const { data: tripDetails } = useQuery<{
+  const { data: tripDetails, refetch } = useQuery<{
     participants: ParticipantDetails[];
     owner: User;
   }>({
@@ -84,6 +84,35 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       const res = await fetch(`/api/trips/${tripId}/participants`);
       if (!res.ok) throw new Error("Failed to fetch participants");
       return res.json();
+    },
+  });
+
+  const addParticipantMutation = useMutation({
+    mutationFn: async (data: AddParticipantForm) => {
+      const res = await fetch(`/api/trips/${tripId}/participants`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error("Failed to add participant");
+      return res.json();
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      await refetch(); // Force a refresh of the participants data
+      setIsAddParticipantOpen(false);
+      form.reset();
+      toast({
+        title: "Success",
+        description: "Participant added successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to add participant",
+      });
     },
   });
 
@@ -100,30 +129,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
   });
 
-  const onSubmit = async (data: AddParticipantForm) => {
-    try {
-      const res = await fetch(`/api/trips/${tripId}/participants`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (!res.ok) throw new Error("Failed to add participant");
-
-      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-      setIsAddParticipantOpen(false);
-      form.reset();
-      toast({
-        title: "Success",
-        description: "Participant added successfully",
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to add participant",
-      });
-    }
+  const onSubmit = (data: AddParticipantForm) => {
+    addParticipantMutation.mutate(data);
   };
 
   const updateBookingStatus = async (
@@ -140,7 +147,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
       if (!res.ok) throw new Error(`Failed to update ${type} status`);
 
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      await refetch(); // Force a refresh after status update
       toast({
         title: "Success",
         description: `${type.charAt(0).toUpperCase() + type.slice(1)} status updated`,
@@ -285,7 +293,13 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full">Add Traveller</Button>
+                  <Button 
+                    type="submit" 
+                    className="w-full"
+                    disabled={addParticipantMutation.isPending}
+                  >
+                    {addParticipantMutation.isPending ? "Adding..." : "Add Traveller"}
+                  </Button>
                 </form>
               </Form>
             </DialogContent>
