@@ -34,7 +34,7 @@ import {
   DragOverEvent,
 } from "@dnd-kit/core";
 import type { Trip, Activity } from "@db/schema";
-import { Pencil, Trash2, Loader2 } from "lucide-react";
+import { Pencil, Trash2, Loader2, Plus } from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -44,11 +44,7 @@ interface TimeSlot {
   hour: number;
 }
 
-function DraggableEvent({
-  event,
-  onEdit,
-  onDelete,
-}: {
+function DraggableEvent({ event, onEdit, onDelete }: {
   event: Activity;
   onEdit: () => void;
   onDelete: () => void;
@@ -129,8 +125,8 @@ function DroppableTimeSlot({
   });
 
   return (
-    <div 
-      ref={setNodeRef} 
+    <div
+      ref={setNodeRef}
       className={`h-12 relative border-t ${
         isOver ? 'bg-primary/10' : ''
       }`}
@@ -146,9 +142,11 @@ export function DayView({ trip }: { trip: Trip }) {
   const [selectedEvent, setSelectedEvent] = useState<Activity | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [activeDropId, setActiveDropId] = useState<string | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -172,6 +170,12 @@ export function DayView({ trip }: { trip: Trip }) {
       return res.json();
     },
   });
+
+  useEffect(() => {
+    if (isCreateDialogOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isCreateDialogOpen]);
 
   const handleDragStart = () => {
     document.body.classList.add('select-none');
@@ -265,6 +269,7 @@ export function DayView({ trip }: { trip: Trip }) {
   const createEvent = async () => {
     if (!selectedTimeSlot || !newEventTitle) return;
 
+    setIsCreating(true);
     const startTime = new Date(selectedTimeSlot.date);
     startTime.setHours(selectedTimeSlot.hour, 0, 0, 0);
     const endTime = addHours(startTime, 1);
@@ -282,8 +287,18 @@ export function DayView({ trip }: { trip: Trip }) {
 
       if (!res.ok) throw new Error("Failed to create activity");
 
-      await queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
-      toast({ title: "Event created successfully" });
+      // Optimistically update the UI
+      const newEvent = await res.json();
+      queryClient.setQueryData(
+        ["/api/trips", trip.id, "activities"],
+        (old: Activity[]) => [...(old || []), newEvent]
+      );
+
+      toast({
+        title: "Event created",
+        description: `"${newEventTitle}" has been added to your schedule.`,
+      });
+
       setIsCreateDialogOpen(false);
       setNewEventTitle("");
     } catch (error) {
@@ -292,13 +307,15 @@ export function DayView({ trip }: { trip: Trip }) {
         title: "Failed to create event",
         description: error instanceof Error ? error.message : "An error occurred",
       });
+    } finally {
+      setIsCreating(false);
     }
   };
 
   const deleteEvent = async (activityId: number) => {
     try {
-      const res = await fetch(`/api/trips/${trip.id}/activities/${activityId}`, { 
-        method: "DELETE" 
+      const res = await fetch(`/api/trips/${trip.id}/activities/${activityId}`, {
+        method: "DELETE"
       });
 
       if (!res.ok) throw new Error("Failed to delete activity");
@@ -332,7 +349,6 @@ export function DayView({ trip }: { trip: Trip }) {
         onDragOver={handleDragOver}
       >
         <div className="min-w-fit relative">
-          {/* Header row with dates */}
           <div className="flex border-b bg-muted/5">
             <div className="w-24 flex-none border-r sticky left-0 z-20 bg-background" />
             {dates.map((date) => (
@@ -345,9 +361,7 @@ export function DayView({ trip }: { trip: Trip }) {
             ))}
           </div>
 
-          {/* Time slots and events grid */}
           <div className="flex">
-            {/* Time column */}
             <div className="w-24 flex-none border-r sticky left-0 z-20 bg-background">
               {hours.map((hour) => (
                 <div
@@ -359,7 +373,6 @@ export function DayView({ trip }: { trip: Trip }) {
               ))}
             </div>
 
-            {/* Days columns */}
             <div className="flex">
               {dates.map((date) => (
                 <div
@@ -397,26 +410,46 @@ export function DayView({ trip }: { trip: Trip }) {
                             <DialogTrigger asChild>
                               <Button
                                 variant="ghost"
-                                className="w-full h-12 opacity-0 hover:opacity-100 transition-opacity"
+                                className="w-full h-12 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 hover:bg-primary/5"
                                 onClick={() => setSelectedTimeSlot({ date, hour })}
                               >
-                                + Add Event
+                                <Plus className="h-4 w-4" />
+                                <span>Add Event</span>
                               </Button>
                             </DialogTrigger>
-                            <DialogContent>
+                            <DialogContent className="sm:max-w-[425px]">
                               <DialogHeader>
                                 <DialogTitle>Create New Event</DialogTitle>
                               </DialogHeader>
-                              <div className="space-y-4 mt-4">
+                              <form
+                                onSubmit={(e) => {
+                                  e.preventDefault();
+                                  createEvent();
+                                }}
+                                className="space-y-4 mt-4"
+                              >
                                 <Input
+                                  ref={inputRef}
                                   placeholder="Event title"
                                   value={newEventTitle}
                                   onChange={(e) => setNewEventTitle(e.target.value)}
+                                  className="transition-all duration-200 focus-visible:ring-2"
                                 />
-                                <Button onClick={createEvent} className="w-full">
-                                  Create Event
+                                <Button
+                                  type="submit"
+                                  className="w-full relative"
+                                  disabled={isCreating || !newEventTitle.trim()}
+                                >
+                                  {isCreating ? (
+                                    <>
+                                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                      Creating...
+                                    </>
+                                  ) : (
+                                    'Create Event'
+                                  )}
                                 </Button>
-                              </div>
+                              </form>
                             </DialogContent>
                           </Dialog>
                         )}
@@ -431,7 +464,6 @@ export function DayView({ trip }: { trip: Trip }) {
       </DndContext>
       <ScrollBar orientation="horizontal" />
 
-      {/* Edit Event Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
