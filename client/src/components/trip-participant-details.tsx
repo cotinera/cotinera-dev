@@ -83,9 +83,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         throw new Error(error.message || "Failed to update status");
       }
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-      toast({ title: "Success", description: "Status updated successfully" });
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
     },
     onError: (error: Error) => {
       toast({
@@ -170,7 +169,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   const getStatusBadgeVariant = (status: Status) => {
     switch (status) {
       case 'yes':
-        return 'default';
+        return 'success'; // Changed to 'success' for consistency
       case 'no':
         return 'destructive';
       default:
