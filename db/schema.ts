@@ -34,7 +34,7 @@ export const trips = pgTable("trips", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   description: text("description"),
-  location: text("location").notNull(),
+  location: text("location"), // Made optional
   coordinates: json("coordinates").$type<{
     lat: number;
     lng: number;
@@ -43,6 +43,22 @@ export const trips = pgTable("trips", {
   endDate: date("end_date").notNull(),
   thumbnail: text("thumbnail"),
   ownerId: integer("owner_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const destinations = pgTable("destinations", {
+  id: serial("id").primaryKey(),
+  tripId: integer("trip_id").notNull().references(() => trips.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  coordinates: json("coordinates").$type<{
+    lat: number;
+    lng: number;
+  }>(),
+  order: integer("order").notNull(), // For maintaining the sequence of destinations
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -204,6 +220,7 @@ export const tripsRelations = relations(trips, ({ one, many }) => ({
     fields: [trips.ownerId],
     references: [users.id],
   }),
+  destinations: many(destinations),
   participants: many(participants),
   activities: many(activities),
   checklist: many(checklist),
@@ -212,6 +229,13 @@ export const tripsRelations = relations(trips, ({ one, many }) => ({
   flights: many(flights),
   accommodations: many(accommodations),
   chatMessages: many(chatMessages),
+}));
+
+export const destinationsRelations = relations(destinations, ({ one }) => ({
+  trip: one(trips, {
+    fields: [destinations.tripId],
+    references: [trips.id],
+  }),
 }));
 
 export const checklistRelations = relations(checklist, ({ one }) => ({
@@ -330,6 +354,8 @@ export const insertExpenseSchema = createInsertSchema(expenses);
 export const selectExpenseSchema = createSelectSchema(expenses);
 export const insertTaskAssignmentSchema = createInsertSchema(taskAssignments);
 export const selectTaskAssignmentSchema = createSelectSchema(taskAssignments);
+export const insertDestinationSchema = createInsertSchema(destinations);
+export const selectDestinationSchema = createSelectSchema(destinations);
 
 export type User = typeof users.$inferSelect;
 export type Trip = typeof trips.$inferSelect;
@@ -346,3 +372,4 @@ export type ActivityVote = typeof activityVotes.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
 export type ExpenseSplit = typeof expenseSplits.$inferSelect;
 export type TaskAssignment = typeof taskAssignments.$inferSelect;
+export type Destination = typeof destinations.$inferSelect;

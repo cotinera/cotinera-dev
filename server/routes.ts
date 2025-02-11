@@ -7,8 +7,8 @@ import { crypto } from "./auth.js";
 import express from "express";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations, chatMessages, users } from "@db/schema";
-import { eq, and } from "drizzle-orm";
+import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations, chatMessages, users, destinations } from "@db/schema";
+import { eq, and, sql } from "drizzle-orm";
 import { addDays } from "date-fns";
 
 // Configure multer for handling file uploads
@@ -766,6 +766,81 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error updating participant status:', error);
       res.status(500).json({ error: 'Failed to update participant status' });
+    }
+  });
+
+  // Add these new endpoints after the existing trip routes
+
+  // Get destinations for a trip
+  app.get("/api/trips/:tripId/destinations", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const tripDestinations = await db.select().from(destinations).where(eq(destinations.tripId, tripId));
+      res.json(tripDestinations);
+    } catch (error) {
+      console.error('Error fetching destinations:', error);
+      res.status(500).json({ error: 'Failed to fetch destinations' });
+    }
+  });
+
+  // Add a new destination to a trip
+  app.post("/api/trips/:tripId/destinations", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+
+      // Get the current highest order for this trip's destinations
+      const [maxOrder] = await db
+        .select({ maxOrder: sql`MAX(${destinations.order})` })
+        .from(destinations)
+        .where(eq(destinations.tripId, tripId));
+
+      const newOrder = (maxOrder?.maxOrder || 0) + 1;
+
+      const [newDestination] = await db.insert(destinations).values({
+        tripId,
+        name: req.body.name,
+        description: req.body.description,
+        startDate: new Date(req.body.startDate),
+        endDate: new Date(req.body.endDate),
+        coordinates: req.body.coordinates,
+        order: newOrder,
+      }).returning();
+
+      res.json(newDestination);
+    } catch (error) {
+      console.error('Error creating destination:', error);
+      res.status(500).json({ error: 'Failed to create destination' });
+    }
+  });
+
+  // Update destination order
+  app.patch("/api/trips/:tripId/destinations/reorder", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const { destinationIds } = req.body; // Array of destination IDs in new order
+
+      // Update order for each destination
+      await Promise.all(
+        destinationIds.map((id: number, index: number) =>
+          db.update(destinations)
+            .set({ order: index + 1 })
+            .where(and(
+              eq(destinations.id, id),
+              eq(destinations.tripId, tripId)
+            ))
+        )
+      );
+
+      const updatedDestinations = await db
+        .select()
+        .from(destinations)
+        .where(eq(destinations.tripId, tripId))
+        .orderBy(destinations.order);
+
+      res.json(updatedDestinations);
+    } catch (error) {
+      console.error('Error reordering destinations:', error);
+      res.status(500).json({ error: 'Failed to reorder destinations' });
     }
   });
 
