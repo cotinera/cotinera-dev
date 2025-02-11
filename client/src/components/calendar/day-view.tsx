@@ -14,14 +14,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { 
-  format, 
-  addHours, 
+import {
+  format,
+  addHours,
   addDays,
-  differenceInDays, 
-  startOfDay, 
+  differenceInDays,
+  startOfDay,
   endOfDay,
-  parseISO 
+  parseISO
 } from "date-fns";
 import {
   DndContext,
@@ -59,23 +59,17 @@ function DraggableEvent({
     id: event.id.toString(),
   });
 
-  const style = transform ? {
-    transform: CSS.Transform.toString(transform),
-    width: '280px',
-    height: '48px', // Fixed height to match time slot
-    position: 'absolute',
-    left: '8px', // Consistent padding from the left
-    top: '0',
-    backgroundColor: isDragging ? 'hsl(var(--primary)/0.2)' : undefined,
-    boxShadow: isDragging ? 'var(--shadow-md)' : undefined,
-    opacity: isDragging ? 0.9 : 1,
-    zIndex: isDragging ? 50 : 1,
-  } : {
+  const style = {
+    transform: transform ? CSS.Transform.toString(transform) : undefined,
     width: '280px',
     height: '48px',
     position: 'absolute',
     left: '8px',
     top: '0',
+    backgroundColor: isDragging ? 'hsl(var(--primary)/0.2)' : undefined,
+    boxShadow: isDragging ? 'var(--shadow-md)' : undefined,
+    opacity: isDragging ? 0.9 : 1,
+    zIndex: isDragging ? 50 : 1,
   };
 
   return (
@@ -84,7 +78,7 @@ function DraggableEvent({
       {...attributes}
       {...listeners}
       style={style}
-      className={`bg-primary/20 hover:bg-primary/30 rounded-md p-2 cursor-move group/event transition-all duration-200 ${
+      className={`bg-primary/20 hover:bg-primary/30 rounded-md p-2 cursor-move group/event transition-colors ${
         isDragging ? 'ring-1 ring-primary/50' : ''
       }`}
     >
@@ -139,7 +133,7 @@ function DroppableTimeSlot({
   return (
     <div 
       ref={setNodeRef} 
-      className={`h-12 relative transition-colors duration-200 ${
+      className={`h-12 relative transition-colors ${
         isOver ? 'bg-primary/10' : ''
       }`}
     >
@@ -208,18 +202,6 @@ export function DayView({ trip }: { trip: Trip }) {
     newStartTime.setHours(newHour, startDate.getMinutes(), 0, 0);
     const newEndTime = new Date(newStartTime.getTime() + durationMs);
 
-    const tripStart = startOfDay(new Date(trip.startDate));
-    const tripEnd = endOfDay(new Date(trip.endDate));
-
-    if (newStartTime < tripStart || newEndTime > tripEnd) {
-      toast({
-        variant: "destructive",
-        title: "Invalid move",
-        description: "Event must stay within trip dates",
-      });
-      return;
-    }
-
     try {
       const res = await fetch(`/api/trips/${trip.id}/activities/${activityToUpdate.id}`, {
         method: "PATCH",
@@ -232,9 +214,7 @@ export function DayView({ trip }: { trip: Trip }) {
       });
 
       if (!res.ok) throw new Error("Failed to update activity");
-
       await queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
-      toast({ title: "Event updated successfully" });
     } catch (error) {
       toast({
         variant: "destructive",
@@ -326,7 +306,7 @@ export function DayView({ trip }: { trip: Trip }) {
         sensors={sensors}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        onDragOver={handleDragOver}
+        modifiers={[restrictToVerticalAxis]}
       >
         <div className="min-w-fit relative">
           {/* Header row with dates */}
@@ -349,7 +329,7 @@ export function DayView({ trip }: { trip: Trip }) {
               {hours.map((hour) => (
                 <div
                   key={hour}
-                  className="h-12 px-2 py-3 text-sm text-muted-foreground border-t first:border-t-0"
+                  className="h-12 flex items-center px-2 text-sm text-muted-foreground border-t first:border-t-0"
                 >
                   {format(new Date().setHours(hour, 0), "h:mm a")}
                 </div>
@@ -369,7 +349,7 @@ export function DayView({ trip }: { trip: Trip }) {
                     const isOver = activeDropId === timeSlotId;
 
                     return (
-                      <div key={timeSlotId} className="relative border-t first:border-t-0">
+                      <div key={timeSlotId} className="border-t first:border-t-0">
                         <DroppableTimeSlot id={timeSlotId} isOver={isOver}>
                           {timeSlotEvents.map((event) => (
                             <DraggableEvent
@@ -395,7 +375,7 @@ export function DayView({ trip }: { trip: Trip }) {
                               <DialogTrigger asChild>
                                 <Button
                                   variant="ghost"
-                                  className="w-full h-full opacity-0 group-hover:opacity-100"
+                                  className="w-full h-12 opacity-0 hover:opacity-100 transition-opacity"
                                   onClick={() => setSelectedTimeSlot({ date, hour })}
                                 >
                                   + Add Event
@@ -433,7 +413,7 @@ export function DayView({ trip }: { trip: Trip }) {
       </DndContext>
       <ScrollBar orientation="horizontal" />
 
-      {/* Edit Event Dialog */}
+      {/* Edit Event Dialog remains unchanged */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
