@@ -34,7 +34,6 @@ import {
   DragStartEvent,
   DragOverEvent,
 } from "@dnd-kit/core";
-import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import type { Trip, Activity } from "@db/schema";
 import { Pencil, Trash2, Loader2 } from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
@@ -62,7 +61,7 @@ function DraggableEvent({
   const style = {
     transform: transform ? CSS.Transform.toString(transform) : undefined,
     width: '280px',
-    height: '48px',
+    height: '3rem',
     position: 'absolute',
     left: '8px',
     top: '0',
@@ -202,6 +201,19 @@ export function DayView({ trip }: { trip: Trip }) {
     newStartTime.setHours(newHour, startDate.getMinutes(), 0, 0);
     const newEndTime = new Date(newStartTime.getTime() + durationMs);
 
+    // Validate that the new times are within trip dates
+    const tripStart = startOfDay(new Date(trip.startDate));
+    const tripEnd = endOfDay(new Date(trip.endDate));
+
+    if (newStartTime < tripStart || newEndTime > tripEnd) {
+      toast({
+        variant: "destructive",
+        title: "Invalid move",
+        description: "Event must stay within trip dates",
+      });
+      return;
+    }
+
     try {
       const res = await fetch(`/api/trips/${trip.id}/activities/${activityToUpdate.id}`, {
         method: "PATCH",
@@ -214,6 +226,18 @@ export function DayView({ trip }: { trip: Trip }) {
       });
 
       if (!res.ok) throw new Error("Failed to update activity");
+
+      // Optimistically update the UI
+      queryClient.setQueryData(
+        ["/api/trips", trip.id, "activities"],
+        activities.map(activity =>
+          activity.id === eventId
+            ? { ...activity, startTime: newStartTime, endTime: newEndTime }
+            : activity
+        )
+      );
+
+      // Then refetch to ensure consistency
       await queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
     } catch (error) {
       toast({
@@ -306,7 +330,7 @@ export function DayView({ trip }: { trip: Trip }) {
         sensors={sensors}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        modifiers={[restrictToVerticalAxis]}
+        onDragOver={handleDragOver}
       >
         <div className="min-w-fit relative">
           {/* Header row with dates */}
@@ -413,7 +437,7 @@ export function DayView({ trip }: { trip: Trip }) {
       </DndContext>
       <ScrollBar orientation="horizontal" />
 
-      {/* Edit Event Dialog remains unchanged */}
+      {/* Edit Event Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
