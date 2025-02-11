@@ -21,7 +21,6 @@ import {
   differenceInDays,
   startOfDay,
   endOfDay,
-  parseISO
 } from "date-fns";
 import {
   DndContext,
@@ -77,12 +76,12 @@ function DraggableEvent({
       {...attributes}
       {...listeners}
       style={style}
-      className={`bg-primary/20 hover:bg-primary/30 rounded-md p-2 cursor-move group/event transition-colors ${
+      className={`bg-primary/20 hover:bg-primary/30 rounded-md px-2 py-1 cursor-move group/event transition-colors ${
         isDragging ? 'ring-1 ring-primary/50' : ''
       }`}
     >
-      <div className="flex items-center justify-between">
-        <span className="font-medium truncate">{event.title}</span>
+      <div className="flex items-center justify-between h-[18px]">
+        <span className="font-medium text-sm truncate max-w-[180px]">{event.title}</span>
         <div className="hidden group-hover/event:flex items-center gap-1">
           <Button
             variant="ghost"
@@ -108,7 +107,7 @@ function DraggableEvent({
           </Button>
         </div>
       </div>
-      <span className="text-xs text-muted-foreground">
+      <span className="text-xs text-muted-foreground block">
         {format(new Date(event.startTime), "h:mm a")} -{" "}
         {format(new Date(event.endTime), "h:mm a")}
       </span>
@@ -132,7 +131,7 @@ function DroppableTimeSlot({
   return (
     <div 
       ref={setNodeRef} 
-      className={`h-12 relative ${
+      className={`h-12 relative border-t ${
         isOver ? 'bg-primary/10' : ''
       }`}
     >
@@ -353,7 +352,7 @@ export function DayView({ trip }: { trip: Trip }) {
               {hours.map((hour) => (
                 <div
                   key={hour}
-                  className="h-12 flex items-center px-2 text-sm text-muted-foreground"
+                  className="h-12 flex items-center px-2 text-sm text-muted-foreground border-t first:border-t-0"
                 >
                   {format(new Date().setHours(hour, 0), "h:mm a")}
                 </div>
