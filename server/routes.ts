@@ -167,7 +167,18 @@ export function registerRoutes(app: Express): Server {
         where: eq(trips.ownerId, req.user?.id || 1),
         with: {
           participants: true,
-          activities: true,
+          activities: {
+            columns: {
+              id: true,
+              title: true,
+              description: true,
+              location: true,
+              startTime: true,
+              endTime: true,
+              participants: true,
+              createdAt: true,
+            }
+          },
           flights: true,
           accommodations: true,
         },
@@ -179,7 +190,18 @@ export function registerRoutes(app: Express): Server {
           trip: {
             with: {
               participants: true,
-              activities: true,
+              activities: {
+                columns: {
+                  id: true,
+                  title: true,
+                  description: true,
+                  location: true,
+                  startTime: true,
+                  endTime: true,
+                  participants: true,
+                  createdAt: true,
+                }
+              },
               flights: true,
               accommodations: true,
             }
