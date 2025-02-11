@@ -100,7 +100,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       const res = await fetch(`/api/trips/${tripId}/participants`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({...data, status: 'pending'}), //Added status here.
       });
 
       if (!res.ok) {
@@ -112,7 +112,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-      await refetch(); //Retained refetch here.
+      await refetch(); 
       setIsAddParticipantOpen(false);
       form.reset();
       toast({ title: "Success", description: "Participant added successfully" });
@@ -161,8 +161,10 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   });
 
   const handleStatusClick = (participantId: number, currentStatus: Status) => {
+    console.log('Current status:', currentStatus);
     const currentIndex = STATUS_CYCLE.indexOf(currentStatus);
     const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
+    console.log('Next status:', nextStatus);
     updateStatusMutation.mutate({ participantId, status: nextStatus });
   };
 

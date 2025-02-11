@@ -179,7 +179,7 @@ export const participants = pgTable("participants", {
   tripId: integer("trip_id").notNull().references(() => trips.id),
   userId: integer("user_id").references(() => users.id),
   name: text("name"),
-  status: text("status").notNull(),
+  status: text("status").notNull().default('pending'),
   arrivalDate: date("arrival_date"),
   departureDate: date("departure_date"),
   flightStatus: text("flight_status").notNull().default('pending'),

@@ -569,21 +569,21 @@ export function registerRoutes(app: Express): Server {
       try {
         const participantData = {
           tripId,
-          status: 'confirmed',
           name,
+          status: 'pending', // Changed from 'confirmed' to 'pending'
           arrivalDate: arrivalDate ? new Date(arrivalDate) : null,
           departureDate: departureDate ? new Date(departureDate) : null,
           flightStatus: 'pending',
           hotelStatus: 'pending',
         };
 
-        const [newParticipant] = await db.insert(participants).values([participantData]).returning();
+        const [newParticipant] = await db.insert(participants).values(participantData).returning();
         console.log('Created participant:', newParticipant);
 
         // If flight details provided, create flight entry
         if (airline && flightNumber) {
           console.log('Creating flight entry');
-          await db.insert(flights).values([{
+          await db.insert(flights).values({
             tripId,
             airline,
             flightNumber,
@@ -595,13 +595,13 @@ export function registerRoutes(app: Express): Server {
             arrivalTime: '14:00', // Default time, can be updated later
             bookingReference: flightNumber,
             bookingStatus: 'pending',
-          }]);
+          });
         }
 
         // If accommodation details provided, create accommodation entry
         if (accommodation) {
           console.log('Creating accommodation entry');
-          await db.insert(accommodations).values([{
+          await db.insert(accommodations).values({
             tripId,
             name: accommodation,
             type: 'hotel', // Default type
@@ -610,7 +610,7 @@ export function registerRoutes(app: Express): Server {
             checkOutDate: newParticipant.departureDate || new Date(),
             bookingReference: 'TBD',
             bookingStatus: 'pending',
-          }]);
+          });
         }
 
         res.json(newParticipant);
