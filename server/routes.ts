@@ -576,34 +576,18 @@ export function registerRoutes(app: Express): Server {
             user = existingUser;
           } else {
             console.log('Creating new user');
-            // Generate a random password for the user
             const randomPassword = Math.random().toString(36).slice(-8);
             const hashedPassword = await crypto.hash(randomPassword);
 
-            try {
-              const [newUser] = await db.insert(users).values({
-                email,
-                name,
-                password: hashedPassword,
-                provider: 'email',
-              }).returning();
+            const [newUser] = await db.insert(users).values({
+              email,
+              name,
+              password: hashedPassword,
+              provider: 'email',
+            }).returning();
 
-              user = newUser;
-              console.log('Created new user:', user.id);
-            } catch (userError) {
-              console.error('Failed to create user:', userError);
-              // Only throw if it's not a duplicate email error
-              if (!userError.message.includes('duplicate key')) {
-                throw new Error('Failed to create user account');
-              }
-              // If it's a duplicate email, try to fetch the existing user again
-              const [retryUser] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-              if (retryUser) {
-                user = retryUser;
-              } else {
-                throw new Error('Failed to process user account');
-              }
-            }
+            user = newUser;
+            console.log('Created new user:', user.id);
           }
         } catch (error) {
           console.error('Error handling user:', error);
@@ -641,7 +625,7 @@ export function registerRoutes(app: Express): Server {
       if (airline && flightNumber) {
         try {
           console.log('Creating flight entry');
-          const [flight] = await db.insert(flights).values([{
+          const [flight] = await db.insert(flights).values({
             tripId,
             airline,
             flightNumber,
@@ -653,7 +637,7 @@ export function registerRoutes(app: Express): Server {
             arrivalTime: '14:00', // Default time, can be updated later
             bookingReference: flightNumber,
             bookingStatus: 'pending',
-          }]).returning();
+          }).returning();
         } catch (error) {
           console.error('Error creating flight:', error);
           // Don't fail the whole request if flight creation fails
@@ -664,7 +648,7 @@ export function registerRoutes(app: Express): Server {
       if (accommodation) {
         try {
           console.log('Creating accommodation entry');
-          const [newAccommodation] = await db.insert(accommodations).values([{
+          const [newAccommodation] = await db.insert(accommodations).values({
             tripId,
             name: accommodation,
             type: 'hotel', // Default type
@@ -673,7 +657,7 @@ export function registerRoutes(app: Express): Server {
             checkOutDate: participant.departureDate || new Date(),
             bookingReference: 'TBD',
             bookingStatus: 'pending',
-          }]).returning();
+          }).returning();
         } catch (error) {
           console.error('Error creating accommodation:', error);
           // Don't fail the whole request if accommodation creation fails
