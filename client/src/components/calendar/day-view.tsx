@@ -132,7 +132,7 @@ function DroppableTimeSlot({
   return (
     <div 
       ref={setNodeRef} 
-      className={`h-12 relative transition-colors ${
+      className={`h-12 relative ${
         isOver ? 'bg-primary/10' : ''
       }`}
     >
@@ -353,7 +353,7 @@ export function DayView({ trip }: { trip: Trip }) {
               {hours.map((hour) => (
                 <div
                   key={hour}
-                  className="h-12 flex items-center px-2 text-sm text-muted-foreground border-t first:border-t-0"
+                  className="h-12 flex items-center px-2 text-sm text-muted-foreground"
                 >
                   {format(new Date().setHours(hour, 0), "h:mm a")}
                 </div>
@@ -373,60 +373,55 @@ export function DayView({ trip }: { trip: Trip }) {
                     const isOver = activeDropId === timeSlotId;
 
                     return (
-                      <div key={timeSlotId} className="border-t first:border-t-0">
-                        <DroppableTimeSlot id={timeSlotId} isOver={isOver}>
-                          {timeSlotEvents.map((event) => (
-                            <DraggableEvent
-                              key={event.id}
-                              event={event}
-                              onEdit={() => {
-                                setSelectedEvent(event);
-                                setIsEditDialogOpen(true);
-                              }}
-                              onDelete={() => deleteEvent(event.id)}
-                            />
-                          ))}
-                          {timeSlotEvents.length === 0 && (
-                            <Dialog
-                              open={
-                                isCreateDialogOpen &&
-                                selectedTimeSlot?.date.toDateString() ===
-                                  date.toDateString() &&
-                                selectedTimeSlot?.hour === hour
-                              }
-                              onOpenChange={setIsCreateDialogOpen}
-                            >
-                              <DialogTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  className="w-full h-12 opacity-0 hover:opacity-100 transition-opacity"
-                                  onClick={() => setSelectedTimeSlot({ date, hour })}
-                                >
-                                  + Add Event
+                      <DroppableTimeSlot key={timeSlotId} id={timeSlotId} isOver={isOver}>
+                        {timeSlotEvents.map((event) => (
+                          <DraggableEvent
+                            key={event.id}
+                            event={event}
+                            onEdit={() => {
+                              setSelectedEvent(event);
+                              setIsEditDialogOpen(true);
+                            }}
+                            onDelete={() => deleteEvent(event.id)}
+                          />
+                        ))}
+                        {timeSlotEvents.length === 0 && (
+                          <Dialog
+                            open={
+                              isCreateDialogOpen &&
+                              selectedTimeSlot?.date.toDateString() ===
+                                date.toDateString() &&
+                              selectedTimeSlot?.hour === hour
+                            }
+                            onOpenChange={setIsCreateDialogOpen}
+                          >
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                className="w-full h-12 opacity-0 hover:opacity-100 transition-opacity"
+                                onClick={() => setSelectedTimeSlot({ date, hour })}
+                              >
+                                + Add Event
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Create New Event</DialogTitle>
+                              </DialogHeader>
+                              <div className="space-y-4 mt-4">
+                                <Input
+                                  placeholder="Event title"
+                                  value={newEventTitle}
+                                  onChange={(e) => setNewEventTitle(e.target.value)}
+                                />
+                                <Button onClick={createEvent} className="w-full">
+                                  Create Event
                                 </Button>
-                              </DialogTrigger>
-                              <DialogContent>
-                                <DialogHeader>
-                                  <DialogTitle>Create New Event</DialogTitle>
-                                </DialogHeader>
-                                <div className="space-y-4 mt-4">
-                                  <Input
-                                    placeholder="Event title"
-                                    value={newEventTitle}
-                                    onChange={(e) => setNewEventTitle(e.target.value)}
-                                  />
-                                  <Button
-                                    onClick={createEvent}
-                                    className="w-full"
-                                  >
-                                    Create Event
-                                  </Button>
-                                </div>
-                              </DialogContent>
-                            </Dialog>
-                          )}
-                        </DroppableTimeSlot>
-                      </div>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        )}
+                      </DroppableTimeSlot>
                     );
                   })}
                 </div>
