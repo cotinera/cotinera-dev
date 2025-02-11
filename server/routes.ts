@@ -553,31 +553,38 @@ export function registerRoutes(app: Express): Server {
   // Add participant to trip
   app.post("/api/trips/:tripId/participants", async (req, res) => {
     try {
+      console.log('Received participant creation request:', req.body);
+
       // Validate input
       const tripId = parseInt(req.params.tripId);
       const { name, email, passportNumber, arrivalDate, departureDate, flightNumber, airline, accommodation } = req.body;
 
       if (!name || !email) {
+        console.log('Validation failed: missing name or email');
         return res.status(400).json({ error: "Name and email are required" });
       }
 
       // Check if user exists or create new user
+      console.log('Checking for existing user with email:', email);
       const [existingUser] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
       let user;
       if (existingUser) {
+        console.log('Found existing user:', existingUser.id);
         user = existingUser;
       } else {
+        console.log('Creating new user');
         const [newUser] = await db.insert(users).values({
           email,
           name,
-          // Generate a random password for now - user can set it later
           password: await crypto.hash(Math.random().toString(36)),
         }).returning();
         user = newUser;
+        console.log('Created new user:', user.id);
       }
 
       // Create participant entry
+      console.log('Creating participant entry for user:', user.id);
       const [participant] = await db.insert(participants).values({
         tripId,
         userId: user.id,
@@ -588,8 +595,11 @@ export function registerRoutes(app: Express): Server {
         hotelStatus: 'pending',
       }).returning();
 
+      console.log('Created participant:', participant);
+
       // If flight details provided, create flight entry
       if (airline && flightNumber) {
+        console.log('Creating flight entry');
         await db.insert(flights).values({
           tripId,
           airline,
@@ -602,11 +612,12 @@ export function registerRoutes(app: Express): Server {
           arrivalTime: '14:00', // Default time, can be updated later
           bookingReference: flightNumber,
           bookingStatus: 'pending',
-        });
+        }).returning();
       }
 
       // If accommodation details provided, create accommodation entry
       if (accommodation) {
+        console.log('Creating accommodation entry');
         await db.insert(accommodations).values({
           tripId,
           name: accommodation,
@@ -616,7 +627,7 @@ export function registerRoutes(app: Express): Server {
           checkOutDate: participant.departureDate,
           bookingReference: 'TBD',
           bookingStatus: 'pending',
-        });
+        }).returning();
       }
 
       // Fetch the created participant with related details
@@ -627,10 +638,11 @@ export function registerRoutes(app: Express): Server {
         },
       });
 
+      console.log('Returning participant details:', participantDetails);
       res.json(participantDetails);
     } catch (error) {
       console.error('Error creating participant:', error);
-      res.status(500).json({ error: 'Failed to create participant' });
+      res.status(500).json({ error: 'Failed to create participant: ' + error.message });
     }
   });
 
