@@ -550,6 +550,90 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add participant to trip
+  app.post("/api/trips/:tripId/participants", async (req, res) => {
+    try {
+      // Validate input
+      const tripId = parseInt(req.params.tripId);
+      const { name, email, passportNumber, arrivalDate, departureDate, flightNumber, airline, accommodation } = req.body;
+
+      if (!name || !email) {
+        return res.status(400).json({ error: "Name and email are required" });
+      }
+
+      // Check if user exists or create new user
+      const [existingUser] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+
+      let user;
+      if (existingUser) {
+        user = existingUser;
+      } else {
+        const [newUser] = await db.insert(users).values({
+          email,
+          name,
+          // Generate a random password for now - user can set it later
+          password: await crypto.hash(Math.random().toString(36)),
+        }).returning();
+        user = newUser;
+      }
+
+      // Create participant entry
+      const [participant] = await db.insert(participants).values({
+        tripId,
+        userId: user.id,
+        status: 'confirmed',
+        arrivalDate: arrivalDate ? new Date(arrivalDate) : null,
+        departureDate: departureDate ? new Date(departureDate) : null,
+        flightStatus: 'pending',
+        hotelStatus: 'pending',
+      }).returning();
+
+      // If flight details provided, create flight entry
+      if (airline && flightNumber) {
+        await db.insert(flights).values({
+          tripId,
+          airline,
+          flightNumber,
+          departureAirport: '', // These can be updated later
+          arrivalAirport: '',
+          departureDate: participant.arrivalDate,
+          departureTime: '12:00', // Default time, can be updated later
+          arrivalDate: participant.arrivalDate,
+          arrivalTime: '14:00', // Default time, can be updated later
+          bookingReference: flightNumber,
+          bookingStatus: 'pending',
+        });
+      }
+
+      // If accommodation details provided, create accommodation entry
+      if (accommodation) {
+        await db.insert(accommodations).values({
+          tripId,
+          name: accommodation,
+          type: 'hotel', // Default type
+          address: '',  // Can be updated later
+          checkInDate: participant.arrivalDate,
+          checkOutDate: participant.departureDate,
+          bookingReference: 'TBD',
+          bookingStatus: 'pending',
+        });
+      }
+
+      // Fetch the created participant with related details
+      const participantDetails = await db.query.participants.findFirst({
+        where: eq(participants.id, participant.id),
+        with: {
+          user: true,
+        },
+      });
+
+      res.json(participantDetails);
+    } catch (error) {
+      console.error('Error creating participant:', error);
+      res.status(500).json({ error: 'Failed to create participant' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
