@@ -55,11 +55,14 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   const { toast } = useToast();
   const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
 
-  const { data: participants = [], refetch } = useQuery({
+  const { data: participants = [], refetch } = useQuery<Participant[]>({
     queryKey: [`/api/trips/${tripId}/participants`],
     queryFn: async () => {
       const res = await fetch(`/api/trips/${tripId}/participants`);
-      if (!res.ok) throw new Error("Failed to fetch participants");
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to fetch participants");
+      }
       return res.json();
     },
   });
@@ -100,17 +103,20 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       const res = await fetch(`/api/trips/${tripId}/participants/${participantId}`, {
         method: "DELETE",
       });
-      if (!res.ok) throw new Error("Failed to delete participant");
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to delete participant");
+      }
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
       toast({ title: "Success", description: "Participant removed successfully" });
     },
-    onError: () => {
+    onError: (error: Error) => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to remove participant",
+        description: error.message || "Failed to remove participant",
       });
     },
   });
@@ -219,7 +225,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
           </TableHeader>
           <TableBody>
             {participants && participants.length > 0 ? (
-              participants.map((participant) => (
+              participants.map((participant: Participant) => (
                 <TableRow key={participant.id}>
                   <TableCell>{participant.name}</TableCell>
                   <TableCell>
@@ -261,7 +267,11 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => deleteParticipantMutation.mutate(participant.id)}
+                        onClick={() => {
+                          if (window.confirm('Are you sure you want to remove this participant?')) {
+                            deleteParticipantMutation.mutate(participant.id);
+                          }
+                        }}
                       >
                         <X className="h-4 w-4" />
                       </Button>
