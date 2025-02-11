@@ -112,7 +112,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       }
     },
     onSuccess: async () => {
-      // Invalidate and refetch
       await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
       await refetch();
       setIsAddParticipantOpen(false);
@@ -162,7 +161,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
       if (!res.ok) throw new Error(`Failed to update ${type} status`);
 
-      // Invalidate and refetch
       await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
       await refetch();
       toast({

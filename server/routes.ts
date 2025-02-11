@@ -595,19 +595,15 @@ export function registerRoutes(app: Express): Server {
       let participant;
       try {
         const participantData = {
-          tripId: tripId,
+          tripId,
           status: 'confirmed',
-          name: name, // Store name directly in participants table
+          name,
+          userId: user?.id,
           arrivalDate: arrivalDate ? new Date(arrivalDate) : null,
           departureDate: departureDate ? new Date(departureDate) : null,
           flightStatus: 'pending',
           hotelStatus: 'pending',
         };
-
-        // Only add userId if we have a user
-        if (user) {
-          participantData.userId = user.id;
-        }
 
         const [newParticipant] = await db.insert(participants).values(participantData).returning();
         participant = newParticipant;
@@ -621,9 +617,8 @@ export function registerRoutes(app: Express): Server {
       if (airline && flightNumber) {
         try {
           console.log('Creating flight entry');
-          await db.insert(flights).values({
+          const [flight] = await db.insert(flights).values([{
             tripId,
-            userId: user?.id, // Use optional chaining here
             airline,
             flightNumber,
             departureAirport: '', // These can be updated later
@@ -634,7 +629,7 @@ export function registerRoutes(app: Express): Server {
             arrivalTime: '14:00', // Default time, can be updated later
             bookingReference: flightNumber,
             bookingStatus: 'pending',
-          });
+          }]).returning();
         } catch (error) {
           console.error('Error creating flight:', error);
           // Don't fail the whole request if flight creation fails
@@ -645,17 +640,16 @@ export function registerRoutes(app: Express): Server {
       if (accommodation) {
         try {
           console.log('Creating accommodation entry');
-          await db.insert(accommodations).values({
+          const [newAccommodation] = await db.insert(accommodations).values([{
             tripId,
-            userId: user?.id, //Use optional chaining here
             name: accommodation,
             type: 'hotel', // Default type
-            address: '',  // Can be updated later
-            checkInDate: participant.arrivalDate,
-            checkOutDate: participant.departureDate,
+            address: '', // Can be updated later
+            checkInDate: participant.arrivalDate || new Date(),
+            checkOutDate: participant.departureDate || new Date(),
             bookingReference: 'TBD',
             bookingStatus: 'pending',
-          });
+          }]).returning();
         } catch (error) {
           console.error('Error creating accommodation:', error);
           // Don't fail the whole request if accommodation creation fails
@@ -691,10 +685,10 @@ export function registerRoutes(app: Express): Server {
           name: users.name
         }
       })
-      .from(trips)
-      .where(eq(trips.id, tripId))
-      .leftJoin(users, eq(trips.ownerId, users.id))
-      .limit(1);
+        .from(trips)
+        .where(eq(trips.id, tripId))
+        .leftJoin(users, eq(trips.ownerId, users.id))
+        .limit(1);
 
       if (!tripWithOwner.length) {
         return res.status(404).json({ error: "Trip not found" });
@@ -716,9 +710,9 @@ export function registerRoutes(app: Express): Server {
           email: users.email
         }
       })
-      .from(participants)
-      .where(eq(participants.tripId, tripId))
-      .leftJoin(users, eq(participants.userId, users.id));
+        .from(participants)
+        .where(eq(participants.tripId, tripId))
+        .leftJoin(users, eq(participants.userId, users.id));
 
       console.log('Found participants:', tripParticipants);
 
@@ -730,6 +724,34 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error fetching participants:', error);
       res.status(500).json({ error: 'Failed to fetch participants' });
+    }
+  });
+
+  // Update participant status endpoint
+  app.patch("/api/trips/:tripId/participants/:participantId/status", async (req, res) => {
+    try {
+      const { type, status } = req.body;
+      if (!['flight', 'hotel'].includes(type) || !['yes', 'no', 'pending'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid status update parameters' });
+      }
+
+      const participantId = parseInt(req.params.participantId);
+      const statusField = type === 'flight' ? 'flightStatus' : 'hotelStatus';
+
+      const [updatedParticipant] = await db
+        .update(participants)
+        .set({ [statusField]: status })
+        .where(eq(participants.id, participantId))
+        .returning();
+
+      if (!updatedParticipant) {
+        return res.status(404).json({ error: 'Participant not found' });
+      }
+
+      res.json(updatedParticipant);
+    } catch (error) {
+      console.error('Error updating participant status:', error);
+      res.status(500).json({ error: 'Failed to update participant status' });
     }
   });
 
