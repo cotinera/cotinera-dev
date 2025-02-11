@@ -566,68 +566,91 @@ export function registerRoutes(app: Express): Server {
 
       // Check if user exists or create new user
       console.log('Checking for existing user with email:', email);
-      const [existingUser] = await db.select().from(users).where(eq(users.email, email)).limit(1);
-
       let user;
-      if (existingUser) {
-        console.log('Found existing user:', existingUser.id);
-        user = existingUser;
-      } else {
-        console.log('Creating new user');
-        const [newUser] = await db.insert(users).values({
-          email,
-          name,
-          password: await crypto.hash(Math.random().toString(36)),
-        }).returning();
-        user = newUser;
-        console.log('Created new user:', user.id);
+      try {
+        const [existingUser] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+
+        if (existingUser) {
+          console.log('Found existing user:', existingUser.id);
+          user = existingUser;
+        } else {
+          console.log('Creating new user');
+          const [newUser] = await db.insert(users).values({
+            email,
+            name,
+            password: await crypto.hash(Math.random().toString(36)),
+          }).returning();
+          user = newUser;
+          console.log('Created new user:', user.id);
+        }
+      } catch (error) {
+        console.error('Error handling user:', error);
+        return res.status(500).json({ error: "Failed to process user" });
       }
 
       // Create participant entry
       console.log('Creating participant entry for user:', user.id);
-      const [participant] = await db.insert(participants).values({
-        tripId,
-        userId: user.id,
-        status: 'confirmed',
-        arrivalDate: arrivalDate ? new Date(arrivalDate) : null,
-        departureDate: departureDate ? new Date(departureDate) : null,
-        flightStatus: 'pending',
-        hotelStatus: 'pending',
-      }).returning();
-
-      console.log('Created participant:', participant);
+      let participant;
+      try {
+        const [newParticipant] = await db.insert(participants).values({
+          userId: user.id,
+          tripId: tripId,
+          status: 'confirmed',
+          arrivalDate: arrivalDate ? new Date(arrivalDate) : null,
+          departureDate: departureDate ? new Date(departureDate) : null,
+          flightStatus: 'pending',
+          hotelStatus: 'pending',
+        }).returning();
+        participant = newParticipant;
+        console.log('Created participant:', participant);
+      } catch (error) {
+        console.error('Error creating participant:', error);
+        return res.status(500).json({ error: "Failed to create participant entry" });
+      }
 
       // If flight details provided, create flight entry
       if (airline && flightNumber) {
-        console.log('Creating flight entry');
-        await db.insert(flights).values({
-          tripId,
-          airline,
-          flightNumber,
-          departureAirport: '', // These can be updated later
-          arrivalAirport: '',
-          departureDate: participant.arrivalDate,
-          departureTime: '12:00', // Default time, can be updated later
-          arrivalDate: participant.arrivalDate,
-          arrivalTime: '14:00', // Default time, can be updated later
-          bookingReference: flightNumber,
-          bookingStatus: 'pending',
-        }).returning();
+        try {
+          console.log('Creating flight entry');
+          await db.insert(flights).values({
+            tripId,
+            userId: user.id,
+            airline,
+            flightNumber,
+            departureAirport: '', // These can be updated later
+            arrivalAirport: '',
+            departureDate: participant.arrivalDate,
+            departureTime: '12:00', // Default time, can be updated later
+            arrivalDate: participant.arrivalDate,
+            arrivalTime: '14:00', // Default time, can be updated later
+            bookingReference: flightNumber,
+            bookingStatus: 'pending',
+          });
+        } catch (error) {
+          console.error('Error creating flight:', error);
+          // Don't fail the whole request if flight creation fails
+        }
       }
 
       // If accommodation details provided, create accommodation entry
       if (accommodation) {
-        console.log('Creating accommodation entry');
-        await db.insert(accommodations).values({
-          tripId,
-          name: accommodation,
-          type: 'hotel', // Default type
-          address: '',  // Can be updated later
-          checkInDate: participant.arrivalDate,
-          checkOutDate: participant.departureDate,
-          bookingReference: 'TBD',
-          bookingStatus: 'pending',
-        }).returning();
+        try {
+          console.log('Creating accommodation entry');
+          await db.insert(accommodations).values({
+            tripId,
+            userId: user.id,
+            name: accommodation,
+            type: 'hotel', // Default type
+            address: '',  // Can be updated later
+            checkInDate: participant.arrivalDate,
+            checkOutDate: participant.departureDate,
+            bookingReference: 'TBD',
+            bookingStatus: 'pending',
+          });
+        } catch (error) {
+          console.error('Error creating accommodation:', error);
+          // Don't fail the whole request if accommodation creation fails
+        }
       }
 
       // Fetch the created participant with related details
@@ -642,7 +665,7 @@ export function registerRoutes(app: Express): Server {
       res.json(participantDetails);
     } catch (error) {
       console.error('Error creating participant:', error);
-      res.status(500).json({ error: 'Failed to create participant: ' + error.message });
+      res.status(500).json({ error: 'Failed to create participant: ' + (error instanceof Error ? error.message : 'Unknown error') });
     }
   });
 

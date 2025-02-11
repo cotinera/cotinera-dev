@@ -89,17 +89,31 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
   const addParticipantMutation = useMutation({
     mutationFn: async (data: AddParticipantForm) => {
-      const res = await fetch(`/api/trips/${tripId}/participants`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error("Failed to add participant");
-      return res.json();
+      try {
+        const res = await fetch(`/api/trips/${tripId}/participants`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...data,
+            arrivalDate: data.arrivalDate || null,
+            departureDate: data.departureDate || null,
+          }),
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || "Failed to add participant");
+        }
+
+        return res.json();
+      } catch (error) {
+        console.error("Error adding participant:", error);
+        throw error;
+      }
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-      await refetch(); // Force a refresh of the participants data
+      await refetch();
       setIsAddParticipantOpen(false);
       form.reset();
       toast({
@@ -293,8 +307,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                       </FormItem>
                     )}
                   />
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     className="w-full"
                     disabled={addParticipantMutation.isPending}
                   >
