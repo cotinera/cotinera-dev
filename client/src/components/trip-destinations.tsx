@@ -5,9 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import {
   Form,
@@ -19,7 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { format } from "date-fns";
-import { Map, Pin, Plus, ChevronDown } from "lucide-react";
+import { Pin, Plus, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -35,10 +33,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-
-interface TripDestinationsProps {
-  tripId: number;
-}
+import { MapPicker } from "@/components/map-picker";
 
 interface AddDestinationForm {
   name: string;
@@ -56,6 +51,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
   const { toast } = useToast();
   const [isAddDestinationOpen, setIsAddDestinationOpen] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
 
   const { data: destinations, refetch } = useQuery<Destination[]>({
     queryKey: [`/api/trips/${tripId}/destinations`],
@@ -68,10 +64,17 @@ export function TripDestinations({ tripId }: { tripId: number }) {
 
   const addDestinationMutation = useMutation({
     mutationFn: async (data: AddDestinationForm) => {
+      if (!selectedCoordinates) {
+        throw new Error("Please select a location from the map");
+      }
+
       const res = await fetch(`/api/trips/${tripId}/destinations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...data,
+          coordinates: selectedCoordinates
+        }),
       });
 
       if (!res.ok) {
@@ -86,6 +89,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
       await refetch();
       setIsAddDestinationOpen(false);
       form.reset();
+      setSelectedCoordinates(null);
       toast({
         title: "Success",
         description: "Destination added successfully",
@@ -119,15 +123,15 @@ export function TripDestinations({ tripId }: { tripId: number }) {
     <Collapsible
       open={isOpen}
       onOpenChange={setIsOpen}
-      className="w-[300px]"
+      className="w-[250px]"
     >
       <Card className="border shadow-sm">
         <CollapsibleTrigger asChild>
-          <CardHeader className="p-3 cursor-pointer">
+          <CardHeader className="p-2 cursor-pointer">
             <div className="flex justify-between items-center">
               <div className="flex items-center gap-2">
                 <Pin className="h-4 w-4" />
-                <span className="font-medium">
+                <span className="font-medium text-sm">
                   Destinations ({sortedDestinations.length})
                 </span>
               </div>
@@ -141,15 +145,15 @@ export function TripDestinations({ tripId }: { tripId: number }) {
         </CollapsibleTrigger>
 
         <CollapsibleContent>
-          <CardContent className="p-3 pt-0">
-            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+          <CardContent className="p-2 pt-0">
+            <div className="space-y-1.5 max-h-[250px] overflow-y-auto">
               {sortedDestinations.map((destination, index) => (
                 <div
                   key={destination.id}
-                  className="flex items-center justify-between p-2 rounded-md bg-muted/50"
+                  className="flex items-center justify-between p-1.5 rounded-md bg-muted/50 text-sm"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
+                    <p className="font-medium truncate text-xs">
                       {destination.name}
                     </p>
                     <p className="text-xs text-muted-foreground">
@@ -157,7 +161,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                       {format(new Date(destination.endDate), "MMM d")}
                     </p>
                   </div>
-                  <Badge variant="outline" className="ml-2">
+                  <Badge variant="outline" className="ml-2 text-xs">
                     {index + 1}
                   </Badge>
                 </div>
@@ -169,9 +173,9 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full mt-3"
+                  className="w-full mt-2"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus className="h-3 w-3 mr-1" />
                   Add Stop
                 </Button>
               </DialogTrigger>
@@ -186,9 +190,16 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                       name="name"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Location Name*</FormLabel>
+                          <FormLabel>Location</FormLabel>
                           <FormControl>
-                            <Input placeholder="Enter location name" {...field} />
+                            <MapPicker
+                              value={field.value}
+                              onChange={(address, coordinates) => {
+                                field.onChange(address);
+                                setSelectedCoordinates(coordinates);
+                              }}
+                              placeholder="Search for a location..."
+                            />
                           </FormControl>
                         </FormItem>
                       )}
@@ -201,7 +212,8 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                           <FormLabel>Description</FormLabel>
                           <FormControl>
                             <Textarea
-                              placeholder="Enter destination description"
+                              placeholder="Enter destination details"
+                              className="h-20"
                               {...field}
                             />
                           </FormControl>
@@ -214,7 +226,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                         name="startDate"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Start Date*</FormLabel>
+                            <FormLabel>Start Date</FormLabel>
                             <FormControl>
                               <Input type="date" {...field} />
                             </FormControl>
@@ -226,7 +238,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                         name="endDate"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>End Date*</FormLabel>
+                            <FormLabel>End Date</FormLabel>
                             <FormControl>
                               <Input type="date" {...field} />
                             </FormControl>
