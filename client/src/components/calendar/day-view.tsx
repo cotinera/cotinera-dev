@@ -61,7 +61,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-// Form schema for event creation/editing
+// Update the form schema to be more specific about participant IDs
 const eventFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
   startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format (HH:mm)"),
@@ -69,7 +69,7 @@ const eventFormSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
   location: z.string().optional(),
   description: z.string().optional(),
-  participants: z.array(z.number()).optional(),
+  participants: z.array(z.number()).default([]),
 });
 
 type EventFormValues = z.infer<typeof eventFormSchema>;
@@ -309,11 +309,16 @@ function EventForm({
 }) {
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
-    defaultValues,
+    defaultValues: {
+      ...defaultValues,
+      participants: defaultValues.participants || [],
+    },
   });
 
-  // Get all participants from the trip
-  const participants = trip.participants?.map(p => p.user).filter(Boolean) || [];
+  // Get all participants from the trip, ensuring we have valid user objects
+  const participants = (trip.participants || [])
+    .map(p => p.user)
+    .filter((user): user is User => !!user);
 
   return (
     <Form {...form}>
@@ -416,9 +421,9 @@ function EventForm({
                 </div>
               </FormLabel>
               <Select
-                value={field.value?.map(String)}
-                onValueChange={(value) => {
-                  field.onChange(value ? value.map(Number) : []);
+                defaultValue={field.value.map(String)}
+                onValueChange={(values) => {
+                  field.onChange(values.map(Number));
                 }}
                 multiple
               >
@@ -429,7 +434,10 @@ function EventForm({
                 </FormControl>
                 <SelectContent>
                   {participants.map((participant) => (
-                    <SelectItem key={participant.id} value={participant.id.toString()}>
+                    <SelectItem
+                      key={participant.id}
+                      value={participant.id.toString()}
+                    >
                       {participant.name}
                     </SelectItem>
                   ))}
