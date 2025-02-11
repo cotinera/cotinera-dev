@@ -37,6 +37,7 @@ import {
   FormField,
   FormItem,
   FormLabel,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
@@ -57,6 +58,17 @@ interface ParticipantDetails extends Participant {
   accommodation?: Accommodation;
 }
 
+interface AddParticipantForm {
+  name: string;
+  email: string;
+  passportNumber?: string;
+  arrivalDate?: string;
+  departureDate?: string;
+  flightNumber?: string;
+  airline?: string;
+  accommodation?: string;
+}
+
 export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -75,15 +87,20 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
   });
 
-  const form = useForm({
+  const form = useForm<AddParticipantForm>({
     defaultValues: {
+      name: "",
       email: "",
+      passportNumber: "",
       arrivalDate: "",
       departureDate: "",
+      flightNumber: "",
+      airline: "",
+      accommodation: "",
     },
   });
 
-  const onSubmit = async (data: { email: string; arrivalDate: string; departureDate: string }) => {
+  const onSubmit = async (data: AddParticipantForm) => {
     try {
       const res = await fetch(`/api/trips/${tripId}/participants`, {
         method: "POST",
@@ -93,7 +110,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
       if (!res.ok) throw new Error("Failed to add participant");
 
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
       setIsAddParticipantOpen(false);
       form.reset();
       toast({
@@ -170,6 +187,18 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                   <FormField
                     control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter name" {...field} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
                     name="email"
                     render={({ field }) => (
                       <FormItem>
@@ -182,24 +211,76 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   />
                   <FormField
                     control={form.control}
-                    name="arrivalDate"
+                    name="passportNumber"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Arrival Date</FormLabel>
+                        <FormLabel>Passport Number (Optional)</FormLabel>
                         <FormControl>
-                          <Input type="date" {...field} />
+                          <Input placeholder="Enter passport number" {...field} />
                         </FormControl>
                       </FormItem>
                     )}
                   />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="arrivalDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Arrival Date</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="departureDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Departure Date</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="airline"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Airline (Optional)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter airline" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="flightNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Flight # (Optional)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter flight number" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <FormField
                     control={form.control}
-                    name="departureDate"
+                    name="accommodation"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Departure Date</FormLabel>
+                        <FormLabel>Accommodation (Optional)</FormLabel>
                         <FormControl>
-                          <Input type="date" {...field} />
+                          <Input placeholder="Enter accommodation details" {...field} />
                         </FormControl>
                       </FormItem>
                     )}
