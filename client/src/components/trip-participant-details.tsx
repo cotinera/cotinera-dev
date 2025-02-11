@@ -53,14 +53,14 @@ interface TripParticipantDetailsProps {
 type BookingStatus = "yes" | "no" | "pending";
 
 interface ParticipantDetails extends Participant {
-  user: User;
+  user: User | null;
   flights?: Flight[];
   accommodation?: Accommodation;
 }
 
 interface AddParticipantForm {
   name: string;
-  email: string;
+  email?: string;
   passportNumber?: string;
   arrivalDate?: string;
   departureDate?: string;
@@ -181,8 +181,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
   // Sort participants to show owner first
   const sortedParticipants = [...participants].sort((a, b) => {
-    if (a.user.id === owner?.id) return -1;
-    if (b.user.id === owner?.id) return 1;
+    if (a.user?.id === owner?.id) return -1;
+    if (b.user?.id === owner?.id) return 1;
     return 0;
   });
 
@@ -212,7 +212,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                     name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Name</FormLabel>
+                        <FormLabel>Name*</FormLabel>
                         <FormControl>
                           <Input placeholder="Enter name" {...field} />
                         </FormControl>
@@ -224,10 +224,13 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Email</FormLabel>
+                        <FormLabel>Email (Optional)</FormLabel>
                         <FormControl>
                           <Input type="email" placeholder="Enter email" {...field} />
                         </FormControl>
+                        <FormDescription>
+                          Only required if the participant needs access to the trip details
+                        </FormDescription>
                       </FormItem>
                     )}
                   />
@@ -335,8 +338,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
             {sortedParticipants.map((participant) => (
               <TableRow key={participant.id}>
                 <TableCell className="font-medium">
-                  {participant.user.name}
-                  {participant.user.id === owner?.id && (
+                  {participant.user ? participant.user.name : participant.name}
+                  {participant.user?.id === owner?.id && (
                     <Badge variant="secondary" className="ml-2">Owner</Badge>
                   )}
                 </TableCell>

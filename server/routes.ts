@@ -559,48 +559,57 @@ export function registerRoutes(app: Express): Server {
       const tripId = parseInt(req.params.tripId);
       const { name, email, passportNumber, arrivalDate, departureDate, flightNumber, airline, accommodation } = req.body;
 
-      if (!name || !email) {
-        console.log('Validation failed: missing name or email');
-        return res.status(400).json({ error: "Name and email are required" });
+      if (!name) {
+        console.log('Validation failed: missing name');
+        return res.status(400).json({ error: "Name is required" });
       }
 
-      // Check if user exists or create new user
-      console.log('Checking for existing user with email:', email);
-      let user;
-      try {
-        const [existingUser] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+      let user = null;
+      // Only create/fetch user if email is provided
+      if (email) {
+        try {
+          console.log('Checking for existing user with email:', email);
+          const [existingUser] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
-        if (existingUser) {
-          console.log('Found existing user:', existingUser.id);
-          user = existingUser;
-        } else {
-          console.log('Creating new user');
-          const [newUser] = await db.insert(users).values({
-            email,
-            name,
-            password: await crypto.hash(Math.random().toString(36)),
-          }).returning();
-          user = newUser;
-          console.log('Created new user:', user.id);
+          if (existingUser) {
+            console.log('Found existing user:', existingUser.id);
+            user = existingUser;
+          } else {
+            console.log('Creating new user');
+            const [newUser] = await db.insert(users).values({
+              email,
+              name,
+              password: await crypto.hash(Math.random().toString(36)),
+            }).returning();
+            user = newUser;
+            console.log('Created new user:', user.id);
+          }
+        } catch (error) {
+          console.error('Error handling user:', error);
+          return res.status(500).json({ error: "Failed to process user" });
         }
-      } catch (error) {
-        console.error('Error handling user:', error);
-        return res.status(500).json({ error: "Failed to process user" });
       }
 
       // Create participant entry
-      console.log('Creating participant entry for user:', user.id);
+      console.log('Creating participant entry', user ? `for user: ${user.id}` : 'without user account');
       let participant;
       try {
-        const [newParticipant] = await db.insert(participants).values({
-          userId: user.id,
+        const participantData = {
           tripId: tripId,
           status: 'confirmed',
+          name: name, // Store name directly in participants table
           arrivalDate: arrivalDate ? new Date(arrivalDate) : null,
           departureDate: departureDate ? new Date(departureDate) : null,
           flightStatus: 'pending',
           hotelStatus: 'pending',
-        }).returning();
+        };
+
+        // Only add userId if we have a user
+        if (user) {
+          participantData.userId = user.id;
+        }
+
+        const [newParticipant] = await db.insert(participants).values(participantData).returning();
         participant = newParticipant;
         console.log('Created participant:', participant);
       } catch (error) {
@@ -614,7 +623,7 @@ export function registerRoutes(app: Express): Server {
           console.log('Creating flight entry');
           await db.insert(flights).values({
             tripId,
-            userId: user.id,
+            userId: user?.id, // Use optional chaining here
             airline,
             flightNumber,
             departureAirport: '', // These can be updated later
@@ -638,7 +647,7 @@ export function registerRoutes(app: Express): Server {
           console.log('Creating accommodation entry');
           await db.insert(accommodations).values({
             tripId,
-            userId: user.id,
+            userId: user?.id, //Use optional chaining here
             name: accommodation,
             type: 'hotel', // Default type
             address: '',  // Can be updated later
@@ -654,12 +663,12 @@ export function registerRoutes(app: Express): Server {
       }
 
       // Fetch the created participant with related details
-      const participantDetails = await db.query.participants.findFirst({
+      const participantDetails = user ? await db.query.participants.findFirst({
         where: eq(participants.id, participant.id),
         with: {
           user: true,
         },
-      });
+      }) : participant;
 
       console.log('Returning participant details:', participantDetails);
       res.json(participantDetails);
