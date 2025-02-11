@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Trip, Participant, Flight, Accommodation, User } from "@db/schema";
+import type { Trip, Participant, Flight, Accommodation } from "@db/schema";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,13 +17,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -36,12 +29,11 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { format } from "date-fns";
-import { CalendarDays, Hotel, Plane, Users, Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
@@ -49,18 +41,8 @@ interface TripParticipantDetailsProps {
   tripId: number;
 }
 
-type BookingStatus = "yes" | "no" | "pending";
-
-interface ParticipantDetails extends Participant {
-  user: User | null;
-  flights?: Flight[];
-  accommodation?: Accommodation;
-}
-
 interface AddParticipantForm {
   name: string;
-  email?: string;
-  passportNumber?: string;
   arrivalDate?: string;
   departureDate?: string;
   flightNumber?: string;
@@ -73,11 +55,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   const { toast } = useToast();
   const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
 
-  // Fetch trip and participants with their travel details
-  const { data: tripDetails, refetch } = useQuery<{
-    participants: ParticipantDetails[];
-    owner: User;
-  }>({
+  const { data: participants = [], refetch } = useQuery({
     queryKey: [`/api/trips/${tripId}/participants`],
     queryFn: async () => {
       const res = await fetch(`/api/trips/${tripId}/participants`);
@@ -88,33 +66,25 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
   const addParticipantMutation = useMutation({
     mutationFn: async (data: AddParticipantForm) => {
-      try {
-        const res = await fetch(`/api/trips/${tripId}/participants`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data),
-        });
+      const res = await fetch(`/api/trips/${tripId}/participants`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
 
-        if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.error || "Failed to add participant");
-        }
-
-        return res.json();
-      } catch (error) {
-        console.error("Error adding participant:", error);
-        throw error;
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to add participant");
       }
+
+      return res.json();
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
       await refetch();
       setIsAddParticipantOpen(false);
       form.reset();
-      toast({
-        title: "Success",
-        description: "Participant added successfully",
-      });
+      toast({ title: "Success", description: "Participant added successfully" });
     },
     onError: (error: Error) => {
       toast({
@@ -125,11 +95,29 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
   });
 
+  const deleteParticipantMutation = useMutation({
+    mutationFn: async (participantId: number) => {
+      const res = await fetch(`/api/trips/${tripId}/participants/${participantId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete participant");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      toast({ title: "Success", description: "Participant removed successfully" });
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to remove participant",
+      });
+    },
+  });
+
   const form = useForm<AddParticipantForm>({
     defaultValues: {
       name: "",
-      email: "",
-      passportNumber: "",
       arrivalDate: "",
       departureDate: "",
       flightNumber: "",
@@ -138,49 +126,11 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
   });
 
-  const onSubmit = (data: AddParticipantForm) => {
-    addParticipantMutation.mutate(data);
-  };
-
-  const updateBookingStatus = async (
-    participantId: number,
-    type: "flight" | "hotel",
-    status: BookingStatus
-  ) => {
-    try {
-      const res = await fetch(`/api/trips/${tripId}/participants/${participantId}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, status }),
-      });
-
-      if (!res.ok) throw new Error(`Failed to update ${type} status`);
-
-      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-      await refetch();
-      toast({
-        title: "Success",
-        description: `${type.charAt(0).toUpperCase() + type.slice(1)} status updated`,
-      });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : `Failed to update ${type} status`,
-      });
-    }
-  };
-
-  const participants = tripDetails?.participants || [];
-  const owner = tripDetails?.owner;
-
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="pb-3">
         <div className="flex justify-between items-center">
-          <div>
-            <CardTitle>Travellers</CardTitle>
-          </div>
+          <CardTitle>Travellers</CardTitle>
           <Dialog open={isAddParticipantOpen} onOpenChange={setIsAddParticipantOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -193,13 +143,14 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                 <DialogTitle>Add New Traveller</DialogTitle>
               </DialogHeader>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <form onSubmit={form.handleSubmit(data => addParticipantMutation.mutate(data))} 
+                      className="space-y-4">
                   <FormField
                     control={form.control}
                     name="name"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Name*</FormLabel>
+                        <FormLabel>Name</FormLabel>
                         <FormControl>
                           <Input placeholder="Enter name" {...field} />
                         </FormControl>
@@ -209,36 +160,10 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
-                      name="arrivalDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Arrival Date</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="departureDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Departure Date</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
                       name="airline"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Airline (Optional)</FormLabel>
+                          <FormLabel>Airline</FormLabel>
                           <FormControl>
                             <Input placeholder="Enter airline" {...field} />
                           </FormControl>
@@ -250,9 +175,35 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                       name="flightNumber"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Flight # (Optional)</FormLabel>
+                          <FormLabel>Flight #</FormLabel>
                           <FormControl>
                             <Input placeholder="Enter flight number" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="arrivalDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Arrival</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="departureDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Departure</FormLabel>
+                          <FormControl>
+                            <Input type="date" {...field} />
                           </FormControl>
                         </FormItem>
                       )}
@@ -263,18 +214,14 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                     name="accommodation"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Accommodation (Optional)</FormLabel>
+                        <FormLabel>Hotel</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter accommodation details" {...field} />
+                          <Input placeholder="Enter hotel name" {...field} />
                         </FormControl>
                       </FormItem>
                     )}
                   />
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={addParticipantMutation.isPending}
-                  >
+                  <Button type="submit" className="w-full">
                     {addParticipantMutation.isPending ? "Adding..." : "Add Traveller"}
                   </Button>
                 </form>
@@ -287,84 +234,70 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead><Users className="h-4 w-4" /> Traveller</TableHead>
-              <TableHead><CalendarDays className="h-4 w-4" /> Dates</TableHead>
-              <TableHead><Hotel className="h-4 w-4" /> Accommodation</TableHead>
-              <TableHead><Plane className="h-4 w-4" /> Flight</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Arrival</TableHead>
+              <TableHead>Flight in</TableHead>
+              <TableHead>Departure</TableHead>
+              <TableHead>Flight Out</TableHead>
+              <TableHead>Hotel</TableHead>
+              <TableHead className="w-[100px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
             {participants.map((participant) => (
               <TableRow key={participant.id}>
-                <TableCell className="font-medium">
-                  {participant.name}
-                  {participant.user?.id === owner?.id && (
-                    <Badge variant="secondary" className="ml-2">Owner</Badge>
+                <TableCell>{participant.name}</TableCell>
+                <TableCell>
+                  {participant.arrivalDate ? (
+                    format(new Date(participant.arrivalDate), "dd/MM/yyyy")
+                  ) : (
+                    <Input className="w-32" type="date" placeholder="dd/mm/yyyy" />
                   )}
                 </TableCell>
                 <TableCell>
-                  {participant.arrivalDate && participant.departureDate ? (
-                    <span>
-                      {format(new Date(participant.arrivalDate), "MMM d")} -{" "}
-                      {format(new Date(participant.departureDate), "MMM d, yyyy")}
-                    </span>
+                  <Input 
+                    className="w-40" 
+                    placeholder="Flight number & time"
+                    defaultValue={participant.flights?.[0]?.flightNumber || ""}
+                  />
+                </TableCell>
+                <TableCell>
+                  {participant.departureDate ? (
+                    format(new Date(participant.departureDate), "dd/MM/yyyy")
                   ) : (
-                    <Badge variant="outline">No dates set</Badge>
+                    <Input className="w-32" type="date" placeholder="dd/mm/yyyy" />
                   )}
                 </TableCell>
                 <TableCell>
-                  {participant.accommodation?.name ? (
-                    <span>{participant.accommodation.name}</span>
-                  ) : (
-                    <Badge variant="outline">Not specified</Badge>
-                  )}
+                  <Input 
+                    className="w-40" 
+                    placeholder="Flight number & time"
+                    defaultValue={participant.flights?.[1]?.flightNumber || ""}
+                  />
                 </TableCell>
                 <TableCell>
-                  {participant.flights?.length ? (
-                    <div className="flex flex-col gap-1">
-                      {participant.flights.map((flight) => (
-                        <div key={flight.id} className="text-sm">
-                          {flight.airline} {flight.flightNumber}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <Badge variant="outline">Not specified</Badge>
-                  )}
+                  <Input 
+                    className="w-40" 
+                    placeholder="Hotel name"
+                    defaultValue={participant.accommodation?.name || ""}
+                  />
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-2">
-                    <Select
-                      value={participant.flightStatus || "pending"}
-                      onValueChange={(value: BookingStatus) =>
-                        updateBookingStatus(participant.id, "flight", value)
-                      }
+                    <Badge variant={participant.flightStatus === "yes" ? "default" : "secondary"}>
+                      {participant.flightStatus === "yes" ? "Booked" : "Pending"}
+                    </Badge>
+                    <Badge variant={participant.hotelStatus === "yes" ? "default" : "secondary"}>
+                      {participant.hotelStatus === "yes" ? "Paid" : "Pending"}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => deleteParticipantMutation.mutate(participant.id)}
                     >
-                      <SelectTrigger className="w-[100px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="yes">Flight ✓</SelectItem>
-                        <SelectItem value="no">Flight ✗</SelectItem>
-                        <SelectItem value="pending">Flight ?</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={participant.hotelStatus || "pending"}
-                      onValueChange={(value: BookingStatus) =>
-                        updateBookingStatus(participant.id, "hotel", value)
-                      }
-                    >
-                      <SelectTrigger className="w-[100px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="yes">Hotel ✓</SelectItem>
-                        <SelectItem value="no">Hotel ✗</SelectItem>
-                        <SelectItem value="pending">Hotel ?</SelectItem>
-                      </SelectContent>
-                    </Select>
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
                 </TableCell>
               </TableRow>
