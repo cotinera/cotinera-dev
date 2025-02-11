@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { FlightBookings } from "@/components/flight-bookings";
 import { Checklist } from "@/components/checklist";
 import { CalendarView } from "@/components/calendar-view";
 import { MapView } from "@/components/map-view";
@@ -10,7 +9,8 @@ import { Loader2, ArrowLeft, Calendar, MapPin, Users } from "lucide-react";
 import { ViewToggle } from "@/components/view-toggle";
 import type { Trip } from "@db/schema";
 import { format } from "date-fns";
-import { TripHeaderEdit } from "@/components/trip-header-edit"; // Added import statement
+import { TripHeaderEdit } from "@/components/trip-header-edit";
+import { TripParticipantDetails } from "@/components/trip-participant-details";
 
 export default function TripDetail() {
   const [, params] = useRoute("/trips/:id");
@@ -65,14 +65,14 @@ export default function TripDetail() {
       <header className="border-b">
         <div className="relative overflow-hidden py-12">
           {trip.thumbnail && (
-            <div 
+            <div
               className="absolute inset-0 bg-cover bg-center"
-              style={{ 
+              style={{
                 backgroundImage: `url(${trip.thumbnail})`,
-                filter: 'blur(20px)',
-                transform: 'scale(1.2)',
-                opacity: '0.9'
-              }} 
+                filter: "blur(20px)",
+                transform: "scale(1.2)",
+                opacity: "0.9",
+              }}
             />
           )}
           <div className="absolute inset-0 bg-gradient-to-b from-background/30 to-background/70" />
@@ -86,10 +86,7 @@ export default function TripDetail() {
               Back
             </Button>
 
-            <TripHeaderEdit 
-              trip={trip} 
-              onBack={() => setLocation("/")} 
-            />
+            <TripHeaderEdit trip={trip} onBack={() => setLocation("/")} />
           </div>
         </div>
       </header>
@@ -103,8 +100,7 @@ export default function TripDetail() {
             </section>
 
             <section>
-              <h2 className="text-xl font-semibold mb-4">Flight Bookings</h2>
-              <FlightBookings tripId={trip.id} />
+              <TripParticipantDetails tripId={trip.id} />
             </section>
           </div>
 

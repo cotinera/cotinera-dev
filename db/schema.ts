@@ -165,6 +165,8 @@ export const participants = pgTable("participants", {
   status: text("status").notNull(),
   arrivalDate: date("arrival_date"),
   departureDate: date("departure_date"),
+  flightStatus: text("flight_status").notNull().default('pending'),
+  hotelStatus: text("hotel_status").notNull().default('pending'),
 });
 
 export const activities = pgTable("activities", {
