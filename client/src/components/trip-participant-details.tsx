@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Trip, Participant, Flight, Accommodation } from "@db/schema";
+import type { Trip, Participant } from "@db/schema";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -169,7 +169,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   const getStatusBadgeVariant = (status: Status) => {
     switch (status) {
       case 'yes':
-        return 'success'; // Changed to 'success' for consistency
+        return 'success';
       case 'no':
         return 'destructive';
       default:
@@ -265,7 +265,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
               <TableHead>Departure</TableHead>
               <TableHead>Flight Out</TableHead>
               <TableHead>Hotel</TableHead>
-              <TableHead className="w-[100px]" />
+              <TableHead className="w-[100px]">Status</TableHead>
+              <TableHead className="w-[50px]" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -277,57 +278,45 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                     {participant.arrivalDate && format(new Date(participant.arrivalDate), "dd/MM/yyyy")}
                   </TableCell>
                   <TableCell>
-                    <Input
-                      className="w-40"
-                      placeholder="Flight number & time"
-                      defaultValue={participant.flights?.[0]?.flightNumber || ""}
-                    />
+                    {participant.flights?.[0]?.flightNumber || "-"}
                   </TableCell>
                   <TableCell>
                     {participant.departureDate && format(new Date(participant.departureDate), "dd/MM/yyyy")}
                   </TableCell>
                   <TableCell>
-                    <Input
-                      className="w-40"
-                      placeholder="Flight number & time"
-                      defaultValue={participant.flights?.[1]?.flightNumber || ""}
-                    />
+                    {participant.flights?.[1]?.flightNumber || "-"}
                   </TableCell>
                   <TableCell>
-                    <Input
-                      className="w-40"
-                      placeholder="Hotel name"
-                      defaultValue={participant.accommodation?.name || ""}
-                    />
+                    {participant.accommodation?.name || "-"}
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
-                      <Badge
-                        variant={getStatusBadgeVariant(participant.status as Status)}
-                        className="cursor-pointer"
-                        onClick={() => handleStatusClick(participant.id, participant.status as Status)}
-                      >
-                        {participant.status === 'yes' ? 'Confirmed' : participant.status === 'no' ? 'Declined' : 'Pending'}
-                      </Badge>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => {
-                          if (window.confirm('Are you sure you want to remove this participant?')) {
-                            deleteParticipantMutation.mutate(participant.id);
-                          }
-                        }}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    <Badge
+                      variant={getStatusBadgeVariant(participant.status as Status)}
+                      className="cursor-pointer"
+                      onClick={() => handleStatusClick(participant.id, participant.status as Status)}
+                    >
+                      {participant.status === 'yes' ? 'Confirmed' : participant.status === 'no' ? 'Declined' : 'Pending'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        if (window.confirm('Are you sure you want to remove this participant?')) {
+                          deleteParticipantMutation.mutate(participant.id);
+                        }
+                      }}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-4 text-muted-foreground">
                   No travellers added yet
                 </TableCell>
               </TableRow>
