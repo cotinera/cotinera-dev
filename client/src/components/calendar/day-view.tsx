@@ -9,6 +9,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -48,8 +55,8 @@ import {
   DragStartEvent,
   DragOverEvent,
 } from "@dnd-kit/core";
-import type { Trip, Activity } from "@db/schema";
-import { Pencil, Trash2, Loader2 } from "lucide-react";
+import type { Trip, Activity, User } from "@db/schema";
+import { Pencil, Trash2, Loader2, Users } from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -62,6 +69,7 @@ const eventFormSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
   location: z.string().optional(),
   description: z.string().optional(),
+  participants: z.array(z.number()).optional(),
 });
 
 type EventFormValues = z.infer<typeof eventFormSchema>;
@@ -292,15 +300,20 @@ function EventForm({
   defaultValues,
   onSubmit,
   submitLabel,
+  trip,
 }: {
   defaultValues: EventFormValues;
   onSubmit: (values: EventFormValues) => void;
   submitLabel: string;
+  trip: Trip;
 }) {
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
     defaultValues,
   });
+
+  // Get all participants from the trip
+  const participants = trip.participants?.map(p => p.user).filter(Boolean) || [];
 
   return (
     <Form {...form}>
@@ -386,6 +399,42 @@ function EventForm({
               <FormControl>
                 <Textarea {...field} />
               </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="participants"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  <span>Participants (optional)</span>
+                </div>
+              </FormLabel>
+              <Select
+                value={field.value?.map(String)}
+                onValueChange={(value) => {
+                  field.onChange(value ? value.map(Number) : []);
+                }}
+                multiple
+              >
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select participants" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {participants.map((participant) => (
+                    <SelectItem key={participant.id} value={participant.id.toString()}>
+                      {participant.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <FormMessage />
             </FormItem>
           )}
@@ -557,6 +606,7 @@ export function DayView({ trip }: { trip: Trip }) {
           endTime: endTime.toISOString(),
           location: values.location,
           description: values.description,
+          participants: values.participants,
         }),
       });
 
@@ -645,6 +695,7 @@ export function DayView({ trip }: { trip: Trip }) {
       date: format(date, "yyyy-MM-dd"),
       location: "",
       description: "",
+      participants: [],
     };
   };
 
@@ -659,6 +710,7 @@ export function DayView({ trip }: { trip: Trip }) {
       date: format(startTime, "yyyy-MM-dd"),
       location: event.location || "",
       description: event.description || "",
+      participants: event.participants?.map(p => p.userId) || [],
     };
   };
 
@@ -761,6 +813,7 @@ export function DayView({ trip }: { trip: Trip }) {
                                   defaultValues={getCreateFormDefaults(selectedTimeSlot.date, selectedTimeSlot.hour)}
                                   onSubmit={createEvent}
                                   submitLabel="Create Event"
+                                  trip={trip}
                                 />
                               )}
                             </DialogContent>
@@ -801,6 +854,7 @@ export function DayView({ trip }: { trip: Trip }) {
                       endTime: endTime.toISOString(),
                       location: values.location,
                       description: values.description,
+                      participants: values.participants,
                     }),
                   });
 
@@ -818,6 +872,7 @@ export function DayView({ trip }: { trip: Trip }) {
                 }
               }}
               submitLabel="Update Event"
+              trip={trip}
             />
           )}
         </DialogContent>

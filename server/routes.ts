@@ -277,6 +277,7 @@ export function registerRoutes(app: Express): Server {
         endTime: new Date(req.body.endTime),
         description: req.body.description || null,
         location: req.body.location || null,
+        participants: req.body.participants || [],
       }).returning();
 
       if (!newActivity) {
@@ -302,6 +303,7 @@ export function registerRoutes(app: Express): Server {
           location: req.body.location,
           startTime: new Date(req.body.startTime),
           endTime: new Date(req.body.endTime),
+          participants: req.body.participants || [],
         })
         .where(
           and(
