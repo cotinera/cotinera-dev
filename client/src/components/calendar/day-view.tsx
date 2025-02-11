@@ -6,6 +6,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
   Dialog,
@@ -15,6 +16,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
   format,
   addHours,
   addDays,
@@ -23,7 +32,11 @@ import {
   endOfDay,
   differenceInMinutes,
   setMinutes,
+  parse,
 } from "date-fns";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 import {
   DndContext,
   DragEndEvent,
@@ -40,6 +53,18 @@ import { Pencil, Trash2, Loader2 } from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+
+// Form schema for event creation/editing
+const eventFormSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format (HH:mm)"),
+  endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format (HH:mm)"),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format (YYYY-MM-DD)"),
+  location: z.string().optional(),
+  description: z.string().optional(),
+});
+
+type EventFormValues = z.infer<typeof eventFormSchema>;
 
 // Helper function to snap time to nearest 15 minutes
 function snapToQuarterHour(date: Date): Date {
@@ -263,6 +288,115 @@ function DroppableTimeSlot({
   );
 }
 
+function EventForm({
+  defaultValues,
+  onSubmit,
+  submitLabel,
+}: {
+  defaultValues: EventFormValues;
+  onSubmit: (values: EventFormValues) => void;
+  submitLabel: string;
+}) {
+  const form = useForm<EventFormValues>({
+    resolver: zodResolver(eventFormSchema),
+    defaultValues,
+  });
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          control={form.control}
+          name="title"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Title</FormLabel>
+              <FormControl>
+                <Input {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="startTime"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Start Time</FormLabel>
+                <FormControl>
+                  <Input {...field} type="time" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="endTime"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>End Time</FormLabel>
+                <FormControl>
+                  <Input {...field} type="time" />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        <FormField
+          control={form.control}
+          name="date"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Date</FormLabel>
+              <FormControl>
+                <Input {...field} type="date" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="location"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Location (optional)</FormLabel>
+              <FormControl>
+                <Input {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="description"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Notes (optional)</FormLabel>
+              <FormControl>
+                <Textarea {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <Button type="submit" className="w-full">{submitLabel}</Button>
+      </form>
+    </Form>
+  );
+}
+
 export function DayView({ trip }: { trip: Trip }) {
   const [newEventTitle, setNewEventTitle] = useState("");
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | null>(null);
@@ -409,21 +543,20 @@ export function DayView({ trip }: { trip: Trip }) {
     });
   };
 
-  const createEvent = async () => {
-    if (!selectedTimeSlot || !newEventTitle) return;
-
-    const startTime = new Date(selectedTimeSlot.date);
-    startTime.setHours(selectedTimeSlot.hour, 0, 0, 0);
-    const endTime = addHours(startTime, 1);
-
+  const createEvent = async (values: EventFormValues) => {
     try {
+      const startTime = new Date(`${values.date}T${values.startTime}:00`);
+      const endTime = new Date(`${values.date}T${values.endTime}:00`);
+
       const res = await fetch(`/api/trips/${trip.id}/activities`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: newEventTitle,
+          title: values.title,
           startTime: startTime.toISOString(),
           endTime: endTime.toISOString(),
+          location: values.location,
+          description: values.description,
         }),
       });
 
@@ -432,7 +565,6 @@ export function DayView({ trip }: { trip: Trip }) {
       await queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
       toast({ title: "Event created successfully" });
       setIsCreateDialogOpen(false);
-      setNewEventTitle("");
     } catch (error) {
       toast({
         variant: "destructive",
@@ -500,6 +632,36 @@ export function DayView({ trip }: { trip: Trip }) {
       });
     }
   };
+
+  const getCreateFormDefaults = (date: Date, hour: number): EventFormValues => {
+    const startTime = new Date(date);
+    startTime.setHours(hour, 0, 0, 0);
+    const endTime = addHours(startTime, 1);
+
+    return {
+      title: "",
+      startTime: format(startTime, "HH:mm"),
+      endTime: format(endTime, "HH:mm"),
+      date: format(date, "yyyy-MM-dd"),
+      location: "",
+      description: "",
+    };
+  };
+
+  const getEditFormDefaults = (event: Activity): EventFormValues => {
+    const startTime = new Date(event.startTime);
+    const endTime = new Date(event.endTime);
+
+    return {
+      title: event.title,
+      startTime: format(startTime, "HH:mm"),
+      endTime: format(endTime, "HH:mm"),
+      date: format(startTime, "yyyy-MM-dd"),
+      location: event.location || "",
+      description: event.description || "",
+    };
+  };
+
 
   if (isLoading) {
     return (
@@ -594,16 +756,13 @@ export function DayView({ trip }: { trip: Trip }) {
                               <DialogHeader>
                                 <DialogTitle>Create New Event</DialogTitle>
                               </DialogHeader>
-                              <div className="space-y-4 mt-4">
-                                <Input
-                                  placeholder="Event title"
-                                  value={newEventTitle}
-                                  onChange={(e) => setNewEventTitle(e.target.value)}
+                              {selectedTimeSlot && (
+                                <EventForm
+                                  defaultValues={getCreateFormDefaults(selectedTimeSlot.date, selectedTimeSlot.hour)}
+                                  onSubmit={createEvent}
+                                  submitLabel="Create Event"
                                 />
-                                <Button onClick={createEvent} className="w-full">
-                                  Create Event
-                                </Button>
-                              </div>
+                              )}
                             </DialogContent>
                           </Dialog>
                         )}
@@ -624,62 +783,43 @@ export function DayView({ trip }: { trip: Trip }) {
           <DialogHeader>
             <DialogTitle>Edit Event</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 mt-4">
-            <Input
-              placeholder="Event title"
-              value={selectedEvent?.title || ""}
-              onChange={(e) =>
-                setSelectedEvent(
-                  selectedEvent
-                    ? { ...selectedEvent, title: e.target.value }
-                    : null
-                )
-              }
+          {selectedEvent && (
+            <EventForm
+              defaultValues={getEditFormDefaults(selectedEvent)}
+              onSubmit={async (values) => {
+                try {
+                  const startTime = new Date(`${values.date}T${values.startTime}:00`);
+                  const endTime = new Date(`${values.date}T${values.endTime}:00`);
+
+                  const res = await fetch(`/api/trips/${trip.id}/activities/${selectedEvent.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      ...selectedEvent,
+                      title: values.title,
+                      startTime: startTime.toISOString(),
+                      endTime: endTime.toISOString(),
+                      location: values.location,
+                      description: values.description,
+                    }),
+                  });
+
+                  if (!res.ok) throw new Error("Failed to update activity");
+
+                  await queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+                  toast({ title: "Event updated successfully" });
+                  setIsEditDialogOpen(false);
+                } catch (error) {
+                  toast({
+                    variant: "destructive",
+                    title: "Failed to update event",
+                    description: error instanceof Error ? error.message : "An error occurred",
+                  });
+                }
+              }}
+              submitLabel="Update Event"
             />
-            <div className="flex justify-between gap-4">
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  if (selectedEvent) {
-                    deleteEvent(selectedEvent.id);
-                  }
-                }}
-                className="flex-1"
-              >
-                Delete
-              </Button>
-              <Button
-                onClick={async () => {
-                  if (selectedEvent) {
-                    try {
-                      const res = await fetch(`/api/trips/${trip.id}/activities/${selectedEvent.id}`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(selectedEvent),
-                      });
-
-                      if (!res.ok) throw new Error("Failed to update activity");
-
-                      await queryClient.invalidateQueries({
-                        queryKey: ["/api/trips", trip.id, "activities"],
-                      });
-                      toast({ title: "Event updated successfully" });
-                      setIsEditDialogOpen(false);
-                    } catch (error) {
-                      toast({
-                        variant: "destructive",
-                        title: "Failed to update event",
-                        description: error instanceof Error ? error.message : "An error occurred",
-                      });
-                    }
-                  }
-                }}
-                className="flex-1"
-              >
-                Update
-              </Button>
-            </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
     </ScrollArea>
