@@ -112,7 +112,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-      await refetch();
+      await refetch(); //Retained refetch here.
       setIsAddParticipantOpen(false);
       form.reset();
       toast({ title: "Success", description: "Participant added successfully" });
