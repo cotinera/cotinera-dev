@@ -62,60 +62,66 @@ function DraggableEvent({
   const [isResizing, setIsResizing] = useState(false);
   const [resizeEdge, setResizeEdge] = useState<'top' | 'bottom' | null>(null);
   const [startY, setStartY] = useState(0);
-  const [originalTime, setOriginalTime] = useState<Date | null>(null);
-  const [resizedHeight, setResizedHeight] = useState<number | null>(null);
-  const [initialHeight, setInitialHeight] = useState<number | null>(null);
+  const [startHeight, setStartHeight] = useState(0);
+  const elementRef = useRef<HTMLDivElement>(null);
 
   const handleResizeStart = (e: React.MouseEvent, edge: 'top' | 'bottom') => {
     e.stopPropagation();
+    if (!elementRef.current) return;
+
     setIsResizing(true);
     setResizeEdge(edge);
     setStartY(e.clientY);
+    setStartHeight(elementRef.current.offsetHeight);
 
+    // Calculate initial times
     const eventStart = new Date(event.startTime);
     const eventEnd = new Date(event.endTime);
-    const duration = eventEnd.getTime() - eventStart.getTime();
-    const heightInHours = duration / (1000 * 60 * 60);
-    setInitialHeight(heightInHours * 48);
 
-    setOriginalTime(edge === 'top' ? eventStart : eventEnd);
+    // Store the opposite end time that won't change during resize
+    const fixedTime = edge === 'top' ? eventEnd : eventStart;
   };
 
   const handleResizeMove = (e: MouseEvent) => {
-    if (!isResizing || !resizeEdge || !originalTime || !initialHeight) return;
+    if (!isResizing || !resizeEdge || !elementRef.current) return;
 
-    const deltaY = e.clientY - startY;
-    const hourDelta = Math.round(deltaY / 48); // 48px is the height of one hour slot
+    const currentY = e.clientY;
+    const deltaY = currentY - startY;
 
-    const newTime = new Date(originalTime);
-    newTime.setHours(originalTime.getHours() + hourDelta);
-
-    // Calculate new height based on resize edge
-    const eventStart = new Date(event.startTime);
-    const eventEnd = new Date(event.endTime);
-    let newHeight;
-
+    // Calculate new height (minimum 1 hour = 48px)
+    let newHeight = startHeight;
     if (resizeEdge === 'top') {
-      const duration = eventEnd.getTime() - newTime.getTime();
-      newHeight = (duration / (1000 * 60 * 60)) * 48;
+      newHeight = Math.max(48, startHeight - deltaY);
     } else {
-      const duration = newTime.getTime() - eventStart.getTime();
-      newHeight = (duration / (1000 * 60 * 60)) * 48;
+      newHeight = Math.max(48, startHeight + deltaY);
     }
 
-    // Only update if the new height is valid (minimum 1 hour)
-    if (newHeight >= 48) {
-      setResizedHeight(newHeight);
-      onResize(resizeEdge, newTime);
+    // Update element height
+    elementRef.current.style.height = `${newHeight}px`;
+
+    // Calculate new time based on height change
+    const hourDelta = (newHeight - startHeight) / 48; // 48px per hour
+    const eventStart = new Date(event.startTime);
+    const eventEnd = new Date(event.endTime);
+
+    if (resizeEdge === 'top') {
+      const newStart = new Date(eventStart);
+      newStart.setHours(eventStart.getHours() - hourDelta);
+      if (newStart < eventEnd) {
+        onResize('top', newStart);
+      }
+    } else {
+      const newEnd = new Date(eventEnd);
+      newEnd.setHours(eventEnd.getHours() + hourDelta);
+      if (newEnd > eventStart) {
+        onResize('bottom', newEnd);
+      }
     }
   };
 
   const handleResizeEnd = () => {
     setIsResizing(false);
     setResizeEdge(null);
-    setOriginalTime(null);
-    setResizedHeight(null);
-    setInitialHeight(null);
   };
 
   useEffect(() => {
@@ -127,12 +133,12 @@ function DraggableEvent({
         window.removeEventListener('mouseup', handleResizeEnd);
       };
     }
-  }, [isResizing, startY, originalTime, resizeEdge, initialHeight]);
+  }, [isResizing, startY, startHeight, resizeEdge]);
 
   const eventStart = new Date(event.startTime);
   const eventEnd = new Date(event.endTime);
   const durationInHours = (eventEnd.getTime() - eventStart.getTime()) / (1000 * 60 * 60);
-  const heightInPixels = resizedHeight ?? (durationInHours * 48); // 48px per hour
+  const heightInPixels = durationInHours * 48; // 48px per hour
 
   const style: React.CSSProperties = {
     transform: transform ? CSS.Transform.toString(transform) : undefined,
@@ -145,13 +151,15 @@ function DraggableEvent({
     boxShadow: isDragging ? 'var(--shadow-md)' : undefined,
     opacity: isDragging ? 0.9 : 1,
     zIndex: isDragging ? 50 : 1,
-    pointerEvents: isResizing ? 'none' : undefined,
     cursor: isResizing ? 'ns-resize' : 'move',
   };
 
   return (
     <div
-      ref={setNodeRef}
+      ref={(el) => {
+        setNodeRef(el);
+        if (elementRef) elementRef.current = el;
+      }}
       {...(isResizing ? {} : { ...attributes, ...listeners })}
       style={style}
       className={`bg-primary/20 hover:bg-primary/30 rounded-md px-2 py-1 group/event transition-colors ${
@@ -192,8 +200,7 @@ function DraggableEvent({
         </div>
       </div>
       <span className="text-xs text-muted-foreground block">
-        {format(new Date(event.startTime), "h:mm a")} -{" "}
-        {format(new Date(event.endTime), "h:mm a")}
+        {format(eventStart, "h:mm a")} - {format(eventEnd, "h:mm a")}
       </span>
 
       {/* Bottom resize handle */}
