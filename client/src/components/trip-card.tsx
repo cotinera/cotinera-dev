@@ -25,7 +25,7 @@ const THUMBNAILS = [
 
 interface TripCardProps {
   trip: Trip & {
-    participants?: { userId: number; status: string }[];
+    participants?: { userId: number | null; name?: string; status: string }[];
   };
 }
 
@@ -38,6 +38,14 @@ export function TripCard({ trip }: TripCardProps) {
   const handleNavigate = () => {
     setLocation(`/trips/${trip.id}`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Get initial for avatar fallback
+  const getInitial = (participant: { userId: number | null; name?: string }) => {
+    if (participant.name) {
+      return participant.name[0].toUpperCase();
+    }
+    return '?';
   };
 
   return (
@@ -110,7 +118,7 @@ export function TripCard({ trip }: TripCardProps) {
                   {trip.participants.slice(0, 3).map((participant, i) => (
                     <Avatar key={i} className="h-6 w-6 border-2 border-background">
                       <AvatarFallback>
-                        {participant.userId.toString()[0]}
+                        {getInitial(participant)}
                       </AvatarFallback>
                     </Avatar>
                   ))}
