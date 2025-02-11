@@ -64,33 +64,50 @@ function DraggableEvent({
   const [startY, setStartY] = useState(0);
   const [originalTime, setOriginalTime] = useState<Date | null>(null);
   const [resizedHeight, setResizedHeight] = useState<number | null>(null);
+  const [initialHeight, setInitialHeight] = useState<number | null>(null);
 
   const handleResizeStart = (e: React.MouseEvent, edge: 'top' | 'bottom') => {
     e.stopPropagation();
     setIsResizing(true);
     setResizeEdge(edge);
     setStartY(e.clientY);
-    setOriginalTime(edge === 'top' ? new Date(event.startTime) : new Date(event.endTime));
+
+    const eventStart = new Date(event.startTime);
+    const eventEnd = new Date(event.endTime);
+    const duration = eventEnd.getTime() - eventStart.getTime();
+    const heightInHours = duration / (1000 * 60 * 60);
+    setInitialHeight(heightInHours * 48);
+
+    setOriginalTime(edge === 'top' ? eventStart : eventEnd);
   };
 
   const handleResizeMove = (e: MouseEvent) => {
-    if (!isResizing || !resizeEdge || !originalTime) return;
+    if (!isResizing || !resizeEdge || !originalTime || !initialHeight) return;
 
     const deltaY = e.clientY - startY;
     const hourDelta = Math.round(deltaY / 48); // 48px is the height of one hour slot
+
     const newTime = new Date(originalTime);
     newTime.setHours(originalTime.getHours() + hourDelta);
 
-    // Update visual height during resize
+    // Calculate new height based on resize edge
     const eventStart = new Date(event.startTime);
     const eventEnd = new Date(event.endTime);
-    const duration = resizeEdge === 'top' 
-      ? (eventEnd.getTime() - newTime.getTime()) 
-      : (newTime.getTime() - eventStart.getTime());
-    const heightInHours = duration / (1000 * 60 * 60);
-    setResizedHeight(heightInHours * 48); // 48px per hour
+    let newHeight;
 
-    onResize(resizeEdge, newTime);
+    if (resizeEdge === 'top') {
+      const duration = eventEnd.getTime() - newTime.getTime();
+      newHeight = (duration / (1000 * 60 * 60)) * 48;
+    } else {
+      const duration = newTime.getTime() - eventStart.getTime();
+      newHeight = (duration / (1000 * 60 * 60)) * 48;
+    }
+
+    // Only update if the new height is valid (minimum 1 hour)
+    if (newHeight >= 48) {
+      setResizedHeight(newHeight);
+      onResize(resizeEdge, newTime);
+    }
   };
 
   const handleResizeEnd = () => {
@@ -98,6 +115,7 @@ function DraggableEvent({
     setResizeEdge(null);
     setOriginalTime(null);
     setResizedHeight(null);
+    setInitialHeight(null);
   };
 
   useEffect(() => {
@@ -109,18 +127,18 @@ function DraggableEvent({
         window.removeEventListener('mouseup', handleResizeEnd);
       };
     }
-  }, [isResizing, startY, originalTime, resizeEdge]);
+  }, [isResizing, startY, originalTime, resizeEdge, initialHeight]);
 
   const eventStart = new Date(event.startTime);
   const eventEnd = new Date(event.endTime);
   const durationInHours = (eventEnd.getTime() - eventStart.getTime()) / (1000 * 60 * 60);
   const heightInPixels = resizedHeight ?? (durationInHours * 48); // 48px per hour
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: transform ? CSS.Transform.toString(transform) : undefined,
     width: '280px',
     height: `${heightInPixels}px`,
-    position: 'absolute' as const,
+    position: 'absolute',
     left: '8px',
     top: '0',
     backgroundColor: isDragging ? 'hsl(var(--primary)/0.2)' : undefined,
@@ -128,6 +146,7 @@ function DraggableEvent({
     opacity: isDragging ? 0.9 : 1,
     zIndex: isDragging ? 50 : 1,
     pointerEvents: isResizing ? 'none' : undefined,
+    cursor: isResizing ? 'ns-resize' : 'move',
   };
 
   return (
@@ -135,7 +154,7 @@ function DraggableEvent({
       ref={setNodeRef}
       {...(isResizing ? {} : { ...attributes, ...listeners })}
       style={style}
-      className={`bg-primary/20 hover:bg-primary/30 rounded-md px-2 py-1 cursor-move group/event transition-colors ${
+      className={`bg-primary/20 hover:bg-primary/30 rounded-md px-2 py-1 group/event transition-colors ${
         isDragging ? 'ring-1 ring-primary/50' : ''
       }`}
     >
