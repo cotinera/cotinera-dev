@@ -4,8 +4,10 @@ import type { Participant } from "@db/schema";
 import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardHeader,
   CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card";
 import {
   Table,
@@ -52,13 +54,12 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   const { toast } = useToast();
   const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
 
-  const { data: tripParticipants, refetch } = useQuery<Participant[]>({
+  const { data: participants, refetch } = useQuery({
     queryKey: [`/api/trips/${tripId}/participants`],
     queryFn: async () => {
       const res = await fetch(`/api/trips/${tripId}/participants`);
       if (!res.ok) throw new Error("Failed to fetch participants");
-      const data = await res.json();
-      return data.participants;
+      return res.json();
     },
   });
 
@@ -132,9 +133,9 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            <span className="font-semibold">Participants</span>
+          <div>
+            <CardTitle>Trip Details</CardTitle>
+            <CardDescription>Manage participant travel arrangements</CardDescription>
           </div>
           <Dialog open={isAddParticipantOpen} onOpenChange={setIsAddParticipantOpen}>
             <DialogTrigger asChild>
@@ -224,7 +225,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
             </TableRow>
           </TableHeader>
           <TableBody>
-            {tripParticipants?.map((participant) => (
+            {participants?.participants?.map((participant) => (
               <TableRow key={participant.id}>
                 <TableCell className="font-medium">
                   {participant.name}
