@@ -6,6 +6,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
   Dialog,
@@ -15,6 +16,15 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Select } from "@/components/ui/select"; // Added import
+import {
   format,
   addHours,
   addDays,
@@ -23,7 +33,11 @@ import {
   endOfDay,
   differenceInMinutes,
   setMinutes,
+  parse,
 } from "date-fns";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 import {
   DndContext,
   DragEndEvent,
@@ -36,10 +50,22 @@ import {
   DragOverEvent,
 } from "@dnd-kit/core";
 import type { Trip, Activity } from "@db/schema";
-import { Pencil, Trash2, Loader2 } from "lucide-react";
+import { Pencil, Trash2, Loader2, Users } from "lucide-react"; // Added Users import
 import { CSS } from "@dnd-kit/utilities";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+
+// Define form schema
+const eventFormSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  startTime: z.string(),
+  endTime: z.string(),
+  location: z.string().optional(),
+  description: z.string().optional(),
+  participants: z.array(z.number()).optional(), // Added participants field
+});
+
+type EventFormValues = z.infer<typeof eventFormSchema>;
 
 // Helper function to snap time to nearest 15 minutes
 function snapToQuarterHour(date: Date): Date {
@@ -62,11 +88,13 @@ interface TimeSlot {
 
 function DraggableEvent({
   event,
+  participants, // Added participants prop
   onEdit,
   onDelete,
   onResize,
 }: {
   event: Activity;
+  participants: { userId: number; user: { name?: string; email: string } }[]; // Added user property to participant type
   onEdit: () => void;
   onDelete: () => void;
   onResize: (edge: 'top' | 'bottom', newTime: Date) => void;
@@ -199,6 +227,12 @@ function DraggableEvent({
       <div className="flex items-center justify-between h-[18px]">
         <span className="font-medium text-sm truncate max-w-[180px]">{event.title}</span>
         <div className="hidden group-hover/event:flex items-center gap-1">
+          {participants.length > 0 && (
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <Users className="h-3 w-3" />
+              <span className="text-xs">{participants.length}</span>
+            </div>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -264,7 +298,6 @@ function DroppableTimeSlot({
 }
 
 export function DayView({ trip }: { trip: Trip }) {
-  const [newEventTitle, setNewEventTitle] = useState("");
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Activity | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -273,6 +306,67 @@ export function DayView({ trip }: { trip: Trip }) {
   const [isDragging, setIsDragging] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Create form
+  const createForm = useForm<EventFormValues>({
+    resolver: zodResolver(eventFormSchema),
+    defaultValues: {
+      title: "",
+      startTime: "",
+      endTime: "",
+      location: "",
+      description: "",
+      participants: [], // Added default value for participants
+    },
+  });
+
+  // Edit form
+  const editForm = useForm<EventFormValues>({
+    resolver: zodResolver(eventFormSchema),
+    defaultValues: {
+      title: "",
+      startTime: "",
+      endTime: "",
+      location: "",
+      description: "",
+      participants: [], // Added default value for participants
+    },
+  });
+
+  // Reset and set form values when opening create dialog
+  useEffect(() => {
+    if (isCreateDialogOpen && selectedTimeSlot) {
+      const startDate = new Date(selectedTimeSlot.date);
+      startDate.setHours(selectedTimeSlot.hour, 0, 0, 0);
+      const endDate = addHours(startDate, 1);
+
+      createForm.reset({
+        title: "",
+        startTime: format(startDate, "HH:mm"),
+        endTime: format(endDate, "HH:mm"),
+        location: "",
+        description: "",
+        participants: [], // Added participants to reset
+      });
+    }
+  }, [isCreateDialogOpen, selectedTimeSlot]);
+
+  // Reset and set form values when opening edit dialog
+  useEffect(() => {
+    if (isEditDialogOpen && selectedEvent) {
+      const startDate = new Date(selectedEvent.startTime);
+      const endDate = new Date(selectedEvent.endTime);
+
+      editForm.reset({
+        title: selectedEvent.title,
+        startTime: format(startDate, "HH:mm"),
+        endTime: format(endDate, "HH:mm"),
+        location: selectedEvent.location || "",
+        description: selectedEvent.description || "",
+        participants: selectedEvent.participants || [], // Added participants to reset
+      });
+    }
+  }, [isEditDialogOpen, selectedEvent]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -293,6 +387,16 @@ export function DayView({ trip }: { trip: Trip }) {
     queryFn: async () => {
       const res = await fetch(`/api/trips/${trip.id}/activities`);
       if (!res.ok) throw new Error("Failed to fetch activities");
+      return res.json();
+    },
+  });
+
+  // Add participants query
+  const { data: participants = [], isLoading: isParticipantsLoading } = useQuery({
+    queryKey: ["/api/trips", trip.id, "participants"],
+    queryFn: async () => {
+      const res = await fetch(`/api/trips/${trip.id}/participants`);
+      if (!res.ok) throw new Error("Failed to fetch participants");
       return res.json();
     },
   });
@@ -409,21 +513,24 @@ export function DayView({ trip }: { trip: Trip }) {
     });
   };
 
-  const createEvent = async () => {
-    if (!selectedTimeSlot || !newEventTitle) return;
+  const createEvent = async (values: EventFormValues) => {
+    if (!selectedTimeSlot) return;
 
-    const startTime = new Date(selectedTimeSlot.date);
-    startTime.setHours(selectedTimeSlot.hour, 0, 0, 0);
-    const endTime = addHours(startTime, 1);
+    const date = selectedTimeSlot.date;
+    const startTime = parse(values.startTime, "HH:mm", date);
+    const endTime = parse(values.endTime, "HH:mm", date);
 
     try {
       const res = await fetch(`/api/trips/${trip.id}/activities`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: newEventTitle,
+          title: values.title,
           startTime: startTime.toISOString(),
           endTime: endTime.toISOString(),
+          location: values.location || null,
+          description: values.description || null,
+          participants: values.participants, // Added participants to the request body
         }),
       });
 
@@ -432,11 +539,45 @@ export function DayView({ trip }: { trip: Trip }) {
       await queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
       toast({ title: "Event created successfully" });
       setIsCreateDialogOpen(false);
-      setNewEventTitle("");
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Failed to create event",
+        description: error instanceof Error ? error.message : "An error occurred",
+      });
+    }
+  };
+
+  const updateEvent = async (values: EventFormValues) => {
+    if (!selectedEvent) return;
+
+    const currentDate = new Date(selectedEvent.startTime);
+    const startTime = parse(values.startTime, "HH:mm", currentDate);
+    const endTime = parse(values.endTime, "HH:mm", currentDate);
+
+    try {
+      const res = await fetch(`/api/trips/${trip.id}/activities/${selectedEvent.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: values.title,
+          startTime: startTime.toISOString(),
+          endTime: endTime.toISOString(),
+          location: values.location || null,
+          description: values.description || null,
+          participants: values.participants, // Added participants to the request body
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to update activity");
+
+      await queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+      toast({ title: "Event updated successfully" });
+      setIsEditDialogOpen(false);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Failed to update event",
         description: error instanceof Error ? error.message : "An error occurred",
       });
     }
@@ -501,7 +642,7 @@ export function DayView({ trip }: { trip: Trip }) {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || isParticipantsLoading) { // added isParticipantsLoading
     return (
       <div className="flex items-center justify-center h-96">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -563,6 +704,7 @@ export function DayView({ trip }: { trip: Trip }) {
                           <DraggableEvent
                             key={event.id}
                             event={event}
+                            participants={participants.filter(p => event.participants?.includes(p.userId))} //Filter participants for this event.
                             onEdit={() => {
                               setSelectedEvent(event);
                               setIsEditDialogOpen(true);
@@ -594,16 +736,106 @@ export function DayView({ trip }: { trip: Trip }) {
                               <DialogHeader>
                                 <DialogTitle>Create New Event</DialogTitle>
                               </DialogHeader>
-                              <div className="space-y-4 mt-4">
-                                <Input
-                                  placeholder="Event title"
-                                  value={newEventTitle}
-                                  onChange={(e) => setNewEventTitle(e.target.value)}
-                                />
-                                <Button onClick={createEvent} className="w-full">
-                                  Create Event
-                                </Button>
-                              </div>
+                              <Form {...createForm}>
+                                <form onSubmit={createForm.handleSubmit(createEvent)} className="space-y-4">
+                                  <FormField
+                                    control={createForm.control}
+                                    name="title"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Title</FormLabel>
+                                        <FormControl>
+                                          <Input placeholder="Event title" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <FormField
+                                      control={createForm.control}
+                                      name="startTime"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>Start Time</FormLabel>
+                                          <FormControl>
+                                            <Input type="time" {...field} />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                    <FormField
+                                      control={createForm.control}
+                                      name="endTime"
+                                      render={({ field }) => (
+                                        <FormItem>
+                                          <FormLabel>End Time</FormLabel>
+                                          <FormControl>
+                                            <Input type="time" {...field} />
+                                          </FormControl>
+                                          <FormMessage />
+                                        </FormItem>
+                                      )}
+                                    />
+                                  </div>
+                                  <FormField
+                                    control={createForm.control}
+                                    name="location"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Location (optional)</FormLabel>
+                                        <FormControl>
+                                          <Input placeholder="Event location" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={createForm.control}
+                                    name="description"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Notes (optional)</FormLabel>
+                                        <FormControl>
+                                          <Textarea
+                                            placeholder="Add any additional notes..."
+                                            className="resize-none"
+                                            {...field}
+                                          />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={createForm.control}
+                                    name="participants"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Participants</FormLabel>
+                                        <FormControl>
+                                          <Select
+                                            {...field}
+                                            options={participants.map(p => ({
+                                              value: p.userId,
+                                              label: p.user.name || p.user.email
+                                            }))}
+                                            isMulti
+                                            className="w-full"
+                                            placeholder="Select participants..."
+                                          />
+                                        </FormControl>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <Button type="submit" className="w-full">
+                                    Create Event
+                                  </Button>
+                                </form>
+                              </Form>
                             </DialogContent>
                           </Dialog>
                         )}
@@ -624,62 +856,119 @@ export function DayView({ trip }: { trip: Trip }) {
           <DialogHeader>
             <DialogTitle>Edit Event</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 mt-4">
-            <Input
-              placeholder="Event title"
-              value={selectedEvent?.title || ""}
-              onChange={(e) =>
-                setSelectedEvent(
-                  selectedEvent
-                    ? { ...selectedEvent, title: e.target.value }
-                    : null
-                )
-              }
-            />
-            <div className="flex justify-between gap-4">
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  if (selectedEvent) {
-                    deleteEvent(selectedEvent.id);
-                  }
-                }}
-                className="flex-1"
-              >
-                Delete
-              </Button>
-              <Button
-                onClick={async () => {
-                  if (selectedEvent) {
-                    try {
-                      const res = await fetch(`/api/trips/${trip.id}/activities/${selectedEvent.id}`, {
-                        method: "PATCH",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(selectedEvent),
-                      });
-
-                      if (!res.ok) throw new Error("Failed to update activity");
-
-                      await queryClient.invalidateQueries({
-                        queryKey: ["/api/trips", trip.id, "activities"],
-                      });
-                      toast({ title: "Event updated successfully" });
-                      setIsEditDialogOpen(false);
-                    } catch (error) {
-                      toast({
-                        variant: "destructive",
-                        title: "Failed to update event",
-                        description: error instanceof Error ? error.message : "An error occurred",
-                      });
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(updateEvent)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Title</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Event title" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={editForm.control}
+                  name="startTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Time</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="endTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Time</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={editForm.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location (optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Event location" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes (optional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Add any additional notes..."                        className="resize-none"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="participants"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Participants</FormLabel>
+                    <FormControl>
+                      <Select
+                        {...field}
+                        options={participants.map(p => ({
+                          value: p.userId,
+                          label: p.user.name || p.user.email
+                        }))}
+                        isMulti
+                        className="w-full"
+                        placeholder="Select participants..."
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-between gap-4">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => {
+                    if (selectedEvent) {
+                      deleteEvent(selectedEvent.id);
                     }
-                  }
-                }}
-                className="flex-1"
-              >
-                Update
-              </Button>
-            </div>
-          </div>
+                  }}
+                  className="flex-1"
+                >
+                  Delete
+                </Button>
+                <Button type="submit" className="flex-1">
+                  Update
+                </Button>
+              </div>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </ScrollArea>
