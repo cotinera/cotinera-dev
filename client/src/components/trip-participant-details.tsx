@@ -72,6 +72,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ participantId, status }: { participantId: number; status: Status }) => {
+      console.log('Current status:', status);
       const res = await fetch(`/api/trips/${tripId}/participants/${participantId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -82,15 +83,42 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         const error = await res.json();
         throw new Error(error.message || "Failed to update status");
       }
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      refetch();
     },
     onError: (error: Error) => {
       toast({
         variant: "destructive",
         title: "Error",
         description: error.message || "Failed to update status",
+      });
+    },
+  });
+
+  const deleteParticipantMutation = useMutation({
+    mutationFn: async (participantId: number) => {
+      const res = await fetch(`/api/trips/${tripId}/participants/${participantId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete participant");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      refetch();
+      toast({
+        title: "Success",
+        description: "Participant removed successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to remove participant",
       });
     },
   });
@@ -142,6 +170,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     const currentIndex = STATUS_CYCLE.indexOf(currentStatus as Status);
     // Get the next status (or go back to the start if at the end)
     const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
+    console.log('Next status:', nextStatus);
     // Update the status
     updateStatusMutation.mutate({ participantId, status: nextStatus });
   };
@@ -273,7 +302,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                     {participant.departureDate && format(new Date(participant.departureDate), "dd/MM/yyyy")}
                   </TableCell>
                   <TableCell>{participant.flightNumber || "-"}</TableCell>
-                  <TableCell>{participant.accommodation || "-"}</TableCell>
+                  <TableCell>{participant.hotelBooking || "-"}</TableCell>
                   <TableCell>
                     <Badge
                       variant={getStatusBadgeVariant(participant.status as Status)}
