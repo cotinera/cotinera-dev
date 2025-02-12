@@ -58,13 +58,21 @@ export default function TripDetail() {
 
   const deleteTrip = useMutation({
     mutationFn: async () => {
+      if (!tripId) throw new Error("No trip ID provided");
+
       const res = await fetch(`/api/trips/${tripId}`, {
         method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
       });
+
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to delete trip");
+        const errorData = await res.json().catch(() => ({ message: "Failed to delete trip" }));
+        throw new Error(errorData.message || "Failed to delete trip");
       }
+
+      return res.json().catch(() => ({}));
     },
     onSuccess: () => {
       toast({
@@ -74,6 +82,7 @@ export default function TripDetail() {
       setLocation("/");
     },
     onError: (error: Error) => {
+      console.error("Delete trip error:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -82,8 +91,12 @@ export default function TripDetail() {
     },
   });
 
-  const handleDelete = () => {
-    deleteTrip.mutate();
+  const handleDelete = async () => {
+    try {
+      await deleteTrip.mutateAsync();
+    } catch (error) {
+      console.error("Error in handleDelete:", error);
+    }
   };
 
   if (isLoading) {
