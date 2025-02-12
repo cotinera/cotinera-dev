@@ -1,4 +1,4 @@
-import { ReactNode, createContext, useContext } from "react";
+import { ReactNode, createContext, useContext, useState } from "react";
 import {
   useQuery,
   useMutation,
@@ -34,11 +34,12 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [error, setError] = useState<Error | null>(null);
 
   const {
     data: user,
-    error,
     isLoading,
+    error: queryError,
   } = useQuery<User | null>({
     queryKey: ["/api/user"],
     queryFn: async () => {
@@ -55,6 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return res.json();
       } catch (error) {
         console.error("Auth error:", error);
+        setError(error instanceof Error ? error : new Error(String(error)));
         return null;
       }
     },
@@ -140,23 +142,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  return (
-    <AuthContext.Provider
-      value={{
-        user: user ?? null,
-        isLoading,
-        error,
-        loginMutation,
-        logoutMutation,
-        registerMutation,
-        login: loginMutation.mutateAsync,
-        logout: logoutMutation.mutateAsync,
-        register: registerMutation.mutateAsync,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+  const value = {
+    user: user ?? null,
+    isLoading,
+    error: error || queryError || null,
+    loginMutation,
+    logoutMutation,
+    registerMutation,
+    login: loginMutation.mutateAsync,
+    logout: logoutMutation.mutateAsync,
+    register: registerMutation.mutateAsync,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
