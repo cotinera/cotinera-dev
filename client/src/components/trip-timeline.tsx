@@ -38,15 +38,6 @@ export function TripTimeline({
   const queryClient = useQueryClient();
   const [destinationToDelete, setDestinationToDelete] = useState<Destination | null>(null);
 
-  const { data: tripData } = useQuery({
-    queryKey: ["/api/trips", tripId],
-    queryFn: async () => {
-      const res = await fetch(`/api/trips/${tripId}`);
-      if (!res.ok) throw new Error("Failed to fetch trip");
-      return res.json();
-    },
-  });
-
   const { data: destinations } = useQuery<Destination[]>({
     queryKey: [`/api/trips/${tripId}/destinations`],
     queryFn: async () => {
@@ -62,6 +53,7 @@ export function TripTimeline({
         method: "DELETE",
         headers: {
           "Accept": "application/json",
+          "Content-Type": "application/json",
         },
       });
 
@@ -70,23 +62,24 @@ export function TripTimeline({
         if (contentType && contentType.includes("application/json")) {
           const errorData = await res.json();
           throw new Error(errorData.error || "Failed to delete destination");
-        } else {
-          throw new Error("Failed to delete destination. Please try again.");
         }
+        throw new Error(`Failed to delete destination: ${res.status} ${res.statusText}`);
       }
 
-      // Only try to parse JSON if we have JSON content
-      const contentType = res.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        return res.json();
-      }
-      return null;
+      // Return true to indicate successful deletion
+      return true;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
-      if (currentDestinationId === destinationToDelete?.id) {
+    onSuccess: async (_, deletedDestinationId) => {
+      // Immediately invalidate and refetch to ensure we have the latest data
+      await queryClient.invalidateQueries({ 
+        queryKey: [`/api/trips/${tripId}/destinations`] 
+      });
+
+      // If the deleted destination was selected, clear the selection
+      if (currentDestinationId === deletedDestinationId) {
         onDestinationChange(undefined);
       }
+
       toast({
         title: "Success",
         description: "Destination deleted successfully",
@@ -94,6 +87,7 @@ export function TripTimeline({
       setDestinationToDelete(null);
     },
     onError: (error: Error) => {
+      console.error("Delete destination error:", error);
       toast({
         variant: "destructive",
         title: "Error",
