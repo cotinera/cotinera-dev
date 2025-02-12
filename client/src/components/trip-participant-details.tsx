@@ -97,7 +97,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       }
     },
     onMutate: async ({ participantId, status }) => {
-      // Cancel any outgoing refetches so they don't overwrite our optimistic update
+      // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
 
       // Snapshot the previous value
@@ -111,11 +111,9 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         );
       });
 
-      // Return a context object with the snapshotted value
       return { previousParticipants };
     },
     onError: (err, variables, context) => {
-      // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousParticipants) {
         queryClient.setQueryData([`/api/trips/${tripId}/participants`], context.previousParticipants);
       }
@@ -125,14 +123,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         description: err.message || "Failed to update status",
       });
     },
-    onSuccess: (data) => {
-      toast({
-        title: "Success",
-        description: "Status updated successfully",
-      });
-    },
     onSettled: () => {
-      // Always refetch after error or success to ensure we're up to date
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
     },
   });
