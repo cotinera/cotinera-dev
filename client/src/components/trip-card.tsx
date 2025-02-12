@@ -9,6 +9,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
 import { Button } from "@/components/ui/button";
 import { MapPin, Calendar, Users, ImageIcon } from "lucide-react";
 import { ShareTripDialog } from "@/components/share-trip-dialog";
@@ -114,20 +119,44 @@ export function TripCard({ trip }: TripCardProps) {
             {trip.participants && trip.participants.length > 0 && (
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-muted-foreground" />
-                <div className="flex -space-x-2">
-                  {trip.participants.slice(0, 3).map((participant, i) => (
-                    <Avatar key={i} className="h-6 w-6 border-2 border-background">
-                      <AvatarFallback>
-                        {getInitial(participant)}
-                      </AvatarFallback>
-                    </Avatar>
-                  ))}
-                  {trip.participants.length > 3 && (
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-muted text-xs">
-                      +{trip.participants.length - 3}
+                <HoverCard>
+                  <HoverCardTrigger asChild>
+                    <div className="flex -space-x-2 cursor-help">
+                      {trip.participants.slice(0, 3).map((participant, i) => (
+                        <Avatar key={i} className="h-6 w-6 border-2 border-background">
+                          <AvatarFallback>
+                            {getInitial(participant)}
+                          </AvatarFallback>
+                        </Avatar>
+                      ))}
+                      {trip.participants.length > 3 && (
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-muted text-xs">
+                          +{trip.participants.length - 3}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
+                  </HoverCardTrigger>
+                  <HoverCardContent className="w-64">
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-semibold">Trip Participants</h4>
+                      <div className="space-y-1">
+                        {trip.participants.map((participant, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <Avatar className="h-6 w-6">
+                              <AvatarFallback>{getInitial(participant)}</AvatarFallback>
+                            </Avatar>
+                            <span className="text-sm">{participant.name || 'Unknown'}</span>
+                            <span className="text-xs text-muted-foreground ml-auto">
+                              {participant.status === 'yes' && 'Confirmed'}
+                              {participant.status === 'no' && 'Declined'}
+                              {participant.status === 'pending' && 'Pending'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </HoverCardContent>
+                </HoverCard>
               </div>
             )}
           </div>
