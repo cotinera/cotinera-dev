@@ -59,6 +59,15 @@ interface AddParticipantForm {
 const STATUS_CYCLE = ['pending', 'yes', 'no'] as const;
 type Status = (typeof STATUS_CYCLE)[number];
 
+const sortParticipants = (a: Participant, b: Participant) => {
+  const statusOrder = {
+    yes: 0,
+    pending: 1,
+    no: 2
+  };
+  return statusOrder[a.status as Status] - statusOrder[b.status as Status];
+};
+
 export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -91,7 +100,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
           const error = await res.json();
           throw new Error(error.message || "Failed to update status");
         }
-        
+
         const updatedParticipant = await res.json();
         return { participantId, status: updatedParticipant.status };
       } finally {
@@ -100,15 +109,15 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
     onMutate: async ({ participantId, status }) => {
       await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-      
+
       const previousParticipants = queryClient.getQueryData<Participant[]>([`/api/trips/${tripId}/participants`]);
-      
+
       // Immediately update the UI
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
         (old) => old?.map(p => (p.id === participantId ? { ...p, status } : p)) ?? []
       );
-      
+
       return { previousParticipants };
     },
     onError: (err, { participantId }, context) => {
@@ -119,7 +128,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
           context.previousParticipants
         );
       }
-      
+
       toast({
         variant: "destructive",
         title: "Error",
@@ -132,7 +141,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         [`/api/trips/${tripId}/participants`],
         (old) => old?.map(p => (p.id === data.participantId ? { ...p, status: data.status } : p)) ?? []
       );
-      
+
       toast({
         title: "Success",
         description: "Status updated successfully",
@@ -336,7 +345,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
           </TableHeader>
           <TableBody>
             {participants && participants.length > 0 ? (
-              participants.map((participant) => (
+              [...participants].sort(sortParticipants).map((participant) => (
                 <TableRow key={participant.id}>
                   <TableCell>{participant.name}</TableCell>
                   <TableCell>
