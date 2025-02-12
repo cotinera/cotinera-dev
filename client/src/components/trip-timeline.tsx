@@ -58,11 +58,8 @@ export function TripTimeline({
       });
 
       if (!res.ok) {
-        const contentType = res.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const errorData = await res.json();
-          throw new Error(errorData.error || "Failed to delete destination");
-        }
+        const errorText = await res.text();
+        console.error("Delete destination error response:", errorText);
         throw new Error(`Failed to delete destination: ${res.status} ${res.statusText}`);
       }
 
@@ -70,10 +67,15 @@ export function TripTimeline({
       return true;
     },
     onSuccess: async (_, deletedDestinationId) => {
-      // Immediately invalidate and refetch to ensure we have the latest data
-      await queryClient.invalidateQueries({ 
-        queryKey: [`/api/trips/${tripId}/destinations`] 
-      });
+      // Immediately invalidate all queries that might show destinations
+      await Promise.all([
+        queryClient.invalidateQueries({ 
+          queryKey: [`/api/trips/${tripId}/destinations`] 
+        }),
+        queryClient.invalidateQueries({ 
+          queryKey: ["/api/trips", tripId] 
+        })
+      ]);
 
       // If the deleted destination was selected, clear the selection
       if (currentDestinationId === deletedDestinationId) {
