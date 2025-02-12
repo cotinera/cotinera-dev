@@ -33,6 +33,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { MapPicker } from "@/components/map-picker";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface AddDestinationForm {
   name: string;
@@ -225,57 +226,59 @@ export function TripDestinations({ tripId }: { tripId: number }) {
 
         <CollapsibleContent>
           <CardContent className="p-2 pt-0">
-            <div className="space-y-1.5 max-h-[250px] overflow-y-auto">
-              {trip && (
-                <div
-                  className="flex items-center justify-between p-1.5 rounded-md bg-muted/50 text-sm"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate text-xs">
-                      {trip.location || 'Starting Point'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(trip.startDate), "MMM d")} -{" "}
-                      {format(new Date(sortedDestinations[0]?.startDate || trip.endDate), "MMM d")}
-                    </p>
+            <ScrollArea className="h-[250px] pr-4">
+              <div className="space-y-1.5">
+                {trip && (
+                  <div
+                    className="flex items-center justify-between p-1.5 rounded-md bg-muted/50 text-sm"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate text-xs">
+                        {trip.location || 'Starting Point'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(trip.startDate), "MMM d")} -{" "}
+                        {format(new Date(sortedDestinations[0]?.startDate || trip.endDate), "MMM d")}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        1
+                      </Badge>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline" className="text-xs">
-                      1
-                    </Badge>
+                )}
+                {sortedDestinations.map((destination, index) => (
+                  <div
+                    key={destination.id}
+                    className="flex items-center justify-between p-1.5 rounded-md bg-muted/50 text-sm"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate text-xs">
+                        {destination.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(destination.startDate), "MMM d")} -{" "}
+                        {format(new Date(destination.endDate), "MMM d")}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => onEdit(destination)}
+                      >
+                        <Edit2 className="h-3 w-3" />
+                      </Button>
+                      <Badge variant="outline" className="text-xs">
+                        {index + 2}
+                      </Badge>
+                    </div>
                   </div>
-                </div>
-              )}
-              {sortedDestinations.map((destination, index) => (
-                <div
-                  key={destination.id}
-                  className="flex items-center justify-between p-1.5 rounded-md bg-muted/50 text-sm"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate text-xs">
-                      {destination.name}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(destination.startDate), "MMM d")} -{" "}
-                      {format(new Date(destination.endDate), "MMM d")}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={() => onEdit(destination)}
-                    >
-                      <Edit2 className="h-3 w-3" />
-                    </Button>
-                    <Badge variant="outline" className="text-xs">
-                      {index + 2}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </ScrollArea>
 
             <Dialog open={isAddDestinationOpen} onOpenChange={setIsAddDestinationOpen}>
               <DialogTrigger asChild>
