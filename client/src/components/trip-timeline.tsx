@@ -10,14 +10,6 @@ import { format } from "date-fns";
 import { MapPin, CalendarDays, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface Stop {
-  id: number | 'main';
-  name: string;
-  startDate: string;
-  endDate: string;
-  order: number;
-}
-
 interface TripTimelineProps {
   tripId: number;
   currentDestinationId?: number;
@@ -50,7 +42,7 @@ export function TripTimeline({
   if (!destinations?.length && !tripData?.location) return null;
 
   const sortedDestinations = destinations?.sort((a, b) => a.order - b.order) || [];
-  const allStops: Stop[] = [
+  const allStops = [
     {
       id: 'main',
       name: tripData?.location || 'Starting Point',
@@ -80,9 +72,9 @@ export function TripTimeline({
                 currentDestinationId === (stop.id === 'main' ? undefined : stop.id) && "bg-accent"
               )}
               onClick={() => {
-                if (typeof stop.id === 'string' && stop.id === 'main') {
+                if (stop.id === 'main') {
                   onDestinationChange(undefined);
-                } else if (typeof stop.id === 'number') {
+                } else {
                   onDestinationChange(stop.id === currentDestinationId ? undefined : stop.id);
                 }
               }}

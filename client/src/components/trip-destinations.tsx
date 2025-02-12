@@ -57,15 +57,6 @@ export function TripDestinations({ tripId }: { tripId: number }) {
   const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [editingDestination, setEditingDestination] = useState<Destination | null>(null);
 
-  const { data: trip } = useQuery<Trip>({
-    queryKey: ["/api/trips", tripId],
-    queryFn: async () => {
-      const res = await fetch(`/api/trips/${tripId}`);
-      if (!res.ok) throw new Error("Failed to fetch trip");
-      return res.json();
-    },
-  });
-
   const { data: destinations, refetch } = useQuery<Destination[]>({
     queryKey: [`/api/trips/${tripId}/destinations`],
     queryFn: async () => {
@@ -86,8 +77,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...data,
-          coordinates: selectedCoordinates,
-          order: destinations?.length || 0
+          coordinates: selectedCoordinates
         }),
       });
 
@@ -197,7 +187,6 @@ export function TripDestinations({ tripId }: { tripId: number }) {
   };
 
   const sortedDestinations = destinations?.sort((a, b) => a.order - b.order) || [];
-  const totalStops = sortedDestinations.length + 1; // Including the initial stop
 
   return (
     <Collapsible
@@ -212,7 +201,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
               <div className="flex items-center gap-2">
                 <Pin className="h-4 w-4" />
                 <span className="font-medium text-sm">
-                  Destinations ({totalStops})
+                  Destinations ({sortedDestinations.length})
                 </span>
               </div>
               <ChevronDown
@@ -227,23 +216,6 @@ export function TripDestinations({ tripId }: { tripId: number }) {
         <CollapsibleContent>
           <CardContent className="p-2 pt-0">
             <div className="space-y-1.5 max-h-[250px] overflow-y-auto">
-              {/* Initial Stop */}
-              <div
-                key="main"
-                className="flex items-center justify-between p-1.5 rounded-md bg-muted/50 text-sm"
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate text-xs">
-                    {trip?.location || 'Starting Point'}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {trip?.startDate && format(new Date(trip.startDate), "MMM d")}
-                  </p>
-                </div>
-                <Badge variant="outline" className="text-xs">1</Badge>
-              </div>
-
-              {/* Additional Destinations */}
               {sortedDestinations.map((destination, index) => (
                 <div
                   key={destination.id}
@@ -268,7 +240,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                       <Edit2 className="h-3 w-3" />
                     </Button>
                     <Badge variant="outline" className="text-xs">
-                      {index + 2}
+                      {index + 1}
                     </Badge>
                   </div>
                 </div>

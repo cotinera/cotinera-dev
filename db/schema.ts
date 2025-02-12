@@ -60,7 +60,6 @@ export const destinations = pgTable("destinations", {
     lng: number;
   }>(),
   order: integer("order").notNull(), // For maintaining the sequence of destinations
-  image: text("image"), // Added image field
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
