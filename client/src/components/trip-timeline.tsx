@@ -60,12 +60,27 @@ export function TripTimeline({
     mutationFn: async (destinationId: number) => {
       const res = await fetch(`/api/trips/${tripId}/destinations/${destinationId}`, {
         method: "DELETE",
+        headers: {
+          "Accept": "application/json",
+        },
       });
+
       if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Failed to delete destination");
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || "Failed to delete destination");
+        } else {
+          throw new Error("Failed to delete destination. Please try again.");
+        }
       }
-      return res.json();
+
+      // Only try to parse JSON if we have JSON content
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        return res.json();
+      }
+      return null;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
@@ -88,7 +103,7 @@ export function TripTimeline({
     },
   });
 
-  if (!destinations?.length && !tripData?.location) return null;
+  if (!destinations?.length) return null;
 
   const sortedDestinations = destinations?.sort((a, b) => a.order - b.order) || [];
   const allStops = sortedDestinations;
