@@ -30,10 +30,16 @@ import {
   FormItem,
   FormLabel,
 } from "@/components/ui/form";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { format } from "date-fns";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Check, X as XIcon, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
@@ -106,7 +112,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-      refetch();
       toast({
         title: "Success",
         description: "Participant removed successfully",
@@ -136,9 +141,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
       return res.json();
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-      await refetch();
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
       setIsAddParticipantOpen(false);
       form.reset();
       toast({ title: "Success", description: "Person added successfully" });
@@ -163,12 +167,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
   });
 
-  const handleStatusClick = (participantId: number, currentStatus: string) => {
-    const currentIndex = STATUS_CYCLE.indexOf(currentStatus as Status);
-    const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
-    updateStatusMutation.mutate({ participantId, status: nextStatus });
-  };
-
   const getStatusBadgeVariant = (status: Status) => {
     switch (status) {
       case 'yes':
@@ -177,6 +175,17 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         return 'destructive';
       default:
         return 'secondary';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'yes':
+        return <Check className="h-4 w-4" />;
+      case 'no':
+        return <XIcon className="h-4 w-4" />;
+      default:
+        return <Clock className="h-4 w-4" />;
     }
   };
 
@@ -189,6 +198,10 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       default:
         return 'Pending';
     }
+  };
+
+  const handleStatusChange = (participantId: number, newStatus: Status) => {
+    updateStatusMutation.mutate({ participantId, status: newStatus });
   };
 
   return (
@@ -298,13 +311,42 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   <TableCell>{participant.flightNumber || "-"}</TableCell>
                   <TableCell>{participant.hotelBooking || "-"}</TableCell>
                   <TableCell>
-                    <Badge
-                      variant={getStatusBadgeVariant(participant.status as Status)}
-                      className="cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => handleStatusClick(participant.id, participant.status)}
-                    >
-                      {getStatusDisplay(participant.status)}
-                    </Badge>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          className="flex items-center gap-2 px-2 py-1 h-8"
+                        >
+                          <Badge
+                            variant={getStatusBadgeVariant(participant.status as Status)}
+                            className="gap-1"
+                          >
+                            {getStatusIcon(participant.status)}
+                            {getStatusDisplay(participant.status)}
+                          </Badge>
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => handleStatusChange(participant.id, 'yes')}
+                          className="gap-2"
+                        >
+                          <Check className="h-4 w-4" /> Confirm
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleStatusChange(participant.id, 'no')}
+                          className="gap-2"
+                        >
+                          <XIcon className="h-4 w-4" /> Decline
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleStatusChange(participant.id, 'pending')}
+                          className="gap-2"
+                        >
+                          <Clock className="h-4 w-4" /> Reset to Pending
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                   <TableCell>
                     <Button
