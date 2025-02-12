@@ -91,40 +91,52 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
           const error = await res.json();
           throw new Error(error.message || "Failed to update status");
         }
-        return res.json();
+        
+        const updatedParticipant = await res.json();
+        return { participantId, status: updatedParticipant.status };
       } finally {
         setUpdatingParticipants(prev => prev.filter(id => id !== participantId));
       }
     },
     onMutate: async ({ participantId, status }) => {
-      // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-
-      // Snapshot the previous value
+      
       const previousParticipants = queryClient.getQueryData<Participant[]>([`/api/trips/${tripId}/participants`]);
-
-      // Optimistically update to the new value
-      queryClient.setQueryData<Participant[]>([`/api/trips/${tripId}/participants`], old => {
-        if (!old) return old;
-        return old.map(p =>
-          p.id === participantId ? { ...p, status } : p
-        );
-      });
-
+      
+      // Immediately update the UI
+      queryClient.setQueryData<Participant[]>(
+        [`/api/trips/${tripId}/participants`],
+        (old) => old?.map(p => (p.id === participantId ? { ...p, status } : p)) ?? []
+      );
+      
       return { previousParticipants };
     },
-    onError: (err, variables, context) => {
+    onError: (err, { participantId }, context) => {
+      // Revert the optimistic update
       if (context?.previousParticipants) {
-        queryClient.setQueryData([`/api/trips/${tripId}/participants`], context.previousParticipants);
+        queryClient.setQueryData(
+          [`/api/trips/${tripId}/participants`],
+          context.previousParticipants
+        );
       }
+      
       toast({
         variant: "destructive",
         title: "Error",
-        description: err.message || "Failed to update status",
+        description: err instanceof Error ? err.message : "Failed to update status",
       });
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+    onSuccess: (data) => {
+      // Update the cache with the returned data
+      queryClient.setQueryData<Participant[]>(
+        [`/api/trips/${tripId}/participants`],
+        (old) => old?.map(p => (p.id === data.participantId ? { ...p, status: data.status } : p)) ?? []
+      );
+      
+      toast({
+        title: "Success",
+        description: "Status updated successfully",
+      });
     },
   });
 
