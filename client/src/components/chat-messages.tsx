@@ -72,8 +72,8 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
             <div key={message.id} className="flex items-start gap-2">
               <Avatar className="h-8 w-8">
                 <AvatarFallback>
-                  {message.user?.username?.[0]?.toUpperCase() || 
-                   message.user?.name?.[0]?.toUpperCase() || 'U'}
+                  {message.user?.name?.[0]?.toUpperCase() || 
+                   message.user?.username?.[0]?.toUpperCase() || 'U'}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
