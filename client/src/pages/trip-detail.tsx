@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { TripDestinationTabs } from "@/components/trip-destination-tabs";
 
 export default function TripDetail() {
   const [, params] = useRoute("/trips/:id");
@@ -33,6 +34,7 @@ export default function TripDetail() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [currentDestinationId, setCurrentDestinationId] = useState<number | undefined>();
   const queryClient = useQueryClient();
 
   const { data: trip, isLoading, error } = useQuery<Trip>({
@@ -57,6 +59,8 @@ export default function TripDetail() {
     enabled: !!tripId,
   });
 
+  const currentDestination = destinations?.find(d => d.id === currentDestinationId);
+
   const deleteTrip = useMutation({
     mutationFn: async () => {
       if (!tripId) throw new Error("No trip ID provided");
@@ -76,7 +80,6 @@ export default function TripDetail() {
       return res.json().catch(() => ({}));
     },
     onSuccess: () => {
-      // Invalidate all trips queries to force a refresh of the trips list
       queryClient.invalidateQueries({ queryKey: ["/api/trips"] });
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}`] });
 
@@ -139,17 +142,17 @@ export default function TripDetail() {
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="relative overflow-hidden py-12">
-          {trip.thumbnail && (
-            <div
-              className="absolute inset-0 bg-cover bg-center"
-              style={{
-                backgroundImage: `url(${trip.thumbnail})`,
-                filter: "blur(20px)",
-                transform: "scale(1.2)",
-                opacity: "0.9",
-              }}
-            />
-          )}
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{
+              backgroundImage: currentDestination?.image ? 
+                `url(${currentDestination.image})` : 
+                trip?.thumbnail ? `url(${trip.thumbnail})` : undefined,
+              filter: "blur(20px)",
+              transform: "scale(1.2)",
+              opacity: "0.9",
+            }}
+          />
           <div className="absolute inset-0 bg-gradient-to-b from-background/30 to-background/70" />
           <div className="container mx-auto px-4 relative z-10">
             <div className="flex justify-between items-center absolute left-4 top-0">
@@ -174,7 +177,11 @@ export default function TripDetail() {
               <TripDestinations tripId={trip.id} />
             </div>
 
-            <TripHeaderEdit trip={trip} onBack={() => setLocation("/")} />
+            <TripHeaderEdit 
+              trip={trip} 
+              currentDestination={currentDestination}
+              onBack={() => setLocation("/")} 
+            />
           </div>
         </div>
       </header>
@@ -185,14 +192,27 @@ export default function TripDetail() {
             <TripTimeline tripId={trip.id} />
           </section>
 
+          {destinations && destinations.length > 1 && (
+            <TripDestinationTabs
+              tripId={trip.id}
+              currentDestinationId={currentDestinationId}
+              onDestinationChange={setCurrentDestinationId}
+            />
+          )}
+
           <div className="grid gap-8 md:grid-cols-[2fr,1fr]">
             <div className="space-y-8">
               <section>
-                <TripParticipantDetails tripId={trip.id} />
+                <TripParticipantDetails 
+                  tripId={trip.id}
+                  destinationId={currentDestinationId}
+                />
               </section>
 
               <section>
-                {destinations && destinations.length >= 2 ? (
+                {currentDestination ? (
+                  <MapView location={currentDestination.name || ""} />
+                ) : destinations && destinations.length >= 2 ? (
                   <MapRouteView destinations={destinations} />
                 ) : (
                   <MapView location={trip.location || ""} />
@@ -202,11 +222,17 @@ export default function TripDetail() {
 
             <div className="space-y-8">
               <section>
-                <ChatMessages tripId={trip.id} />
+                <ChatMessages 
+                  tripId={trip.id} 
+                  destinationId={currentDestinationId}
+                />
               </section>
 
               <section>
-                <Checklist tripId={trip.id} />
+                <Checklist 
+                  tripId={trip.id} 
+                  destinationId={currentDestinationId}
+                />
               </section>
             </div>
           </div>
