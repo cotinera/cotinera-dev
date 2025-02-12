@@ -247,6 +247,27 @@ export function registerRoutes(app: Express): Server {
   });
 
 
+  // Delete trip
+  app.delete("/api/trips/:id", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.id);
+
+      // Delete the trip
+      const [deletedTrip] = await db.delete(trips)
+        .where(eq(trips.id, tripId))
+        .returning();
+
+      if (!deletedTrip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+
+      res.json(deletedTrip);
+    } catch (error) {
+      console.error('Error deleting trip:', error);
+      res.status(500).json({ error: 'Failed to delete trip' });
+    }
+  });
+
   // Get all activities for a trip
   app.get("/api/trips/:tripId/activities", async (req, res) => {
     try {
@@ -692,7 +713,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add this endpoint right after the other participant routes, before the destinations routes
+    // Add this endpoint right after the other participant routes, before the destinations routes
   app.delete("/api/trips/:tripId/participants/:participantId", async (req, res) => {
     try {
       const tripId = parseInt(req.params.tripId);
