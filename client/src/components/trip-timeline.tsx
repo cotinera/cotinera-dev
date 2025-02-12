@@ -44,7 +44,7 @@ export function TripTimeline({
   const sortedDestinations = destinations?.sort((a, b) => a.order - b.order) || [];
   const allStops = [
     {
-      id: 'origin',
+      id: 'main',
       name: tripData?.location || 'Starting Point',
       startDate: tripData?.startDate,
       endDate: sortedDestinations[0]?.startDate || tripData?.endDate,
@@ -68,12 +68,13 @@ export function TripTimeline({
             <Card 
               key={stop.id} 
               className={cn(
-                "relative ml-8 transition-colors",
-                stop.id !== 'origin' && "hover:bg-accent cursor-pointer",
-                currentDestinationId === stop.id && "bg-accent"
+                "relative ml-8 transition-colors hover:bg-accent cursor-pointer",
+                currentDestinationId === (stop.id === 'main' ? undefined : stop.id) && "bg-accent"
               )}
               onClick={() => {
-                if (stop.id !== 'origin') {
+                if (stop.id === 'main') {
+                  onDestinationChange(undefined);
+                } else {
                   onDestinationChange(stop.id === currentDestinationId ? undefined : stop.id);
                 }
               }}
@@ -82,7 +83,7 @@ export function TripTimeline({
               <div className="absolute -left-8 top-1/2 -translate-y-1/2 flex items-center">
                 <div className={cn(
                   "w-2 h-2 rounded-full border-2 border-background",
-                  currentDestinationId === stop.id ? "bg-primary" : "bg-muted"
+                  (currentDestinationId === (stop.id === 'main' ? undefined : stop.id)) ? "bg-primary" : "bg-muted"
                 )} />
                 {index < allStops.length - 1 && (
                   <ArrowRight className="h-4 w-4 text-muted-foreground ml-2" />
@@ -102,7 +103,7 @@ export function TripTimeline({
                     </div>
                   </div>
                   <div className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs">
-                    {index === 0 ? 'Origin' : `Stop ${index}`}
+                    {`Stop ${index + 1}`}
                   </div>
                 </div>
               </CardHeader>
