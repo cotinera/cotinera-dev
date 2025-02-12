@@ -252,16 +252,43 @@ export function registerRoutes(app: Express): Server {
     try {
       const tripId = parseInt(req.params.id);
 
-      // Delete the trip
-      const [deletedTrip] = await db.delete(trips)
-        .where(eq(trips.id, tripId))
-        .returning();
+      // Delete all related data in the correct order
+      await db.transaction(async (tx) => {
+        // Delete chat messages
+        await tx.delete(chatMessages).where(eq(chatMessages.tripId, tripId));
 
-      if (!deletedTrip) {
-        return res.status(404).json({ error: "Trip not found" });
-      }
+        // Delete activities
+        await tx.delete(activities).where(eq(activities.tripId, tripId));
 
-      res.json(deletedTrip);
+        // Delete checklist items
+        await tx.delete(checklist).where(eq(checklist.tripId, tripId));
+
+        // Delete flights
+        await tx.delete(flights).where(eq(flights.tripId, tripId));
+
+        // Delete accommodations
+        await tx.delete(accommodations).where(eq(accommodations.tripId, tripId));
+
+        // Delete participants
+        await tx.delete(participants).where(eq(participants.tripId, tripId));
+
+        // Delete destinations
+        await tx.delete(destinations).where(eq(destinations.tripId, tripId));
+
+        // Delete share links
+        await tx.delete(shareLinks).where(eq(shareLinks.tripId, tripId));
+
+        // Finally, delete the trip
+        const [deletedTrip] = await tx.delete(trips)
+          .where(eq(trips.id, tripId))
+          .returning();
+
+        if (!deletedTrip) {
+          throw new Error("Trip not found");
+        }
+      });
+
+      res.json({ success: true, message: "Trip and all related data deleted successfully" });
     } catch (error) {
       console.error('Error deleting trip:', error);
       res.status(500).json({ error: 'Failed to delete trip' });
