@@ -33,7 +33,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { MapPicker } from "@/components/map-picker";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 interface AddDestinationForm {
   name: string;
@@ -226,8 +226,8 @@ export function TripDestinations({ tripId }: { tripId: number }) {
 
         <CollapsibleContent>
           <CardContent className="p-2 pt-0">
-            <ScrollArea className="h-[250px]">
-              <div className="space-y-1.5 pr-4">
+            <ScrollArea className="h-[300px] w-full rounded-md overflow-auto"> {/*Increased height and added overflow-auto */}
+              <div className="space-y-1.5 px-2"> {/* Added padding */}
                 {trip && (
                   <div
                     className="flex items-center justify-between p-1.5 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors"
@@ -278,6 +278,8 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                   </div>
                 ))}
               </div>
+              <ScrollBar orientation="vertical" />
+              <ScrollBar orientation="horizontal" /> {/* Added horizontal scrollbar */}
             </ScrollArea>
 
             <Dialog open={isAddDestinationOpen} onOpenChange={setIsAddDestinationOpen}>
@@ -353,7 +355,6 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                 </Form>
               </DialogContent>
             </Dialog>
-
             <Dialog open={isEditDestinationOpen} onOpenChange={setIsEditDestinationOpen}>
               <DialogContent>
                 <DialogHeader>
