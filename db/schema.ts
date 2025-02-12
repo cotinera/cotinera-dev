@@ -20,6 +20,7 @@ export const users = pgTable("users", {
   email: text("email").unique().notNull(),
   password: text("password").notNull(),
   name: text("name"),
+  username: text("username"),
   avatar: text("avatar"),
   provider: text("provider").default("email"), // 'email', 'google', or 'apple'
   providerId: text("provider_id"), // ID from the provider
@@ -338,6 +339,7 @@ export const insertUserSchema = createInsertSchema(users, {
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   name: z.string().optional(),
+  username: z.string().optional(),
   provider: z.enum(["email", "google", "apple"]).default("email"),
   providerId: z.string().optional(),
 });

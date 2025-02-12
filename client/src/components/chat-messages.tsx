@@ -72,16 +72,19 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
             <div key={message.id} className="flex items-start gap-2">
               <Avatar className="h-8 w-8">
                 <AvatarFallback>
-                  {message.user?.username?.[0].toUpperCase() || 'U'}
+                  {message.user?.username?.[0]?.toUpperCase() || 
+                   message.user?.name?.[0]?.toUpperCase() || 'U'}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="font-medium">{message.user?.username || 'Unknown User'}</span>
+                  <span className="font-medium">
+                    {message.user?.name || message.user?.username || 'Unknown User'}
+                  </span>
                   <span className="text-xs text-muted-foreground">
-                    {formatDistance(new Date(message.createdAt), new Date(), {
+                    {message.createdAt ? formatDistance(new Date(message.createdAt), new Date(), {
                       addSuffix: true,
-                    })}
+                    }) : ''}
                   </span>
                 </div>
                 <p className="text-sm mt-1">{message.message}</p>
@@ -108,7 +111,7 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
           <Button
             type="submit"
             size="icon"
-            disabled={sendMessage.isLoading}
+            disabled={sendMessage.isPending}
           >
             <Send className="h-4 w-4" />
           </Button>

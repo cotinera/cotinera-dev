@@ -481,12 +481,13 @@ export function registerRoutes(app: Express): Server {
           user: {
             columns: {
               id: true,
+              username: true,
               name: true,
               avatar: true
             }
           }
         },
-        orderBy: (messages, { desc }) => [desc(messages.createdAt)],
+        orderBy: (messages, { asc }) => [asc(messages.createdAt)],
       });
       res.json(messages);
     } catch (error) {
@@ -496,20 +497,27 @@ export function registerRoutes(app: Express): Server {
   });
 
   app.post("/api/trips/:tripId/chat", async (req, res) => {
-    // For development, allow without authentication
-    const userId = req.user?.id || 1;
-
     try {
+      // For development, allow without authentication
+      const userId = req.user?.id || 1;
+
       const [message] = await db.insert(chatMessages).values({
         tripId: parseInt(req.params.tripId),
-        userId: userId,
+        userId,
         message: req.body.message,
       }).returning();
 
       const messageWithUser = await db.query.chatMessages.findFirst({
         where: eq(chatMessages.id, message.id),
         with: {
-          user: true,
+          user: {
+            columns: {
+              id: true,
+              username: true,
+              name: true,
+              avatar: true
+            }
+          }
         },
       });
 
