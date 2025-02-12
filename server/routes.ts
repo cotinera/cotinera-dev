@@ -752,6 +752,116 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Add this endpoint right after the participant status update endpoint
+  app.patch("/api/trips/:tripId/participants/:participantId", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const participantId = parseInt(req.params.participantId);
+      const {
+        name,
+        arrivalDate,
+        departureDate,
+        flightNumber,
+        airline,
+        accommodation
+      } = req.body;
+
+      const [updatedParticipant] = await db
+        .update(participants)
+        .set({
+          name: name || undefined,
+          arrivalDate: arrivalDate ? new Date(arrivalDate) : undefined,
+          departureDate: departureDate ? new Date(departureDate) : undefined,
+          flightStatus: flightNumber || airline ? 'pending' : undefined,
+          hotelStatus: accommodation ? 'pending' : undefined,
+        })
+        .where(
+          and(
+            eq(participants.id, participantId),
+            eq(participants.tripId, tripId)
+          )
+        )
+        .returning();
+
+      if (!updatedParticipant) {
+        return res.status(404).json({ error: "Participant not found" });
+      }
+
+      // If flight details are provided, update or create flight entry
+      if (flightNumber || airline) {
+        const existingFlight = await db
+          .select()
+          .from(flights)
+          .where(
+            and(
+              eq(flights.tripId, tripId),
+              eq(flights.flightNumber, flightNumber || '')
+            )
+          )
+          .limit(1);
+
+        if (existingFlight.length > 0) {
+          await db
+            .update(flights)
+            .set({
+              airline: airline || undefined,
+              flightNumber: flightNumber || undefined,
+              departureDate: arrivalDate ? new Date(arrivalDate) : undefined,
+            })
+            .where(eq(flights.id, existingFlight[0].id));
+        } else {
+          await db.insert(flights).values({
+            tripId,
+            airline: airline || '',
+            flightNumber: flightNumber || '',
+            departureDate: arrivalDate ? new Date(arrivalDate) : new Date(),
+            bookingStatus: 'pending',
+          });
+        }
+      }
+
+      // If accommodation details are provided, update or create accommodation entry
+      if (accommodation) {
+        const existingAccommodation = await db
+          .select()
+          .from(accommodations)
+          .where(eq(accommodations.tripId, tripId))
+          .limit(1);
+
+        if (existingAccommodation.length > 0) {
+          await db
+            .update(accommodations)
+            .set({
+              name: accommodation,
+              checkInDate: arrivalDate ? new Date(arrivalDate) : undefined,
+              checkOutDate: departureDate ? new Date(departureDate) : undefined,
+            })
+            .where(eq(accommodations.id, existingAccommodation[0].id));
+        } else {
+          await db.insert(accommodations).values({
+            tripId,
+            name: accommodation,
+            checkInDate: arrivalDate ? new Date(arrivalDate) : new Date(),
+            checkOutDate: departureDate ? new Date(departureDate) : new Date(),
+            bookingStatus: 'pending',
+          });
+        }
+      }
+
+      // Fetch the updated participant with all related details
+      const participantWithDetails = {
+        ...updatedParticipant,
+        flights: await db.select().from(flights).where(eq(flights.tripId, tripId)),
+        accommodation: (await db.select().from(accommodations).where(eq(accommodations.tripId, tripId)))[0],
+      };
+
+      res.json(participantWithDetails);
+    } catch (error) {
+      console.error('Error updating participant:', error);
+      res.status(500).json({ error: 'Failed to update participant' });
+    }
+  });
+
   // Add this endpoint right after the other participant routes, before the destinations routes
   app.delete("/api/trips/:tripId/participants/:participantId", async (req, res) => {
     try {
