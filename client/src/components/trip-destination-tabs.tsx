@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MapPin, Plus } from "lucide-react";
+import { MapPin } from "lucide-react";
 import type { Destination } from "@db/schema";
 
 interface TripDestinationTabsProps {
@@ -30,7 +29,7 @@ export function TripDestinationTabs({
 
   return (
     <div className="border-b">
-      <ScrollArea className="w-full" orientation="horizontal">
+      <ScrollArea className="w-full whitespace-nowrap">
         <div className="flex items-center px-4 py-2">
           <Tabs
             value={currentDestinationId?.toString()}
