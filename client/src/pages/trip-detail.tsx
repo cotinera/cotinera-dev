@@ -1,11 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Checklist } from "@/components/checklist";
 import { CalendarView } from "@/components/calendar-view";
 import { MapView } from "@/components/map-view";
 import { ChatMessages } from "@/components/chat-messages";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, Trash2 } from "lucide-react";
 import { ViewToggle } from "@/components/view-toggle";
 import type { Trip } from "@db/schema";
 import { TripHeaderEdit } from "@/components/trip-header-edit";
@@ -14,11 +14,25 @@ import { TripDestinations } from "@/components/trip-destinations";
 import { TripTimeline } from "@/components/trip-timeline";
 import { MapRouteView } from "@/components/map-route-view";
 import type { Destination } from "@db/schema";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 export default function TripDetail() {
   const [, params] = useRoute("/trips/:id");
   const tripId = params ? parseInt(params.id) : null;
   const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const { data: trip, isLoading, error } = useQuery<Trip>({
     queryKey: ["/api/trips", tripId],
@@ -41,6 +55,36 @@ export default function TripDetail() {
     },
     enabled: !!tripId,
   });
+
+  const deleteTrip = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`/api/trips/${tripId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to delete trip");
+      }
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Trip deleted successfully",
+      });
+      setLocation("/");
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to delete trip",
+      });
+    },
+  });
+
+  const handleDelete = () => {
+    deleteTrip.mutate();
+  };
 
   if (isLoading) {
     return (
@@ -90,14 +134,23 @@ export default function TripDetail() {
           )}
           <div className="absolute inset-0 bg-gradient-to-b from-background/30 to-background/70" />
           <div className="container mx-auto px-4 relative z-10">
-            <Button
-              variant="ghost"
-              onClick={() => setLocation("/")}
-              className="absolute left-4 top-0"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
+            <div className="flex justify-between items-center absolute left-4 top-0">
+              <Button
+                variant="ghost"
+                onClick={() => setLocation("/")}
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+              <Button
+                variant="ghost"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Trip
+              </Button>
+            </div>
 
             <div className="absolute right-4 top-0">
               <TripDestinations tripId={trip.id} />
@@ -141,6 +194,27 @@ export default function TripDetail() {
           </div>
         </div>
       </main>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to delete this trip?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the trip
+              and all its associated data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

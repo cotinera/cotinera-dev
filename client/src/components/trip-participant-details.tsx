@@ -51,7 +51,7 @@ interface AddParticipantForm {
 }
 
 const STATUS_CYCLE = ['pending', 'yes', 'no'] as const;
-type Status = typeof STATUS_CYCLE[number];
+type Status = (typeof STATUS_CYCLE)[number];
 
 export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) {
   const queryClient = useQueryClient();
@@ -100,7 +100,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       const res = await fetch(`/api/trips/${tripId}/participants`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, status: 'pending' }),
+        body: JSON.stringify({ ...data, status: 'pending' as Status }),
       });
 
       if (!res.ok) {
@@ -115,36 +115,13 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       await refetch();
       setIsAddParticipantOpen(false);
       form.reset();
-      toast({ title: "Success", description: "Participant added successfully" });
+      toast({ title: "Success", description: "Person added successfully" });
     },
     onError: (error: Error) => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "Failed to add participant",
-      });
-    },
-  });
-
-  const deleteParticipantMutation = useMutation({
-    mutationFn: async (participantId: number) => {
-      const res = await fetch(`/api/trips/${tripId}/participants/${participantId}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to delete participant");
-      }
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-      toast({ title: "Success", description: "Participant removed successfully" });
-    },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to remove participant",
+        description: error.message || "Failed to add person",
       });
     },
   });
@@ -160,16 +137,19 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
   });
 
-  const handleStatusClick = (participantId: number, currentStatus: Status) => {
+  const handleStatusClick = (participantId: number, currentStatus: string) => {
+    // Find the current index in the cycle
     const currentIndex = STATUS_CYCLE.indexOf(currentStatus as Status);
+    // Get the next status (or go back to the start if at the end)
     const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
+    // Update the status
     updateStatusMutation.mutate({ participantId, status: nextStatus });
   };
 
   const getStatusBadgeVariant = (status: Status) => {
     switch (status) {
       case 'yes':
-        return 'success';
+        return 'default';
       case 'no':
         return 'destructive';
       default:
@@ -177,7 +157,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     }
   };
 
-  const getStatusDisplay = (status: Status) => {
+  const getStatusDisplay = (status: string) => {
     switch (status) {
       case 'yes':
         return 'Confirmed';
@@ -192,7 +172,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     <Card>
       <CardHeader className="pb-3">
         <div className="flex justify-between items-center">
-          <CardTitle>Travellers</CardTitle>
+          <CardTitle>People</CardTitle>
           <Dialog open={isAddParticipantOpen} onOpenChange={setIsAddParticipantOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -288,25 +268,19 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   <TableCell>
                     {participant.arrivalDate && format(new Date(participant.arrivalDate), "dd/MM/yyyy")}
                   </TableCell>
-                  <TableCell>
-                    {participant.flights?.[0]?.flightNumber || "-"}
-                  </TableCell>
+                  <TableCell>{participant.flightNumber || "-"}</TableCell>
                   <TableCell>
                     {participant.departureDate && format(new Date(participant.departureDate), "dd/MM/yyyy")}
                   </TableCell>
-                  <TableCell>
-                    {participant.flights?.[1]?.flightNumber || "-"}
-                  </TableCell>
-                  <TableCell>
-                    {participant.accommodation?.name || "-"}
-                  </TableCell>
+                  <TableCell>{participant.flightNumber || "-"}</TableCell>
+                  <TableCell>{participant.accommodation || "-"}</TableCell>
                   <TableCell>
                     <Badge
                       variant={getStatusBadgeVariant(participant.status as Status)}
                       className="cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => handleStatusClick(participant.id, participant.status as Status)}
+                      onClick={() => handleStatusClick(participant.id, participant.status)}
                     >
-                      {getStatusDisplay(participant.status as Status)}
+                      {getStatusDisplay(participant.status)}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -315,7 +289,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                       size="icon"
                       className="h-8 w-8 text-muted-foreground hover:text-destructive"
                       onClick={() => {
-                        if (window.confirm('Are you sure you want to remove this participant?')) {
+                        if (window.confirm('Are you sure you want to remove this person?')) {
                           deleteParticipantMutation.mutate(participant.id);
                         }
                       }}
