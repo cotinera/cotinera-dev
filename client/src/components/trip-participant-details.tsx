@@ -100,7 +100,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       const res = await fetch(`/api/trips/${tripId}/participants`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({...data, status: 'pending'}), //Added status here.
+        body: JSON.stringify({ ...data, status: 'pending' }),
       });
 
       if (!res.ok) {
@@ -112,7 +112,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-      await refetch(); 
+      await refetch();
       setIsAddParticipantOpen(false);
       form.reset();
       toast({ title: "Success", description: "Participant added successfully" });
@@ -161,10 +161,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   });
 
   const handleStatusClick = (participantId: number, currentStatus: Status) => {
-    console.log('Current status:', currentStatus);
-    const currentIndex = STATUS_CYCLE.indexOf(currentStatus);
+    const currentIndex = STATUS_CYCLE.indexOf(currentStatus as Status);
     const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
-    console.log('Next status:', nextStatus);
     updateStatusMutation.mutate({ participantId, status: nextStatus });
   };
 
@@ -179,11 +177,22 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     }
   };
 
+  const getStatusDisplay = (status: Status) => {
+    switch (status) {
+      case 'yes':
+        return 'Confirmed';
+      case 'no':
+        return 'Declined';
+      default:
+        return 'Pending';
+    }
+  };
+
   return (
     <Card>
       <CardHeader className="pb-3">
         <div className="flex justify-between items-center">
-          <CardTitle>People</CardTitle>
+          <CardTitle>Travellers</CardTitle>
           <Dialog open={isAddParticipantOpen} onOpenChange={setIsAddParticipantOpen}>
             <DialogTrigger asChild>
               <Button>
@@ -273,7 +282,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
           </TableHeader>
           <TableBody>
             {participants && participants.length > 0 ? (
-              participants.map((participant: Participant) => (
+              participants.map((participant) => (
                 <TableRow key={participant.id}>
                   <TableCell>{participant.name}</TableCell>
                   <TableCell>
@@ -294,10 +303,10 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   <TableCell>
                     <Badge
                       variant={getStatusBadgeVariant(participant.status as Status)}
-                      className="cursor-pointer"
+                      className="cursor-pointer hover:opacity-80 transition-opacity"
                       onClick={() => handleStatusClick(participant.id, participant.status as Status)}
                     >
-                      {participant.status === 'yes' ? 'Confirmed' : participant.status === 'no' ? 'Declined' : 'Pending'}
+                      {getStatusDisplay(participant.status as Status)}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -319,7 +328,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
             ) : (
               <TableRow>
                 <TableCell colSpan={8} className="text-center py-4 text-muted-foreground">
-                  No travellers added yet
+                  No people added yet
                 </TableCell>
               </TableRow>
             )}
