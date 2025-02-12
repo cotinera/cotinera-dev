@@ -717,16 +717,22 @@ export function registerRoutes(app: Express): Server {
   app.patch("/api/trips/:tripId/participants/:participantId/status", async (req, res) => {
     try {
       const { status } = req.body;
-      if (!['yes', 'no', 'pending'].includes(status)) {
-        return res.status(400).json({ error: 'Invalid status' });
+      const validStatuses = ['yes', 'no', 'pending'];
+
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ error: 'Invalid status. Must be one of: yes, no, pending' });
       }
 
       const participantId = parseInt(req.params.participantId);
+      const tripId = parseInt(req.params.tripId);
 
       const [updatedParticipant] = await db
         .update(participants)
         .set({ status })
-        .where(eq(participants.id, participantId))
+        .where(and(
+          eq(participants.id, participantId),
+          eq(participants.tripId, tripId)
+        ))
         .returning();
 
       if (!updatedParticipant) {
@@ -740,7 +746,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-    // Add this endpoint right after the other participant routes, before the destinations routes
+  // Add this endpoint right after the other participant routes, before the destinations routes
   app.delete("/api/trips/:tripId/participants/:participantId", async (req, res) => {
     try {
       const tripId = parseInt(req.params.tripId);

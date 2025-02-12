@@ -92,6 +92,10 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      toast({
+        title: "Success",
+        description: "Status updated successfully",
+      });
     },
     onError: (error: Error) => {
       toast({
@@ -316,12 +320,17 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                         <Button
                           variant="ghost"
                           className="flex items-center gap-2 px-2 py-1 h-8"
+                          disabled={updateStatusMutation.isPending}
                         >
                           <Badge
                             variant={getStatusBadgeVariant(participant.status as Status)}
                             className="gap-1"
                           >
-                            {getStatusIcon(participant.status)}
+                            {updateStatusMutation.isPending ? (
+                              <span className="animate-spin">⟳</span>
+                            ) : (
+                              getStatusIcon(participant.status)
+                            )}
                             {getStatusDisplay(participant.status)}
                           </Badge>
                         </Button>
@@ -330,18 +339,21 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                         <DropdownMenuItem
                           onClick={() => handleStatusChange(participant.id, 'yes')}
                           className="gap-2"
+                          disabled={updateStatusMutation.isPending}
                         >
                           <Check className="h-4 w-4" /> Confirm
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleStatusChange(participant.id, 'no')}
                           className="gap-2"
+                          disabled={updateStatusMutation.isPending}
                         >
                           <XIcon className="h-4 w-4" /> Decline
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleStatusChange(participant.id, 'pending')}
                           className="gap-2"
+                          disabled={updateStatusMutation.isPending}
                         >
                           <Clock className="h-4 w-4" /> Reset to Pending
                         </DropdownMenuItem>
