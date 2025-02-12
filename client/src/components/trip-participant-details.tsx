@@ -183,17 +183,17 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     <Card>
       <CardHeader className="pb-3">
         <div className="flex justify-between items-center">
-          <CardTitle>Travellers</CardTitle>
+          <CardTitle>People</CardTitle>
           <Dialog open={isAddParticipantOpen} onOpenChange={setIsAddParticipantOpen}>
             <DialogTrigger asChild>
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
-                Add Traveller
+                Add Person
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Add New Traveller</DialogTitle>
+                <DialogTitle>Add New Person</DialogTitle>
               </DialogHeader>
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(data => addParticipantMutation.mutate(data))}
@@ -249,7 +249,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                     )}
                   />
                   <Button type="submit" className="w-full">
-                    {addParticipantMutation.isPending ? "Adding..." : "Add Traveller"}
+                    {addParticipantMutation.isPending ? "Adding..." : "Add Person"}
                   </Button>
                 </form>
               </Form>

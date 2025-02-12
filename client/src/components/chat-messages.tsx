@@ -90,7 +90,7 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
           ))}
           {messages.length === 0 && !isLoading && (
             <p className="text-center text-muted-foreground">
-              No messages yet. Start the conversation!
+              Share flight deals, accommodations, and travel ideas with your group here!
             </p>
           )}
         </div>
