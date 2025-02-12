@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import type { Destination } from "@db/schema";
 import {
   Card,
@@ -10,6 +11,8 @@ import { format } from "date-fns";
 import { MapPin, CalendarDays, ArrowRight } from "lucide-react";
 
 export function TripTimeline({ tripId }: { tripId: number }) {
+  const [, setLocation] = useLocation();
+
   const { data: tripData } = useQuery({
     queryKey: ["/api/trips", tripId],
     queryFn: async () => {
@@ -54,7 +57,17 @@ export function TripTimeline({ tripId }: { tripId: number }) {
 
         <div className="space-y-2">
           {allStops.map((stop, index) => (
-            <Card key={stop.id} className="relative ml-8">
+            <Card 
+              key={stop.id} 
+              className={`relative ml-8 ${
+                stop.id !== 'origin' ? 'hover:bg-accent cursor-pointer transition-colors' : ''
+              }`}
+              onClick={() => {
+                if (stop.id !== 'origin') {
+                  setLocation(`/trips/${tripId}/destinations/${stop.id}`);
+                }
+              }}
+            >
               {/* Timeline dot and arrow */}
               <div className="absolute -left-8 top-1/2 -translate-y-1/2 flex items-center">
                 <div className="w-2 h-2 rounded-full bg-primary border-2 border-background" />
