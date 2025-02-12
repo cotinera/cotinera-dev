@@ -45,6 +45,7 @@ import { useToast } from "@/hooks/use-toast";
 
 interface TripParticipantDetailsProps {
   tripId: number;
+  destinationId?: number;
 }
 
 interface ParticipantForm {
@@ -68,7 +69,7 @@ const sortParticipants = (a: Participant, b: Participant) => {
   return statusOrder[a.status as Status] - statusOrder[b.status as Status];
 };
 
-export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) {
+export function TripParticipantDetails({ tripId, destinationId }: TripParticipantDetailsProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);

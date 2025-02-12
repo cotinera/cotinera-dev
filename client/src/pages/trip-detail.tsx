@@ -208,7 +208,7 @@ export default function TripDetail() {
                 {currentDestination ? (
                   <MapView location={currentDestination.name || ""} />
                 ) : destinations && destinations.length >= 2 ? (
-                  <MapRouteView destinations={destinations} />
+                  <MapRouteView trip={trip} destinations={destinations} />
                 ) : (
                   <MapView location={trip.location || ""} />
                 )}
