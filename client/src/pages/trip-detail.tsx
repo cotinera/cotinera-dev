@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Checklist } from "@/components/checklist";
@@ -33,6 +33,7 @@ export default function TripDetail() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data: trip, isLoading, error } = useQuery<Trip>({
     queryKey: ["/api/trips", tripId],
@@ -75,6 +76,10 @@ export default function TripDetail() {
       return res.json().catch(() => ({}));
     },
     onSuccess: () => {
+      // Invalidate all trips queries to force a refresh of the trips list
+      queryClient.invalidateQueries({ queryKey: ["/api/trips"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}`] });
+
       toast({
         title: "Success",
         description: "Trip deleted successfully",
