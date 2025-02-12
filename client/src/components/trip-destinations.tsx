@@ -226,11 +226,11 @@ export function TripDestinations({ tripId }: { tripId: number }) {
 
         <CollapsibleContent>
           <CardContent className="p-2 pt-0">
-            <ScrollArea className="h-[250px] pr-4">
-              <div className="space-y-1.5">
+            <ScrollArea className="h-[250px]">
+              <div className="space-y-1.5 pr-4">
                 {trip && (
                   <div
-                    className="flex items-center justify-between p-1.5 rounded-md bg-muted/50 text-sm"
+                    className="flex items-center justify-between p-1.5 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors"
                   >
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate text-xs">
@@ -251,7 +251,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                 {sortedDestinations.map((destination, index) => (
                   <div
                     key={destination.id}
-                    className="flex items-center justify-between p-1.5 rounded-md bg-muted/50 text-sm"
+                    className="flex items-center justify-between p-1.5 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors"
                   >
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate text-xs">
