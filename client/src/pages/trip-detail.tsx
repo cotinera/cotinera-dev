@@ -26,7 +26,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
-import { TripDestinationTabs } from "@/components/trip-destination-tabs";
 
 export default function TripDetail() {
   const [, params] = useRoute("/trips/:id");
@@ -189,16 +188,12 @@ export default function TripDetail() {
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-8">
           <section>
-            <TripTimeline tripId={trip.id} />
-          </section>
-
-          {destinations && destinations.length > 1 && (
-            <TripDestinationTabs
-              tripId={trip.id}
+            <TripTimeline 
+              tripId={trip.id} 
               currentDestinationId={currentDestinationId}
               onDestinationChange={setCurrentDestinationId}
             />
-          )}
+          </section>
 
           <div className="grid gap-8 md:grid-cols-[2fr,1fr]">
             <div className="space-y-8">

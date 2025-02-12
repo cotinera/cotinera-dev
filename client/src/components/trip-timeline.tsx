@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
 import type { Destination } from "@db/schema";
 import {
   Card,
@@ -9,10 +8,19 @@ import {
 } from "@/components/ui/card";
 import { format } from "date-fns";
 import { MapPin, CalendarDays, ArrowRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-export function TripTimeline({ tripId }: { tripId: number }) {
-  const [, setLocation] = useLocation();
+interface TripTimelineProps {
+  tripId: number;
+  currentDestinationId?: number;
+  onDestinationChange: (destinationId?: number) => void;
+}
 
+export function TripTimeline({ 
+  tripId, 
+  currentDestinationId,
+  onDestinationChange 
+}: TripTimelineProps) {
   const { data: tripData } = useQuery({
     queryKey: ["/api/trips", tripId],
     queryFn: async () => {
@@ -59,18 +67,23 @@ export function TripTimeline({ tripId }: { tripId: number }) {
           {allStops.map((stop, index) => (
             <Card 
               key={stop.id} 
-              className={`relative ml-8 ${
-                stop.id !== 'origin' ? 'hover:bg-accent cursor-pointer transition-colors' : ''
-              }`}
+              className={cn(
+                "relative ml-8 transition-colors",
+                stop.id !== 'origin' && "hover:bg-accent cursor-pointer",
+                currentDestinationId === stop.id && "bg-accent"
+              )}
               onClick={() => {
                 if (stop.id !== 'origin') {
-                  setLocation(`/trips/${tripId}/destinations/${stop.id}`);
+                  onDestinationChange(stop.id === currentDestinationId ? undefined : stop.id);
                 }
               }}
             >
               {/* Timeline dot and arrow */}
               <div className="absolute -left-8 top-1/2 -translate-y-1/2 flex items-center">
-                <div className="w-2 h-2 rounded-full bg-primary border-2 border-background" />
+                <div className={cn(
+                  "w-2 h-2 rounded-full border-2 border-background",
+                  currentDestinationId === stop.id ? "bg-primary" : "bg-muted"
+                )} />
                 {index < allStops.length - 1 && (
                   <ArrowRight className="h-4 w-4 text-muted-foreground ml-2" />
                 )}
