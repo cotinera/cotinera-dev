@@ -72,7 +72,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ participantId, status }: { participantId: number; status: Status }) => {
-      console.log('Current status:', status);
       const res = await fetch(`/api/trips/${tripId}/participants/${participantId}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -87,7 +86,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-      refetch();
     },
     onError: (error: Error) => {
       toast({
@@ -166,12 +164,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   });
 
   const handleStatusClick = (participantId: number, currentStatus: string) => {
-    // Find the current index in the cycle
     const currentIndex = STATUS_CYCLE.indexOf(currentStatus as Status);
-    // Get the next status (or go back to the start if at the end)
     const nextStatus = STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
-    console.log('Next status:', nextStatus);
-    // Update the status
     updateStatusMutation.mutate({ participantId, status: nextStatus });
   };
 
