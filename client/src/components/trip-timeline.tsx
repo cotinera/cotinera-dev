@@ -38,6 +38,15 @@ export function TripTimeline({
   const queryClient = useQueryClient();
   const [destinationToDelete, setDestinationToDelete] = useState<Destination | null>(null);
 
+  const { data: tripData } = useQuery({
+    queryKey: ["/api/trips", tripId],
+    queryFn: async () => {
+      const res = await fetch(`/api/trips/${tripId}`);
+      if (!res.ok) throw new Error("Failed to fetch trip");
+      return res.json();
+    },
+  });
+
   const { data: destinations } = useQuery<Destination[]>({
     queryKey: [`/api/trips/${tripId}/destinations`],
     queryFn: async () => {
@@ -49,45 +58,20 @@ export function TripTimeline({
 
   const deleteDestinationMutation = useMutation({
     mutationFn: async (destinationId: number) => {
-      console.log('Attempting to delete destination:', destinationId);
-
       const res = await fetch(`/api/trips/${tripId}/destinations/${destinationId}`, {
         method: "DELETE",
-        headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json",
-        },
-        credentials: "include",
       });
-
-      console.log('Delete response status:', res.status);
-
       if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Delete destination error response:", errorText);
-        throw new Error(`Failed to delete destination: ${res.status} ${res.statusText}`);
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to delete destination");
       }
-
-      return destinationId;
+      return res.json();
     },
-    onSuccess: async (deletedDestinationId) => {
-      console.log('Delete mutation succeeded, invalidating queries...');
-
-      // Immediately invalidate all queries that might show destinations
-      await Promise.all([
-        queryClient.invalidateQueries({ 
-          queryKey: [`/api/trips/${tripId}/destinations`] 
-        }),
-        queryClient.invalidateQueries({ 
-          queryKey: ["/api/trips", tripId] 
-        })
-      ]);
-
-      // If the deleted destination was selected, clear the selection
-      if (currentDestinationId === deletedDestinationId) {
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
+      if (currentDestinationId === destinationToDelete?.id) {
         onDestinationChange(undefined);
       }
-
       toast({
         title: "Success",
         description: "Destination deleted successfully",
@@ -95,7 +79,6 @@ export function TripTimeline({
       setDestinationToDelete(null);
     },
     onError: (error: Error) => {
-      console.error("Delete destination error:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -105,10 +88,19 @@ export function TripTimeline({
     },
   });
 
-  if (!destinations?.length) return null;
+  if (!destinations?.length && !tripData?.location) return null;
 
   const sortedDestinations = destinations?.sort((a, b) => a.order - b.order) || [];
-  const allStops = sortedDestinations;
+  const allStops = [
+    {
+      id: 'main',
+      name: tripData?.location || 'Starting Point',
+      startDate: tripData?.startDate,
+      endDate: sortedDestinations[0]?.startDate || tripData?.endDate,
+      order: -1
+    },
+    ...sortedDestinations
+  ];
 
   return (
     <div className="space-y-3">
@@ -126,17 +118,21 @@ export function TripTimeline({
               key={stop.id} 
               className={cn(
                 "relative ml-8 transition-colors hover:bg-accent cursor-pointer group",
-                currentDestinationId === stop.id && "bg-accent"
+                currentDestinationId === (stop.id === 'main' ? undefined : stop.id) && "bg-accent"
               )}
               onClick={() => {
-                onDestinationChange(stop.id === currentDestinationId ? undefined : stop.id);
+                if (stop.id === 'main') {
+                  onDestinationChange(undefined);
+                } else {
+                  onDestinationChange(stop.id === currentDestinationId ? undefined : stop.id);
+                }
               }}
             >
               {/* Timeline dot and arrow */}
               <div className="absolute -left-8 top-1/2 -translate-y-1/2 flex items-center">
                 <div className={cn(
                   "w-2 h-2 rounded-full border-2 border-background",
-                  currentDestinationId === stop.id ? "bg-primary" : "bg-muted"
+                  (currentDestinationId === (stop.id === 'main' ? undefined : stop.id)) ? "bg-primary" : "bg-muted"
                 )} />
                 {index < allStops.length - 1 && (
                   <ArrowRight className="h-4 w-4 text-muted-foreground ml-2" />
@@ -159,18 +155,19 @@ export function TripTimeline({
                     <div className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs">
                       {`Stop ${index + 1}`}
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        console.log('Delete button clicked for destination:', stop.id);
-                        setDestinationToDelete(stop);
-                      }}
-                    >
-                      <Trash2 className="h-3 w-3 text-destructive" />
-                    </Button>
+                    {stop.id !== 'main' && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDestinationToDelete(stop as Destination);
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3 text-destructive" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -196,7 +193,6 @@ export function TripTimeline({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
                 if (destinationToDelete) {
-                  console.log('Confirming deletion of destination:', destinationToDelete.id);
                   deleteDestinationMutation.mutate(destinationToDelete.id);
                 }
               }}
