@@ -9,7 +9,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { addDays, isSameDay, isWithinInterval } from "date-fns";
+import { addDays, isSameDay, isWithinInterval, min, max } from "date-fns";
+import { useQuery } from "@tanstack/react-query";
 
 interface CalendarViewProps {
   trips: Trip[];
@@ -18,24 +19,71 @@ interface CalendarViewProps {
 export function CalendarView({ trips }: CalendarViewProps) {
   const [date, setDate] = useState<Date | undefined>(new Date());
 
+  // Get destinations for all trips
+  const tripDestinationsQueries = trips.map(trip => 
+    useQuery({
+      queryKey: [`/api/trips/${trip.id}/destinations`],
+      queryFn: async () => {
+        const res = await fetch(`/api/trips/${trip.id}/destinations`);
+        if (!res.ok) throw new Error("Failed to fetch destinations");
+        return res.json();
+      },
+      enabled: !!trip.id
+    })
+  );
+
   // Get all trips that are happening on the selected date
-  const tripsOnDate = trips.filter((trip) => {
+  const tripsOnDate = trips.filter((trip, index) => {
     if (!date) return false;
-    return isWithinInterval(date, {
-      start: new Date(trip.startDate),
-      end: new Date(trip.endDate),
-    });
+
+    const destinations = tripDestinationsQueries[index].data;
+
+    if (destinations && destinations.length > 0) {
+      // If trip has destinations, use them to determine date range
+      const startDates = destinations.map(d => new Date(d.startDate));
+      const endDates = destinations.map(d => new Date(d.endDate));
+      const tripStart = min(startDates);
+      const tripEnd = max(endDates);
+
+      return isWithinInterval(date, {
+        start: tripStart,
+        end: tripEnd,
+      });
+    } else {
+      // Fallback to trip's main dates if no destinations
+      return isWithinInterval(date, {
+        start: new Date(trip.startDate),
+        end: new Date(trip.endDate),
+      });
+    }
   });
 
   // Create an array of dates that have trips for the calendar to highlight
-  const tripDates = trips.reduce<Date[]>((dates, trip) => {
-    const start = new Date(trip.startDate);
-    const end = new Date(trip.endDate);
-    let current = start;
+  const tripDates = trips.reduce<Date[]>((dates, trip, index) => {
+    const destinations = tripDestinationsQueries[index].data;
 
-    while (current <= end) {
-      dates.push(current);
-      current = addDays(current, 1);
+    if (destinations && destinations.length > 0) {
+      // If trip has destinations, use them to determine date range
+      const startDates = destinations.map(d => new Date(d.startDate));
+      const endDates = destinations.map(d => new Date(d.endDate));
+      const tripStart = min(startDates);
+      const tripEnd = max(endDates);
+
+      let current = tripStart;
+      while (current <= tripEnd) {
+        dates.push(current);
+        current = addDays(current, 1);
+      }
+    } else {
+      // Fallback to trip's main dates if no destinations
+      const start = new Date(trip.startDate);
+      const end = new Date(trip.endDate);
+      let current = start;
+
+      while (current <= end) {
+        dates.push(current);
+        current = addDays(current, 1);
+      }
     }
 
     return dates;
