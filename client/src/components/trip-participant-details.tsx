@@ -90,8 +90,17 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       }
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+    onSuccess: async (data) => {
+      // Force a refetch of the participants data
+      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      // Optionally update the cache directly for immediate UI update
+      queryClient.setQueryData([`/api/trips/${tripId}/participants`], (oldData: Participant[] | undefined) => {
+        if (!oldData) return oldData;
+        return oldData.map(participant => 
+          participant.id === data.id ? { ...participant, status: data.status } : participant
+        );
+      });
+
       toast({
         title: "Success",
         description: "Status updated successfully",
