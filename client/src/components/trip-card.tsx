@@ -1,5 +1,6 @@
 import { formatDistance } from "date-fns";
 import type { Trip } from "@db/schema";
+import { useQuery } from "@tanstack/react-query";
 import {
   Card,
   CardContent,
@@ -39,6 +40,19 @@ export function TripCard({ trip }: TripCardProps) {
   const [isEditingImage, setIsEditingImage] = useState(false);
   const thumbnailIndex = trip.id % THUMBNAILS.length;
   const thumbnail = trip.thumbnail || THUMBNAILS[thumbnailIndex];
+
+  // Live query for participants
+  const { data: participants = [] } = useQuery({
+    queryKey: [`/api/trips/${trip.id}/participants`],
+    queryFn: async () => {
+      const res = await fetch(`/api/trips/${trip.id}/participants`);
+      if (!res.ok) {
+        throw new Error("Failed to fetch participants");
+      }
+      return res.json();
+    },
+    refetchInterval: 2000, // Poll every 2 seconds for updates
+  });
 
   const handleNavigate = () => {
     setLocation(`/trips/${trip.id}`);
@@ -116,22 +130,22 @@ export function TripCard({ trip }: TripCardProps) {
                 })}
               </span>
             </div>
-            {trip.participants && trip.participants.length > 0 && (
+            {participants && participants.length > 0 && (
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-muted-foreground" />
                 <HoverCard>
                   <HoverCardTrigger asChild>
                     <div className="flex -space-x-2 cursor-help">
-                      {trip.participants.slice(0, 3).map((participant, i) => (
+                      {participants.slice(0, 3).map((participant, i) => (
                         <Avatar key={i} className="h-6 w-6 border-2 border-background">
                           <AvatarFallback>
                             {getInitial(participant)}
                           </AvatarFallback>
                         </Avatar>
                       ))}
-                      {trip.participants.length > 3 && (
+                      {participants.length > 3 && (
                         <div className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-background bg-muted text-xs">
-                          +{trip.participants.length - 3}
+                          +{participants.length - 3}
                         </div>
                       )}
                     </div>
@@ -140,7 +154,7 @@ export function TripCard({ trip }: TripCardProps) {
                     <div className="space-y-2">
                       <h4 className="text-sm font-semibold">Trip Participants</h4>
                       <div className="space-y-1">
-                        {trip.participants.map((participant, i) => (
+                        {participants.map((participant, i) => (
                           <div key={i} className="flex items-center gap-2">
                             <Avatar className="h-6 w-6">
                               <AvatarFallback>{getInitial(participant)}</AvatarFallback>
