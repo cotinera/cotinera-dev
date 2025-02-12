@@ -63,8 +63,9 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
+  const [updatingParticipants, setUpdatingParticipants] = useState<number[]>([]);
 
-  const { data: participants = [], refetch } = useQuery<Participant[]>({
+  const { data: participants = [] } = useQuery<Participant[]>({
     queryKey: [`/api/trips/${tripId}/participants`],
     queryFn: async () => {
       const res = await fetch(`/api/trips/${tripId}/participants`);
@@ -78,40 +79,61 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ participantId, status }: { participantId: number; status: Status }) => {
-      const res = await fetch(`/api/trips/${tripId}/participants/${participantId}/status`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
-      });
+      setUpdatingParticipants(prev => [...prev, participantId]);
+      try {
+        const res = await fetch(`/api/trips/${tripId}/participants/${participantId}/status`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        });
 
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to update status");
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.message || "Failed to update status");
+        }
+        return res.json();
+      } finally {
+        setUpdatingParticipants(prev => prev.filter(id => id !== participantId));
       }
-      return res.json();
     },
-    onSuccess: async (data) => {
-      // Force a refetch of the participants data
-      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-      // Optionally update the cache directly for immediate UI update
-      queryClient.setQueryData([`/api/trips/${tripId}/participants`], (oldData: Participant[] | undefined) => {
-        if (!oldData) return oldData;
-        return oldData.map(participant => 
-          participant.id === data.id ? { ...participant, status: data.status } : participant
+    onMutate: async ({ participantId, status }) => {
+      // Cancel any outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+
+      // Snapshot the previous value
+      const previousParticipants = queryClient.getQueryData<Participant[]>([`/api/trips/${tripId}/participants`]);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData<Participant[]>([`/api/trips/${tripId}/participants`], old => {
+        if (!old) return old;
+        return old.map(p =>
+          p.id === participantId ? { ...p, status } : p
         );
       });
 
+      // Return a context object with the snapshotted value
+      return { previousParticipants };
+    },
+    onError: (err, variables, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousParticipants) {
+        queryClient.setQueryData([`/api/trips/${tripId}/participants`], context.previousParticipants);
+      }
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err.message || "Failed to update status",
+      });
+    },
+    onSuccess: (data) => {
       toast({
         title: "Success",
         description: "Status updated successfully",
       });
     },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to update status",
-      });
+    onSettled: () => {
+      // Always refetch after error or success to ensure we're up to date
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
     },
   });
 
@@ -329,13 +351,13 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                         <Button
                           variant="ghost"
                           className="flex items-center gap-2 px-2 py-1 h-8"
-                          disabled={updateStatusMutation.isPending}
+                          disabled={updatingParticipants.includes(participant.id)}
                         >
                           <Badge
                             variant={getStatusBadgeVariant(participant.status as Status)}
                             className="gap-1"
                           >
-                            {updateStatusMutation.isPending ? (
+                            {updatingParticipants.includes(participant.id) ? (
                               <span className="animate-spin">⟳</span>
                             ) : (
                               getStatusIcon(participant.status)
@@ -348,21 +370,21 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                         <DropdownMenuItem
                           onClick={() => handleStatusChange(participant.id, 'yes')}
                           className="gap-2"
-                          disabled={updateStatusMutation.isPending}
+                          disabled={updatingParticipants.includes(participant.id)}
                         >
                           <Check className="h-4 w-4" /> Confirm
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleStatusChange(participant.id, 'no')}
                           className="gap-2"
-                          disabled={updateStatusMutation.isPending}
+                          disabled={updatingParticipants.includes(participant.id)}
                         >
                           <XIcon className="h-4 w-4" /> Decline
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleStatusChange(participant.id, 'pending')}
                           className="gap-2"
-                          disabled={updateStatusMutation.isPending}
+                          disabled={updatingParticipants.includes(participant.id)}
                         >
                           <Clock className="h-4 w-4" /> Reset to Pending
                         </DropdownMenuItem>
