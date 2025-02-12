@@ -481,9 +481,8 @@ export function registerRoutes(app: Express): Server {
           user: {
             columns: {
               id: true,
-              username: true,
               name: true,
-              avatar: true
+              email: true
             }
           }
         },
@@ -498,11 +497,11 @@ export function registerRoutes(app: Express): Server {
 
   app.post("/api/trips/:tripId/chat", async (req, res) => {
     try {
-      // For development, allow without authentication
       const userId = req.user?.id || 1;
+      const tripId = parseInt(req.params.tripId);
 
       const [message] = await db.insert(chatMessages).values({
-        tripId: parseInt(req.params.tripId),
+        tripId,
         userId,
         message: req.body.message,
       }).returning();
@@ -513,9 +512,8 @@ export function registerRoutes(app: Express): Server {
           user: {
             columns: {
               id: true,
-              username: true,
               name: true,
-              avatar: true
+              email: true
             }
           }
         },

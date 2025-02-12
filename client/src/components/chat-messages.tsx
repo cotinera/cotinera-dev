@@ -36,7 +36,7 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
     refetchInterval: 2000, // Poll every 2 seconds for new messages
   });
 
-  const sendMessage = useMutation({
+  const { mutate: sendMessage, isPending } = useMutation({
     mutationFn: async (data: ChatFormData) => {
       const res = await fetch(`/api/trips/${tripId}/chat`, {
         method: "POST",
@@ -47,7 +47,7 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["/api/trips", tripId, "chat"]);
+      queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "chat"] });
       form.reset();
     },
   });
@@ -61,7 +61,7 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
 
   const onSubmit = (data: ChatFormData) => {
     if (!data.message.trim()) return;
-    sendMessage.mutate(data);
+    sendMessage(data);
   };
 
   return (
@@ -72,14 +72,13 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
             <div key={message.id} className="flex items-start gap-2">
               <Avatar className="h-8 w-8">
                 <AvatarFallback>
-                  {message.user?.name?.[0]?.toUpperCase() || 
-                   message.user?.username?.[0]?.toUpperCase() || 'U'}
+                  {message.user?.name?.[0]?.toUpperCase() || 'U'}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <span className="font-medium">
-                    {message.user?.name || message.user?.username || 'Unknown User'}
+                    {message.user?.name || message.user?.email?.split('@')[0] || 'Unknown User'}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {message.createdAt ? formatDistance(new Date(message.createdAt), new Date(), {
@@ -111,7 +110,7 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
           <Button
             type="submit"
             size="icon"
-            disabled={sendMessage.isPending}
+            disabled={isPending}
           >
             <Send className="h-4 w-4" />
           </Button>
