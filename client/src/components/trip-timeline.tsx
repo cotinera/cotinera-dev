@@ -49,13 +49,18 @@ export function TripTimeline({
 
   const deleteDestinationMutation = useMutation({
     mutationFn: async (destinationId: number) => {
+      console.log('Attempting to delete destination:', destinationId);
+
       const res = await fetch(`/api/trips/${tripId}/destinations/${destinationId}`, {
         method: "DELETE",
         headers: {
           "Accept": "application/json",
           "Content-Type": "application/json",
         },
+        credentials: "include",
       });
+
+      console.log('Delete response status:', res.status);
 
       if (!res.ok) {
         const errorText = await res.text();
@@ -63,10 +68,11 @@ export function TripTimeline({
         throw new Error(`Failed to delete destination: ${res.status} ${res.statusText}`);
       }
 
-      // Return true to indicate successful deletion
-      return true;
+      return destinationId;
     },
-    onSuccess: async (_, deletedDestinationId) => {
+    onSuccess: async (deletedDestinationId) => {
+      console.log('Delete mutation succeeded, invalidating queries...');
+
       // Immediately invalidate all queries that might show destinations
       await Promise.all([
         queryClient.invalidateQueries({ 
@@ -159,6 +165,7 @@ export function TripTimeline({
                       className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={(e) => {
                         e.stopPropagation();
+                        console.log('Delete button clicked for destination:', stop.id);
                         setDestinationToDelete(stop);
                       }}
                     >
@@ -189,6 +196,7 @@ export function TripTimeline({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
                 if (destinationToDelete) {
+                  console.log('Confirming deletion of destination:', destinationToDelete.id);
                   deleteDestinationMutation.mutate(destinationToDelete.id);
                 }
               }}
