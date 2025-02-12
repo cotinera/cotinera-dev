@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Destination } from "@db/schema";
 import {
   Card,
@@ -7,8 +7,21 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { format } from "date-fns";
-import { MapPin, CalendarDays, ArrowRight } from "lucide-react";
+import { MapPin, CalendarDays, ArrowRight, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 
 interface TripTimelineProps {
   tripId: number;
@@ -21,6 +34,10 @@ export function TripTimeline({
   currentDestinationId,
   onDestinationChange 
 }: TripTimelineProps) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [destinationToDelete, setDestinationToDelete] = useState<Destination | null>(null);
+
   const { data: tripData } = useQuery({
     queryKey: ["/api/trips", tripId],
     queryFn: async () => {
@@ -36,6 +53,38 @@ export function TripTimeline({
       const res = await fetch(`/api/trips/${tripId}/destinations`);
       if (!res.ok) throw new Error("Failed to fetch destinations");
       return res.json();
+    },
+  });
+
+  const deleteDestinationMutation = useMutation({
+    mutationFn: async (destinationId: number) => {
+      const res = await fetch(`/api/trips/${tripId}/destinations/${destinationId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to delete destination");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
+      if (currentDestinationId === destinationToDelete?.id) {
+        onDestinationChange(undefined);
+      }
+      toast({
+        title: "Success",
+        description: "Destination deleted successfully",
+      });
+      setDestinationToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to delete destination",
+      });
+      setDestinationToDelete(null);
     },
   });
 
@@ -68,7 +117,7 @@ export function TripTimeline({
             <Card 
               key={stop.id} 
               className={cn(
-                "relative ml-8 transition-colors hover:bg-accent cursor-pointer",
+                "relative ml-8 transition-colors hover:bg-accent cursor-pointer group",
                 currentDestinationId === (stop.id === 'main' ? undefined : stop.id) && "bg-accent"
               )}
               onClick={() => {
@@ -102,8 +151,23 @@ export function TripTimeline({
                       {format(new Date(stop.endDate), "MMM d")}
                     </div>
                   </div>
-                  <div className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs">
-                    {`Stop ${index + 1}`}
+                  <div className="flex items-center gap-2">
+                    <div className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs">
+                      {`Stop ${index + 1}`}
+                    </div>
+                    {stop.id !== 'main' && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDestinationToDelete(stop as Destination);
+                        }}
+                      >
+                        <Trash2 className="h-3 w-3 text-destructive" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -111,6 +175,33 @@ export function TripTimeline({
           ))}
         </div>
       </div>
+
+      <AlertDialog 
+        open={!!destinationToDelete} 
+        onOpenChange={(open) => !open && setDestinationToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete destination</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this destination? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (destinationToDelete) {
+                  deleteDestinationMutation.mutate(destinationToDelete.id);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
