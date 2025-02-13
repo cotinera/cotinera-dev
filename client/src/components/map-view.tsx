@@ -17,8 +17,18 @@ const defaultOptions = {
 // Define libraries array outside component to prevent recreation
 const libraries: ("places")[] = ["places"];
 
+interface PinnedPlace {
+  id: number;
+  name: string;
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
+}
+
 interface MapViewProps {
   location: string;
+  pinnedPlaces?: PinnedPlace[];
 }
 
 interface Coordinates {
@@ -26,7 +36,7 @@ interface Coordinates {
   lng: number;
 }
 
-export function MapView({ location }: MapViewProps) {
+export function MapView({ location, pinnedPlaces = [] }: MapViewProps) {
   const [coordinates, setCoordinates] = useState<Coordinates>({
     lat: 37.7749,
     lng: -122.4194, // Default to San Francisco
@@ -107,6 +117,21 @@ export function MapView({ location }: MapViewProps) {
         options={defaultOptions}
       >
         <MarkerF position={coordinates} />
+        {pinnedPlaces.map((place) => (
+          <MarkerF
+            key={place.id}
+            position={place.coordinates}
+            title={place.name}
+            icon={{
+              path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z",
+              fillColor: "#2563eb",
+              fillOpacity: 1,
+              strokeWeight: 1,
+              strokeColor: "#ffffff",
+              scale: 1.5,
+            }}
+          />
+        ))}
       </GoogleMap>
     </Card>
   );

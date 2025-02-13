@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MapPicker } from "@/components/map-picker";
+import { MapView } from "@/components/map-view";
 import {
   Card,
   CardContent,
@@ -240,16 +241,11 @@ export function PinnedPlaces({
 
   return (
     <Card>
-      {showMap && (
-        <div className="mb-4">
-          <MapPicker
-            value=""
-            onChange={() => {}}
-            existingPins={pinnedPlaces}
-            readOnly
-            initialCenter={tripCoordinates}
-          />
-        </div>
+      {defaultLocation && showMap && (
+        <MapView 
+          location={defaultLocation}
+          pinnedPlaces={pinnedPlaces}
+        />
       )}
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">
