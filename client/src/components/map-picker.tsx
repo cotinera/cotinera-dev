@@ -1,6 +1,6 @@
 import { useLoadScript, GoogleMap, MarkerF } from "@react-google-maps/api";
 import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LocationSearchBar } from "./location-search-bar";
 
@@ -44,6 +44,7 @@ export function MapPicker({
   const [coordinates, setCoordinates] = useState<google.maps.LatLngLiteral>(
     initialCenter && initialCenter.lat && initialCenter.lng ? initialCenter : DEFAULT_CENTER
   );
+  const [mapCenter, setMapCenter] = useState<google.maps.LatLngLiteral>(coordinates);
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
@@ -70,7 +71,6 @@ export function MapPicker({
 
       if (data.status === "OK" && data.results?.[0]) {
         const formattedAddress = data.results[0].formatted_address;
-        // Use the first result's name if available, otherwise use the formatted address
         const name = data.results[0].address_components?.[0]?.long_name || formattedAddress;
         onChange(formattedAddress, { lat, lng }, name);
       }
@@ -78,6 +78,14 @@ export function MapPicker({
       console.error("Reverse geocoding error:", err);
     }
   };
+
+  // Handle map idle event to update center
+  const handleIdle = useCallback((map: google.maps.Map) => {
+    const center = map.getCenter();
+    if (center) {
+      setMapCenter({ lat: center.lat(), lng: center.lng() });
+    }
+  }, []);
 
   if (loadError) {
     return (
@@ -111,7 +119,7 @@ export function MapPicker({
           }}
           placeholder={placeholder}
           className="flex-1"
-          searchBias={searchBias || (initialCenter ? { ...initialCenter, radius: 50000 } : undefined)}
+          searchBias={{ ...mapCenter, radius: 5000 }}
           onInputRef={onSearchInputRef}
         />
       )}
@@ -121,6 +129,7 @@ export function MapPicker({
           zoom={13}
           center={coordinates}
           onClick={handleMapClick}
+          onIdle={(map) => handleIdle(map)}
           options={{
             disableDefaultUI: true,
             zoomControl: true,
