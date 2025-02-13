@@ -68,7 +68,7 @@ export enum PlaceCategory {
   RELIC = "relic"
 }
 
-const CATEGORY_ICONS: Record<PlaceCategory, React.ComponentType> = {
+const CATEGORY_ICONS: Record<PlaceCategory, typeof MapPin> = {
   [PlaceCategory.FOOD]: UtensilsCrossed,
   [PlaceCategory.BAR]: Beer,
   [PlaceCategory.CAFE]: Coffee,
@@ -433,14 +433,17 @@ export function PinnedPlaces({
                           {Object.entries(CATEGORY_GROUPS).map(([groupName, categories]) => (
                             <SelectGroup key={groupName}>
                               <SelectLabel>{groupName}</SelectLabel>
-                              {categories.map((category) => (
-                                <SelectItem key={category} value={category}>
-                                  <div className="flex items-center gap-2">
-                                    {React.createElement(getIconComponent(category), { className: "h-4 w-4" })}
-                                    <span>{category.replace(/_/g, ' ').toLowerCase()}</span>
-                                  </div>
-                                </SelectItem>
-                              ))}
+                              {categories.map((category) => {
+                                const Icon = getIconComponent(category);
+                                return (
+                                  <SelectItem key={category} value={category}>
+                                    <div className="flex items-center gap-2">
+                                      <Icon className="h-4 w-4" />
+                                      <span>{category.replace(/_/g, ' ').toLowerCase()}</span>
+                                    </div>
+                                  </SelectItem>
+                                );
+                              })}
                             </SelectGroup>
                           ))}
                         </SelectContent>
@@ -477,41 +480,44 @@ export function PinnedPlaces({
       <CardContent>
         <ScrollArea className="h-[200px] w-full rounded-md">
           <div className="space-y-2">
-            {(pinnedPlacesQuery.data || []).map((place) => (
-              <div
-                key={place.id}
-                className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted/70 transition-colors"
-              >
-                <div className="min-w-0 flex-1">
+            {(pinnedPlacesQuery.data || []).map((place) => {
+              const Icon = getIconComponent(place.category);
+              return (
+                <div
+                  key={place.id}
+                  className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted/70 transition-colors"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <Icon className="h-4 w-4" />
+                      <p className="text-sm font-medium truncate">{place.name}</p>
+                    </div>
+                  </div>
                   <div className="flex items-center gap-2">
-                    {React.createElement(getIconComponent(place.category), { className: "h-4 w-4" })}
-                    <p className="text-sm font-medium truncate">{place.name}</p>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleAddToChecklist(place)}
+                      className={cn(
+                        "p-0 h-8 w-8",
+                        place.addedToChecklist ? "text-green-600" : "text-muted-foreground hover:text-green-600"
+                      )}
+                      disabled={place.addedToChecklist}
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setPlaceToDelete(place)}
+                      className="p-0 h-8 w-8 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleAddToChecklist(place)}
-                    className={cn(
-                      "p-0 h-8 w-8",
-                      place.addedToChecklist ? "text-green-600" : "text-muted-foreground hover:text-green-600"
-                    )}
-                    disabled={place.addedToChecklist}
-                  >
-                    <CheckCircle className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setPlaceToDelete(place)}
-                    className="p-0 h-8 w-8 text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
             {(pinnedPlacesQuery.data || []).length === 0 && (
               <p className="text-center text-muted-foreground py-4">
                 No places pinned yet
