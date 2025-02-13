@@ -1,5 +1,4 @@
-import React from "react";
-import { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MapPicker } from "@/components/map-picker";
 import {
@@ -19,16 +18,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -115,20 +104,18 @@ const CATEGORY_GROUPS = {
 interface PinnedPlace {
   id: number;
   name: string;
-  address: string;
   notes?: string;
-  category: PlaceCategory;
   coordinates: {
     lat: number;
     lng: number;
   };
+  category: PlaceCategory;
   tripId: number;
   destinationId?: number;
   addedToChecklist: boolean;
 }
 
 interface AddPinnedPlaceForm {
-  address: string;
   notes?: string;
   category: PlaceCategory;
 }
@@ -156,11 +143,9 @@ export function PinnedPlaces({
   const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [placeToDelete, setPlaceToDelete] = useState<PinnedPlace | null>(null);
   const [selectedPlaceName, setSelectedPlaceName] = useState<string>("");
-  const [searchInputRef, setSearchInputRef] = useState<HTMLInputElement | null>(null);
 
   const form = useForm<AddPinnedPlaceForm>({
     defaultValues: {
-      address: "",
       notes: "",
       category: PlaceCategory.TOURIST,
     },
@@ -173,9 +158,7 @@ export function PinnedPlaces({
       if (destinationId) {
         url.searchParams.append('destinationId', destinationId.toString());
       }
-      const res = await fetch(url, {
-        credentials: 'include'
-      });
+      const res = await fetch(url);
       if (!res.ok) {
         const error = await res.text();
         throw new Error(error);
@@ -190,19 +173,21 @@ export function PinnedPlaces({
         throw new Error("Please select a location");
       }
 
+      const payload = {
+        name: selectedPlaceName,
+        notes: data.notes,
+        coordinates: selectedCoordinates,
+        category: data.category,
+        destinationId,
+        addedToChecklist: false,
+      };
+
+      console.log('Sending payload:', payload);
+
       const res = await fetch(`/api/trips/${tripId}/pinned-places`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: 'include',
-        body: JSON.stringify({
-          name: selectedPlaceName,
-          address: data.address,
-          notes: data.notes,
-          coordinates: selectedCoordinates,
-          category: data.category,
-          destinationId,
-          addedToChecklist: false,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -210,8 +195,7 @@ export function PinnedPlaces({
         throw new Error(errorText || "Failed to add pinned place");
       }
 
-      const newPlace = await res.json();
-      return newPlace;
+      return res.json();
     },
     onSuccess: (newPlace) => {
       queryClient.setQueryData<PinnedPlace[]>(
@@ -238,6 +222,7 @@ export function PinnedPlaces({
       });
     },
     onError: (error: Error) => {
+      console.error('Error adding pinned place:', error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -250,7 +235,6 @@ export function PinnedPlaces({
     mutationFn: async (placeId: number) => {
       const res = await fetch(`/api/trips/${tripId}/pinned-places/${placeId}`, {
         method: "DELETE",
-        credentials: 'include',
       });
 
       if (!res.ok) {
@@ -284,7 +268,6 @@ export function PinnedPlaces({
       const res = await fetch(`/api/trips/${tripId}/checklist`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        credentials: 'include',
         body: JSON.stringify({
           title: `Visit ${pinnedPlacesQuery.data?.find(p => p.id === placeId)?.name || 'place'}`,
         }),
@@ -295,14 +278,17 @@ export function PinnedPlaces({
         throw new Error(error);
       }
 
-      await fetch(`/api/trips/${tripId}/pinned-places/${placeId}`, {
+      const updateRes = await fetch(`/api/trips/${tripId}/pinned-places/${placeId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        credentials: 'include',
         body: JSON.stringify({
           addedToChecklist: true,
         }),
       });
+
+      if (!updateRes.ok) {
+        throw new Error("Failed to update pinned place status");
+      }
 
       return res.json();
     },
@@ -342,10 +328,7 @@ export function PinnedPlaces({
       return;
     }
 
-    addPinnedPlaceMutation.mutate({
-      ...data,
-      address: selectedPlaceName,
-    });
+    addPinnedPlaceMutation.mutate(data);
   };
 
   const handleAddToChecklist = (place: PinnedPlace) => {
@@ -387,35 +370,22 @@ export function PinnedPlaces({
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="address"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Location</FormLabel>
-                      <FormControl>
-                        <div className="h-[400px] w-full">
-                          <MapPicker
-                            value={field.value}
-                            onChange={(address, coordinates, name) => {
-                              field.onChange(address);
-                              setSelectedCoordinates(coordinates);
-                              setSelectedPlaceName(name || address);
-                            }}
-                            placeholder="Search for a place to pin..."
-                            existingPins={pinnedPlacesQuery.data || []}
-                            initialCenter={tripCoordinates}
-                            searchBias={tripCoordinates ? {
-                              ...tripCoordinates,
-                              radius: 50000
-                            } : undefined}
-                            onSearchInputRef={setSearchInputRef}
-                          />
-                        </div>
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                <div className="h-[400px] w-full">
+                  <MapPicker
+                    value=""
+                    onChange={(address, coordinates, name) => {
+                      setSelectedCoordinates(coordinates);
+                      setSelectedPlaceName(name || address);
+                    }}
+                    placeholder="Search for a place to pin..."
+                    existingPins={pinnedPlacesQuery.data || []}
+                    initialCenter={tripCoordinates}
+                    searchBias={tripCoordinates ? {
+                      ...tripCoordinates,
+                      radius: 50000
+                    } : undefined}
+                  />
+                </div>
                 <FormField
                   control={form.control}
                   name="category"
@@ -466,7 +436,6 @@ export function PinnedPlaces({
                 <DialogFooter>
                   <Button
                     type="submit"
-                    variant="default"
                     disabled={!selectedCoordinates || addPinnedPlaceMutation.isPending}
                   >
                     {addPinnedPlaceMutation.isPending ? "Pinning..." : "Pin Place"}
