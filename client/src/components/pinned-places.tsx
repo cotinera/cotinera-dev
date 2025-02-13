@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MapPicker } from "@/components/map-picker";
-import { MapView } from "@/components/map-view";
 import {
   Card,
   CardContent,
@@ -196,42 +195,6 @@ export function PinnedPlaces({
     },
   });
 
-  const addToChecklistMutation = useMutation({
-    mutationFn: async (placeId: number) => {
-      const res = await fetch(`/api/trips/${tripId}/pinned-places/${placeId}/checklist`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: 'include',
-      });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || "Failed to add to checklist");
-      }
-
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [`/api/trips/${tripId}/pinned-places`]
-      });
-      queryClient.invalidateQueries({
-        queryKey: [`/api/trips/${tripId}/checklist`]
-      });
-      toast({
-        title: "Success",
-        description: "Added to checklist successfully",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to add to checklist",
-      });
-    },
-  });
-
   const handleDeletePlace = () => {
     if (!placeToDelete) return;
     deletePinnedPlaceMutation.mutate(placeToDelete.id);
@@ -243,12 +206,6 @@ export function PinnedPlaces({
 
   return (
     <Card>
-      {defaultLocation && showMap && (
-        <MapView 
-          location={defaultLocation}
-          pinnedPlaces={pinnedPlacesQuery.data || []}
-        />
-      )}
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">
           <div className="flex items-center gap-2">

@@ -122,14 +122,6 @@ export function MapView({ location, pinnedPlaces = [] }: MapViewProps) {
             key={place.id}
             position={place.coordinates}
             title={place.name}
-            icon={{
-              path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z",
-              fillColor: "#2563eb",
-              fillOpacity: 1,
-              strokeWeight: 1,
-              strokeColor: "#ffffff",
-              scale: 1.5,
-            }}
           />
         ))}
       </GoogleMap>
