@@ -33,6 +33,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface PinnedPlace {
   id: number;
@@ -127,6 +128,7 @@ export function PinnedPlaces({
           notes: data.notes,
           coordinates: selectedCoordinates,
           destinationId,
+          addedToChecklist: false, // Added to ensure consistent data
         }),
       });
 
@@ -204,6 +206,55 @@ export function PinnedPlaces({
     },
   });
 
+  const addToChecklistMutation = useMutation({
+    mutationFn: async (placeId: number) => {
+      const res = await fetch(`/api/trips/${tripId}/checklist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify({
+          title: `Visit ${pinnedPlacesQuery.data?.find(p => p.id === placeId)?.name || 'place'}`,
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error);
+      }
+
+      // Update the pinned place to mark it as added to checklist
+      await fetch(`/api/trips/${tripId}/pinned-places/${placeId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify({
+          addedToChecklist: true,
+        }),
+      });
+
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [`/api/trips/${tripId}/pinned-places`]
+      });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/trips/${tripId}/checklist`]
+      });
+      toast({
+        title: "Success",
+        description: "Place added to checklist",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to add place to checklist",
+      });
+    },
+  });
+
   const handleDeletePlace = () => {
     if (!placeToDelete) return;
     deletePinnedPlaceMutation.mutate(placeToDelete.id);
@@ -211,6 +262,12 @@ export function PinnedPlaces({
 
   const onSubmit = (data: AddPinnedPlaceForm) => {
     addPinnedPlaceMutation.mutate(data);
+  };
+
+  const handleAddToChecklist = (place: PinnedPlace) => {
+    if (!place.addedToChecklist) {
+      addToChecklistMutation.mutate(place.id);
+    }
   };
 
   return (
@@ -309,6 +366,18 @@ export function PinnedPlaces({
                   <p className="text-sm font-medium truncate">{place.name}</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleAddToChecklist(place)}
+                    className={cn(
+                      "p-0 h-8 w-8",
+                      place.addedToChecklist ? "text-green-600" : "text-muted-foreground hover:text-green-600"
+                    )}
+                    disabled={place.addedToChecklist}
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
