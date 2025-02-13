@@ -900,8 +900,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Add a new destination to a trip
-  app.post("/api/trips/:tripId/destinations", async (req, res) => {
-    try {
+  app.post("/api/trips/:tripId/destinations", async (req, res) => {    try {
       const tripId = parseInt(req.params.tripId);
 
       // Get current max order
@@ -996,17 +995,12 @@ export function registerRoutes(app: Express): Server {
       const tripId = parseInt(req.params.tripId);
       const destinationId = req.query.destinationId ? parseInt(req.query.destinationId as string) : undefined;
 
-      let query = db.select().from(pinnedPlaces);
-      if (destinationId) {
-        query = query.where(and(
-          eq(pinnedPlaces.tripId, tripId),
-          eq(pinnedPlaces.destinationId, destinationId)
-        ));
-      } else {
-        query = query.where(eq(pinnedPlaces.tripId, tripId));
-      }
+      const places = await db.select().from(pinnedPlaces).where(
+        destinationId
+          ? and(eq(pinnedPlaces.tripId, tripId), eq(pinnedPlaces.destinationId, destinationId))
+          : eq(pinnedPlaces.tripId, tripId)
+      );
 
-      const places = await query;
       res.json(places);
     } catch (error) {
       console.error('Error fetching pinned places:', error);
@@ -1020,21 +1014,16 @@ export function registerRoutes(app: Express): Server {
       const tripId = parseInt(req.params.tripId);
       const { name, notes, coordinates, destinationId } = req.body;
 
-      // Validate coordinates
-      if (!coordinates || typeof coordinates.lat !== 'number' || typeof coordinates.lng !== 'number') {
-        return res.status(400).json({ error: 'Invalid coordinates. Both latitude and longitude must be numbers.' });
-      }
-
       const [newPlace] = await db.insert(pinnedPlaces).values({
         tripId,
         name,
-        notes: notes || null,
+        notes,
         coordinates,
-        destinationId: destinationId ? parseInt(destinationId) : null,
+        destinationId: destinationId ? parseInt(destinationId) : undefined,
         addedToChecklist: false,
       }).returning();
 
-      res.status(201).json(newPlace);
+      res.json(newPlace);
     } catch (error) {
       console.error('Error creating pinned place:', error);
       res.status(500).json({ error: 'Failed to create pinned place' });
@@ -1047,31 +1036,34 @@ export function registerRoutes(app: Express): Server {
       const tripId = parseInt(req.params.tripId);
       const placeId = parseInt(req.params.placeId);
 
-      // First update the pinned place
-      const [updatedPlace] = await db
-        .update(pinnedPlaces)
-        .set({ addedToChecklist: true })
-        .where(and(
-          eq(pinnedPlaces.id, placeId),
-          eq(pinnedPlaces.tripId, tripId)
-        ))
-        .returning();
+      // Start a transaction to ensure both operations succeed or fail together
+      await db.transaction(async (tx) => {
+        // Get the place details
+        const [place] = await tx
+          .select()
+          .from(pinnedPlaces)
+          .where(and(eq(pinnedPlaces.id, placeId), eq(pinnedPlaces.tripId, tripId)))
+          .limit(1);
 
-      if (!updatedPlace) {
-        return res.status(404).json({ error: 'Pinned place not found' });
-      }
+        if (!place) {
+          throw new Error("Pinned place not found");
+        }
 
-      // Then create a checklist item
-      const [checklistItem] = await db
-        .insert(checklist)
-        .values({
+        // Create checklist item
+        const [checklistItem] = await tx.insert(checklist).values({
           tripId,
-          title: `Visit ${updatedPlace.name}`,
+          title: `Visit ${place.name}`,
           completed: false,
-        })
-        .returning();
+        }).returning();
 
-      res.json({ checklistItem, place: updatedPlace });
+        // Update pinned place
+        await tx
+          .update(pinnedPlaces)
+          .set({ addedToChecklist: true })
+          .where(eq(pinnedPlaces.id, placeId));
+
+        res.json(checklistItem);
+      });
     } catch (error) {
       console.error('Error adding to checklist:', error);
       res.status(500).json({ error: 'Failed to add to checklist' });

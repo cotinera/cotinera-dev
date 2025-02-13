@@ -8,13 +8,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Plus } from "lucide-react";
+import { MapPin, Plus, CheckCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -22,8 +23,10 @@ import {
   FormField,
   FormItem,
   FormLabel,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
@@ -44,19 +47,16 @@ interface PinnedPlace {
 interface AddPinnedPlaceForm {
   name: string;
   notes?: string;
-  coordinates?: {
-    lat: number;
-    lng: number;
-  };
 }
 
 interface PinnedPlacesProps {
   tripId: number;
   destinationId?: number;
   defaultLocation?: string;
+  onPinPlace?: (place: PinnedPlace) => void;
 }
 
-export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedPlacesProps) {
+export function PinnedPlaces({ tripId, destinationId, defaultLocation, onPinPlace }: PinnedPlacesProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isAddPlaceOpen, setIsAddPlaceOpen] = useState(false);
@@ -114,7 +114,11 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
         }
       }
 
-      return res.json();
+      const newPlace = await res.json();
+      if (onPinPlace) {
+        onPinPlace(newPlace);
+      }
+      return newPlace;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ 
@@ -201,9 +205,12 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
               <Plus className="h-4 w-4" />
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[800px] w-full max-h-[90vh] overflow-y-auto">
+          <DialogContent className="sm:max-w-[800px]">
             <DialogHeader>
               <DialogTitle>Pin a New Place</DialogTitle>
+              <DialogDescription>
+                Search for a location and pin it to your trip. Pinned places will appear on your trip map.
+              </DialogDescription>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -214,7 +221,7 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
                     <FormItem>
                       <FormLabel>Location</FormLabel>
                       <FormControl>
-                        <div className="h-[500px] w-full">
+                        <div className="h-[400px] w-full">
                           <MapPicker
                             value={field.value}
                             onChange={(address, coordinates) => {
@@ -222,10 +229,12 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
                               setSelectedCoordinates(coordinates);
                             }}
                             placeholder="Search for a place to pin..."
-                            defaultLocation={defaultLocation}
                           />
                         </div>
                       </FormControl>
+                      <FormDescription>
+                        Search for a location or click on the map to pin a place
+                      </FormDescription>
                     </FormItem>
                   )}
                 />
@@ -236,7 +245,7 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
                     <FormItem>
                       <FormLabel>Notes</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Add any notes about this place..." />
+                        <Textarea {...field} placeholder="Add any notes about this place..." />
                       </FormControl>
                     </FormItem>
                   )}
@@ -274,7 +283,9 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
                     variant="ghost"
                     size="sm"
                     onClick={() => addToChecklistMutation.mutate(place.id)}
+                    className="flex items-center gap-1"
                   >
+                    <CheckCircle className="h-4 w-4" />
                     Add to Checklist
                   </Button>
                 )}
