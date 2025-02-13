@@ -23,7 +23,7 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormDescription,
+  //FormDescription, // Removed as per intention
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -320,7 +320,7 @@ export function PinnedPlaces({
         id: detailedPlace.id,
         data: editForm.getValues()
       });
-      setDetailedPlace(updatedPlace); 
+      setDetailedPlace(updatedPlace);
       setIsEditing(false);
       setSelectedCoordinates(null);
     } catch (error) {
@@ -402,14 +402,11 @@ export function PinnedPlaces({
                             initialCenter={tripCoordinates}
                             searchBias={tripCoordinates ? {
                               ...tripCoordinates,
-                              radius: 50000 
+                              radius: 50000
                             } : undefined}
                           />
                         </div>
                       </FormControl>
-                      <FormDescription>
-                        Search for a location or click on the map to pin a place
-                      </FormDescription>
                     </FormItem>
                   )}
                 />
