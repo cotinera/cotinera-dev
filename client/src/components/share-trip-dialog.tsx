@@ -2,12 +2,16 @@ import { useState } from "react";
 import { useShareLinks } from "@/hooks/use-share-links";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -67,16 +71,19 @@ export function ShareTripDialog({ tripId }: ShareTripDialogProps) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
+    <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+      <AlertDialogTrigger asChild>
         <Button variant="outline" size="icon">
           <Share className="h-4 w-4" />
         </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Share Trip</DialogTitle>
-        </DialogHeader>
+      </AlertDialogTrigger>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Share Trip</AlertDialogTitle>
+          <AlertDialogDescription>
+            Create a shareable link to allow others to access this trip.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label>Access Level</Label>
@@ -135,7 +142,15 @@ export function ShareTripDialog({ tripId }: ShareTripDialogProps) {
             </div>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          {shareUrl && (
+            <AlertDialogAction onClick={copyToClipboard}>
+              Copy Link
+            </AlertDialogAction>
+          )}
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
