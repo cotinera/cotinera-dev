@@ -35,7 +35,6 @@ import {
   FormItem,
   FormLabel,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -162,14 +161,6 @@ export function PinnedPlaces({
   });
 
   const onSubmit = (data: AddPinnedPlaceForm) => {
-    if (!selectedCoordinates || !selectedPlaceName) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Please select a location on the map",
-      });
-      return;
-    }
     addPinnedPlaceMutation.mutate(data);
   };
 
@@ -216,12 +207,7 @@ export function PinnedPlaces({
 
       if (!res.ok) {
         const errorText = await res.text();
-        try {
-          const errorData = JSON.parse(errorText);
-          throw new Error(errorData.error || "Failed to add to checklist");
-        } catch {
-          throw new Error(errorText || "Failed to add to checklist");
-        }
+        throw new Error(errorText || "Failed to add to checklist");
       }
 
       return res.json();
@@ -305,9 +291,7 @@ export function PinnedPlaces({
                             onChange={(address, coordinates, name) => {
                               field.onChange(address);
                               setSelectedCoordinates(coordinates);
-                              if (name) {
-                                setSelectedPlaceName(name);
-                              }
+                              setSelectedPlaceName(name || address);
                             }}
                             placeholder="Search for a place to pin..."
                             existingPins={pinnedPlaces}
@@ -337,7 +321,8 @@ export function PinnedPlaces({
                 <DialogFooter>
                   <Button
                     type="submit"
-                    disabled={addPinnedPlaceMutation.isPending || !selectedCoordinates}
+                    variant="default"
+                    disabled={!selectedCoordinates || addPinnedPlaceMutation.isPending}
                   >
                     {addPinnedPlaceMutation.isPending ? "Pinning..." : "Pin Place"}
                   </Button>
