@@ -67,27 +67,66 @@ export function LocationSearchBar({
     setError(null);
 
     try {
-      let locationBias: google.maps.places.AutocompletionRequest['bounds'] | undefined;
+      let locationBias: google.maps.places.AutocompletionRequest['locationBias'] | undefined;
 
       if (searchBias && searchBias.lat && searchBias.lng) {
-        const radius = searchBias.radius || 50000; // Default 50km radius
-        const metersPerDegree = 111320; // Approximate meters per degree at the equator
-        const latDelta = radius / metersPerDegree;
-        const lngDelta = radius / (metersPerDegree * Math.cos(searchBias.lat * Math.PI / 180));
+        const radius = searchBias.radius || 5000; // Default 5km radius for tighter local search
+        const location = new google.maps.LatLng(searchBias.lat, searchBias.lng);
 
-        locationBias = new google.maps.LatLngBounds(
-          new google.maps.LatLng(searchBias.lat - latDelta, searchBias.lng - lngDelta),
-          new google.maps.LatLng(searchBias.lat + latDelta, searchBias.lng + lngDelta)
-        );
+        // Create a tight circular bias around the current location
+        locationBias = {
+          center: location,
+          radius: radius
+        };
       }
 
       const response = await autocompleteService.current.getPlacePredictions({
         input: searchValue,
         types: ['establishment', 'geocode'],
-        bounds: locationBias,
+        locationBias: locationBias,
+        strictBounds: true, // This makes the location bias stronger
+        fields: ['formatted_address', 'geometry', 'name', 'place_id']
       });
 
-      setPredictions(response.predictions);
+      // Sort predictions by distance if we have location bias
+      if (searchBias && response.predictions.length > 0) {
+        const location = new google.maps.LatLng(searchBias.lat, searchBias.lng);
+
+        // Calculate distances and sort
+        const predictionsWithDistance = await Promise.all(
+          response.predictions.map(async (prediction) => {
+            const details = await new Promise<google.maps.places.PlaceResult>((resolve, reject) => {
+              placesService.current!.getDetails(
+                {
+                  placeId: prediction.place_id,
+                  fields: ['geometry']
+                },
+                (result, status) => {
+                  if (status === google.maps.places.PlacesServiceStatus.OK && result) {
+                    resolve(result);
+                  } else {
+                    reject(new Error('Failed to get place details'));
+                  }
+                }
+              );
+            });
+
+            const distance = google.maps.geometry.spherical.computeDistanceBetween(
+              location,
+              details.geometry!.location!
+            );
+
+            return { prediction, distance };
+          })
+        );
+
+        // Sort by distance
+        predictionsWithDistance.sort((a, b) => a.distance - b.distance);
+        setPredictions(predictionsWithDistance.map(p => p.prediction));
+      } else {
+        setPredictions(response.predictions);
+      }
+
       setIsOpen(true);
     } catch (err) {
       console.error('Autocomplete error:', err);
