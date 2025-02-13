@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { TripCard } from "@/components/trip-card";
 import { Plus, LogOut } from "lucide-react";
 import { useState, useMemo } from "react";
+import { z } from "zod";
 import {
   Dialog,
   DialogContent,
@@ -18,17 +19,21 @@ import {
   FormField,
   FormItem,
   FormLabel,
+  FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { MapPicker } from "@/components/map-picker";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 
-interface TripFormData {
-  title: string;
-  location: string;
-  startDate: string;
-  endDate: string;
-}
+const tripFormSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  location: z.string().min(1, "Location is required"),
+  startDate: z.string().min(1, "Start date is required"),
+  endDate: z.string().min(1, "End date is required"),
+});
+
+interface TripFormData extends z.infer<typeof tripFormSchema> {}
 
 export default function Dashboard() {
   const { trips, createTrip } = useTrips();
@@ -37,20 +42,17 @@ export default function Dashboard() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Sort trips by creation date (assuming trips have an id that increments with creation)
-  // and then alphabetically by title as a secondary sort
+  // Sort trips by creation date and then alphabetically by title
   const sortedTrips = useMemo(() => {
     return [...trips].sort((a, b) => {
-      // Primary sort by ID (creation order)
-      const idDiff = a.id - b.id;
+      const idDiff = b.id - a.id; // Newest first
       if (idDiff !== 0) return idDiff;
-
-      // Secondary sort alphabetically by title
       return a.title.localeCompare(b.title);
     });
   }, [trips]);
 
   const form = useForm<TripFormData>({
+    resolver: zodResolver(tripFormSchema),
     defaultValues: {
       title: "",
       location: "",
@@ -64,8 +66,21 @@ export default function Dashboard() {
       if (!selectedCoordinates) {
         toast({
           variant: "destructive",
-          title: "Error",
+          title: "Location Required",
           description: "Please select a location from the map or search",
+        });
+        return;
+      }
+
+      // Validate dates
+      const startDate = new Date(data.startDate);
+      const endDate = new Date(data.endDate);
+
+      if (endDate < startDate) {
+        toast({
+          variant: "destructive",
+          title: "Invalid Dates",
+          description: "End date cannot be before start date",
         });
         return;
       }
@@ -75,7 +90,12 @@ export default function Dashboard() {
         coordinates: selectedCoordinates,
       };
 
-      await createTrip(tripData);
+      const newTrip = await createTrip(tripData);
+
+      if (!newTrip) {
+        throw new Error("Failed to create trip. Please try again.");
+      }
+
       setIsCreateOpen(false);
       form.reset();
       setSelectedCoordinates(null);
@@ -89,7 +109,7 @@ export default function Dashboard() {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to create trip",
+        description: error instanceof Error ? error.message : "Failed to create trip. Please try again.",
       });
     }
   }
@@ -133,6 +153,7 @@ export default function Dashboard() {
                         <FormControl>
                           <Input placeholder="Summer Vacation" {...field} />
                         </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -152,6 +173,7 @@ export default function Dashboard() {
                             placeholder="Search for a location..."
                           />
                         </FormControl>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
@@ -165,6 +187,7 @@ export default function Dashboard() {
                           <FormControl>
                             <Input type="date" {...field} />
                           </FormControl>
+                          <FormMessage />
                         </FormItem>
                       )}
                     />
@@ -177,6 +200,7 @@ export default function Dashboard() {
                           <FormControl>
                             <Input type="date" {...field} />
                           </FormControl>
+                          <FormMessage />
                         </FormItem>
                       )}
                     />
