@@ -216,6 +216,20 @@ export const documents = pgTable("documents", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const pinnedPlaces = pgTable("pinned_places", {
+  id: serial("id").primaryKey(),
+  tripId: integer("trip_id").notNull().references(() => trips.id),
+  name: text("name").notNull(),
+  notes: text("notes"),
+  coordinates: json("coordinates").$type<{
+    lat: number;
+    lng: number;
+  }>(),
+  destinationId: integer("destination_id").references(() => destinations.id),
+  addedToChecklist: boolean("added_to_checklist").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const tripsRelations = relations(trips, ({ one, many }) => ({
   owner: one(users, {
     fields: [trips.ownerId],
@@ -230,6 +244,7 @@ export const tripsRelations = relations(trips, ({ one, many }) => ({
   flights: many(flights),
   accommodations: many(accommodations),
   chatMessages: many(chatMessages),
+  pinnedPlaces: many(pinnedPlaces),
 }));
 
 export const destinationsRelations = relations(destinations, ({ one }) => ({
@@ -335,6 +350,17 @@ export const taskAssignmentsRelations = relations(taskAssignments, ({ one }) => 
   }),
 }));
 
+export const pinnedPlacesRelations = relations(pinnedPlaces, ({ one }) => ({
+  trip: one(trips, {
+    fields: [pinnedPlaces.tripId],
+    references: [trips.id],
+  }),
+  destination: one(destinations, {
+    fields: [pinnedPlaces.destinationId],
+    references: [destinations.id],
+  }),
+}));
+
 export const insertUserSchema = createInsertSchema(users, {
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
@@ -379,3 +405,4 @@ export type Expense = typeof expenses.$inferSelect;
 export type ExpenseSplit = typeof expenseSplits.$inferSelect;
 export type TaskAssignment = typeof taskAssignments.$inferSelect;
 export type Destination = typeof destinations.$inferSelect;
+export type PinnedPlace = typeof pinnedPlaces.$inferSelect;

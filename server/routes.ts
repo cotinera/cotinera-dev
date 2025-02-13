@@ -7,7 +7,7 @@ import { crypto } from "./auth.js";
 import express from "express";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations, chatMessages, users, destinations } from "@db/schema";
+import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations, chatMessages, users, destinations, pinnedPlaces } from "@db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { addDays } from "date-fns";
 
@@ -277,6 +277,9 @@ export function registerRoutes(app: Express): Server {
 
         // Delete share links
         await tx.delete(shareLinks).where(eq(shareLinks.tripId, tripId));
+
+        // Delete pinned places
+        await tx.delete(pinnedPlaces).where(eq(pinnedPlaces.tripId, tripId));
 
         // Finally, delete the trip
         const [deletedTrip] = await tx.delete(trips)
@@ -984,6 +987,96 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error reordering destinations:', error);
       res.status(500).json({ error: 'Failed to reorder destinations' });
+    }
+  });
+
+  // Get pinned places for a trip
+  app.get("/api/trips/:tripId/pinned-places", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const destinationId = req.query.destinationId ? parseInt(req.query.destinationId as string) : undefined;
+
+      const query = db.select().from(pinnedPlaces).where(eq(pinnedPlaces.tripId, tripId));
+      if (destinationId) {
+        query.where(eq(pinnedPlaces.destinationId, destinationId));
+      }
+
+      const places = await query;
+      res.json(places);
+    } catch (error) {
+      console.error('Error fetching pinned places:', error);
+      res.status(500).json({ error: 'Failed to fetch pinned places' });
+    }
+  });
+
+  // Create a new pinned place
+  app.post("/api/trips/:tripId/pinned-places", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const { name, notes, coordinates, destinationId } = req.body;
+
+      const [newPlace] = await db.insert(pinnedPlaces).values({
+        tripId,
+        name,
+        notes: notes || null,
+        coordinates,
+        destinationId: destinationId || null,
+        addedToChecklist: false,
+      }).returning();
+
+      res.json(newPlace);
+    } catch (error) {
+      console.error('Error creating pinned place:', error);
+      res.status(500).json({ error: 'Failed to create pinned place' });
+    }
+  });
+
+  // Add pinned place to checklist
+  app.post("/api/trips/:tripId/pinned-places/:placeId/checklist", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const placeId = parseInt(req.params.placeId);
+
+      // Start a transaction to ensure both operations succeed or fail together
+      const result = await db.transaction(async (tx) => {
+        // Get the pinned place
+        const [place] = await tx
+          .select()
+          .from(pinnedPlaces)
+          .where(and(
+            eq(pinnedPlaces.id, placeId),
+            eq(pinnedPlaces.tripId, tripId)
+          ))
+          .limit(1);
+
+        if (!place) {
+          throw new Error("Pinned place not found");
+        }
+
+        // Add to checklist
+        const [checklistItem] = await tx
+          .insert(checklist)
+          .values({
+            tripId,
+            title: `Visit ${place.name}`,
+            completed: false,
+          })
+          .returning();
+
+        // Mark as added to checklist
+        const [updatedPlace] = await tx
+          .update(pinnedPlaces)
+          .set({ addedToChecklist: true })
+          .where(eq(pinnedPlaces.id, placeId))
+          .returning();
+
+        return { checklistItem, place: updatedPlace };
+      });
+
+      res.json(result);
+    } catch (error) {
+      console.error('Error adding to checklist:', error);
+      res.status(500).json({ error: 'Failed to add to checklist' });
     }
   });
 
