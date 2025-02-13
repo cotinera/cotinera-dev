@@ -380,22 +380,29 @@ export function PinnedPlaces({
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="h-[400px] w-full">
-                  <MapPicker
-                    value=""
-                    onChange={(address, coordinates, name) => {
-                      setSelectedCoordinates(coordinates);
-                      setSelectedPlaceName(name || address);
-                    }}
-                    placeholder="Search for a place to pin..."
-                    existingPins={pinnedPlacesQuery.data || []}
-                    initialCenter={tripCoordinates}
-                    searchBias={tripCoordinates ? {
-                      ...tripCoordinates,
-                      radius: 50000
-                    } : undefined}
-                  />
-                </div>
+                <FormItem>
+                  <FormLabel>Location</FormLabel>
+                  <FormControl>
+                    <div className="h-[400px] w-full">
+                      <MapPicker
+                        value=""
+                        onChange={(address, coordinates, name) => {
+                          setSelectedCoordinates(coordinates);
+                          setSelectedPlaceName(name || address);
+                        }}
+                        placeholder="Search for a place to pin..."
+                        existingPins={pinnedPlacesQuery.data || []}
+                        initialCenter={tripCoordinates}
+                        searchBias={tripCoordinates ? {
+                          ...tripCoordinates,
+                          radius: 50000
+                        } : undefined}
+                        autoFocus={true}
+                      />
+                    </div>
+                  </FormControl>
+                </FormItem>
+
                 <FormField
                   control={form.control}
                   name="category"
