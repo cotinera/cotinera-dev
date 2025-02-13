@@ -310,13 +310,20 @@ export function PinnedPlaces({
     if (!detailedPlace) return;
 
     try {
-      await editPinnedPlaceMutation.mutateAsync({
+      const updatedPlace = await editPinnedPlaceMutation.mutateAsync({
         id: detailedPlace.id,
         data: editForm.getValues()
       });
+      setDetailedPlace(updatedPlace); // Update the detailed place with new data
       setIsEditing(false);
+      setSelectedCoordinates(null);
     } catch (error) {
       console.error("Failed to save edits:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to save changes to pinned place",
+      });
     }
   };
 
