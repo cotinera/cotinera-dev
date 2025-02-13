@@ -81,8 +81,6 @@ export function PinnedPlaces({
   const [isAddPlaceOpen, setIsAddPlaceOpen] = useState(false);
   const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [placeToDelete, setPlaceToDelete] = useState<PinnedPlace | null>(null);
-  const [detailedPlace, setDetailedPlace] = useState<PinnedPlace | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
   const [selectedPlaceName, setSelectedPlaceName] = useState<string>("");
 
   const form = useForm<AddPinnedPlaceForm>({
@@ -284,13 +282,7 @@ export function PinnedPlaces({
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
-              <form 
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  form.handleSubmit(onSubmit)(e);
-                }} 
-                className="space-y-4"
-              >
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
                   name="address"
@@ -396,6 +388,7 @@ export function PinnedPlaces({
           <ScrollBar orientation="vertical" />
         </ScrollArea>
       </CardContent>
+
       <AlertDialog open={!!placeToDelete} onOpenChange={() => setPlaceToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
