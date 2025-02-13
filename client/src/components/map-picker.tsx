@@ -45,6 +45,7 @@ export function MapPicker({
     initialCenter && initialCenter.lat && initialCenter.lng ? initialCenter : DEFAULT_CENTER
   );
   const [mapCenter, setMapCenter] = useState<google.maps.LatLngLiteral>(coordinates);
+  const [map, setMap] = useState<google.maps.Map | null>(null);
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
@@ -79,13 +80,23 @@ export function MapPicker({
     }
   };
 
-  // Handle map idle event to update center
-  const handleIdle = useCallback((map: google.maps.Map) => {
+  // Handle map load
+  const onLoad = useCallback((map: google.maps.Map) => {
+    setMap(map);
     const center = map.getCenter();
     if (center) {
       setMapCenter({ lat: center.lat(), lng: center.lng() });
     }
   }, []);
+
+  // Handle map idle event to update center
+  const onIdle = useCallback(() => {
+    if (!map) return;
+    const center = map.getCenter();
+    if (center) {
+      setMapCenter({ lat: center.lat(), lng: center.lng() });
+    }
+  }, [map]);
 
   if (loadError) {
     return (
@@ -129,7 +140,8 @@ export function MapPicker({
           zoom={13}
           center={coordinates}
           onClick={handleMapClick}
-          onIdle={(map) => handleIdle(map)}
+          onLoad={onLoad}
+          onIdle={onIdle}
           options={{
             disableDefaultUI: true,
             zoomControl: true,
