@@ -904,13 +904,13 @@ export function registerRoutes(app: Express): Server {
     try {
       const tripId = parseInt(req.params.tripId);
 
-      // Get the current highest order for this trip's destinations
-      const [maxOrder] = await db
+      // Get current max order
+      const [result] = await db
         .select({ maxOrder: sql`MAX(${destinations.order})` })
         .from(destinations)
         .where(eq(destinations.tripId, tripId));
 
-      const newOrder = (maxOrder?.maxOrder || 0) + 1;
+      const newOrder = (result?.maxOrder || 0) + 1;
 
       const [newDestination] = await db.insert(destinations).values({
         tripId,
@@ -990,15 +990,20 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Get pinned places for a trip
+  // Get pinned places
   app.get("/api/trips/:tripId/pinned-places", async (req, res) => {
     try {
       const tripId = parseInt(req.params.tripId);
       const destinationId = req.query.destinationId ? parseInt(req.query.destinationId as string) : undefined;
 
-      const query = db.select().from(pinnedPlaces).where(eq(pinnedPlaces.tripId, tripId));
+      let query = db.select().from(pinnedPlaces);
       if (destinationId) {
-        query.where(eq(pinnedPlaces.destinationId, destinationId));
+        query = query.where(and(
+          eq(pinnedPlaces.tripId, tripId),
+          eq(pinnedPlaces.destinationId, destinationId)
+        ));
+      } else {
+        query = query.where(eq(pinnedPlaces.tripId, tripId));
       }
 
       const places = await query;
@@ -1009,22 +1014,27 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Create a new pinned place
+  // Create pinned place
   app.post("/api/trips/:tripId/pinned-places", async (req, res) => {
     try {
       const tripId = parseInt(req.params.tripId);
       const { name, notes, coordinates, destinationId } = req.body;
+
+      // Validate coordinates
+      if (!coordinates || typeof coordinates.lat !== 'number' || typeof coordinates.lng !== 'number') {
+        return res.status(400).json({ error: 'Invalid coordinates. Both latitude and longitude must be numbers.' });
+      }
 
       const [newPlace] = await db.insert(pinnedPlaces).values({
         tripId,
         name,
         notes: notes || null,
         coordinates,
-        destinationId: destinationId || null,
+        destinationId: destinationId ? parseInt(destinationId) : null,
         addedToChecklist: false,
       }).returning();
 
-      res.json(newPlace);
+      res.status(201).json(newPlace);
     } catch (error) {
       console.error('Error creating pinned place:', error);
       res.status(500).json({ error: 'Failed to create pinned place' });
@@ -1037,43 +1047,31 @@ export function registerRoutes(app: Express): Server {
       const tripId = parseInt(req.params.tripId);
       const placeId = parseInt(req.params.placeId);
 
-      // Start a transaction to ensure both operations succeed or fail together
-      const result = await db.transaction(async (tx) => {
-        // Get the pinned place
-        const [place] = await tx
-          .select()
-          .from(pinnedPlaces)
-          .where(and(
-            eq(pinnedPlaces.id, placeId),
-            eq(pinnedPlaces.tripId, tripId)
-          ))
-          .limit(1);
+      // First update the pinned place
+      const [updatedPlace] = await db
+        .update(pinnedPlaces)
+        .set({ addedToChecklist: true })
+        .where(and(
+          eq(pinnedPlaces.id, placeId),
+          eq(pinnedPlaces.tripId, tripId)
+        ))
+        .returning();
 
-        if (!place) {
-          throw new Error("Pinned place not found");
-        }
+      if (!updatedPlace) {
+        return res.status(404).json({ error: 'Pinned place not found' });
+      }
 
-        // Add to checklist
-        const [checklistItem] = await tx
-          .insert(checklist)
-          .values({
-            tripId,
-            title: `Visit ${place.name}`,
-            completed: false,
-          })
-          .returning();
+      // Then create a checklist item
+      const [checklistItem] = await db
+        .insert(checklist)
+        .values({
+          tripId,
+          title: `Visit ${updatedPlace.name}`,
+          completed: false,
+        })
+        .returning();
 
-        // Mark as added to checklist
-        const [updatedPlace] = await tx
-          .update(pinnedPlaces)
-          .set({ addedToChecklist: true })
-          .where(eq(pinnedPlaces.id, placeId))
-          .returning();
-
-        return { checklistItem, place: updatedPlace };
-      });
-
-      res.json(result);
+      res.json({ checklistItem, place: updatedPlace });
     } catch (error) {
       console.error('Error adding to checklist:', error);
       res.status(500).json({ error: 'Failed to add to checklist' });

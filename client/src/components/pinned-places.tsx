@@ -64,7 +64,7 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
 
   const form = useForm<AddPinnedPlaceForm>({
     defaultValues: {
-      name: defaultLocation || "",
+      name: "",
       notes: "",
     },
   });
@@ -76,11 +76,12 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
       if (destinationId) {
         url.searchParams.append('destinationId', destinationId.toString());
       }
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Failed to fetch pinned places");
-      const contentType = res.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("Invalid response format");
+      const res = await fetch(url, {
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error);
       }
       return res.json();
     },
@@ -95,6 +96,7 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
       const res = await fetch(`/api/trips/${tripId}/pinned-places`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: 'include',
         body: JSON.stringify({
           ...data,
           coordinates: selectedCoordinates,
@@ -103,20 +105,15 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
       });
 
       if (!res.ok) {
-        const contentType = res.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const errorData = await res.json();
+        const errorText = await res.text();
+        try {
+          const errorData = JSON.parse(errorText);
           throw new Error(errorData.error || "Failed to add pinned place");
-        } else {
-          const errorText = await res.text();
-          throw new Error(`Server error: ${errorText}`);
+        } catch {
+          throw new Error(errorText || "Failed to add pinned place");
         }
       }
 
-      const contentType = res.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("Invalid response format");
-      }
       return res.json();
     },
     onSuccess: () => {
@@ -124,10 +121,7 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
         queryKey: [`/api/trips/${tripId}/pinned-places`] 
       });
       setIsAddPlaceOpen(false);
-      form.reset({
-        name: defaultLocation || "",
-        notes: "",
-      });
+      form.reset();
       setSelectedCoordinates(null);
       toast({
         title: "Success",
@@ -148,22 +142,19 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
       const res = await fetch(`/api/trips/${tripId}/pinned-places/${placeId}/checklist`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: 'include',
       });
 
       if (!res.ok) {
-        const contentType = res.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const errorData = await res.json();
+        const errorText = await res.text();
+        try {
+          const errorData = JSON.parse(errorText);
           throw new Error(errorData.error || "Failed to add to checklist");
-        } else {
-          throw new Error("Failed to add to checklist");
+        } catch {
+          throw new Error(errorText || "Failed to add to checklist");
         }
       }
 
-      const contentType = res.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("Invalid response format");
-      }
       return res.json();
     },
     onSuccess: () => {
@@ -210,7 +201,7 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
               <Plus className="h-4 w-4" />
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[600px]">
+          <DialogContent className="sm:max-w-[800px] w-full max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Pin a New Place</DialogTitle>
             </DialogHeader>
@@ -223,7 +214,7 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
                     <FormItem>
                       <FormLabel>Location</FormLabel>
                       <FormControl>
-                        <div className="h-[400px]">
+                        <div className="h-[500px] w-full">
                           <MapPicker
                             value={field.value}
                             onChange={(address, coordinates) => {
@@ -253,7 +244,7 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={addPinnedPlaceMutation.isPending}
+                  disabled={!selectedCoordinates || addPinnedPlaceMutation.isPending}
                 >
                   {addPinnedPlaceMutation.isPending ? "Pinning..." : "Pin Place"}
                 </Button>
@@ -289,6 +280,11 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
                 )}
               </div>
             ))}
+            {pinnedPlaces.length === 0 && (
+              <p className="text-center text-muted-foreground py-4">
+                No places pinned yet
+              </p>
+            )}
           </div>
           <ScrollBar orientation="vertical" />
         </ScrollArea>
