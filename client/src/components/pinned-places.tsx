@@ -97,8 +97,6 @@ export function PinnedPlaces({
         addedToChecklist: false
       };
 
-      console.log('Attempting to add pinned place with payload:', payload);
-
       const res = await fetch(`/api/trips/${tripId}/pinned-places`, {
         method: "POST",
         headers: { 
@@ -109,14 +107,10 @@ export function PinnedPlaces({
       });
 
       if (!res.ok) {
-        const errorText = await res.text();
-        console.error('Server error response:', errorText);
-        throw new Error(errorText || "Failed to add pinned place");
+        throw new Error("Failed to add pinned place");
       }
 
-      const result = await res.json();
-      console.log('Server success response:', result);
-      return result;
+      return res.json();
     },
     onSuccess: (newPlace) => {
       queryClient.setQueryData<PinnedPlace[]>(
@@ -143,7 +137,6 @@ export function PinnedPlaces({
       });
     },
     onError: (error: Error) => {
-      console.error('Error adding pinned place:', error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -159,8 +152,7 @@ export function PinnedPlaces({
       });
 
       if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error);
+        throw new Error("Failed to delete place");
       }
 
       return res.json();
@@ -195,8 +187,7 @@ export function PinnedPlaces({
       });
 
       if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error);
+        throw new Error("Failed to add to checklist");
       }
 
       const updateRes = await fetch(`/api/trips/${tripId}/pinned-places/${placeId}`, {
@@ -240,10 +231,6 @@ export function PinnedPlaces({
   };
 
   const onSubmit = async (data: AddPinnedPlaceForm) => {
-    console.log('Form submission data:', data);
-    console.log('Selected coordinates:', selectedCoordinates);
-    console.log('Selected place name:', selectedPlaceName);
-
     if (!selectedCoordinates || !selectedPlaceName) {
       toast({
         variant: "destructive",
