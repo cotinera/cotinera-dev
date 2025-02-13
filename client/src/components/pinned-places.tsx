@@ -90,27 +90,6 @@ const CATEGORY_ICONS: Record<PlaceCategory, typeof MapPin> = {
   [PlaceCategory.RELIC]: History,
 };
 
-const CATEGORY_GROUPS = {
-  "Food & Drink": [PlaceCategory.FOOD, PlaceCategory.BAR, PlaceCategory.CAFE, PlaceCategory.WINE],
-  "Shopping": [PlaceCategory.SHOPPING, PlaceCategory.GROCERY],
-  "Entertainment / Leisure": [
-    PlaceCategory.ARTS,
-    PlaceCategory.LIGHTHOUSE,
-    PlaceCategory.THEATRE,
-    PlaceCategory.TOURIST,
-    PlaceCategory.CASINO,
-    PlaceCategory.AQUARIUM,
-    PlaceCategory.EVENT_VENUE,
-    PlaceCategory.AMUSEMENT_PARK,
-    PlaceCategory.HISTORIC,
-    PlaceCategory.MUSEUM,
-    PlaceCategory.MOVIE_THEATRE,
-    PlaceCategory.MONUMENT,
-    PlaceCategory.MUSIC,
-    PlaceCategory.RELIC
-  ]
-};
-
 interface PinnedPlace {
   id: number;
   name: string;
@@ -183,15 +162,16 @@ export function PinnedPlaces({
       }
 
       const payload = {
+        tripId: tripId, 
         name: selectedPlaceName,
-        notes: data.notes,
+        notes: data.notes || "",
         coordinates: selectedCoordinates,
-        category: data.category as PlaceCategory, // Ensure proper category typing
-        destinationId,
-        addedToChecklist: false,
+        category: data.category || PlaceCategory.TOURIST,
+        destinationId: destinationId || null,
+        addedToChecklist: false
       };
 
-      console.log('Sending payload:', payload); // Debug log
+      console.log('Sending payload:', payload); 
 
       const res = await fetch(`/api/trips/${tripId}/pinned-places`, {
         method: "POST",
@@ -204,11 +184,14 @@ export function PinnedPlaces({
       });
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ message: "Failed to add pinned place" }));
-        throw new Error(errorData.message || "Failed to add pinned place");
+        const errorText = await res.text();
+        console.error('Server error:', errorText); 
+        throw new Error(errorText || "Failed to add pinned place");
       }
 
-      return res.json();
+      const result = await res.json();
+      console.log('Server response:', result); 
+      return result;
     },
     onSuccess: (newPlace) => {
       queryClient.setQueryData<PinnedPlace[]>(
@@ -341,15 +324,6 @@ export function PinnedPlaces({
       return;
     }
 
-    if (!data.category) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Please select a category",
-      });
-      return;
-    }
-
     try {
       await addPinnedPlaceMutation.mutateAsync(data);
     } catch (error) {
@@ -432,22 +406,17 @@ export function PinnedPlaces({
                           <SelectValue placeholder="Select a category" />
                         </SelectTrigger>
                         <SelectContent>
-                          {Object.entries(CATEGORY_GROUPS).map(([groupName, categories]) => (
-                            <SelectGroup key={groupName}>
-                              <SelectLabel>{groupName}</SelectLabel>
-                              {categories.map((category) => {
-                                const Icon = getIconComponent(category);
-                                return (
-                                  <SelectItem key={category} value={category}>
-                                    <div className="flex items-center gap-2">
-                                      <Icon className="h-4 w-4" />
-                                      <span>{category.replace(/_/g, ' ').toLowerCase()}</span>
-                                    </div>
-                                  </SelectItem>
-                                );
-                              })}
-                            </SelectGroup>
-                          ))}
+                          {Object.entries(PlaceCategory).map(([key, value]) => {
+                            const Icon = CATEGORY_ICONS[value as PlaceCategory];
+                            return (
+                              <SelectItem key={key} value={value}>
+                                <div className="flex items-center gap-2">
+                                  <Icon className="h-4 w-4" />
+                                  <span>{value.replace(/_/g, ' ').toLowerCase()}</span>
+                                </div>
+                              </SelectItem>
+                            );
+                          })}
                         </SelectContent>
                       </Select>
                     </FormItem>
