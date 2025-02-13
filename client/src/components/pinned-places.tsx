@@ -56,6 +56,7 @@ interface PinnedPlace {
 
 interface AddPinnedPlaceForm {
   name: string;
+  address: string;
   notes?: string;
 }
 
@@ -87,6 +88,7 @@ export function PinnedPlaces({
   const form = useForm<AddPinnedPlaceForm>({
     defaultValues: {
       name: "",
+      address: "",
       notes: "",
     },
   });
@@ -94,6 +96,7 @@ export function PinnedPlaces({
   const editForm = useForm<AddPinnedPlaceForm>({
     defaultValues: {
       name: "",
+      address: "",
       notes: "",
     },
   });
@@ -127,7 +130,9 @@ export function PinnedPlaces({
         headers: { "Content-Type": "application/json" },
         credentials: 'include',
         body: JSON.stringify({
-          ...data,
+          name: data.name,
+          address: data.address,
+          notes: data.notes,
           coordinates: selectedCoordinates,
           destinationId,
         }),
@@ -302,6 +307,7 @@ export function PinnedPlaces({
     setSelectedCoordinates(place.coordinates);
     editForm.reset({
       name: place.name,
+      address: place.name,
       notes: place.notes,
     });
     setDetailedPlace(place);
@@ -378,7 +384,7 @@ export function PinnedPlaces({
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <FormField
                   control={form.control}
-                  name="name"
+                  name="address"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Location</FormLabel>
@@ -386,8 +392,11 @@ export function PinnedPlaces({
                         <div className="h-[400px] w-full">
                           <MapPicker
                             value={field.value}
-                            onChange={(address, coordinates) => {
+                            onChange={(address, coordinates, name) => {
                               field.onChange(address);
+                              if (name) {
+                                form.setValue("name", name);
+                              }
                               setSelectedCoordinates(coordinates);
                             }}
                             placeholder="Search for a place to pin..."
@@ -402,6 +411,21 @@ export function PinnedPlaces({
                       </FormControl>
                       <FormDescription>
                         Search for a location or click on the map to pin a place
+                      </FormDescription>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Place Name</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Enter the name of this place" />
+                      </FormControl>
+                      <FormDescription>
+                        This is how the place will be displayed in your trip
                       </FormDescription>
                     </FormItem>
                   )}

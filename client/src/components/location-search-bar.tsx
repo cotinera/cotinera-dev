@@ -14,7 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface LocationSearchBarProps {
   value: string;
-  onChange: (address: string, coordinates?: { lat: number; lng: number }) => void;
+  onChange: (address: string, coordinates?: { lat: number; lng: number }, name?: string) => void;
   placeholder?: string;
   className?: string;
   searchBias?: {
@@ -58,7 +58,6 @@ export function LocationSearchBar({
     setError(null);
 
     try {
-      // Create location bias using bounds instead of circle
       let locationBias: google.maps.places.AutocompletionRequest['bounds'] | undefined;
 
       if (searchBias && searchBias.lat && searchBias.lng) {
@@ -101,7 +100,7 @@ export function LocationSearchBar({
         placesService.current!.getDetails(
           {
             placeId: placeId,
-            fields: ['formatted_address', 'geometry', 'name'],
+            fields: ['formatted_address', 'geometry', 'name', 'types'],
           },
           (result, status) => {
             if (status === google.maps.places.PlacesServiceStatus.OK && result) {
@@ -118,7 +117,7 @@ export function LocationSearchBar({
           lat: place.geometry.location.lat(),
           lng: place.geometry.location.lng(),
         };
-        onChange(place.formatted_address || place.name || '', coordinates);
+        onChange(place.formatted_address || '', coordinates, place.name || '');
       }
     } catch (err) {
       console.error('Place details error:', err);
