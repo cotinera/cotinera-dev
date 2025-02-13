@@ -1,8 +1,8 @@
 import { useLoadScript, GoogleMap, MarkerF } from "@react-google-maps/api";
-import { Input } from "@/components/ui/input";
 import { Loader2 } from "lucide-react";
-import { useEffect, useState, useCallback } from "react";
+import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { LocationSearchBar } from "./location-search-bar";
 
 const libraries: ("places")[] = ["places"];
 
@@ -34,51 +34,14 @@ export function MapPicker({
     lat: 40.7128,
     lng: -74.0060, // Default to New York City
   });
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     libraries,
   });
 
-  // Function to handle search input changes and geocoding
-  const handleSearch = async () => {
-    if (!value) return;
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
-          value
-        )}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Geocoding failed: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      if (data.status === "OK" && data.results?.[0]?.geometry?.location) {
-        const { lat, lng } = data.results[0].geometry.location;
-        setCoordinates({ lat, lng });
-        onChange(data.results[0].formatted_address, { lat, lng });
-      } else {
-        setError(`Could not find location: ${data.status}`);
-      }
-    } catch (err) {
-      console.error("Search error:", err);
-      setError(err instanceof Error ? err.message : "Failed to find location");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // Handle map click events
-  const handleMapClick = useCallback(async (e: google.maps.MapMouseEvent) => {
+  const handleMapClick = async (e: google.maps.MapMouseEvent) => {
     if (!e.latLng || readOnly) return;
 
     const lat = e.latLng.lat();
@@ -101,18 +64,7 @@ export function MapPicker({
     } catch (err) {
       console.error("Reverse geocoding error:", err);
     }
-  }, [onChange, readOnly]);
-
-  // Search when value changes (with debounce)
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (value) {
-        handleSearch();
-      }
-    }, 1000);
-
-    return () => clearTimeout(timeoutId);
-  }, [value]);
+  };
 
   if (loadError) {
     return (
@@ -127,7 +79,7 @@ export function MapPicker({
   if (!isLoaded) {
     return (
       <div className="flex items-center gap-2">
-        <Input disabled placeholder="Loading..." />
+        <div className="flex-1 h-8 bg-muted animate-pulse rounded-md" />
         <Loader2 className="h-4 w-4 animate-spin" />
       </div>
     );
@@ -136,15 +88,17 @@ export function MapPicker({
   return (
     <div className="space-y-4">
       {!readOnly && (
-        <div className="flex gap-2">
-          <Input
-            value={value}
-            onChange={(e) => onChange(e.target.value, coordinates)}
-            placeholder={placeholder}
-            className="flex-1"
-          />
-          {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-        </div>
+        <LocationSearchBar
+          value={value}
+          onChange={(address, coords) => {
+            if (coords) {
+              setCoordinates(coords);
+            }
+            onChange(address, coords || coordinates);
+          }}
+          placeholder={placeholder}
+          className="flex-1"
+        />
       )}
       <div className={`${readOnly ? 'h-[400px]' : 'h-[300px]'} rounded-lg overflow-hidden border relative`}>
         <GoogleMap
@@ -171,11 +125,6 @@ export function MapPicker({
           ))}
         </GoogleMap>
       </div>
-      {error && (
-        <Alert variant="destructive">
-          <AlertDescription>{error}</AlertDescription>
-        </Alert>
-      )}
     </div>
   );
 }
