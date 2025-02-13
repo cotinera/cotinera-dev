@@ -385,7 +385,7 @@ export function PinnedPlaces({
                   <FormControl>
                     <div className="h-[400px] w-full">
                       <MapPicker
-                        value=""
+                        value={selectedPlaceName}
                         onChange={(address, coordinates, name) => {
                           setSelectedCoordinates(coordinates);
                           setSelectedPlaceName(name || address);
@@ -397,7 +397,6 @@ export function PinnedPlaces({
                           ...tripCoordinates,
                           radius: 50000
                         } : undefined}
-                        autoFocus={true}
                       />
                     </div>
                   </FormControl>

@@ -1,6 +1,6 @@
 import { useLoadScript, GoogleMap, MarkerF } from "@react-google-maps/api";
 import { Loader2 } from "lucide-react";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LocationSearchBar } from "./location-search-bar";
 
@@ -23,7 +23,6 @@ interface MapPickerProps {
   readOnly?: boolean;
   initialCenter?: { lat: number; lng: number } | null;
   searchBias?: { lat: number; lng: number; radius?: number };
-  onSearchInputRef?: (ref: HTMLInputElement | null) => void;
 }
 
 const DEFAULT_CENTER = {
@@ -39,18 +38,25 @@ export function MapPicker({
   readOnly = false,
   initialCenter,
   searchBias,
-  onSearchInputRef,
 }: MapPickerProps) {
   const [coordinates, setCoordinates] = useState<google.maps.LatLngLiteral>(
     initialCenter && initialCenter.lat && initialCenter.lng ? initialCenter : DEFAULT_CENTER
   );
   const [mapCenter, setMapCenter] = useState<google.maps.LatLngLiteral>(coordinates);
   const [map, setMap] = useState<google.maps.Map | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     libraries,
   });
+
+  useEffect(() => {
+    // Focus the search input when the component mounts
+    if (searchInputRef.current && !readOnly) {
+      searchInputRef.current.focus();
+    }
+  }, [readOnly]);
 
   // Handle map click events
   const handleMapClick = async (e: google.maps.MapMouseEvent) => {
@@ -125,13 +131,14 @@ export function MapPicker({
           onChange={(address, coords, name) => {
             if (coords) {
               setCoordinates(coords);
+              setMapCenter(coords);
             }
             onChange(address, coords || coordinates, name);
           }}
           placeholder={placeholder}
           className="flex-1"
-          searchBias={{ ...mapCenter, radius: 5000 }}
-          onInputRef={onSearchInputRef}
+          searchBias={{ ...mapCenter, radius: searchBias?.radius || 5000 }}
+          ref={searchInputRef}
         />
       )}
       <div className={`${readOnly ? 'h-[400px]' : 'h-[300px]'} rounded-lg overflow-hidden border relative`}>
