@@ -54,9 +54,16 @@ interface PinnedPlacesProps {
   destinationId?: number;
   defaultLocation?: string;
   onPinPlace?: (place: PinnedPlace) => void;
+  showMap?: boolean;
 }
 
-export function PinnedPlaces({ tripId, destinationId, defaultLocation, onPinPlace }: PinnedPlacesProps) {
+export function PinnedPlaces({ 
+  tripId, 
+  destinationId, 
+  defaultLocation, 
+  onPinPlace,
+  showMap = false 
+}: PinnedPlacesProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isAddPlaceOpen, setIsAddPlaceOpen] = useState(false);
@@ -188,6 +195,16 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation, onPinPlac
 
   return (
     <Card>
+      {showMap && (
+        <div className="mb-4">
+          <MapPicker
+            value=""
+            onChange={() => {}}
+            existingPins={pinnedPlaces}
+            readOnly
+          />
+        </div>
+      )}
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">
           <div className="flex items-center gap-2">
@@ -229,6 +246,7 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation, onPinPlac
                               setSelectedCoordinates(coordinates);
                             }}
                             placeholder="Search for a place to pin..."
+                            existingPins={pinnedPlaces}
                           />
                         </div>
                       </FormControl>

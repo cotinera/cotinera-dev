@@ -6,16 +6,29 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const libraries: ("places")[] = ["places"];
 
+interface PinnedPlace {
+  id: number;
+  name: string;
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
+}
+
 interface MapPickerProps {
   value: string;
   onChange: (address: string, coordinates: { lat: number; lng: number }) => void;
   placeholder?: string;
+  existingPins?: PinnedPlace[];
+  readOnly?: boolean;
 }
 
 export function MapPicker({
   value,
   onChange,
   placeholder = "Enter a location",
+  existingPins = [],
+  readOnly = false,
 }: MapPickerProps) {
   const [coordinates, setCoordinates] = useState<google.maps.LatLngLiteral>({
     lat: 40.7128,
@@ -66,7 +79,7 @@ export function MapPicker({
 
   // Handle map click events
   const handleMapClick = useCallback(async (e: google.maps.MapMouseEvent) => {
-    if (!e.latLng) return;
+    if (!e.latLng || readOnly) return;
 
     const lat = e.latLng.lat();
     const lng = e.latLng.lng();
@@ -88,7 +101,7 @@ export function MapPicker({
     } catch (err) {
       console.error("Reverse geocoding error:", err);
     }
-  }, [onChange]);
+  }, [onChange, readOnly]);
 
   // Search when value changes (with debounce)
   useEffect(() => {
@@ -122,16 +135,18 @@ export function MapPicker({
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
-        <Input
-          value={value}
-          onChange={(e) => onChange(e.target.value, coordinates)}
-          placeholder={placeholder}
-          className="flex-1"
-        />
-        {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-      </div>
-      <div className="h-[300px] rounded-lg overflow-hidden border relative">
+      {!readOnly && (
+        <div className="flex gap-2">
+          <Input
+            value={value}
+            onChange={(e) => onChange(e.target.value, coordinates)}
+            placeholder={placeholder}
+            className="flex-1"
+          />
+          {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+        </div>
+      )}
+      <div className={`${readOnly ? 'h-[400px]' : 'h-[300px]'} rounded-lg overflow-hidden border relative`}>
         <GoogleMap
           mapContainerStyle={{ width: "100%", height: "100%" }}
           zoom={13}
@@ -143,7 +158,17 @@ export function MapPicker({
             scrollwheel: true,
           }}
         >
-          <MarkerF position={coordinates} />
+          {/* Show temporary marker for new pin */}
+          {!readOnly && <MarkerF position={coordinates} />}
+
+          {/* Show existing pins */}
+          {existingPins.map((pin) => (
+            <MarkerF
+              key={pin.id}
+              position={pin.coordinates}
+              title={pin.name}
+            />
+          ))}
         </GoogleMap>
       </div>
       {error && (
