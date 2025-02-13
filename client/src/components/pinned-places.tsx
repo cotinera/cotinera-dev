@@ -53,9 +53,10 @@ interface AddPinnedPlaceForm {
 interface PinnedPlacesProps {
   tripId: number;
   destinationId?: number;
+  defaultLocation?: string;
 }
 
-export function PinnedPlaces({ tripId, destinationId }: PinnedPlacesProps) {
+export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedPlacesProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isAddPlaceOpen, setIsAddPlaceOpen] = useState(false);
@@ -63,7 +64,7 @@ export function PinnedPlaces({ tripId, destinationId }: PinnedPlacesProps) {
 
   const form = useForm<AddPinnedPlaceForm>({
     defaultValues: {
-      name: "",
+      name: defaultLocation || "",
       notes: "",
     },
   });
@@ -98,7 +99,7 @@ export function PinnedPlaces({ tripId, destinationId }: PinnedPlacesProps) {
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
+        const errorData = await res.json().catch(() => ({ error: "Failed to add pinned place" }));
         throw new Error(errorData.error || "Failed to add pinned place");
       }
 
@@ -109,7 +110,10 @@ export function PinnedPlaces({ tripId, destinationId }: PinnedPlacesProps) {
         queryKey: [`/api/trips/${tripId}/pinned-places`] 
       });
       setIsAddPlaceOpen(false);
-      form.reset();
+      form.reset({
+        name: defaultLocation || "",
+        notes: "",
+      });
       setSelectedCoordinates(null);
       toast({
         title: "Success",
@@ -133,7 +137,7 @@ export function PinnedPlaces({ tripId, destinationId }: PinnedPlacesProps) {
       });
 
       if (!res.ok) {
-        const errorData = await res.json();
+        const errorData = await res.json().catch(() => ({ error: "Failed to add to checklist" }));
         throw new Error(errorData.error || "Failed to add to checklist");
       }
 
@@ -203,6 +207,7 @@ export function PinnedPlaces({ tripId, destinationId }: PinnedPlacesProps) {
                             setSelectedCoordinates(coordinates);
                           }}
                           placeholder="Search for a place to pin..."
+                          defaultLocation={defaultLocation}
                         />
                       </FormControl>
                     </FormItem>

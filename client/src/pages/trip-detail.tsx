@@ -219,6 +219,7 @@ export default function TripDetail() {
                 <PinnedPlaces
                   tripId={trip.id}
                   destinationId={currentDestinationId}
+                  defaultLocation={currentDestination?.name || trip.location || ""}
                 />
               </section>
             </div>
