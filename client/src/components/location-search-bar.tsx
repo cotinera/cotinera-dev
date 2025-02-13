@@ -8,8 +8,10 @@ import {
   CommandGroup,
   CommandInput,
   CommandItem,
+  CommandList,
 } from "@/components/ui/command";
 import { MapPin } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface LocationSearchBarProps {
   value: string;
@@ -134,23 +136,34 @@ export function LocationSearchBar({
         )}
       </div>
       {isOpen && predictions.length > 0 && (
-        <Command className="absolute top-full left-0 right-0 z-50 mt-1 overflow-hidden rounded-md border bg-popover shadow-md">
-          <CommandGroup>
-            {predictions.map((prediction) => (
-              <CommandItem
-                key={prediction.place_id}
-                onSelect={() => handleSelect(prediction.place_id)}
-                className="flex items-center gap-2 px-4 py-2 hover:bg-accent"
-              >
-                <MapPin className="h-4 w-4" />
-                <span>{prediction.description}</span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-          {predictions.length === 0 && (
-            <CommandEmpty>No locations found</CommandEmpty>
-          )}
-        </Command>
+        <div className="absolute top-full left-0 right-0 z-50 mt-1 rounded-md border bg-popover shadow-md">
+          <Command>
+            <CommandList>
+              <CommandGroup>
+                <ScrollArea className="h-[200px]">
+                  {predictions.map((prediction) => (
+                    <CommandItem
+                      key={prediction.place_id}
+                      onSelect={() => handleSelect(prediction.place_id)}
+                      className="flex items-center gap-2 px-4 py-2 hover:bg-accent cursor-pointer"
+                    >
+                      <MapPin className="h-4 w-4 shrink-0" />
+                      <div className="flex flex-col">
+                        <span className="text-sm">{prediction.structured_formatting.main_text}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {prediction.structured_formatting.secondary_text}
+                        </span>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </ScrollArea>
+              </CommandGroup>
+              {predictions.length === 0 && (
+                <CommandEmpty>No locations found</CommandEmpty>
+              )}
+            </CommandList>
+          </Command>
+        </div>
       )}
     </div>
   );
