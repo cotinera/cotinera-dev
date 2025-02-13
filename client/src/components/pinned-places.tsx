@@ -23,7 +23,6 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  //FormDescription, // Removed as per intention
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -120,7 +119,7 @@ export function PinnedPlaces({
 
   const addPinnedPlaceMutation = useMutation({
     mutationFn: async (data: AddPinnedPlaceForm) => {
-      if (!selectedCoordinates) {
+      if (!selectedCoordinates || !selectedPlaceName) {
         throw new Error("Please select a location on the map");
       }
 
@@ -426,124 +425,12 @@ export function PinnedPlaces({
                 <Button
                   type="submit"
                   className="w-full"
-                  disabled={!selectedCoordinates || addPinnedPlaceMutation.isPending}
+                  disabled={!selectedCoordinates || !selectedPlaceName || addPinnedPlaceMutation.isPending}
                 >
                   {addPinnedPlaceMutation.isPending ? "Pinning..." : "Pin Place"}
                 </Button>
               </form>
             </Form>
-          </DialogContent>
-        </Dialog>
-
-        <AlertDialog open={!!placeToDelete} onOpenChange={(isOpen) => !isOpen && setPlaceToDelete(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Pinned Place</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete {placeToDelete?.name}? This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => placeToDelete && deletePinnedPlaceMutation.mutate(placeToDelete.id)}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                {deletePinnedPlaceMutation.isPending ? "Deleting..." : "Delete"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        <Dialog open={!!detailedPlace} onOpenChange={handleCloseDetailedView}>
-          <DialogContent className="sm:max-w-[800px]">
-            <DialogHeader>
-              <DialogTitle>{detailedPlace?.name}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-sm font-medium mb-2">Location</h4>
-                <div className="h-[400px] w-full">
-                  {isEditing ? (
-                    <Form {...editForm}>
-                      <FormField
-                        control={editForm.control}
-                        name="address"
-                        render={({ field }) => (
-                          <MapPicker
-                            value={field.value}
-                            onChange={(address, coordinates) => {
-                              field.onChange(address);
-                              setSelectedCoordinates(coordinates);
-                            }}
-                            placeholder="Search for a place..."
-                            existingPins={pinnedPlaces}
-                          />
-                        )}
-                      />
-                    </Form>
-                  ) : (
-                    <MapPicker
-                      value={detailedPlace?.name || ""}
-                      onChange={() => {}}
-                      existingPins={[detailedPlace].filter(Boolean) as PinnedPlace[]}
-                      readOnly
-                    />
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-medium mb-2">Notes</h4>
-                {isEditing ? (
-                  <Form {...editForm}>
-                    <FormField
-                      control={editForm.control}
-                      name="notes"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <Textarea {...field} placeholder="Add any notes about this place..." />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  </Form>
-                ) : (
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {detailedPlace?.notes || "No notes added"}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex justify-end gap-2">
-                {isEditing ? (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsEditing(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={handleSaveEdit}
-                      disabled={!selectedCoordinates || editPinnedPlaceMutation.isPending}
-                    >
-                      {editPinnedPlaceMutation.isPending ? "Saving..." : "Save Changes"}
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    type="button"
-                    onClick={() => handleEditPlace(detailedPlace)}
-                  >
-                    Edit Place
-                  </Button>
-                )}
-              </div>
-            </div>
           </DialogContent>
         </Dialog>
       </CardHeader>
