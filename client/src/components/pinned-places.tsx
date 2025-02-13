@@ -186,10 +186,12 @@ export function PinnedPlaces({
         name: selectedPlaceName,
         notes: data.notes,
         coordinates: selectedCoordinates,
-        category: data.category,
+        category: data.category as PlaceCategory, // Ensure proper category typing
         destinationId,
         addedToChecklist: false,
       };
+
+      console.log('Sending payload:', payload); // Debug log
 
       const res = await fetch(`/api/trips/${tripId}/pinned-places`, {
         method: "POST",
@@ -335,6 +337,15 @@ export function PinnedPlaces({
         variant: "destructive",
         title: "Error",
         description: "Please select a location first",
+      });
+      return;
+    }
+
+    if (!data.category) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select a category",
       });
       return;
     }
