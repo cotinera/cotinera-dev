@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { PinnedPlaces } from "@/components/pinned-places";
 
 export default function TripDetail() {
   const [, params] = useRoute("/trips/:id");
@@ -212,6 +213,13 @@ export default function TripDetail() {
                 ) : (
                   <MapView location={trip.location || ""} />
                 )}
+              </section>
+
+              <section>
+                <PinnedPlaces
+                  tripId={trip.id}
+                  destinationId={currentDestinationId}
+                />
               </section>
             </div>
 
