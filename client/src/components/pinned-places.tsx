@@ -55,7 +55,6 @@ interface PinnedPlace {
 }
 
 interface AddPinnedPlaceForm {
-  name: string;
   address: string;
   notes?: string;
 }
@@ -84,10 +83,10 @@ export function PinnedPlaces({
   const [placeToDelete, setPlaceToDelete] = useState<PinnedPlace | null>(null);
   const [detailedPlace, setDetailedPlace] = useState<PinnedPlace | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [selectedPlaceName, setSelectedPlaceName] = useState<string>("");
 
   const form = useForm<AddPinnedPlaceForm>({
     defaultValues: {
-      name: "",
       address: "",
       notes: "",
     },
@@ -95,7 +94,6 @@ export function PinnedPlaces({
 
   const editForm = useForm<AddPinnedPlaceForm>({
     defaultValues: {
-      name: "",
       address: "",
       notes: "",
     },
@@ -130,7 +128,7 @@ export function PinnedPlaces({
         headers: { "Content-Type": "application/json" },
         credentials: 'include',
         body: JSON.stringify({
-          name: data.name,
+          name: selectedPlaceName || data.address,
           address: data.address,
           notes: data.notes,
           coordinates: selectedCoordinates,
@@ -161,6 +159,7 @@ export function PinnedPlaces({
       setIsAddPlaceOpen(false);
       form.reset();
       setSelectedCoordinates(null);
+      setSelectedPlaceName("");
       toast({
         title: "Success",
         description: "Place pinned successfully",
@@ -306,7 +305,6 @@ export function PinnedPlaces({
   const handleEditPlace = (place: PinnedPlace) => {
     setSelectedCoordinates(place.coordinates);
     editForm.reset({
-      name: place.name,
       address: place.name,
       notes: place.notes,
     });
@@ -394,10 +392,10 @@ export function PinnedPlaces({
                             value={field.value}
                             onChange={(address, coordinates, name) => {
                               field.onChange(address);
-                              if (name) {
-                                form.setValue("name", name);
-                              }
                               setSelectedCoordinates(coordinates);
+                              if (name) {
+                                setSelectedPlaceName(name);
+                              }
                             }}
                             placeholder="Search for a place to pin..."
                             existingPins={pinnedPlaces}
@@ -411,21 +409,6 @@ export function PinnedPlaces({
                       </FormControl>
                       <FormDescription>
                         Search for a location or click on the map to pin a place
-                      </FormDescription>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Place Name</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Enter the name of this place" />
-                      </FormControl>
-                      <FormDescription>
-                        This is how the place will be displayed in your trip
                       </FormDescription>
                     </FormItem>
                   )}
@@ -487,7 +470,7 @@ export function PinnedPlaces({
                     <Form {...editForm}>
                       <FormField
                         control={editForm.control}
-                        name="name"
+                        name="address"
                         render={({ field }) => (
                           <MapPicker
                             value={field.value}
