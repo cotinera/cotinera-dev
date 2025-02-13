@@ -19,23 +19,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-} from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -91,7 +75,8 @@ export function PinnedPlaces({
     },
   });
 
-  const { data: pinnedPlaces = [] } = useQuery<PinnedPlace[]>({
+  // Query for pinned places with proper invalidation
+  const pinnedPlacesQuery = useQuery<PinnedPlace[]>({
     queryKey: [`/api/trips/${tripId}/pinned-places`, destinationId],
     queryFn: async () => {
       const url = new URL(`/api/trips/${tripId}/pinned-places`, window.location.origin);
@@ -134,19 +119,29 @@ export function PinnedPlaces({
       }
 
       const newPlace = await res.json();
-      if (onPinPlace) {
-        onPinPlace(newPlace);
-      }
       return newPlace;
     },
-    onSuccess: () => {
+    onSuccess: (newPlace) => {
+      // Immediately update the query data with the new place
+      queryClient.setQueryData<PinnedPlace[]>(
+        [`/api/trips/${tripId}/pinned-places`, destinationId],
+        (old) => [...(old || []), newPlace]
+      );
+
+      // Also invalidate to ensure we're in sync with server
       queryClient.invalidateQueries({
         queryKey: [`/api/trips/${tripId}/pinned-places`]
       });
+
+      if (onPinPlace) {
+        onPinPlace(newPlace);
+      }
+
       setIsAddPlaceOpen(false);
       form.reset();
       setSelectedCoordinates(null);
       setSelectedPlaceName("");
+
       toast({
         title: "Success",
         description: "Place pinned successfully",
@@ -160,10 +155,6 @@ export function PinnedPlaces({
       });
     },
   });
-
-  const onSubmit = (data: AddPinnedPlaceForm) => {
-    addPinnedPlaceMutation.mutate(data);
-  };
 
   const deletePinnedPlaceMutation = useMutation({
     mutationFn: async (placeId: number) => {
@@ -239,12 +230,16 @@ export function PinnedPlaces({
     deletePinnedPlaceMutation.mutate(placeToDelete.id);
   };
 
+  const onSubmit = (data: AddPinnedPlaceForm) => {
+    addPinnedPlaceMutation.mutate(data);
+  };
+
   return (
     <Card>
       {defaultLocation && showMap && (
         <MapView 
           location={defaultLocation}
-          pinnedPlaces={pinnedPlaces}
+          pinnedPlaces={pinnedPlacesQuery.data || []}
         />
       )}
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -290,7 +285,7 @@ export function PinnedPlaces({
                               setSelectedPlaceName(name || address);
                             }}
                             placeholder="Search for a place to pin..."
-                            existingPins={pinnedPlaces}
+                            existingPins={pinnedPlacesQuery.data || []}
                             initialCenter={tripCoordinates}
                             searchBias={tripCoordinates ? {
                               ...tripCoordinates,
@@ -331,7 +326,7 @@ export function PinnedPlaces({
       <CardContent>
         <ScrollArea className="h-[200px] w-full rounded-md">
           <div className="space-y-2">
-            {pinnedPlaces.map((place) => (
+            {(pinnedPlacesQuery.data || []).map((place) => (
               <div
                 key={place.id}
                 className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted/70 transition-colors"
@@ -362,7 +357,7 @@ export function PinnedPlaces({
                 </div>
               </div>
             ))}
-            {pinnedPlaces.length === 0 && (
+            {(pinnedPlacesQuery.data || []).length === 0 && (
               <p className="text-center text-muted-foreground py-4">
                 No places pinned yet
               </p>
