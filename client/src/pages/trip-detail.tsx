@@ -28,6 +28,16 @@ import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { PinnedPlaces } from "@/components/pinned-places";
 
+// Add PinnedPlace type
+interface PinnedPlace {
+  id: number;
+  name: string;
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
+}
+
 export default function TripDetail() {
   const [, params] = useRoute("/trips/:id");
   const tripId = params ? parseInt(params.id) : null;
@@ -54,6 +64,21 @@ export default function TripDetail() {
     queryFn: async () => {
       const res = await fetch(`/api/trips/${tripId}/destinations`);
       if (!res.ok) throw new Error("Failed to fetch destinations");
+      return res.json();
+    },
+    enabled: !!tripId,
+  });
+
+  // Add query for pinned places
+  const { data: pinnedPlaces } = useQuery<PinnedPlace[]>({
+    queryKey: [`/api/trips/${tripId}/pinned-places`, currentDestinationId],
+    queryFn: async () => {
+      const url = new URL(`/api/trips/${tripId}/pinned-places`, window.location.origin);
+      if (currentDestinationId) {
+        url.searchParams.append('destinationId', currentDestinationId.toString());
+      }
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch pinned places");
       return res.json();
     },
     enabled: !!tripId,
@@ -145,9 +170,7 @@ export default function TripDetail() {
           <div
             className="absolute inset-0 bg-cover bg-center"
             style={{
-              backgroundImage: currentDestination?.image ? 
-                `url(${currentDestination.image})` : 
-                trip?.thumbnail ? `url(${trip.thumbnail})` : undefined,
+              backgroundImage: trip?.thumbnail ? `url(${trip.thumbnail})` : undefined,
               filter: "blur(20px)",
               transform: "scale(1.2)",
               opacity: "0.9",
@@ -179,7 +202,6 @@ export default function TripDetail() {
 
             <TripHeaderEdit 
               trip={trip} 
-              currentDestination={currentDestination}
               onBack={() => setLocation("/")} 
             />
           </div>
@@ -201,17 +223,22 @@ export default function TripDetail() {
               <section>
                 <TripParticipantDetails 
                   tripId={trip.id}
-                  destinationId={currentDestinationId}
                 />
               </section>
 
               <section>
                 {currentDestination ? (
-                  <MapView location={currentDestination.name || ""} />
+                  <MapView 
+                    location={currentDestination.name || ""}
+                    pinnedPlaces={pinnedPlaces || []}
+                  />
                 ) : destinations && destinations.length >= 2 ? (
                   <MapRouteView destinations={destinations} />
                 ) : (
-                  <MapView location={trip.location || ""} />
+                  <MapView 
+                    location={trip.location || ""}
+                    pinnedPlaces={pinnedPlaces || []}
+                  />
                 )}
               </section>
 
@@ -220,7 +247,8 @@ export default function TripDetail() {
                   tripId={trip.id}
                   destinationId={currentDestinationId}
                   defaultLocation={currentDestination?.name || trip.location || ""}
-                  tripCoordinates={currentDestination?.coordinates || trip.coordinates}
+                  showMap={true}
+                  tripCoordinates={currentDestination?.coordinates || undefined}
                 />
               </section>
             </div>
@@ -228,15 +256,13 @@ export default function TripDetail() {
             <div className="space-y-8">
               <section>
                 <ChatMessages 
-                  tripId={trip.id} 
-                  destinationId={currentDestinationId}
+                  tripId={trip.id}
                 />
               </section>
 
               <section>
                 <Checklist 
-                  tripId={trip.id} 
-                  destinationId={currentDestinationId}
+                  tripId={trip.id}
                 />
               </section>
             </div>
