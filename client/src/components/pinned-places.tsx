@@ -19,6 +19,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
@@ -75,7 +85,6 @@ export function PinnedPlaces({
     },
   });
 
-  // Query for pinned places with proper invalidation
   const pinnedPlacesQuery = useQuery<PinnedPlace[]>({
     queryKey: [`/api/trips/${tripId}/pinned-places`, destinationId],
     queryFn: async () => {
@@ -122,13 +131,11 @@ export function PinnedPlaces({
       return newPlace;
     },
     onSuccess: (newPlace) => {
-      // Immediately update the query data with the new place
       queryClient.setQueryData<PinnedPlace[]>(
         [`/api/trips/${tripId}/pinned-places`, destinationId],
         (old) => [...(old || []), newPlace]
       );
 
-      // Also invalidate to ensure we're in sync with server
       queryClient.invalidateQueries({
         queryKey: [`/api/trips/${tripId}/pinned-places`]
       });
