@@ -43,7 +43,6 @@ export function LocationSearchBar({
     if (!window.google) return;
 
     autocompleteService.current = new google.maps.places.AutocompleteService();
-    // Create a hidden map element for PlacesService
     if (mapRef.current) {
       placesService.current = new google.maps.places.PlacesService(mapRef.current);
     }
@@ -59,23 +58,33 @@ export function LocationSearchBar({
     setError(null);
 
     try {
-      // Create location bias if provided
-      const locationBias = searchBias ? {
-        location: new google.maps.LatLng(searchBias.lat, searchBias.lng),
-        radius: searchBias.radius || 50000, // Default 50km radius if not specified
-      } : undefined;
+      // Create location bias using bounds instead of circle
+      let locationBias: google.maps.places.AutocompletionRequest['bounds'] | undefined;
+
+      if (searchBias && searchBias.lat && searchBias.lng) {
+        const radius = searchBias.radius || 50000; // Default 50km radius
+        const metersPerDegree = 111320; // Approximate meters per degree at the equator
+        const latDelta = radius / metersPerDegree;
+        const lngDelta = radius / (metersPerDegree * Math.cos(searchBias.lat * Math.PI / 180));
+
+        locationBias = new google.maps.LatLngBounds(
+          new google.maps.LatLng(searchBias.lat - latDelta, searchBias.lng - lngDelta),
+          new google.maps.LatLng(searchBias.lat + latDelta, searchBias.lng + lngDelta)
+        );
+      }
 
       const response = await autocompleteService.current.getPlacePredictions({
         input: searchValue,
         types: ['establishment', 'geocode'],
-        locationBias,
+        bounds: locationBias,
       });
 
       setPredictions(response.predictions);
       setIsOpen(true);
     } catch (err) {
       console.error('Autocomplete error:', err);
-      setError('Failed to load suggestions');
+      setError('Failed to load suggestions. Please try again.');
+      setPredictions([]);
     } finally {
       setIsLoading(false);
     }
