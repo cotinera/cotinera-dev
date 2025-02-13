@@ -92,7 +92,6 @@ export function PinnedPlaces({
     },
   });
 
-
   const { data: pinnedPlaces = [] } = useQuery<PinnedPlace[]>({
     queryKey: [`/api/trips/${tripId}/pinned-places`, destinationId],
     queryFn: async () => {
@@ -285,7 +284,13 @@ export function PinnedPlaces({
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  form.handleSubmit(onSubmit)(e);
+                }} 
+                className="space-y-4"
+              >
                 <FormField
                   control={form.control}
                   name="address"
@@ -391,23 +396,19 @@ export function PinnedPlaces({
           <ScrollBar orientation="vertical" />
         </ScrollArea>
       </CardContent>
-      <AlertDialog open={placeToDelete !== null} onOpenChange={setPlaceToDelete}>
-        <AlertDialogHeader>
-          <AlertDialogTitle>
-            Delete Pinned Place
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            Are you sure you want to delete this pinned place? This action cannot be undone.
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>
-            Cancel
-          </AlertDialogCancel>
-          <AlertDialogAction onClick={handleDeletePlace}>
-            Delete
-          </AlertDialogAction>
-        </AlertDialogFooter>
+      <AlertDialog open={!!placeToDelete} onOpenChange={() => setPlaceToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Pinned Place</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this pinned place? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeletePlace}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
       </AlertDialog>
     </Card>
   );
