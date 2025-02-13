@@ -21,6 +21,8 @@ interface MapPickerProps {
   placeholder?: string;
   existingPins?: PinnedPlace[];
   readOnly?: boolean;
+  initialCenter?: { lat: number; lng: number };
+  searchBias?: { lat: number; lng: number; radius?: number };
 }
 
 export function MapPicker({
@@ -29,11 +31,15 @@ export function MapPicker({
   placeholder = "Enter a location",
   existingPins = [],
   readOnly = false,
+  initialCenter,
+  searchBias,
 }: MapPickerProps) {
-  const [coordinates, setCoordinates] = useState<google.maps.LatLngLiteral>({
-    lat: 40.7128,
-    lng: -74.0060, // Default to New York City
-  });
+  const [coordinates, setCoordinates] = useState<google.maps.LatLngLiteral>(
+    initialCenter || {
+      lat: 40.7128,
+      lng: -74.0060, // Default to New York City if no initial center provided
+    }
+  );
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
@@ -98,6 +104,7 @@ export function MapPicker({
           }}
           placeholder={placeholder}
           className="flex-1"
+          searchBias={searchBias}
         />
       )}
       <div className={`${readOnly ? 'h-[400px]' : 'h-[300px]'} rounded-lg overflow-hidden border relative`}>

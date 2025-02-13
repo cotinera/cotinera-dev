@@ -65,6 +65,7 @@ interface PinnedPlacesProps {
   defaultLocation?: string;
   onPinPlace?: (place: PinnedPlace) => void;
   showMap?: boolean;
+  tripCoordinates?: { lat: number; lng: number };
 }
 
 export function PinnedPlaces({
@@ -72,7 +73,8 @@ export function PinnedPlaces({
   destinationId,
   defaultLocation,
   onPinPlace,
-  showMap = false
+  showMap = false,
+  tripCoordinates
 }: PinnedPlacesProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -314,7 +316,7 @@ export function PinnedPlaces({
         id: detailedPlace.id,
         data: editForm.getValues()
       });
-      setDetailedPlace(updatedPlace); // Update the detailed place with new data
+      setDetailedPlace(updatedPlace); 
       setIsEditing(false);
       setSelectedCoordinates(null);
     } catch (error) {
@@ -343,6 +345,7 @@ export function PinnedPlaces({
             onChange={() => {}}
             existingPins={pinnedPlaces}
             readOnly
+            initialCenter={tripCoordinates}
           />
         </div>
       )}
@@ -389,6 +392,11 @@ export function PinnedPlaces({
                             }}
                             placeholder="Search for a place to pin..."
                             existingPins={pinnedPlaces}
+                            initialCenter={tripCoordinates}
+                            searchBias={tripCoordinates ? {
+                              ...tripCoordinates,
+                              radius: 50000 
+                            } : undefined}
                           />
                         </div>
                       </FormControl>

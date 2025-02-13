@@ -6,7 +6,6 @@ import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
@@ -18,6 +17,11 @@ interface LocationSearchBarProps {
   onChange: (address: string, coordinates?: { lat: number; lng: number }) => void;
   placeholder?: string;
   className?: string;
+  searchBias?: {
+    lat: number;
+    lng: number;
+    radius?: number;
+  };
 }
 
 export function LocationSearchBar({
@@ -25,6 +29,7 @@ export function LocationSearchBar({
   onChange,
   placeholder = "Search for a location...",
   className,
+  searchBias,
 }: LocationSearchBarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([]);
@@ -54,9 +59,16 @@ export function LocationSearchBar({
     setError(null);
 
     try {
+      // Create location bias if provided
+      const locationBias = searchBias ? {
+        location: new google.maps.LatLng(searchBias.lat, searchBias.lng),
+        radius: searchBias.radius || 50000, // Default 50km radius if not specified
+      } : undefined;
+
       const response = await autocompleteService.current.getPlacePredictions({
         input: searchValue,
-        types: ['(cities)'],
+        types: ['establishment', 'geocode'],
+        locationBias,
       });
 
       setPredictions(response.predictions);
