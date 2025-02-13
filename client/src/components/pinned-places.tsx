@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Plus, CheckCircle } from "lucide-react";
+import { MapPin, Plus, CheckCircle, Pencil, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +30,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface PinnedPlace {
   id: number;
@@ -67,9 +77,19 @@ export function PinnedPlaces({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isAddPlaceOpen, setIsAddPlaceOpen] = useState(false);
+  const [isEditPlaceOpen, setIsEditPlaceOpen] = useState(false);
+  const [selectedPlaceId, setSelectedPlaceId] = useState<number | null>(null);
   const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [placeToDelete, setPlaceToDelete] = useState<PinnedPlace | null>(null);
 
   const form = useForm<AddPinnedPlaceForm>({
+    defaultValues: {
+      name: "",
+      notes: "",
+    },
+  });
+
+  const editForm = useForm<AddPinnedPlaceForm>({
     defaultValues: {
       name: "",
       notes: "",
@@ -148,6 +168,84 @@ export function PinnedPlaces({
     },
   });
 
+  const editPinnedPlaceMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: AddPinnedPlaceForm }) => {
+      if (!selectedCoordinates) {
+        throw new Error("Please select a location on the map");
+      }
+
+      const res = await fetch(`/api/trips/${tripId}/pinned-places/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify({
+          ...data,
+          coordinates: selectedCoordinates,
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error);
+      }
+
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ 
+        queryKey: [`/api/trips/${tripId}/pinned-places`] 
+      });
+      setIsEditPlaceOpen(false);
+      editForm.reset();
+      setSelectedCoordinates(null);
+      setSelectedPlaceId(null);
+      toast({
+        title: "Success",
+        description: "Place updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to update place",
+      });
+    },
+  });
+
+  const deletePinnedPlaceMutation = useMutation({
+    mutationFn: async (placeId: number) => {
+      const res = await fetch(`/api/trips/${tripId}/pinned-places/${placeId}`, {
+        method: "DELETE",
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error);
+      }
+
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ 
+        queryKey: [`/api/trips/${tripId}/pinned-places`] 
+      });
+      setPlaceToDelete(null);
+      toast({
+        title: "Success",
+        description: "Place deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to delete place",
+      });
+    },
+  });
+
   const addToChecklistMutation = useMutation({
     mutationFn: async (placeId: number) => {
       const res = await fetch(`/api/trips/${tripId}/pinned-places/${placeId}/checklist`, {
@@ -191,6 +289,21 @@ export function PinnedPlaces({
 
   const onSubmit = (data: AddPinnedPlaceForm) => {
     addPinnedPlaceMutation.mutate(data);
+  };
+
+  const onSubmitEdit = (data: AddPinnedPlaceForm) => {
+    if (!selectedPlaceId) return;
+    editPinnedPlaceMutation.mutate({ id: selectedPlaceId, data });
+  };
+
+  const handleEditPlace = (place: PinnedPlace) => {
+    setSelectedPlaceId(place.id);
+    setSelectedCoordinates(place.coordinates);
+    editForm.reset({
+      name: place.name,
+      notes: place.notes,
+    });
+    setIsEditPlaceOpen(true);
   };
 
   return (
@@ -279,6 +392,84 @@ export function PinnedPlaces({
             </Form>
           </DialogContent>
         </Dialog>
+
+        {/* Edit Dialog */}
+        <Dialog open={isEditPlaceOpen} onOpenChange={setIsEditPlaceOpen}>
+          <DialogContent className="sm:max-w-[800px]">
+            <DialogHeader>
+              <DialogTitle>Edit Pinned Place</DialogTitle>
+              <DialogDescription>
+                Update the location or notes for this pinned place.
+              </DialogDescription>
+            </DialogHeader>
+            <Form {...editForm}>
+              <form onSubmit={editForm.handleSubmit(onSubmitEdit)} className="space-y-4">
+                <FormField
+                  control={editForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Location</FormLabel>
+                      <FormControl>
+                        <div className="h-[400px] w-full">
+                          <MapPicker
+                            value={field.value}
+                            onChange={(address, coordinates) => {
+                              field.onChange(address);
+                              setSelectedCoordinates(coordinates);
+                            }}
+                            placeholder="Search for a place..."
+                            existingPins={pinnedPlaces}
+                          />
+                        </div>
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notes</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} placeholder="Add any notes about this place..." />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={!selectedCoordinates || editPinnedPlaceMutation.isPending}
+                >
+                  {editPinnedPlaceMutation.isPending ? "Updating..." : "Update Place"}
+                </Button>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={!!placeToDelete} onOpenChange={(isOpen) => !isOpen && setPlaceToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Pinned Place</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete {placeToDelete?.name}? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => placeToDelete && deletePinnedPlaceMutation.mutate(placeToDelete.id)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deletePinnedPlaceMutation.isPending ? "Deleting..." : "Delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-[200px] w-full rounded-md">
@@ -296,17 +487,35 @@ export function PinnedPlaces({
                     </p>
                   )}
                 </div>
-                {!place.addedToChecklist && (
+                <div className="flex items-center gap-2">
+                  {!place.addedToChecklist && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => addToChecklistMutation.mutate(place.id)}
+                      className="flex items-center gap-1"
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                      Add to Checklist
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => addToChecklistMutation.mutate(place.id)}
-                    className="flex items-center gap-1"
+                    onClick={() => handleEditPlace(place)}
+                    className="p-0 h-8 w-8"
                   >
-                    <CheckCircle className="h-4 w-4" />
-                    Add to Checklist
+                    <Pencil className="h-4 w-4" />
                   </Button>
-                )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPlaceToDelete(place)}
+                    className="p-0 h-8 w-8 text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ))}
             {pinnedPlaces.length === 0 && (

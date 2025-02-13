@@ -1070,6 +1070,69 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Existing pinned places routes remain unchanged
+  // Add new routes for editing and deleting pinned places
+
+  // Edit pinned place
+  app.patch("/api/trips/:tripId/pinned-places/:placeId", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const placeId = parseInt(req.params.placeId);
+      const { name, notes, coordinates } = req.body;
+
+      const [updatedPlace] = await db
+        .update(pinnedPlaces)
+        .set({
+          name,
+          notes,
+          coordinates,
+        })
+        .where(
+          and(
+            eq(pinnedPlaces.id, placeId),
+            eq(pinnedPlaces.tripId, tripId)
+          )
+        )
+        .returning();
+
+      if (!updatedPlace) {
+        return res.status(404).json({ error: "Pinned place not found" });
+      }
+
+      res.json(updatedPlace);
+    } catch (error) {
+      console.error('Error updating pinned place:', error);
+      res.status(500).json({ error: 'Failed to update pinned place' });
+    }
+  });
+
+  // Delete pinned place
+  app.delete("/api/trips/:tripId/pinned-places/:placeId", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const placeId = parseInt(req.params.placeId);
+
+      const [deletedPlace] = await db
+        .delete(pinnedPlaces)
+        .where(
+          and(
+            eq(pinnedPlaces.id, placeId),
+            eq(pinnedPlaces.tripId, tripId)
+          )
+        )
+        .returning();
+
+      if (!deletedPlace) {
+        return res.status(404).json({ error: "Pinned place not found" });
+      }
+
+      res.json(deletedPlace);
+    } catch (error) {
+      console.error('Error deleting pinned place:', error);
+      res.status(500).json({ error: 'Failed to delete pinned place' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
