@@ -22,6 +22,7 @@ interface LocationSearchBarProps {
     lng: number;
     radius?: number;
   };
+  onInputRef?: (ref: HTMLInputElement | null) => void;
 }
 
 export function LocationSearchBar({
@@ -30,6 +31,7 @@ export function LocationSearchBar({
   placeholder = "Search for a location...",
   className,
   searchBias,
+  onInputRef,
 }: LocationSearchBarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([]);
@@ -37,7 +39,14 @@ export function LocationSearchBar({
   const [error, setError] = useState<string | null>(null);
   const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
   const placesService = useRef<google.maps.places.PlacesService | null>(null);
-  const mapRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (onInputRef && inputRef.current) {
+      onInputRef(inputRef.current);
+    }
+  }, [onInputRef]);
 
   useEffect(() => {
     if (!window.google) return;
@@ -141,6 +150,7 @@ export function LocationSearchBar({
       <div ref={mapRef} className="hidden" />
       <div className="relative">
         <Input
+          ref={inputRef}
           value={value}
           onChange={(e) => {
             onChange(e.target.value);

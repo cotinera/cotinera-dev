@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MapPicker } from "@/components/map-picker";
 import {
@@ -76,6 +76,15 @@ export function PinnedPlaces({
   const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [placeToDelete, setPlaceToDelete] = useState<PinnedPlace | null>(null);
   const [selectedPlaceName, setSelectedPlaceName] = useState<string>("");
+  const [searchInputRef, setSearchInputRef] = useState<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (isAddPlaceOpen && searchInputRef) {
+      setTimeout(() => {
+        searchInputRef?.focus();
+      }, 100);
+    }
+  }, [isAddPlaceOpen, searchInputRef]);
 
   const form = useForm<AddPinnedPlaceForm>({
     defaultValues: {
@@ -255,6 +264,7 @@ export function PinnedPlaces({
                               ...tripCoordinates,
                               radius: 50000
                             } : undefined}
+                            onSearchInputRef={setSearchInputRef}
                           />
                         </div>
                       </FormControl>
@@ -299,17 +309,6 @@ export function PinnedPlaces({
                   <p className="text-sm font-medium truncate">{place.name}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {!place.addedToChecklist && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => addToChecklistMutation.mutate(place.id)}
-                      className="flex items-center gap-1"
-                    >
-                      <CheckCircle className="h-4 w-4" />
-                      Add to Checklist
-                    </Button>
-                  )}
                   <Button
                     variant="ghost"
                     size="sm"

@@ -23,6 +23,7 @@ interface MapPickerProps {
   readOnly?: boolean;
   initialCenter?: { lat: number; lng: number } | null;
   searchBias?: { lat: number; lng: number; radius?: number };
+  onSearchInputRef?: (ref: HTMLInputElement | null) => void;
 }
 
 const DEFAULT_CENTER = {
@@ -38,8 +39,8 @@ export function MapPicker({
   readOnly = false,
   initialCenter,
   searchBias,
+  onSearchInputRef,
 }: MapPickerProps) {
-  // Use initialCenter if provided and valid, otherwise fall back to DEFAULT_CENTER
   const [coordinates, setCoordinates] = useState<google.maps.LatLngLiteral>(
     initialCenter && initialCenter.lat && initialCenter.lng ? initialCenter : DEFAULT_CENTER
   );
@@ -102,15 +103,16 @@ export function MapPicker({
       {!readOnly && (
         <LocationSearchBar
           value={value}
-          onChange={(address, coords) => {
+          onChange={(address, coords, name) => {
             if (coords) {
               setCoordinates(coords);
             }
-            onChange(address, coords || coordinates);
+            onChange(address, coords || coordinates, name);
           }}
           placeholder={placeholder}
           className="flex-1"
           searchBias={searchBias || (initialCenter ? { ...initialCenter, radius: 50000 } : undefined)}
+          onInputRef={onSearchInputRef}
         />
       )}
       <div className={`${readOnly ? 'h-[400px]' : 'h-[300px]'} rounded-lg overflow-hidden border relative`}>
