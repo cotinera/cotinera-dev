@@ -44,6 +44,7 @@ import {
 interface PinnedPlace {
   id: number;
   name: string;
+  address: string;
   notes?: string;
   coordinates: {
     lat: number;
@@ -128,7 +129,7 @@ export function PinnedPlaces({
         headers: { "Content-Type": "application/json" },
         credentials: 'include',
         body: JSON.stringify({
-          name: selectedPlaceName || data.address,
+          name: selectedPlaceName,
           address: data.address,
           notes: data.notes,
           coordinates: selectedCoordinates,
