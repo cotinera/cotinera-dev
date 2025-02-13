@@ -44,28 +44,30 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
-export enum PlaceCategory {
-  FOOD = "food",
-  BAR = "bar",
-  CAFE = "cafe",
-  WINE = "wine",
-  SHOPPING = "shopping",
-  GROCERY = "grocery",
-  ARTS = "arts",
-  LIGHTHOUSE = "lighthouse",
-  THEATRE = "theatre",
-  TOURIST = "tourist",
-  CASINO = "casino",
-  AQUARIUM = "aquarium",
-  EVENT_VENUE = "event_venue",
-  AMUSEMENT_PARK = "amusement_park",
-  HISTORIC = "historic",
-  MUSEUM = "museum",
-  MOVIE_THEATRE = "movie_theatre",
-  MONUMENT = "monument",
-  MUSIC = "music",
-  RELIC = "relic"
-}
+export const PlaceCategory = {
+  FOOD: "food",
+  BAR: "bar",
+  CAFE: "cafe",
+  WINE: "wine",
+  SHOPPING: "shopping",
+  GROCERY: "grocery",
+  ARTS: "arts",
+  LIGHTHOUSE: "lighthouse",
+  THEATRE: "theatre",
+  TOURIST: "tourist",
+  CASINO: "casino",
+  AQUARIUM: "aquarium",
+  EVENT_VENUE: "event_venue",
+  AMUSEMENT_PARK: "amusement_park",
+  HISTORIC: "historic",
+  MUSEUM: "museum",
+  MOVIE_THEATRE: "movie_theatre",
+  MONUMENT: "monument",
+  MUSIC: "music",
+  RELIC: "relic"
+} as const;
+
+type PlaceCategory = typeof PlaceCategory[keyof typeof PlaceCategory];
 
 const CATEGORY_ICONS: Record<PlaceCategory, typeof MapPin> = {
   [PlaceCategory.FOOD]: UtensilsCrossed,
@@ -140,44 +142,28 @@ export function PinnedPlaces({
     },
   });
 
-  const pinnedPlacesQuery = useQuery<PinnedPlace[]>({
-    queryKey: [`/api/trips/${tripId}/pinned-places`, destinationId],
-    queryFn: async () => {
-      const url = new URL(`/api/trips/${tripId}/pinned-places`, window.location.origin);
-      if (destinationId) {
-        url.searchParams.append('destinationId', destinationId.toString());
-      }
-      const res = await fetch(url);
-      if (!res.ok) {
-        throw new Error(await res.text());
-      }
-      return res.json();
-    },
-  });
-
   const addPinnedPlaceMutation = useMutation({
     mutationFn: async (data: AddPinnedPlaceForm) => {
       if (!selectedCoordinates || !selectedPlaceName) {
-        throw new Error("Please select a location");
+        throw new Error("Missing coordinates or place name");
       }
 
       const payload = {
-        tripId: tripId, 
+        tripId,
         name: selectedPlaceName,
         notes: data.notes || "",
         coordinates: selectedCoordinates,
-        category: data.category || PlaceCategory.TOURIST,
+        category: data.category,
         destinationId: destinationId || null,
         addedToChecklist: false
       };
 
-      console.log('Sending payload:', payload); 
+      console.log('Attempting to add pinned place with payload:', payload);
 
       const res = await fetch(`/api/trips/${tripId}/pinned-places`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "Accept": "application/json"
         },
         credentials: 'include',
         body: JSON.stringify(payload),
@@ -185,12 +171,12 @@ export function PinnedPlaces({
 
       if (!res.ok) {
         const errorText = await res.text();
-        console.error('Server error:', errorText); 
+        console.error('Server error response:', errorText);
         throw new Error(errorText || "Failed to add pinned place");
       }
 
       const result = await res.json();
-      console.log('Server response:', result); 
+      console.log('Server success response:', result);
       return result;
     },
     onSuccess: (newPlace) => {
@@ -315,11 +301,24 @@ export function PinnedPlaces({
   };
 
   const onSubmit = async (data: AddPinnedPlaceForm) => {
+    console.log('Form submission data:', data);
+    console.log('Selected coordinates:', selectedCoordinates);
+    console.log('Selected place name:', selectedPlaceName);
+
     if (!selectedCoordinates || !selectedPlaceName) {
       toast({
         variant: "destructive",
         title: "Error",
         description: "Please select a location first",
+      });
+      return;
+    }
+
+    if (!data.category) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select a category",
       });
       return;
     }
@@ -340,6 +339,21 @@ export function PinnedPlaces({
   const getIconComponent = (category: PlaceCategory) => {
     return CATEGORY_ICONS[category] || MapPin;
   };
+
+  const pinnedPlacesQuery = useQuery<PinnedPlace[]>({
+    queryKey: [`/api/trips/${tripId}/pinned-places`, destinationId],
+    queryFn: async () => {
+      const url = new URL(`/api/trips/${tripId}/pinned-places`, window.location.origin);
+      if (destinationId) {
+        url.searchParams.append('destinationId', destinationId.toString());
+      }
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      return res.json();
+    },
+  });
 
   return (
     <Card>
@@ -407,7 +421,7 @@ export function PinnedPlaces({
                         </SelectTrigger>
                         <SelectContent>
                           {Object.entries(PlaceCategory).map(([key, value]) => {
-                            const Icon = CATEGORY_ICONS[value as PlaceCategory];
+                            const Icon = CATEGORY_ICONS[value];
                             return (
                               <SelectItem key={key} value={value}>
                                 <div className="flex items-center gap-2">
