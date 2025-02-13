@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Plus, CheckCircle, Trash2 } from "lucide-react";
+import { MapPin, Plus, CheckCircle, Trash2, Coffee, UtensilsCrossed, Wine, Beer, Building2, ShoppingBag, Theater, Palmtree, History, Building } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -30,16 +30,93 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+
+export enum PlaceCategory {
+  FOOD = "food",
+  BAR = "bar",
+  CAFE = "cafe",
+  WINE = "wine",
+  SHOPPING = "shopping",
+  GROCERY = "grocery",
+  ARTS = "arts",
+  LIGHTHOUSE = "lighthouse",
+  THEATRE = "theatre",
+  TOURIST = "tourist",
+  CASINO = "casino",
+  AQUARIUM = "aquarium",
+  EVENT_VENUE = "event_venue",
+  AMUSEMENT_PARK = "amusement_park",
+  HISTORIC = "historic",
+  MUSEUM = "museum",
+  MOVIE_THEATRE = "movie_theatre",
+  MONUMENT = "monument",
+  MUSIC = "music",
+  RELIC = "relic"
+}
+
+const CATEGORY_ICONS: Record<PlaceCategory, React.ComponentType<any>> = {
+  [PlaceCategory.FOOD]: UtensilsCrossed,
+  [PlaceCategory.BAR]: Beer,
+  [PlaceCategory.CAFE]: Coffee,
+  [PlaceCategory.WINE]: Wine,
+  [PlaceCategory.SHOPPING]: ShoppingBag,
+  [PlaceCategory.GROCERY]: ShoppingBag,
+  [PlaceCategory.ARTS]: Theater,
+  [PlaceCategory.LIGHTHOUSE]: Building2,
+  [PlaceCategory.THEATRE]: Theater,
+  [PlaceCategory.TOURIST]: Palmtree,
+  [PlaceCategory.CASINO]: Building2,
+  [PlaceCategory.AQUARIUM]: Building2,
+  [PlaceCategory.EVENT_VENUE]: Building2,
+  [PlaceCategory.AMUSEMENT_PARK]: Palmtree,
+  [PlaceCategory.HISTORIC]: History,
+  [PlaceCategory.MUSEUM]: Building,
+  [PlaceCategory.MOVIE_THEATRE]: Theater,
+  [PlaceCategory.MONUMENT]: Building2,
+  [PlaceCategory.MUSIC]: Theater,
+  [PlaceCategory.RELIC]: History,
+};
+
+const CATEGORY_GROUPS = {
+  "Food & Drink": [PlaceCategory.FOOD, PlaceCategory.BAR, PlaceCategory.CAFE, PlaceCategory.WINE],
+  "Shopping": [PlaceCategory.SHOPPING, PlaceCategory.GROCERY],
+  "Entertainment / Leisure": [
+    PlaceCategory.ARTS,
+    PlaceCategory.LIGHTHOUSE,
+    PlaceCategory.THEATRE,
+    PlaceCategory.TOURIST,
+    PlaceCategory.CASINO,
+    PlaceCategory.AQUARIUM,
+    PlaceCategory.EVENT_VENUE,
+    PlaceCategory.AMUSEMENT_PARK,
+    PlaceCategory.HISTORIC,
+    PlaceCategory.MUSEUM,
+    PlaceCategory.MOVIE_THEATRE,
+    PlaceCategory.MONUMENT,
+    PlaceCategory.MUSIC,
+    PlaceCategory.RELIC
+  ]
+};
 
 interface PinnedPlace {
   id: number;
   name: string;
   address: string;
   notes?: string;
+  category: PlaceCategory;
   coordinates: {
     lat: number;
     lng: number;
@@ -52,6 +129,7 @@ interface PinnedPlace {
 interface AddPinnedPlaceForm {
   address: string;
   notes?: string;
+  category: PlaceCategory;
 }
 
 interface PinnedPlacesProps {
@@ -79,18 +157,11 @@ export function PinnedPlaces({
   const [selectedPlaceName, setSelectedPlaceName] = useState<string>("");
   const [searchInputRef, setSearchInputRef] = useState<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    if (isAddPlaceOpen && searchInputRef) {
-      setTimeout(() => {
-        searchInputRef?.focus();
-      }, 100);
-    }
-  }, [isAddPlaceOpen, searchInputRef]);
-
   const form = useForm<AddPinnedPlaceForm>({
     defaultValues: {
       address: "",
       notes: "",
+      category: PlaceCategory.TOURIST,
     },
   });
 
@@ -127,8 +198,9 @@ export function PinnedPlaces({
           address: data.address,
           notes: data.notes,
           coordinates: selectedCoordinates,
+          category: data.category,
           destinationId,
-          addedToChecklist: false, // Added to ensure consistent data
+          addedToChecklist: false,
         }),
       });
 
@@ -222,7 +294,6 @@ export function PinnedPlaces({
         throw new Error(error);
       }
 
-      // Update the pinned place to mark it as added to checklist
       await fetch(`/api/trips/${tripId}/pinned-places/${placeId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -261,7 +332,19 @@ export function PinnedPlaces({
   };
 
   const onSubmit = (data: AddPinnedPlaceForm) => {
-    addPinnedPlaceMutation.mutate(data);
+    if (!selectedCoordinates || !selectedPlaceName) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select a location first",
+      });
+      return;
+    }
+
+    addPinnedPlaceMutation.mutate({
+      ...data,
+      address: selectedPlaceName,
+    });
   };
 
   const handleAddToChecklist = (place: PinnedPlace) => {
@@ -330,6 +413,38 @@ export function PinnedPlaces({
                 />
                 <FormField
                   control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(CATEGORY_GROUPS).map(([groupName, categories]) => (
+                            <SelectGroup key={groupName}>
+                              <SelectLabel>{groupName}</SelectLabel>
+                              {categories.map((category) => (
+                                <SelectItem key={category} value={category}>
+                                  <div className="flex items-center gap-2">
+                                    {React.createElement(CATEGORY_ICONS[category], { className: "h-4 w-4" })}
+                                    <span>{category.replace(/_/g, ' ').toLowerCase()}</span>
+                                  </div>
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
                   name="notes"
                   render={({ field }) => (
                     <FormItem>
@@ -363,7 +478,10 @@ export function PinnedPlaces({
                 className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted/70 transition-colors"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">{place.name}</p>
+                  <div className="flex items-center gap-2">
+                    {React.createElement(CATEGORY_ICONS[place.category], { className: "h-4 w-4" })}
+                    <p className="text-sm font-medium truncate">{place.name}</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button

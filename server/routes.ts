@@ -994,12 +994,20 @@ export function registerRoutes(app: Express): Server {
     try {
       const tripId = parseInt(req.params.tripId);
       const destinationId = req.query.destinationId ? parseInt(req.query.destinationId as string) : undefined;
+      const category = req.query.category ? req.query.category as string : undefined;
 
-      const places = await db.select().from(pinnedPlaces).where(
-        destinationId
-          ? and(eq(pinnedPlaces.tripId, tripId), eq(pinnedPlaces.destinationId, destinationId))
-          : eq(pinnedPlaces.tripId, tripId)
-      );
+      const places = await db
+        .select()
+        .from(pinnedPlaces)
+        .where(
+          destinationId && category
+            ? and(eq(pinnedPlaces.tripId, tripId), eq(pinnedPlaces.destinationId, destinationId), eq(pinnedPlaces.category, category))
+            : destinationId
+              ? and(eq(pinnedPlaces.tripId, tripId), eq(pinnedPlaces.destinationId, destinationId))
+              : category
+                ? eq(pinnedPlaces.category, category)
+                : eq(pinnedPlaces.tripId, tripId)
+        );
 
       res.json(places);
     } catch (error) {
@@ -1012,14 +1020,16 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/trips/:tripId/pinned-places", async (req, res) => {
     try {
       const tripId = parseInt(req.params.tripId);
-      const { name, notes, coordinates, destinationId } = req.body;
+      const { name, address, notes, coordinates, destinationId, category } = req.body;
 
       const [newPlace] = await db.insert(pinnedPlaces).values({
         tripId,
         name,
+        address,
         notes,
         coordinates,
-        destinationId: destinationId ? parseInt(destinationId) : undefined,
+        destinationId: destinationId || null,
+        category,
         addedToChecklist: false,
       }).returning();
 
@@ -1078,14 +1088,17 @@ export function registerRoutes(app: Express): Server {
     try {
       const tripId = parseInt(req.params.tripId);
       const placeId = parseInt(req.params.placeId);
-      const { name, notes, coordinates } = req.body;
+      const { name, address, notes, coordinates, category, addedToChecklist } = req.body;
 
       const [updatedPlace] = await db
         .update(pinnedPlaces)
         .set({
-          name,
-          notes,
-          coordinates,
+          ...(name && { name }),
+          ...(address && { address }),
+          ...(notes && { notes }),
+          ...(coordinates && { coordinates }),
+          ...(category && { category }),
+          ...(typeof addedToChecklist !== 'undefined' && { addedToChecklist }),
         })
         .where(
           and(
