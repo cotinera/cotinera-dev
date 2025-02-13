@@ -78,6 +78,10 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
       }
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch pinned places");
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Invalid response format");
+      }
       return res.json();
     },
   });
@@ -99,10 +103,20 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
       });
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: "Failed to add pinned place" }));
-        throw new Error(errorData.error || "Failed to add pinned place");
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || "Failed to add pinned place");
+        } else {
+          const errorText = await res.text();
+          throw new Error(`Server error: ${errorText}`);
+        }
       }
 
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Invalid response format");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -137,10 +151,19 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
       });
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ error: "Failed to add to checklist" }));
-        throw new Error(errorData.error || "Failed to add to checklist");
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || "Failed to add to checklist");
+        } else {
+          throw new Error("Failed to add to checklist");
+        }
       }
 
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error("Invalid response format");
+      }
       return res.json();
     },
     onSuccess: () => {
@@ -187,7 +210,7 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
               <Plus className="h-4 w-4" />
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="sm:max-w-[600px]">
             <DialogHeader>
               <DialogTitle>Pin a New Place</DialogTitle>
             </DialogHeader>
@@ -200,15 +223,17 @@ export function PinnedPlaces({ tripId, destinationId, defaultLocation }: PinnedP
                     <FormItem>
                       <FormLabel>Location</FormLabel>
                       <FormControl>
-                        <MapPicker
-                          value={field.value}
-                          onChange={(address, coordinates) => {
-                            field.onChange(address);
-                            setSelectedCoordinates(coordinates);
-                          }}
-                          placeholder="Search for a place to pin..."
-                          defaultLocation={defaultLocation}
-                        />
+                        <div className="h-[400px]">
+                          <MapPicker
+                            value={field.value}
+                            onChange={(address, coordinates) => {
+                              field.onChange(address);
+                              setSelectedCoordinates(coordinates);
+                            }}
+                            placeholder="Search for a place to pin..."
+                            defaultLocation={defaultLocation}
+                          />
+                        </div>
                       </FormControl>
                     </FormItem>
                   )}
