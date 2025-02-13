@@ -220,6 +220,7 @@ export default function TripDetail() {
                   tripId={trip.id}
                   destinationId={currentDestinationId}
                   defaultLocation={currentDestination?.name || trip.location || ""}
+                  tripCoordinates={currentDestination?.coordinates || trip.coordinates}
                 />
               </section>
             </div>

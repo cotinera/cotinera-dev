@@ -21,9 +21,14 @@ interface MapPickerProps {
   placeholder?: string;
   existingPins?: PinnedPlace[];
   readOnly?: boolean;
-  initialCenter?: { lat: number; lng: number };
+  initialCenter?: { lat: number; lng: number } | null;
   searchBias?: { lat: number; lng: number; radius?: number };
 }
+
+const DEFAULT_CENTER = {
+  lat: 40.7128,
+  lng: -74.0060, // New York City
+};
 
 export function MapPicker({
   value,
@@ -34,11 +39,9 @@ export function MapPicker({
   initialCenter,
   searchBias,
 }: MapPickerProps) {
+  // Use initialCenter if provided and valid, otherwise fall back to DEFAULT_CENTER
   const [coordinates, setCoordinates] = useState<google.maps.LatLngLiteral>(
-    initialCenter || {
-      lat: 40.7128,
-      lng: -74.0060, // Default to New York City if no initial center provided
-    }
+    initialCenter && initialCenter.lat && initialCenter.lng ? initialCenter : DEFAULT_CENTER
   );
 
   const { isLoaded, loadError } = useLoadScript({
@@ -104,7 +107,7 @@ export function MapPicker({
           }}
           placeholder={placeholder}
           className="flex-1"
-          searchBias={searchBias}
+          searchBias={searchBias || (initialCenter ? { ...initialCenter, radius: 50000 } : undefined)}
         />
       )}
       <div className={`${readOnly ? 'h-[400px]' : 'h-[300px]'} rounded-lg overflow-hidden border relative`}>
