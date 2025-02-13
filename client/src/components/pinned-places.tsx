@@ -162,6 +162,14 @@ export function PinnedPlaces({
   });
 
   const onSubmit = (data: AddPinnedPlaceForm) => {
+    if (!selectedCoordinates || !selectedPlaceName) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select a location on the map",
+      });
+      return;
+    }
     addPinnedPlaceMutation.mutate(data);
   };
 
@@ -279,7 +287,7 @@ export function PinnedPlaces({
             <DialogHeader>
               <DialogTitle>Pin a New Place</DialogTitle>
               <DialogDescription>
-                Pinned places will appear on your trip map.
+                Search and select a location to pin on your trip map.
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
@@ -329,7 +337,7 @@ export function PinnedPlaces({
                 <DialogFooter>
                   <Button
                     type="submit"
-                    disabled={!selectedPlaceName}
+                    disabled={addPinnedPlaceMutation.isPending || !selectedCoordinates}
                   >
                     {addPinnedPlaceMutation.isPending ? "Pinning..." : "Pin Place"}
                   </Button>
