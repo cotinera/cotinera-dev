@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Plus, CheckCircle, Trash2, Coffee, UtensilsCrossed, Wine, Beer, Building2, ShoppingBag, Theater, Palmtree, History, Building } from "lucide-react";
+import { MapPin, Plus, CheckCircle, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -30,67 +30,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-
-export const PlaceCategory = {
-  FOOD: "food",
-  BAR: "bar",
-  CAFE: "cafe",
-  WINE: "wine",
-  SHOPPING: "shopping",
-  GROCERY: "grocery",
-  ARTS: "arts",
-  LIGHTHOUSE: "lighthouse",
-  THEATRE: "theatre",
-  TOURIST: "tourist",
-  CASINO: "casino",
-  AQUARIUM: "aquarium",
-  EVENT_VENUE: "event_venue",
-  AMUSEMENT_PARK: "amusement_park",
-  HISTORIC: "historic",
-  MUSEUM: "museum",
-  MOVIE_THEATRE: "movie_theatre",
-  MONUMENT: "monument",
-  MUSIC: "music",
-  RELIC: "relic"
-} as const;
-
-type PlaceCategory = typeof PlaceCategory[keyof typeof PlaceCategory];
-
-const CATEGORY_ICONS: Record<PlaceCategory, typeof MapPin> = {
-  [PlaceCategory.FOOD]: UtensilsCrossed,
-  [PlaceCategory.BAR]: Beer,
-  [PlaceCategory.CAFE]: Coffee,
-  [PlaceCategory.WINE]: Wine,
-  [PlaceCategory.SHOPPING]: ShoppingBag,
-  [PlaceCategory.GROCERY]: ShoppingBag,
-  [PlaceCategory.ARTS]: Theater,
-  [PlaceCategory.LIGHTHOUSE]: Building2,
-  [PlaceCategory.THEATRE]: Theater,
-  [PlaceCategory.TOURIST]: Palmtree,
-  [PlaceCategory.CASINO]: Building2,
-  [PlaceCategory.AQUARIUM]: Building2,
-  [PlaceCategory.EVENT_VENUE]: Building2,
-  [PlaceCategory.AMUSEMENT_PARK]: Palmtree,
-  [PlaceCategory.HISTORIC]: History,
-  [PlaceCategory.MUSEUM]: Building,
-  [PlaceCategory.MOVIE_THEATRE]: Theater,
-  [PlaceCategory.MONUMENT]: Building2,
-  [PlaceCategory.MUSIC]: Theater,
-  [PlaceCategory.RELIC]: History,
-};
 
 interface PinnedPlace {
   id: number;
@@ -100,7 +43,6 @@ interface PinnedPlace {
     lat: number;
     lng: number;
   };
-  category: PlaceCategory;
   tripId: number;
   destinationId?: number;
   addedToChecklist: boolean;
@@ -108,7 +50,6 @@ interface PinnedPlace {
 
 interface AddPinnedPlaceForm {
   notes?: string;
-  category: PlaceCategory;
 }
 
 interface PinnedPlacesProps {
@@ -138,7 +79,6 @@ export function PinnedPlaces({
   const form = useForm<AddPinnedPlaceForm>({
     defaultValues: {
       notes: "",
-      category: PlaceCategory.TOURIST,
     },
   });
 
@@ -153,7 +93,6 @@ export function PinnedPlaces({
         name: selectedPlaceName,
         notes: data.notes || "",
         coordinates: selectedCoordinates,
-        category: data.category,
         destinationId: destinationId || null,
         addedToChecklist: false
       };
@@ -314,15 +253,6 @@ export function PinnedPlaces({
       return;
     }
 
-    if (!data.category) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Please select a category",
-      });
-      return;
-    }
-
     try {
       await addPinnedPlaceMutation.mutateAsync(data);
     } catch (error) {
@@ -334,10 +264,6 @@ export function PinnedPlaces({
     if (!place.addedToChecklist) {
       addToChecklistMutation.mutate(place.id);
     }
-  };
-
-  const getIconComponent = (category: PlaceCategory) => {
-    return CATEGORY_ICONS[category] || MapPin;
   };
 
   const pinnedPlacesQuery = useQuery<PinnedPlace[]>({
@@ -408,37 +334,6 @@ export function PinnedPlaces({
 
                 <FormField
                   control={form.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.entries(PlaceCategory).map(([key, value]) => {
-                            const Icon = CATEGORY_ICONS[value];
-                            return (
-                              <SelectItem key={key} value={value}>
-                                <div className="flex items-center gap-2">
-                                  <Icon className="h-4 w-4" />
-                                  <span>{value.replace(/_/g, ' ').toLowerCase()}</span>
-                                </div>
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
                   name="notes"
                   render={({ field }) => (
                     <FormItem>
@@ -466,44 +361,41 @@ export function PinnedPlaces({
       <CardContent>
         <ScrollArea className="h-[200px] w-full rounded-md">
           <div className="space-y-2">
-            {(pinnedPlacesQuery.data || []).map((place) => {
-              const Icon = getIconComponent(place.category);
-              return (
-                <div
-                  key={place.id}
-                  className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted/70 transition-colors"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <Icon className="h-4 w-4" />
-                      <p className="text-sm font-medium truncate">{place.name}</p>
-                    </div>
-                  </div>
+            {(pinnedPlacesQuery.data || []).map((place) => (
+              <div
+                key={place.id}
+                className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted/70 transition-colors"
+              >
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleAddToChecklist(place)}
-                      className={cn(
-                        "p-0 h-8 w-8",
-                        place.addedToChecklist ? "text-green-600" : "text-muted-foreground hover:text-green-600"
-                      )}
-                      disabled={place.addedToChecklist}
-                    >
-                      <CheckCircle className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setPlaceToDelete(place)}
-                      className="p-0 h-8 w-8 text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <MapPin className="h-4 w-4" />
+                    <p className="text-sm font-medium truncate">{place.name}</p>
                   </div>
                 </div>
-              );
-            })}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleAddToChecklist(place)}
+                    className={cn(
+                      "p-0 h-8 w-8",
+                      place.addedToChecklist ? "text-green-600" : "text-muted-foreground hover:text-green-600"
+                    )}
+                    disabled={place.addedToChecklist}
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPlaceToDelete(place)}
+                    className="p-0 h-8 w-8 text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
             {(pinnedPlacesQuery.data || []).length === 0 && (
               <p className="text-center text-muted-foreground py-4">
                 No places pinned yet
