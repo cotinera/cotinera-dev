@@ -438,97 +438,91 @@ export function PinnedPlaces({
         <Dialog open={!!detailedPlace} onOpenChange={handleCloseDetailedView}>
           <DialogContent className="sm:max-w-[800px]">
             <DialogHeader>
-              <DialogTitle>
-                {isEditing ? "Edit Place" : detailedPlace?.name}
-              </DialogTitle>
+              <DialogTitle>{detailedPlace?.name}</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              {isEditing ? (
-                <Form {...editForm}>
-                  <form className="space-y-4">
-                    <FormField
-                      control={editForm.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Location</FormLabel>
-                          <FormControl>
-                            <div className="h-[400px] w-full">
-                              <MapPicker
-                                value={field.value}
-                                onChange={(address, coordinates) => {
-                                  field.onChange(address);
-                                  setSelectedCoordinates(coordinates);
-                                }}
-                                placeholder="Search for a place..."
-                                existingPins={pinnedPlaces}
-                              />
-                            </div>
-                          </FormControl>
-                        </FormItem>
-                      )}
+              <div>
+                <h4 className="text-sm font-medium mb-2">Location</h4>
+                <div className="h-[400px] w-full">
+                  {isEditing ? (
+                    <Form {...editForm}>
+                      <FormField
+                        control={editForm.control}
+                        name="name"
+                        render={({ field }) => (
+                          <MapPicker
+                            value={field.value}
+                            onChange={(address, coordinates) => {
+                              field.onChange(address);
+                              setSelectedCoordinates(coordinates);
+                            }}
+                            placeholder="Search for a place..."
+                            existingPins={pinnedPlaces}
+                          />
+                        )}
+                      />
+                    </Form>
+                  ) : (
+                    <MapPicker
+                      value={detailedPlace?.name || ""}
+                      onChange={() => {}}
+                      existingPins={[detailedPlace].filter(Boolean) as PinnedPlace[]}
+                      readOnly
                     />
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-medium mb-2">Notes</h4>
+                {isEditing ? (
+                  <Form {...editForm}>
                     <FormField
                       control={editForm.control}
                       name="notes"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Notes</FormLabel>
                           <FormControl>
                             <Textarea {...field} placeholder="Add any notes about this place..." />
                           </FormControl>
                         </FormItem>
                       )}
                     />
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setIsEditing(false)}
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={handleSaveEdit}
-                        disabled={!selectedCoordinates || editPinnedPlaceMutation.isPending}
-                      >
-                        {editPinnedPlaceMutation.isPending ? "Saving..." : "Save Changes"}
-                      </Button>
-                    </div>
-                  </form>
-                </Form>
-              ) : (
-                <>
-                  {detailedPlace?.notes && (
-                    <div>
-                      <h4 className="text-sm font-medium mb-2">Notes</h4>
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                        {detailedPlace.notes}
-                      </p>
-                    </div>
-                  )}
-                  <div>
-                    <h4 className="text-sm font-medium mb-2">Location</h4>
-                    <div className="h-[400px]">
-                      <MapPicker
-                        value={detailedPlace?.name || ""}
-                        onChange={() => {}}
-                        existingPins={[detailedPlace].filter(Boolean) as PinnedPlace[]}
-                        readOnly
-                      />
-                    </div>
-                  </div>
-                  <div className="flex justify-end">
+                  </Form>
+                ) : (
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {detailedPlace?.notes || "No notes added"}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2">
+                {isEditing ? (
+                  <>
                     <Button
                       type="button"
-                      onClick={() => handleEditPlace(detailedPlace)}
+                      variant="outline"
+                      onClick={() => setIsEditing(false)}
                     >
-                      Edit Place
+                      Cancel
                     </Button>
-                  </div>
-                </>
-              )}
+                    <Button
+                      type="button"
+                      onClick={handleSaveEdit}
+                      disabled={!selectedCoordinates || editPinnedPlaceMutation.isPending}
+                    >
+                      {editPinnedPlaceMutation.isPending ? "Saving..." : "Save Changes"}
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    type="button"
+                    onClick={() => handleEditPlace(detailedPlace)}
+                  >
+                    Edit Place
+                  </Button>
+                )}
+              </div>
             </div>
           </DialogContent>
         </Dialog>
