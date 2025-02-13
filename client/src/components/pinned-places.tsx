@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Plus, CheckCircle, Trash2, Info } from "lucide-react";
+import { MapPin, Plus, CheckCircle, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +16,18 @@ import {
   DialogTitle,
   DialogTrigger,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Form,
   FormControl,
@@ -29,16 +40,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 interface PinnedPlace {
   id: number;
@@ -325,13 +326,14 @@ export function PinnedPlaces({
                     </FormItem>
                   )}
                 />
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={!selectedCoordinates || !selectedPlaceName || addPinnedPlaceMutation.isPending}
-                >
-                  {addPinnedPlaceMutation.isPending ? "Pinning..." : "Pin Place"}
-                </Button>
+                <DialogFooter>
+                  <Button
+                    type="submit"
+                    disabled={!selectedPlaceName}
+                  >
+                    {addPinnedPlaceMutation.isPending ? "Pinning..." : "Pin Place"}
+                  </Button>
+                </DialogFooter>
               </form>
             </Form>
           </DialogContent>
@@ -349,14 +351,6 @@ export function PinnedPlaces({
                   <p className="text-sm font-medium truncate">{place.name}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setDetailedPlace(place)}
-                    className="p-0 h-8 w-8"
-                  >
-                    <Info className="h-4 w-4" />
-                  </Button>
                   {!place.addedToChecklist && (
                     <Button
                       variant="ghost"
