@@ -92,12 +92,6 @@ export function PinnedPlaces({
     },
   });
 
-  const editForm = useForm<AddPinnedPlaceForm>({
-    defaultValues: {
-      address: "",
-      notes: "",
-    },
-  });
 
   const { data: pinnedPlaces = [] } = useQuery<PinnedPlace[]>({
     queryKey: [`/api/trips/${tripId}/pinned-places`, destinationId],
@@ -120,7 +114,7 @@ export function PinnedPlaces({
   const addPinnedPlaceMutation = useMutation({
     mutationFn: async (data: AddPinnedPlaceForm) => {
       if (!selectedCoordinates || !selectedPlaceName) {
-        throw new Error("Please select a location on the map");
+        throw new Error("Please select a location");
       }
 
       const res = await fetch(`/api/trips/${tripId}/pinned-places`, {
@@ -138,12 +132,7 @@ export function PinnedPlaces({
 
       if (!res.ok) {
         const errorText = await res.text();
-        try {
-          const errorData = JSON.parse(errorText);
-          throw new Error(errorData.error || "Failed to add pinned place");
-        } catch {
-          throw new Error(errorText || "Failed to add pinned place");
-        }
+        throw new Error(errorText || "Failed to add pinned place");
       }
 
       const newPlace = await res.json();
@@ -174,50 +163,9 @@ export function PinnedPlaces({
     },
   });
 
-  const editPinnedPlaceMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: AddPinnedPlaceForm }) => {
-      if (!selectedCoordinates) {
-        throw new Error("Please select a location on the map");
-      }
-
-      const res = await fetch(`/api/trips/${tripId}/pinned-places/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: 'include',
-        body: JSON.stringify({
-          ...data,
-          coordinates: selectedCoordinates,
-        }),
-      });
-
-      if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error);
-      }
-
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [`/api/trips/${tripId}/pinned-places`]
-      });
-      setIsEditing(false);
-      editForm.reset();
-      setSelectedCoordinates(null);
-      setDetailedPlace(null);
-      toast({
-        title: "Success",
-        description: "Place updated successfully",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to update place",
-      });
-    },
-  });
+  const onSubmit = (data: AddPinnedPlaceForm) => {
+    addPinnedPlaceMutation.mutate(data);
+  };
 
   const deletePinnedPlaceMutation = useMutation({
     mutationFn: async (placeId: number) => {
@@ -293,51 +241,9 @@ export function PinnedPlaces({
     },
   });
 
-  const onSubmit = (data: AddPinnedPlaceForm) => {
-    addPinnedPlaceMutation.mutate(data);
-  };
-
-  const onSubmitEdit = (data: AddPinnedPlaceForm) => {
-    if (!detailedPlace) return;
-    editPinnedPlaceMutation.mutate({ id: detailedPlace.id, data });
-  };
-
-  const handleEditPlace = (place: PinnedPlace) => {
-    setSelectedCoordinates(place.coordinates);
-    editForm.reset({
-      address: place.name,
-      notes: place.notes,
-    });
-    setDetailedPlace(place);
-    setIsEditing(true);
-  };
-
-  const handleSaveEdit = async () => {
-    if (!detailedPlace) return;
-
-    try {
-      const updatedPlace = await editPinnedPlaceMutation.mutateAsync({
-        id: detailedPlace.id,
-        data: editForm.getValues()
-      });
-      setDetailedPlace(updatedPlace);
-      setIsEditing(false);
-      setSelectedCoordinates(null);
-    } catch (error) {
-      console.error("Failed to save edits:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to save changes to pinned place",
-      });
-    }
-  };
-
-  const handleCloseDetailedView = () => {
-    setDetailedPlace(null);
-    setIsEditing(false);
-    editForm.reset();
-    setSelectedCoordinates(null);
+  const handleDeletePlace = () => {
+    if (!placeToDelete) return;
+    deletePinnedPlaceMutation.mutate(placeToDelete.id);
   };
 
   return (
@@ -375,7 +281,7 @@ export function PinnedPlaces({
             <DialogHeader>
               <DialogTitle>Pin a New Place</DialogTitle>
               <DialogDescription>
-                Search for a location and pin it to your trip. Pinned places will appear on your trip map.
+                Pinned places will appear on your trip map.
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
@@ -485,6 +391,24 @@ export function PinnedPlaces({
           <ScrollBar orientation="vertical" />
         </ScrollArea>
       </CardContent>
+      <AlertDialog open={placeToDelete !== null} onOpenChange={setPlaceToDelete}>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            Delete Pinned Place
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete this pinned place? This action cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>
+            Cancel
+          </AlertDialogCancel>
+          <AlertDialogAction onClick={handleDeletePlace}>
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialog>
     </Card>
   );
 }

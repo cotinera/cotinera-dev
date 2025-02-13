@@ -17,7 +17,7 @@ interface PinnedPlace {
 
 interface MapPickerProps {
   value: string;
-  onChange: (address: string, coordinates: { lat: number; lng: number }) => void;
+  onChange: (address: string, coordinates: { lat: number; lng: number }, name?: string) => void;
   placeholder?: string;
   existingPins?: PinnedPlace[];
   readOnly?: boolean;
@@ -68,7 +68,10 @@ export function MapPicker({
       const data = await response.json();
 
       if (data.status === "OK" && data.results?.[0]) {
-        onChange(data.results[0].formatted_address, { lat, lng });
+        const formattedAddress = data.results[0].formatted_address;
+        // Use the first result's name if available, otherwise use the formatted address
+        const name = data.results[0].address_components?.[0]?.long_name || formattedAddress;
+        onChange(formattedAddress, { lat, lng }, name);
       }
     } catch (err) {
       console.error("Reverse geocoding error:", err);
