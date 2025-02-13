@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Plus, CheckCircle, Pencil, Trash2 } from "lucide-react";
+import { MapPin, Plus, CheckCircle, Pencil, Trash2, Info } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -67,12 +67,12 @@ interface PinnedPlacesProps {
   showMap?: boolean;
 }
 
-export function PinnedPlaces({ 
-  tripId, 
-  destinationId, 
-  defaultLocation, 
+export function PinnedPlaces({
+  tripId,
+  destinationId,
+  defaultLocation,
   onPinPlace,
-  showMap = false 
+  showMap = false
 }: PinnedPlacesProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -81,6 +81,7 @@ export function PinnedPlaces({
   const [selectedPlaceId, setSelectedPlaceId] = useState<number | null>(null);
   const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [placeToDelete, setPlaceToDelete] = useState<PinnedPlace | null>(null);
+  const [detailedPlace, setDetailedPlace] = useState<PinnedPlace | null>(null);
 
   const form = useForm<AddPinnedPlaceForm>({
     defaultValues: {
@@ -148,8 +149,8 @@ export function PinnedPlaces({
       return newPlace;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
-        queryKey: [`/api/trips/${tripId}/pinned-places`] 
+      queryClient.invalidateQueries({
+        queryKey: [`/api/trips/${tripId}/pinned-places`]
       });
       setIsAddPlaceOpen(false);
       form.reset();
@@ -192,8 +193,8 @@ export function PinnedPlaces({
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
-        queryKey: [`/api/trips/${tripId}/pinned-places`] 
+      queryClient.invalidateQueries({
+        queryKey: [`/api/trips/${tripId}/pinned-places`]
       });
       setIsEditPlaceOpen(false);
       editForm.reset();
@@ -228,8 +229,8 @@ export function PinnedPlaces({
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
-        queryKey: [`/api/trips/${tripId}/pinned-places`] 
+      queryClient.invalidateQueries({
+        queryKey: [`/api/trips/${tripId}/pinned-places`]
       });
       setPlaceToDelete(null);
       toast({
@@ -267,11 +268,11 @@ export function PinnedPlaces({
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
-        queryKey: [`/api/trips/${tripId}/pinned-places`] 
+      queryClient.invalidateQueries({
+        queryKey: [`/api/trips/${tripId}/pinned-places`]
       });
-      queryClient.invalidateQueries({ 
-        queryKey: [`/api/trips/${tripId}/checklist`] 
+      queryClient.invalidateQueries({
+        queryKey: [`/api/trips/${tripId}/checklist`]
       });
       toast({
         title: "Success",
@@ -325,6 +326,7 @@ export function PinnedPlaces({
             Pinned Places
           </div>
         </CardTitle>
+
         <Dialog open={isAddPlaceOpen} onOpenChange={setIsAddPlaceOpen}>
           <DialogTrigger asChild>
             <Button
@@ -393,7 +395,6 @@ export function PinnedPlaces({
           </DialogContent>
         </Dialog>
 
-        {/* Edit Dialog */}
         <Dialog open={isEditPlaceOpen} onOpenChange={setIsEditPlaceOpen}>
           <DialogContent className="sm:max-w-[800px]">
             <DialogHeader>
@@ -450,7 +451,6 @@ export function PinnedPlaces({
           </DialogContent>
         </Dialog>
 
-        {/* Delete Confirmation Dialog */}
         <AlertDialog open={!!placeToDelete} onOpenChange={(isOpen) => !isOpen && setPlaceToDelete(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -470,6 +470,35 @@ export function PinnedPlaces({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <Dialog open={!!detailedPlace} onOpenChange={(isOpen) => !isOpen && setDetailedPlace(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{detailedPlace?.name}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {detailedPlace?.notes && (
+                <div>
+                  <h4 className="text-sm font-medium mb-2">Notes</h4>
+                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                    {detailedPlace.notes}
+                  </p>
+                </div>
+              )}
+              <div>
+                <h4 className="text-sm font-medium mb-2">Location</h4>
+                <div className="h-[200px]">
+                  <MapPicker
+                    value={detailedPlace?.name || ""}
+                    onChange={() => {}}
+                    existingPins={[detailedPlace].filter(Boolean) as PinnedPlace[]}
+                    readOnly
+                  />
+                </div>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </CardHeader>
       <CardContent>
         <ScrollArea className="h-[200px] w-full rounded-md">
@@ -481,13 +510,16 @@ export function PinnedPlaces({
               >
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium truncate">{place.name}</p>
-                  {place.notes && (
-                    <p className="text-xs text-muted-foreground truncate">
-                      {place.notes}
-                    </p>
-                  )}
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDetailedPlace(place)}
+                    className="p-0 h-8 w-8"
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
                   {!place.addedToChecklist && (
                     <Button
                       variant="ghost"
