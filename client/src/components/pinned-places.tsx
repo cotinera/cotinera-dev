@@ -170,8 +170,7 @@ export function PinnedPlaces({
       }
       const res = await fetch(url);
       if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error);
+        throw new Error(await res.text());
       }
       return res.json();
     },
@@ -192,17 +191,19 @@ export function PinnedPlaces({
         addedToChecklist: false,
       };
 
-      console.log('Sending payload:', payload);
-
       const res = await fetch(`/api/trips/${tripId}/pinned-places`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        credentials: 'include',
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || "Failed to add pinned place");
+        const errorData = await res.json().catch(() => ({ message: "Failed to add pinned place" }));
+        throw new Error(errorData.message || "Failed to add pinned place");
       }
 
       return res.json();
@@ -328,7 +329,7 @@ export function PinnedPlaces({
     deletePinnedPlaceMutation.mutate(placeToDelete.id);
   };
 
-  const onSubmit = (data: AddPinnedPlaceForm) => {
+  const onSubmit = async (data: AddPinnedPlaceForm) => {
     if (!selectedCoordinates || !selectedPlaceName) {
       toast({
         variant: "destructive",
@@ -338,7 +339,11 @@ export function PinnedPlaces({
       return;
     }
 
-    addPinnedPlaceMutation.mutate(data);
+    try {
+      await addPinnedPlaceMutation.mutateAsync(data);
+    } catch (error) {
+      console.error('Submit error:', error);
+    }
   };
 
   const handleAddToChecklist = (place: PinnedPlace) => {
@@ -437,6 +442,7 @@ export function PinnedPlaces({
                     </FormItem>
                   )}
                 />
+
                 <FormField
                   control={form.control}
                   name="notes"
@@ -449,6 +455,7 @@ export function PinnedPlaces({
                     </FormItem>
                   )}
                 />
+
                 <DialogFooter>
                   <Button
                     type="submit"
