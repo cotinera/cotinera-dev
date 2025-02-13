@@ -68,7 +68,7 @@ export enum PlaceCategory {
   RELIC = "relic"
 }
 
-const CATEGORY_ICONS: Record<PlaceCategory, React.ComponentType<any>> = {
+const CATEGORY_ICONS: Record<PlaceCategory, React.ComponentType> = {
   [PlaceCategory.FOOD]: UtensilsCrossed,
   [PlaceCategory.BAR]: Beer,
   [PlaceCategory.CAFE]: Coffee,
@@ -354,6 +354,10 @@ export function PinnedPlaces({
     }
   };
 
+  const getIconComponent = (category: PlaceCategory) => {
+    return CATEGORY_ICONS[category] || MapPin;
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -432,7 +436,7 @@ export function PinnedPlaces({
                               {categories.map((category) => (
                                 <SelectItem key={category} value={category}>
                                   <div className="flex items-center gap-2">
-                                    {React.createElement(CATEGORY_ICONS[category], { className: "h-4 w-4" })}
+                                    {React.createElement(getIconComponent(category), { className: "h-4 w-4" })}
                                     <span>{category.replace(/_/g, ' ').toLowerCase()}</span>
                                   </div>
                                 </SelectItem>
@@ -480,7 +484,7 @@ export function PinnedPlaces({
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    {React.createElement(CATEGORY_ICONS[place.category], { className: "h-4 w-4" })}
+                    {React.createElement(getIconComponent(place.category), { className: "h-4 w-4" })}
                     <p className="text-sm font-medium truncate">{place.name}</p>
                   </div>
                 </div>
