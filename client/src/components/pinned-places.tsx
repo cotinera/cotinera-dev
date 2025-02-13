@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Plus, CheckCircle, Pencil, Trash2, Info } from "lucide-react";
+import { MapPin, Plus, CheckCircle, Trash2, Info } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -77,11 +77,10 @@ export function PinnedPlaces({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isAddPlaceOpen, setIsAddPlaceOpen] = useState(false);
-  const [isEditPlaceOpen, setIsEditPlaceOpen] = useState(false);
-  const [selectedPlaceId, setSelectedPlaceId] = useState<number | null>(null);
   const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [placeToDelete, setPlaceToDelete] = useState<PinnedPlace | null>(null);
   const [detailedPlace, setDetailedPlace] = useState<PinnedPlace | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   const form = useForm<AddPinnedPlaceForm>({
     defaultValues: {
@@ -196,10 +195,10 @@ export function PinnedPlaces({
       queryClient.invalidateQueries({
         queryKey: [`/api/trips/${tripId}/pinned-places`]
       });
-      setIsEditPlaceOpen(false);
+      setIsEditing(false);
       editForm.reset();
       setSelectedCoordinates(null);
-      setSelectedPlaceId(null);
+      setDetailedPlace(null);
       toast({
         title: "Success",
         description: "Place updated successfully",
@@ -293,18 +292,39 @@ export function PinnedPlaces({
   };
 
   const onSubmitEdit = (data: AddPinnedPlaceForm) => {
-    if (!selectedPlaceId) return;
-    editPinnedPlaceMutation.mutate({ id: selectedPlaceId, data });
+    if (!detailedPlace) return;
+    editPinnedPlaceMutation.mutate({ id: detailedPlace.id, data });
   };
 
   const handleEditPlace = (place: PinnedPlace) => {
-    setSelectedPlaceId(place.id);
     setSelectedCoordinates(place.coordinates);
     editForm.reset({
       name: place.name,
       notes: place.notes,
     });
-    setIsEditPlaceOpen(true);
+    setDetailedPlace(place);
+    setIsEditing(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!detailedPlace) return;
+
+    try {
+      await editPinnedPlaceMutation.mutateAsync({
+        id: detailedPlace.id,
+        data: editForm.getValues()
+      });
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Failed to save edits:", error);
+    }
+  };
+
+  const handleCloseDetailedView = () => {
+    setDetailedPlace(null);
+    setIsEditing(false);
+    editForm.reset();
+    setSelectedCoordinates(null);
   };
 
   return (
@@ -395,62 +415,6 @@ export function PinnedPlaces({
           </DialogContent>
         </Dialog>
 
-        <Dialog open={isEditPlaceOpen} onOpenChange={setIsEditPlaceOpen}>
-          <DialogContent className="sm:max-w-[800px]">
-            <DialogHeader>
-              <DialogTitle>Edit Pinned Place</DialogTitle>
-              <DialogDescription>
-                Update the location or notes for this pinned place.
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...editForm}>
-              <form onSubmit={editForm.handleSubmit(onSubmitEdit)} className="space-y-4">
-                <FormField
-                  control={editForm.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Location</FormLabel>
-                      <FormControl>
-                        <div className="h-[400px] w-full">
-                          <MapPicker
-                            value={field.value}
-                            onChange={(address, coordinates) => {
-                              field.onChange(address);
-                              setSelectedCoordinates(coordinates);
-                            }}
-                            placeholder="Search for a place..."
-                            existingPins={pinnedPlaces}
-                          />
-                        </div>
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={editForm.control}
-                  name="notes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Notes</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} placeholder="Add any notes about this place..." />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={!selectedCoordinates || editPinnedPlaceMutation.isPending}
-                >
-                  {editPinnedPlaceMutation.isPending ? "Updating..." : "Update Place"}
-                </Button>
-              </form>
-            </Form>
-          </DialogContent>
-        </Dialog>
-
         <AlertDialog open={!!placeToDelete} onOpenChange={(isOpen) => !isOpen && setPlaceToDelete(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -471,31 +435,100 @@ export function PinnedPlaces({
           </AlertDialogContent>
         </AlertDialog>
 
-        <Dialog open={!!detailedPlace} onOpenChange={(isOpen) => !isOpen && setDetailedPlace(null)}>
-          <DialogContent>
+        <Dialog open={!!detailedPlace} onOpenChange={handleCloseDetailedView}>
+          <DialogContent className="sm:max-w-[800px]">
             <DialogHeader>
-              <DialogTitle>{detailedPlace?.name}</DialogTitle>
+              <DialogTitle>
+                {isEditing ? "Edit Place" : detailedPlace?.name}
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              {detailedPlace?.notes && (
-                <div>
-                  <h4 className="text-sm font-medium mb-2">Notes</h4>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {detailedPlace.notes}
-                  </p>
-                </div>
+              {isEditing ? (
+                <Form {...editForm}>
+                  <form className="space-y-4">
+                    <FormField
+                      control={editForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Location</FormLabel>
+                          <FormControl>
+                            <div className="h-[400px] w-full">
+                              <MapPicker
+                                value={field.value}
+                                onChange={(address, coordinates) => {
+                                  field.onChange(address);
+                                  setSelectedCoordinates(coordinates);
+                                }}
+                                placeholder="Search for a place..."
+                                existingPins={pinnedPlaces}
+                              />
+                            </div>
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={editForm.control}
+                      name="notes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Notes</FormLabel>
+                          <FormControl>
+                            <Textarea {...field} placeholder="Add any notes about this place..." />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsEditing(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={handleSaveEdit}
+                        disabled={!selectedCoordinates || editPinnedPlaceMutation.isPending}
+                      >
+                        {editPinnedPlaceMutation.isPending ? "Saving..." : "Save Changes"}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              ) : (
+                <>
+                  {detailedPlace?.notes && (
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">Notes</h4>
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                        {detailedPlace.notes}
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <h4 className="text-sm font-medium mb-2">Location</h4>
+                    <div className="h-[400px]">
+                      <MapPicker
+                        value={detailedPlace?.name || ""}
+                        onChange={() => {}}
+                        existingPins={[detailedPlace].filter(Boolean) as PinnedPlace[]}
+                        readOnly
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button
+                      type="button"
+                      onClick={() => handleEditPlace(detailedPlace)}
+                    >
+                      Edit Place
+                    </Button>
+                  </div>
+                </>
               )}
-              <div>
-                <h4 className="text-sm font-medium mb-2">Location</h4>
-                <div className="h-[200px]">
-                  <MapPicker
-                    value={detailedPlace?.name || ""}
-                    onChange={() => {}}
-                    existingPins={[detailedPlace].filter(Boolean) as PinnedPlace[]}
-                    readOnly
-                  />
-                </div>
-              </div>
             </div>
           </DialogContent>
         </Dialog>
@@ -531,14 +564,6 @@ export function PinnedPlaces({
                       Add to Checklist
                     </Button>
                   )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleEditPlace(place)}
-                    className="p-0 h-8 w-8"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
