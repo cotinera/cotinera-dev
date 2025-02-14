@@ -6,12 +6,6 @@ import { LocationSearchBar } from "./location-search-bar";
 
 const libraries: ("places")[] = ["places"];
 
-// Default coordinates (San Francisco) when no initial center is provided
-const DEFAULT_COORDINATES = {
-  lat: 37.7749,
-  lng: -122.4194
-};
-
 interface PinnedPlace {
   id: number;
   name: string;
@@ -42,14 +36,15 @@ export function MapPicker({
   searchBias,
   onSearchInputRef,
 }: MapPickerProps) {
-  // Initialize coordinates with initialCenter or default coordinates
-  const [coordinates, setCoordinates] = useState<google.maps.LatLngLiteral>(
-    initialCenter && initialCenter.lat && initialCenter.lng
-      ? initialCenter
-      : DEFAULT_COORDINATES
+  // Initialize coordinates with initialCenter if provided and valid
+  const [coordinates, setCoordinates] = useState<google.maps.LatLngLiteral | null>(
+    initialCenter && initialCenter.lat && initialCenter.lng ? initialCenter : null
   );
-
-  const [mapCenter, setMapCenter] = useState<google.maps.LatLngLiteral>(coordinates);
+  const [mapCenter, setMapCenter] = useState<google.maps.LatLngLiteral>(
+    initialCenter && initialCenter.lat && initialCenter.lng 
+      ? initialCenter 
+      : { lat: 0, lng: 0 } // This will be updated when the map loads
+  );
   const [map, setMap] = useState<google.maps.Map | null>(null);
 
   // Update coordinates and map center when initialCenter changes
@@ -59,14 +54,15 @@ export function MapPicker({
         lat: initialCenter.lat,
         lng: initialCenter.lng
       };
-      setCoordinates(newCoords);
       setMapCenter(newCoords);
-      // If map exists, pan to the new location
+      if (!coordinates) {
+        setCoordinates(newCoords);
+      }
       if (map) {
         map.panTo(newCoords);
       }
     }
-  }, [initialCenter, map]);
+  }, [initialCenter, map, coordinates]);
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
@@ -151,12 +147,13 @@ export function MapPicker({
           onChange={(address, coords, name) => {
             if (coords) {
               setCoordinates(coords);
+              setMapCenter(coords);
             }
-            onChange(address, coords || coordinates, name);
+            onChange(address, coords || mapCenter, name);
           }}
           placeholder={placeholder}
           className="flex-1"
-          searchBias={mapCenter ? { ...mapCenter, radius: 5000 } : undefined}
+          searchBias={searchBias}
           onInputRef={onSearchInputRef}
         />
       )}
