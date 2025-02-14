@@ -662,7 +662,7 @@ export function PinnedPlaces({
                     <FormControl>
                       <div className="h-[400px] w-full">
                         <MapPicker
-                          value={field.value}
+                          value={field.value || ""}
                           onChange={(address, coordinates, name) => {
                             field.onChange(address);
                             setEditedPlaceCoordinates(coordinates);

@@ -27,8 +27,8 @@ interface MapPickerProps {
 }
 
 const DEFAULT_CENTER = {
-  lat: 40.7128,
-  lng: -74.0060, // New York City
+  lat: 37.7749,
+  lng: -122.4194, // San Francisco - a more central default location
 };
 
 export function MapPicker({
