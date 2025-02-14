@@ -246,9 +246,12 @@ export function PinnedPlaces({
       return newPlace;
     },
     onSuccess: (newPlace) => {
-      queryClient.setQueryData<PinnedPlace[]>(
+      queryClient.setQueryData<{ tripLocation: { lat: number; lng: number } | null; places: PinnedPlace[] }>(
         [`/api/trips/${tripId}/pinned-places`, destinationId],
-        (old) => [...(old || []), newPlace]
+        (old) => ({
+          tripLocation: old?.tripLocation || null,
+          places: [...(old?.places || []), newPlace]
+        })
       );
 
       queryClient.invalidateQueries({
@@ -380,11 +383,14 @@ export function PinnedPlaces({
       return res.json();
     },
     onSuccess: (updatedPlace) => {
-      queryClient.setQueryData<PinnedPlace[]>(
+      queryClient.setQueryData<{ tripLocation: { lat: number; lng: number } | null; places: PinnedPlace[] }>(
         [`/api/trips/${tripId}/pinned-places`, destinationId],
-        (old) => old?.map(place =>
-          place.id === updatedPlace.id ? updatedPlace : place
-        ) || []
+        (old) => ({
+          tripLocation: old?.tripLocation || null,
+          places: old?.places?.map(place =>
+            place.id === updatedPlace.id ? updatedPlace : place
+          ) || []
+        })
       );
 
       setPlaceToEdit(null);
