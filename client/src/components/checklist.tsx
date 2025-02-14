@@ -69,10 +69,6 @@ export function Checklist({ tripId }: ChecklistProps) {
       queryClient.invalidateQueries({
         queryKey: [`/api/trips/${tripId}/checklist`],
       });
-      toast({
-        title: "Success",
-        description: "Item deleted successfully",
-      });
     },
     onError: (error: Error) => {
       console.error("Delete error:", error);
