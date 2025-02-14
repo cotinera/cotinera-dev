@@ -902,6 +902,8 @@ export function registerRoutes(app: Express): Server {
   // Add a new destination to a trip
   app.post("/api/trips/:tripId/destinations", async (req, res) => {    try {      const tripId= parseInt(req.params.tripId);
 
+
+
       // Get current max order
       const [result] = await db
         .select({ maxOrder: sql`MAX(${destinations.order})` })
@@ -993,22 +995,34 @@ export function registerRoutes(app: Express): Server {
     try {
       const tripId = parseInt(req.params.tripId);
       const destinationId = req.query.destinationId ? parseInt(req.query.destinationId as string) : undefined;
-      const category = req.query.category ? req.query.category as string : undefined;
 
-      const places = await db
-        .select()
+      // First get the trip's location coordinates
+      const [trip] = await db.select({
+        location: trips.location,
+        coordinates: destinations.coordinates,
+      })
+      .from(trips)
+      .leftJoin(destinations, and(
+        eq(destinations.tripId, trips.id),
+        eq(destinations.order, 1)
+      ))
+      .where(eq(trips.id, tripId))
+      .limit(1);
+
+      // Then get the pinned places
+      const places = await db.select()
         .from(pinnedPlaces)
         .where(
-          destinationId && category
-            ? and(eq(pinnedPlaces.tripId, tripId), eq(pinnedPlaces.destinationId, destinationId), eq(pinnedPlaces.category, category))
-            : destinationId
-              ? and(eq(pinnedPlaces.tripId, tripId), eq(pinnedPlaces.destinationId, destinationId))
-              : category
-                ? eq(pinnedPlaces.category, category)
-                : eq(pinnedPlaces.tripId, tripId)
+          destinationId
+            ? and(eq(pinnedPlaces.tripId, tripId), eq(pinnedPlaces.destinationId, destinationId))
+            : eq(pinnedPlaces.tripId, tripId)
         );
 
-      res.json(places);
+      // Return both trip coordinates and pinned places
+      res.json({
+        tripLocation: trip?.coordinates || null,
+        places
+      });
     } catch (error) {
       console.error('Error fetching pinned places:', error);
       res.status(500).json({ error: 'Failed to fetch pinned places' });

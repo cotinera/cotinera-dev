@@ -195,7 +195,7 @@ export function PinnedPlaces({
     }
   }, [placeToEdit, editForm]);
 
-  const pinnedPlacesQuery = useQuery<PinnedPlace[]>({
+  const pinnedPlacesQuery = useQuery<{ tripLocation: { lat: number; lng: number } | null; places: PinnedPlace[] }>({
     queryKey: [`/api/trips/${tripId}/pinned-places`, destinationId],
     queryFn: async () => {
       const url = new URL(`/api/trips/${tripId}/pinned-places`, window.location.origin);
@@ -212,6 +212,9 @@ export function PinnedPlaces({
       return res.json();
     },
   });
+
+  const existingPins = pinnedPlacesQuery.data?.places || [];
+  const tripLocation = pinnedPlacesQuery.data?.tripLocation || tripCoordinates;
 
   const addPinnedPlaceMutation = useMutation({
     mutationFn: async (data: AddPinnedPlaceForm) => {
@@ -315,7 +318,7 @@ export function PinnedPlaces({
         headers: { "Content-Type": "application/json" },
         credentials: 'include',
         body: JSON.stringify({
-          title: `Visit ${pinnedPlacesQuery.data?.find(p => p.id === placeId)?.name || 'place'}`,
+          title: `Visit ${pinnedPlacesQuery.data?.places.find(p => p.id === placeId)?.name || 'place'}`,
         }),
       });
 
@@ -501,10 +504,10 @@ export function PinnedPlaces({
                               setSelectedPlaceName(name || address);
                             }}
                             placeholder="Search for a place to pin..."
-                            existingPins={pinnedPlacesQuery.data || []}
-                            initialCenter={tripCoordinates}
-                            searchBias={tripCoordinates ? {
-                              ...tripCoordinates,
+                            existingPins={existingPins}
+                            initialCenter={tripLocation}
+                            searchBias={tripLocation ? {
+                              ...tripLocation,
                               radius: 50000
                             } : undefined}
                             onSearchInputRef={setSearchInputRef}
@@ -578,7 +581,7 @@ export function PinnedPlaces({
       <CardContent>
         <ScrollArea className="h-[200px] w-full rounded-md">
           <div className="space-y-2">
-            {(pinnedPlacesQuery.data || []).map((place) => {
+            {existingPins.map((place) => {
               const Icon = getIconComponent(place.category);
               return (
                 <div
@@ -624,7 +627,7 @@ export function PinnedPlaces({
                 </div>
               );
             })}
-            {(pinnedPlacesQuery.data || []).length === 0 && (
+            {existingPins.length === 0 && (
               <p className="text-center text-muted-foreground py-4">
                 No places pinned yet
               </p>
@@ -660,10 +663,10 @@ export function PinnedPlaces({
                             setEditedPlaceName(name || address);
                           }}
                           placeholder="Search for a place to pin..."
-                          existingPins={pinnedPlacesQuery.data?.filter(p => p.id !== placeToEdit?.id) || []}
-                          initialCenter={placeToEdit?.coordinates}
-                          searchBias={tripCoordinates ? {
-                            ...tripCoordinates,
+                          existingPins={existingPins.filter(p => p.id !== placeToEdit?.id)}
+                          initialCenter={placeToEdit?.coordinates || tripLocation}
+                          searchBias={tripLocation ? {
+                            ...tripLocation,
                             radius: 50000
                           } : undefined}
                           onSearchInputRef={setSearchInputRef}
