@@ -195,6 +195,19 @@ export function PinnedPlaces({
     }
   }, [placeToEdit, editForm]);
 
+  useEffect(() => {
+    if (isAddPlaceOpen) {
+      form.reset({
+        address: "",
+        notes: "",
+        category: PlaceCategory.TOURIST,
+      });
+      if (tripCoordinates) {
+        setSelectedCoordinates(tripCoordinates);
+      }
+    }
+  }, [isAddPlaceOpen, tripCoordinates]);
+
   const pinnedPlacesQuery = useQuery<{ tripLocation: { lat: number; lng: number } | null; places: PinnedPlace[] }>({
     queryKey: [`/api/trips/${tripId}/pinned-places`, destinationId],
     queryFn: async () => {
@@ -511,7 +524,7 @@ export function PinnedPlaces({
                             }}
                             placeholder="Search for a place to pin..."
                             existingPins={existingPins}
-                            initialCenter={tripCoordinates || tripLocation || undefined}
+                            initialCenter={tripCoordinates}
                             searchBias={tripCoordinates ? {
                               ...tripCoordinates,
                               radius: 50000 // 50km radius around trip location
@@ -670,9 +683,9 @@ export function PinnedPlaces({
                           }}
                           placeholder="Search for a place to pin..."
                           existingPins={existingPins.filter(p => p.id !== placeToEdit?.id)}
-                          initialCenter={placeToEdit?.coordinates || tripLocation}
-                          searchBias={tripLocation ? {
-                            ...tripLocation,
+                          initialCenter={placeToEdit?.coordinates || tripCoordinates}
+                          searchBias={tripCoordinates ? {
+                            ...tripCoordinates,
                             radius: 50000
                           } : undefined}
                           onSearchInputRef={setSearchInputRef}
