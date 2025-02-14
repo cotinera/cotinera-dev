@@ -37,7 +37,7 @@ export function MapPicker({
   onSearchInputRef,
 }: MapPickerProps) {
   const [coordinates, setCoordinates] = useState<google.maps.LatLngLiteral>(
-    initialCenter || { lat: 37.7749, lng: -122.4194 } // Default to San Francisco only if no initial center provided
+    initialCenter || { lat: 0, lng: 0 } 
   );
   const [mapCenter, setMapCenter] = useState<google.maps.LatLngLiteral>(coordinates);
   const [map, setMap] = useState<google.maps.Map | null>(null);

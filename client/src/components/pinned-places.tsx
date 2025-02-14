@@ -159,7 +159,9 @@ export function PinnedPlaces({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isAddPlaceOpen, setIsAddPlaceOpen] = useState(false);
-  const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(
+    tripCoordinates || null
+  );
   const [placeToDelete, setPlaceToDelete] = useState<PinnedPlace | null>(null);
   const [placeToEdit, setPlaceToEdit] = useState<PinnedPlace | null>(null);
   const [selectedPlaceName, setSelectedPlaceName] = useState<string>("");
@@ -196,13 +198,15 @@ export function PinnedPlaces({
   }, [placeToEdit, editForm]);
 
   useEffect(() => {
-    if (isAddPlaceOpen && tripCoordinates) {
+    if (isAddPlaceOpen) {
       form.reset({
         address: "",
         notes: "",
         category: PlaceCategory.TOURIST,
       });
-      setSelectedCoordinates(tripCoordinates);
+      if (tripCoordinates) {
+        setSelectedCoordinates(tripCoordinates);
+      }
     }
   }, [isAddPlaceOpen, tripCoordinates, form]);
 
