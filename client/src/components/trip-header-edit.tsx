@@ -40,20 +40,25 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  // Format dates for the form
+  const formatDateForInput = (dateString: string | Date) => {
+    const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
+    return format(date, 'yyyy-MM-dd');
+  };
+
   // Initialize form with existing trip data
   const form = useForm<EditTripData>({
     resolver: zodResolver(editTripSchema),
     defaultValues: {
       title: trip.title,
-      location: trip.location,
-      startDate: trip.startDate.split('T')[0], // Ensure we get just the date part
-      endDate: trip.endDate.split('T')[0],     // Ensure we get just the date part
+      location: trip.location || '',
+      startDate: formatDateForInput(trip.startDate),
+      endDate: formatDateForInput(trip.endDate),
     },
   });
 
   const updateTripMutation = useMutation({
     mutationFn: async (data: EditTripData) => {
-      console.log('Sending dates to server:', data.startDate, data.endDate); // Debug log
       const res = await fetch(`/api/trips/${trip.id}`, {
         method: "PATCH",
         headers: {
@@ -62,23 +67,18 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
         body: JSON.stringify({
           ...data,
           coordinates,
-          startDate: data.startDate,
-          endDate: data.endDate,
         }),
         credentials: 'include'
       });
+
       if (!res.ok) {
         throw new Error(await res.text());
       }
-      const updatedTrip = await res.json();
-      console.log('Received updated trip:', updatedTrip); // Debug log
-      return updatedTrip;
+
+      return res.json();
     },
     onSuccess: (updatedTrip) => {
-      // Update both the detailed trip view and the trips list cache
       queryClient.setQueryData(["/api/trips", trip.id], updatedTrip);
-
-      // Update the trip in the trips list cache
       queryClient.setQueryData(["/api/trips"], (oldData: Trip[] | undefined) => {
         if (!oldData) return oldData;
         return oldData.map(t => t.id === trip.id ? updatedTrip : t);
