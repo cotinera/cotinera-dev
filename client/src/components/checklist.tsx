@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Plus, Pencil } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface ChecklistProps {
@@ -38,6 +38,38 @@ export function Checklist({ tripId }: ChecklistProps) {
       return res.json();
     },
     enabled: !!tripId,
+  });
+
+  const deleteItem = useMutation({
+    mutationFn: async (itemId: number) => {
+      const res = await fetch(`/api/trips/${tripId}/checklist/${itemId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || "Failed to delete checklist item");
+      }
+
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [`/api/trips/${tripId}/checklist`],
+      });
+      toast({
+        title: "Success",
+        description: "Item deleted successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to delete item",
+      });
+    },
   });
 
   const createItem = useMutation({
@@ -143,6 +175,11 @@ export function Checklist({ tripId }: ChecklistProps) {
     updateItem.mutate({ id: item.id, title: editingTitle, completed: item.completed });
   };
 
+  const handleDeleteItem = (itemId: number) => {
+    if (!tripId) return;
+    deleteItem.mutate(itemId);
+  };
+
   if (!tripId) {
     return (
       <Card>
@@ -221,14 +258,24 @@ export function Checklist({ tripId }: ChecklistProps) {
                   >
                     {item.title}
                   </label>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="opacity-0 group-hover:opacity-100 h-6 w-6"
-                    onClick={() => startEditing(item)}
-                  >
-                    <Pencil className="h-3 w-3" />
-                  </Button>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => startEditing(item)}
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteItem(item.id)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
                 </>
               )}
             </div>
