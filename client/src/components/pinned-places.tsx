@@ -82,6 +82,16 @@ export function PinnedPlaces({
     },
   });
 
+  // Reset form and selection state when dialog closes
+  const handleDialogOpenChange = (open: boolean) => {
+    if (!open) {
+      form.reset();
+      setSelectedCoordinates(null);
+      setSelectedPlaceName("");
+    }
+    setIsAddPlaceOpen(open);
+  };
+
   const addPinnedPlaceMutation = useMutation({
     mutationFn: async (data: AddPinnedPlaceForm) => {
       if (!selectedCoordinates || !selectedPlaceName) {
@@ -288,7 +298,7 @@ export function PinnedPlaces({
           </div>
         </CardTitle>
 
-        <Dialog open={isAddPlaceOpen} onOpenChange={setIsAddPlaceOpen}>
+        <Dialog open={isAddPlaceOpen} onOpenChange={handleDialogOpenChange}>
           <DialogTrigger asChild>
             <Button
               variant="outline"
@@ -324,6 +334,7 @@ export function PinnedPlaces({
                           ...tripCoordinates,
                           radius: 50000
                         } : undefined}
+                        autoFocus={true}
                       />
                     </div>
                   </FormControl>

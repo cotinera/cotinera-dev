@@ -23,6 +23,7 @@ interface MapPickerProps {
   readOnly?: boolean;
   initialCenter?: { lat: number; lng: number } | null;
   searchBias?: { lat: number; lng: number; radius?: number };
+  autoFocus?: boolean;
 }
 
 const DEFAULT_CENTER = {
@@ -38,6 +39,7 @@ export function MapPicker({
   readOnly = false,
   initialCenter,
   searchBias,
+  autoFocus = false,
 }: MapPickerProps) {
   const [coordinates, setCoordinates] = useState<google.maps.LatLngLiteral>(
     initialCenter && initialCenter.lat && initialCenter.lng ? initialCenter : DEFAULT_CENTER
@@ -52,11 +54,11 @@ export function MapPicker({
   });
 
   useEffect(() => {
-    // Focus the search input when the component mounts
-    if (searchInputRef.current && !readOnly) {
+    // Focus the search input when the component mounts if autoFocus is true
+    if (searchInputRef.current && !readOnly && autoFocus) {
       searchInputRef.current.focus();
     }
-  }, [readOnly]);
+  }, [readOnly, autoFocus]);
 
   // Handle map click events
   const handleMapClick = async (e: google.maps.MapMouseEvent) => {
