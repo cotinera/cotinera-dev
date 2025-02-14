@@ -511,10 +511,10 @@ export function PinnedPlaces({
                             }}
                             placeholder="Search for a place to pin..."
                             existingPins={existingPins}
-                            initialCenter={tripLocation}
-                            searchBias={tripLocation ? {
-                              ...tripLocation,
-                              radius: 50000
+                            initialCenter={tripCoordinates || tripLocation || undefined}
+                            searchBias={tripCoordinates ? {
+                              ...tripCoordinates,
+                              radius: 50000 // 50km radius around trip location
                             } : undefined}
                             onSearchInputRef={setSearchInputRef}
                           />
