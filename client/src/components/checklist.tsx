@@ -45,11 +45,22 @@ export function Checklist({ tripId }: ChecklistProps) {
       const res = await fetch(`/api/trips/${tripId}/checklist/${itemId}`, {
         method: "DELETE",
         credentials: "include",
+        headers: {
+          "Accept": "application/json",
+        },
       });
 
-      if (!res.ok) {
+      // Check if the response is JSON
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        // If not JSON, try to get the error message from the text
         const errorText = await res.text();
         throw new Error(errorText || "Failed to delete checklist item");
+      }
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.message || "Failed to delete checklist item");
       }
 
       return res.json();
@@ -64,6 +75,7 @@ export function Checklist({ tripId }: ChecklistProps) {
       });
     },
     onError: (error: Error) => {
+      console.error("Delete error:", error);
       toast({
         variant: "destructive",
         title: "Error",
