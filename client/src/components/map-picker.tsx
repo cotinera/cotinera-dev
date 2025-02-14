@@ -6,6 +6,12 @@ import { LocationSearchBar } from "./location-search-bar";
 
 const libraries: ("places")[] = ["places"];
 
+// Default coordinates (San Francisco) when no initial center is provided
+const DEFAULT_COORDINATES = {
+  lat: 37.7749,
+  lng: -122.4194
+};
+
 interface PinnedPlace {
   id: number;
   name: string;
@@ -36,11 +42,14 @@ export function MapPicker({
   searchBias,
   onSearchInputRef,
 }: MapPickerProps) {
-  // Initialize coordinates with initialCenter, ensuring it's valid
+  // Initialize coordinates with initialCenter or default coordinates
   const [coordinates, setCoordinates] = useState<google.maps.LatLngLiteral>(
-    initialCenter && initialCenter.lat && initialCenter.lng ? initialCenter : undefined
+    initialCenter && initialCenter.lat && initialCenter.lng
+      ? initialCenter
+      : DEFAULT_COORDINATES
   );
-  const [mapCenter, setMapCenter] = useState<google.maps.LatLngLiteral | undefined>(coordinates);
+
+  const [mapCenter, setMapCenter] = useState<google.maps.LatLngLiteral>(coordinates);
   const [map, setMap] = useState<google.maps.Map | null>(null);
 
   // Update coordinates and map center when initialCenter changes
@@ -147,7 +156,7 @@ export function MapPicker({
           }}
           placeholder={placeholder}
           className="flex-1"
-          searchBias={{ ...mapCenter, radius: 5000 }}
+          searchBias={mapCenter ? { ...mapCenter, radius: 5000 } : undefined}
           onInputRef={onSearchInputRef}
         />
       )}
@@ -155,7 +164,7 @@ export function MapPicker({
         <GoogleMap
           mapContainerStyle={{ width: "100%", height: "100%" }}
           zoom={13}
-          center={mapCenter as google.maps.LatLngLiteral}
+          center={mapCenter}
           onClick={handleMapClick}
           onLoad={onLoad}
           onIdle={onIdle}
@@ -166,7 +175,7 @@ export function MapPicker({
           }}
         >
           {/* Show temporary marker for new pin */}
-          {!readOnly && <MarkerF position={coordinates as google.maps.LatLng} />}
+          {!readOnly && coordinates && <MarkerF position={coordinates} />}
 
           {/* Show existing pins */}
           {existingPins.map((pin) => (
