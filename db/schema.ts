@@ -5,11 +5,7 @@ import {
   timestamp, 
   boolean,
   json,
-  date,
   integer,
-  uuid,
-  time,
-  numeric
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
@@ -40,8 +36,8 @@ export const trips = pgTable("trips", {
     lat: number;
     lng: number;
   }>(),
-  startDate: date("start_date").notNull(),
-  endDate: date("end_date").notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
   thumbnail: text("thumbnail"),
   ownerId: integer("owner_id").notNull().references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
@@ -53,8 +49,8 @@ export const destinations = pgTable("destinations", {
   tripId: integer("trip_id").notNull().references(() => trips.id),
   name: text("name").notNull(),
   description: text("description"),
-  startDate: date("start_date").notNull(),
-  endDate: date("end_date").notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
   coordinates: json("coordinates").$type<{
     lat: number;
     lng: number;
@@ -79,7 +75,7 @@ export const activitySuggestions = pgTable("activity_suggestions", {
   title: text("title").notNull(),
   description: text("description"),
   location: text("location"),
-  estimatedCost: numeric("estimated_cost"),
+  estimatedCost: integer("estimated_cost"),
   currency: text("currency").default("USD"),
   startTime: timestamp("start_time"),
   endTime: timestamp("end_time"),
@@ -100,10 +96,10 @@ export const expenses = pgTable("expenses", {
   tripId: integer("trip_id").notNull().references(() => trips.id),
   paidBy: integer("paid_by").notNull().references(() => users.id),
   title: text("title").notNull(),
-  amount: numeric("amount").notNull(),
+  amount: integer("amount").notNull(),
   currency: text("currency").default("USD"),
   category: text("category").notNull(), 
-  date: date("date").notNull(),
+  date: timestamp("date").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -111,7 +107,7 @@ export const expenseSplits = pgTable("expense_splits", {
   id: serial("id").primaryKey(),
   expenseId: integer("expense_id").notNull().references(() => expenses.id),
   userId: integer("user_id").notNull().references(() => users.id),
-  amount: numeric("amount").notNull(),
+  amount: integer("amount").notNull(),
   status: text("status").notNull().default('pending'), 
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -122,7 +118,7 @@ export const taskAssignments = pgTable("task_assignments", {
   assignedTo: integer("assigned_to").notNull().references(() => users.id),
   title: text("title").notNull(),
   description: text("description"),
-  dueDate: date("due_date"),
+  dueDate: timestamp("due_date"),
   status: text("status").notNull().default('pending'), 
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -134,10 +130,10 @@ export const flights = pgTable("flights", {
   flightNumber: text("flight_number").notNull(),
   departureAirport: text("departure_airport").notNull(),
   arrivalAirport: text("arrival_airport").notNull(),
-  departureDate: date("departure_date").notNull(),
-  departureTime: time("departure_time").notNull(),
-  arrivalDate: date("arrival_date").notNull(),
-  arrivalTime: time("arrival_time").notNull(),
+  departureDate: timestamp("departure_date").notNull(),
+  departureTime: timestamp("departure_time").notNull(),
+  arrivalDate: timestamp("arrival_date").notNull(),
+  arrivalTime: timestamp("arrival_time").notNull(),
   bookingReference: text("booking_reference").notNull(),
   bookingStatus: text("booking_status").notNull(), 
   price: integer("price"), 
@@ -152,10 +148,10 @@ export const accommodations = pgTable("accommodations", {
   name: text("name").notNull(), 
   type: text("type").notNull(), 
   address: text("address").notNull(),
-  checkInDate: date("check_in_date").notNull(),
-  checkOutDate: date("check_out_date").notNull(),
-  checkInTime: time("check_in_time"),
-  checkOutTime: time("check_out_time"),
+  checkInDate: timestamp("check_in_date").notNull(),
+  checkOutDate: timestamp("check_out_date").notNull(),
+  checkInTime: timestamp("check_in_time"),
+  checkOutTime: timestamp("check_out_time"),
   bookingReference: text("booking_reference").notNull(),
   bookingStatus: text("booking_status").notNull(), 
   price: integer("price"), 
@@ -168,7 +164,7 @@ export const accommodations = pgTable("accommodations", {
 export const shareLinks = pgTable("share_links", {
   id: serial("id").primaryKey(),
   tripId: integer("trip_id").notNull().references(() => trips.id),
-  token: uuid("token").notNull().defaultRandom(),
+  token: text("token").notNull(), // Remove default value - will be set by the API
   createdAt: timestamp("created_at").defaultNow(),
   expiresAt: timestamp("expires_at"),
   isActive: boolean("is_active").default(true),
@@ -181,8 +177,8 @@ export const participants = pgTable("participants", {
   userId: integer("user_id").references(() => users.id),
   name: text("name"),
   status: text("status").notNull().default('pending'),
-  arrivalDate: date("arrival_date"),
-  departureDate: date("departure_date"),
+  arrivalDate: timestamp("arrival_date"),
+  departureDate: timestamp("departure_date"),
   flightStatus: text("flight_status").notNull().default('pending'),
   hotelStatus: text("hotel_status").notNull().default('pending'),
 });
@@ -227,7 +223,6 @@ export const pinnedPlaces = pgTable("pinned_places", {
   }>(),
   destinationId: integer("destination_id").references(() => destinations.id),
   addedToChecklist: boolean("added_to_checklist").notNull().default(false),
-  category: text("category").notNull().default('other'), // Adding category field
   createdAt: timestamp("created_at").defaultNow(),
 });
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MapPicker } from "@/components/map-picker";
 import {
@@ -89,28 +89,31 @@ export function PinnedPlaces({
       }
 
       const payload = {
-        tripId,
         name: selectedPlaceName,
-        notes: data.notes || "",
+        notes: data.notes,
         coordinates: selectedCoordinates,
         destinationId: destinationId || null,
-        addedToChecklist: false
       };
+
+      console.log('Sending payload:', payload);
 
       const res = await fetch(`/api/trips/${tripId}/pinned-places`, {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
         },
-        credentials: 'include',
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
-        throw new Error("Failed to add pinned place");
+        const errorText = await res.text();
+        console.error('Server error:', errorText);
+        throw new Error(errorText || "Failed to add pinned place");
       }
 
-      return res.json();
+      const result = await res.json();
+      console.log('Success response:', result);
+      return result;
     },
     onSuccess: (newPlace) => {
       queryClient.setQueryData<PinnedPlace[]>(
@@ -137,6 +140,7 @@ export function PinnedPlaces({
       });
     },
     onError: (error: Error) => {
+      console.error('Error adding place:', error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -231,6 +235,12 @@ export function PinnedPlaces({
   };
 
   const onSubmit = async (data: AddPinnedPlaceForm) => {
+    console.log('Form submission:', {
+      data,
+      selectedCoordinates,
+      selectedPlaceName
+    });
+
     if (!selectedCoordinates || !selectedPlaceName) {
       toast({
         variant: "destructive",
@@ -262,7 +272,7 @@ export function PinnedPlaces({
       }
       const res = await fetch(url);
       if (!res.ok) {
-        throw new Error(await res.text());
+        throw new Error("Failed to fetch pinned places");
       }
       return res.json();
     },
