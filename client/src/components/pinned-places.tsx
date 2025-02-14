@@ -213,7 +213,8 @@ export function PinnedPlaces({
         notes: "",
         category: PlaceCategory.TOURIST,
       });
-      if (tripCoordinates) {
+      // Only set coordinates if they are valid (not 0,0)
+      if (tripCoordinates && (tripCoordinates.lat !== 0 || tripCoordinates.lng !== 0)) {
         setSelectedCoordinates(tripCoordinates);
       }
     }
