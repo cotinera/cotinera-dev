@@ -148,6 +148,15 @@ interface PinnedPlacesProps {
   tripCoordinates?: { lat: number; lng: number };
 }
 
+// Add helper function for formatting category names
+const formatCategoryName = (category: string): string => {
+  return category
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
+
+
 export function PinnedPlaces({
   tripId,
   destinationId,
@@ -561,7 +570,7 @@ export function PinnedPlaces({
                                   <SelectItem key={category} value={category}>
                                     <div className="flex items-center gap-2">
                                       <Icon className="h-4 w-4" />
-                                      <span>{category.replace(/_/g, ' ').toLowerCase()}</span>
+                                      <span>{formatCategoryName(category)}</span>
                                     </div>
                                   </SelectItem>
                                 );
@@ -720,7 +729,7 @@ export function PinnedPlaces({
                                 <SelectItem key={category} value={category}>
                                   <div className="flex items-center gap-2">
                                     <Icon className="h-4 w-4" />
-                                    <span>{category.replace(/_/g, ' ').toLowerCase()}</span>
+                                    <span>{formatCategoryName(category)}</span>
                                   </div>
                                 </SelectItem>
                               );
