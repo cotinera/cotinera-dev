@@ -459,6 +459,33 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Delete checklist item
+  app.delete("/api/trips/:tripId/checklist/:itemId", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const itemId = parseInt(req.params.itemId);
+
+      const [deletedItem] = await db
+        .delete(checklist)
+        .where(
+          and(
+            eq(checklist.id, itemId),
+            eq(checklist.tripId, tripId)
+          )
+        )
+        .returning();
+
+      if (!deletedItem) {
+        return res.status(404).json({ error: "Checklist item not found" });
+      }
+
+      res.json(deletedItem);
+    } catch (error) {
+      console.error('Error deleting checklist item:', error);
+      res.status(500).json({ error: 'Failed to delete checklist item' });
+    }
+  });
+
   // Documents
   app.post("/api/trips/:tripId/documents", async (req, res) => {
     if (!req.isAuthenticated()) {
@@ -903,7 +930,6 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/trips/:tripId/destinations", async (req, res) => {    try {      const tripId= parseInt(req.params.tripId);
 
 
-
       // Get current max order
       const [result] = await db
         .select({ maxOrder: sql`MAX(${destinations.order})` })
@@ -1001,13 +1027,13 @@ export function registerRoutes(app: Express): Server {
         location: trips.location,
         coordinates: destinations.coordinates,
       })
-      .from(trips)
-      .leftJoin(destinations, and(
-        eq(destinations.tripId, trips.id),
-        eq(destinations.order, 1)
-      ))
-      .where(eq(trips.id, tripId))
-      .limit(1);
+        .from(trips)
+        .leftJoin(destinations, and(
+          eq(destinations.tripId, trips.id),
+          eq(destinations.order, 1)
+        ))
+        .where(eq(trips.id, tripId))
+        .limit(1);
 
       // Then get the pinned places
       const places = await db.select()
