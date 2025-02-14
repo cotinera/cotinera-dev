@@ -40,20 +40,26 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Format dates for the form
-  const formatDateForInput = (dateString: string | Date) => {
-    const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
-    return format(date, 'yyyy-MM-dd');
+  // Format dates for the form with validation
+  const formatDateForInput = (dateString: string | Date | null) => {
+    if (!dateString) return "";
+    try {
+      const date = typeof dateString === 'string' ? parseISO(dateString) : dateString;
+      return format(date, 'yyyy-MM-dd');
+    } catch (error) {
+      console.error('Date parsing error:', error);
+      return "";
+    }
   };
 
   // Initialize form with existing trip data
   const form = useForm<EditTripData>({
     resolver: zodResolver(editTripSchema),
     defaultValues: {
-      title: trip.title,
-      location: trip.location || '',
-      startDate: formatDateForInput(trip.startDate),
-      endDate: formatDateForInput(trip.endDate),
+      title: trip.title || "",
+      location: trip.location || "",
+      startDate: formatDateForInput(trip.startDate) || new Date().toISOString().split('T')[0],
+      endDate: formatDateForInput(trip.endDate) || new Date().toISOString().split('T')[0],
     },
   });
 
@@ -116,8 +122,7 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
         <div className="flex items-center justify-center gap-2 text-muted-foreground mt-1 hover:text-primary/80 transition-colors">
           <Calendar className="h-4 w-4" />
           <span>
-            {format(new Date(trip.startDate), "MMM d, yyyy")} -{" "}
-            {format(new Date(trip.endDate), "MMM d, yyyy")}
+            {formatDateForInput(trip.startDate)} - {formatDateForInput(trip.endDate)}
           </span>
         </div>
         <div className="mt-4">
