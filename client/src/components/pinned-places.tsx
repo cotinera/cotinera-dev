@@ -168,9 +168,7 @@ export function PinnedPlaces({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isAddPlaceOpen, setIsAddPlaceOpen] = useState(false);
-  const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(
-    tripCoordinates || null
-  );
+  const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [placeToDelete, setPlaceToDelete] = useState<PinnedPlace | null>(null);
   const [placeToEdit, setPlaceToEdit] = useState<PinnedPlace | null>(null);
   const [selectedPlaceName, setSelectedPlaceName] = useState<string>("");
@@ -213,12 +211,9 @@ export function PinnedPlaces({
         notes: "",
         category: PlaceCategory.TOURIST,
       });
-      // Only set coordinates if they are valid (not 0,0)
-      if (tripCoordinates && (tripCoordinates.lat !== 0 || tripCoordinates.lng !== 0)) {
-        setSelectedCoordinates(tripCoordinates);
-      }
+      setSelectedCoordinates(null);
     }
-  }, [isAddPlaceOpen, tripCoordinates, form]);
+  }, [isAddPlaceOpen, form]);
 
   const pinnedPlacesQuery = useQuery<{ tripLocation: { lat: number; lng: number } | null; places: PinnedPlace[] }>({
     queryKey: [`/api/trips/${tripId}/pinned-places`, destinationId],
