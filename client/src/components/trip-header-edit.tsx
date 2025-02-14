@@ -40,31 +40,20 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  // Format dates for the form with validation
-  const formatDateForInput = (dateString: string | Date | null) => {
-    if (!dateString) return "";
-    try {
-      const date = typeof dateString === 'string' ? parseISO(dateString) : dateString;
-      return format(date, 'yyyy-MM-dd');
-    } catch (error) {
-      console.error('Date parsing error:', error);
-      return "";
-    }
-  };
-
   // Initialize form with existing trip data
   const form = useForm<EditTripData>({
     resolver: zodResolver(editTripSchema),
     defaultValues: {
-      title: trip.title || "",
-      location: trip.location || "",
-      startDate: formatDateForInput(trip.startDate) || new Date().toISOString().split('T')[0],
-      endDate: formatDateForInput(trip.endDate) || new Date().toISOString().split('T')[0],
+      title: trip.title,
+      location: trip.location,
+      startDate: trip.startDate.split('T')[0], // Ensure we get just the date part
+      endDate: trip.endDate.split('T')[0],     // Ensure we get just the date part
     },
   });
 
   const updateTripMutation = useMutation({
     mutationFn: async (data: EditTripData) => {
+      console.log('Sending dates to server:', data.startDate, data.endDate); // Debug log
       const res = await fetch(`/api/trips/${trip.id}`, {
         method: "PATCH",
         headers: {
@@ -73,18 +62,23 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
         body: JSON.stringify({
           ...data,
           coordinates,
+          startDate: data.startDate,
+          endDate: data.endDate,
         }),
         credentials: 'include'
       });
-
       if (!res.ok) {
         throw new Error(await res.text());
       }
-
-      return res.json();
+      const updatedTrip = await res.json();
+      console.log('Received updated trip:', updatedTrip); // Debug log
+      return updatedTrip;
     },
     onSuccess: (updatedTrip) => {
+      // Update both the detailed trip view and the trips list cache
       queryClient.setQueryData(["/api/trips", trip.id], updatedTrip);
+
+      // Update the trip in the trips list cache
       queryClient.setQueryData(["/api/trips"], (oldData: Trip[] | undefined) => {
         if (!oldData) return oldData;
         return oldData.map(t => t.id === trip.id ? updatedTrip : t);
@@ -122,7 +116,8 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
         <div className="flex items-center justify-center gap-2 text-muted-foreground mt-1 hover:text-primary/80 transition-colors">
           <Calendar className="h-4 w-4" />
           <span>
-            {formatDateForInput(trip.startDate)} - {formatDateForInput(trip.endDate)}
+            {format(new Date(trip.startDate), "MMM d, yyyy")} -{" "}
+            {format(new Date(trip.endDate), "MMM d, yyyy")}
           </span>
         </div>
         <div className="mt-4">
