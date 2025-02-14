@@ -6,6 +6,12 @@ import { LocationSearchBar } from "./location-search-bar";
 
 const libraries: ("places")[] = ["places"];
 
+// Default to London if no valid coordinates are provided
+const DEFAULT_CENTER = {
+  lat: 51.5074,
+  lng: -0.1278
+};
+
 interface PinnedPlace {
   id: number;
   name: string;
@@ -36,52 +42,61 @@ export function MapPicker({
   searchBias,
   onSearchInputRef,
 }: MapPickerProps) {
-  // Initialize coordinates with initialCenter if provided and valid
+  // Initialize coordinates with initialCenter if valid, otherwise use search bias or default
   const [coordinates, setCoordinates] = useState<google.maps.LatLngLiteral | null>(
-    initialCenter && initialCenter.lat && initialCenter.lng ? initialCenter : null
+    initialCenter && isValidCoordinates(initialCenter) ? initialCenter :
+    searchBias && isValidCoordinates(searchBias) ? searchBias :
+    null
   );
+
   const [mapCenter, setMapCenter] = useState<google.maps.LatLngLiteral>(
-    initialCenter && initialCenter.lat && initialCenter.lng 
-      ? initialCenter 
-      : { lat: 0, lng: 0 } // This will be updated when the map loads
+    initialCenter && isValidCoordinates(initialCenter) ? initialCenter :
+    searchBias && isValidCoordinates(searchBias) ? searchBias :
+    DEFAULT_CENTER
   );
+
   const [map, setMap] = useState<google.maps.Map | null>(null);
 
-  // Update coordinates and map center when initialCenter changes
+  // Helper function to validate coordinates
+  function isValidCoordinates(coords: { lat: number; lng: number }): boolean {
+    return coords && 
+           typeof coords.lat === 'number' && 
+           typeof coords.lng === 'number' &&
+           coords.lat !== 0 && 
+           coords.lng !== 0 &&
+           !isNaN(coords.lat) && 
+           !isNaN(coords.lng);
+  }
+
+  // Update coordinates and map center when initialCenter or searchBias changes
   useEffect(() => {
-    if (initialCenter && initialCenter.lat && initialCenter.lng) {
-      const newCoords = {
-        lat: initialCenter.lat,
-        lng: initialCenter.lng
-      };
-      setMapCenter(newCoords);
+    if (initialCenter && isValidCoordinates(initialCenter)) {
+      setMapCenter(initialCenter);
       if (!coordinates) {
-        setCoordinates(newCoords);
+        setCoordinates(initialCenter);
       }
-      if (map) {
-        map.panTo(newCoords);
+    } else if (searchBias && isValidCoordinates(searchBias)) {
+      setMapCenter(searchBias);
+      if (!coordinates) {
+        setCoordinates(searchBias);
       }
     }
-  }, [initialCenter, map, coordinates]);
+  }, [initialCenter, searchBias, coordinates]);
+
+  // Handle map load
+  const onLoad = useCallback((map: google.maps.Map) => {
+    setMap(map);
+    const center = initialCenter && isValidCoordinates(initialCenter) ? initialCenter :
+                  searchBias && isValidCoordinates(searchBias) ? searchBias :
+                  DEFAULT_CENTER;
+    map.panTo(center);
+    setMapCenter(center);
+  }, [initialCenter, searchBias]);
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     libraries,
   });
-
-  // Handle map load
-  const onLoad = useCallback((map: google.maps.Map) => {
-    setMap(map);
-    // Set initial position when map loads
-    if (initialCenter && initialCenter.lat && initialCenter.lng) {
-      const position = {
-        lat: initialCenter.lat,
-        lng: initialCenter.lng
-      };
-      map.panTo(position);
-      setMapCenter(position);
-    }
-  }, [initialCenter]);
 
   // Handle map click events
   const handleMapClick = async (e: google.maps.MapMouseEvent) => {
@@ -89,8 +104,10 @@ export function MapPicker({
 
     const lat = e.latLng.lat();
     const lng = e.latLng.lng();
+    const newCoords = { lat, lng };
 
-    setCoordinates({ lat, lng });
+    setCoordinates(newCoords);
+    setMapCenter(newCoords);
 
     try {
       const response = await fetch(
@@ -104,7 +121,7 @@ export function MapPicker({
       if (data.status === "OK" && data.results?.[0]) {
         const formattedAddress = data.results[0].formatted_address;
         const name = data.results[0].address_components?.[0]?.long_name || formattedAddress;
-        onChange(formattedAddress, { lat, lng }, name);
+        onChange(formattedAddress, newCoords, name);
       }
     } catch (err) {
       console.error("Reverse geocoding error:", err);
