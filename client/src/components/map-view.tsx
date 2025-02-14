@@ -28,7 +28,7 @@ interface PinnedPlace {
 
 interface MapViewProps {
   location: string;
-  pinnedPlaces?: PinnedPlace[];
+  pinnedPlaces?: PinnedPlace[] | { places: PinnedPlace[] };
 }
 
 interface Coordinates {
@@ -108,6 +108,10 @@ export function MapView({ location, pinnedPlaces = [] }: MapViewProps) {
     );
   }
 
+  const places = Array.isArray(pinnedPlaces) 
+    ? pinnedPlaces 
+    : (pinnedPlaces as { places: PinnedPlace[] }).places || [];
+
   return (
     <Card className="overflow-hidden">
       <GoogleMap
@@ -117,7 +121,7 @@ export function MapView({ location, pinnedPlaces = [] }: MapViewProps) {
         options={defaultOptions}
       >
         <MarkerF position={coordinates} />
-        {pinnedPlaces.map((place) => (
+        {places.map((place) => (
           <MarkerF
             key={place.id}
             position={place.coordinates}
