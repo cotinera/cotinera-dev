@@ -1,6 +1,6 @@
 import { useLoadScript, GoogleMap, MarkerF } from "@react-google-maps/api";
 import { Loader2 } from "lucide-react";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LocationSearchBar } from "./location-search-bar";
 
@@ -36,18 +36,47 @@ export function MapPicker({
   searchBias,
   onSearchInputRef,
 }: MapPickerProps) {
-  // Initialize coordinates with initialCenter if it's valid
-  const [coordinates, setCoordinates] = useState<google.maps.LatLngLiteral>(initialCenter || {
-    lat: 40.7128,
-    lng: -74.0060 // Only used if no initialCenter is provided
-  });
-  const [mapCenter, setMapCenter] = useState<google.maps.LatLngLiteral>(coordinates);
+  // Initialize coordinates with initialCenter, ensuring it's valid
+  const [coordinates, setCoordinates] = useState<google.maps.LatLngLiteral>(
+    initialCenter && initialCenter.lat && initialCenter.lng ? initialCenter : undefined
+  );
+  const [mapCenter, setMapCenter] = useState<google.maps.LatLngLiteral | undefined>(coordinates);
   const [map, setMap] = useState<google.maps.Map | null>(null);
+
+  // Update coordinates and map center when initialCenter changes
+  useEffect(() => {
+    if (initialCenter && initialCenter.lat && initialCenter.lng) {
+      const newCoords = {
+        lat: initialCenter.lat,
+        lng: initialCenter.lng
+      };
+      setCoordinates(newCoords);
+      setMapCenter(newCoords);
+      // If map exists, pan to the new location
+      if (map) {
+        map.panTo(newCoords);
+      }
+    }
+  }, [initialCenter, map]);
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     libraries,
   });
+
+  // Handle map load
+  const onLoad = useCallback((map: google.maps.Map) => {
+    setMap(map);
+    // Set initial position when map loads
+    if (initialCenter && initialCenter.lat && initialCenter.lng) {
+      const position = {
+        lat: initialCenter.lat,
+        lng: initialCenter.lng
+      };
+      map.panTo(position);
+      setMapCenter(position);
+    }
+  }, [initialCenter]);
 
   // Handle map click events
   const handleMapClick = async (e: google.maps.MapMouseEvent) => {
@@ -76,15 +105,6 @@ export function MapPicker({
       console.error("Reverse geocoding error:", err);
     }
   };
-
-  // Handle map load
-  const onLoad = useCallback((map: google.maps.Map) => {
-    setMap(map);
-    const center = map.getCenter();
-    if (center) {
-      setMapCenter({ lat: center.lat(), lng: center.lng() });
-    }
-  }, []);
 
   // Handle map idle event to update center
   const onIdle = useCallback(() => {
@@ -135,7 +155,7 @@ export function MapPicker({
         <GoogleMap
           mapContainerStyle={{ width: "100%", height: "100%" }}
           zoom={13}
-          center={coordinates}
+          center={mapCenter as google.maps.LatLngLiteral}
           onClick={handleMapClick}
           onLoad={onLoad}
           onIdle={onIdle}
@@ -146,7 +166,7 @@ export function MapPicker({
           }}
         >
           {/* Show temporary marker for new pin */}
-          {!readOnly && <MarkerF position={coordinates} />}
+          {!readOnly && <MarkerF position={coordinates as google.maps.LatLng} />}
 
           {/* Show existing pins */}
           {existingPins.map((pin) => (
