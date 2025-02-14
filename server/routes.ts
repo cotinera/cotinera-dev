@@ -900,7 +900,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Add a new destination to a trip
-  app.post("/api/trips/:tripId/destinations", async (req, res) => {    try {      const tripId = parseInt(req.params.tripId);
+  app.post("/api/trips/:tripId/destinations", async (req, res) => {    try {      const tripId= parseInt(req.params.tripId);
 
       // Get current max order
       const [result] = await db
@@ -1082,22 +1082,20 @@ export function registerRoutes(app: Express): Server {
   // Existing pinned places routes remain unchanged
   // Add new routes for editing and deleting pinned places
 
-  // Edit pinned place
+  // Update pinned place
   app.patch("/api/trips/:tripId/pinned-places/:placeId", async (req, res) => {
     try {
       const tripId = parseInt(req.params.tripId);
       const placeId = parseInt(req.params.placeId);
-      const { name, address, notes, coordinates, category, addedToChecklist } = req.body;
+      const { notes, category, name, coordinates } = req.body;
 
       const [updatedPlace] = await db
         .update(pinnedPlaces)
         .set({
-          ...(name && { name }),
-          ...(address && { address }),
-          ...(notes && { notes }),
-          ...(coordinates && { coordinates }),
-          ...(category && { category }),
-          ...(typeof addedToChecklist !== 'undefined' && { addedToChecklist }),
+          notes: notes || null,
+          category: category || 'tourist',
+          name: name || undefined,
+          coordinates: coordinates || undefined,
         })
         .where(
           and(

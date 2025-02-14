@@ -134,6 +134,7 @@ interface AddPinnedPlaceForm {
 }
 
 interface EditPinnedPlaceForm {
+  address?: string;
   notes?: string;
   category: PlaceCategory;
 }
@@ -162,6 +163,8 @@ export function PinnedPlaces({
   const [placeToDelete, setPlaceToDelete] = useState<PinnedPlace | null>(null);
   const [placeToEdit, setPlaceToEdit] = useState<PinnedPlace | null>(null);
   const [selectedPlaceName, setSelectedPlaceName] = useState<string>("");
+  const [editedPlaceCoordinates, setEditedPlaceCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [editedPlaceName, setEditedPlaceName] = useState<string>("");
   const [searchInputRef, setSearchInputRef] = useState<HTMLInputElement | null>(null);
 
   const form = useForm<AddPinnedPlaceForm>({
@@ -174,6 +177,7 @@ export function PinnedPlaces({
 
   const editForm = useForm<EditPinnedPlaceForm>({
     defaultValues: {
+      address: "",
       notes: "",
       category: PlaceCategory.TOURIST,
     },
@@ -182,9 +186,12 @@ export function PinnedPlaces({
   useEffect(() => {
     if (placeToEdit) {
       editForm.reset({
+        address: placeToEdit.name,
         notes: placeToEdit.notes || "",
         category: placeToEdit.category,
       });
+      setEditedPlaceCoordinates(placeToEdit.coordinates);
+      setEditedPlaceName(placeToEdit.name);
     }
   }, [placeToEdit, editForm]);
 
@@ -350,12 +357,16 @@ export function PinnedPlaces({
   });
 
   const updatePinnedPlaceMutation = useMutation({
-    mutationFn: async (variables: { placeId: number; data: EditPinnedPlaceForm }) => {
+    mutationFn: async (variables: { placeId: number; data: EditPinnedPlaceForm & { coordinates?: { lat: number; lng: number }, name?: string } }) => {
       const res = await fetch(`/api/trips/${tripId}/pinned-places/${variables.placeId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: 'include',
-        body: JSON.stringify(variables.data),
+        body: JSON.stringify({
+          ...variables.data,
+          name: variables.data.name || editedPlaceName,
+          coordinates: variables.data.coordinates || editedPlaceCoordinates,
+        }),
       });
 
       if (!res.ok) {
@@ -375,6 +386,8 @@ export function PinnedPlaces({
 
       setPlaceToEdit(null);
       editForm.reset();
+      setEditedPlaceCoordinates(null);
+      setEditedPlaceName("");
 
       toast({
         title: "Success",
@@ -389,7 +402,6 @@ export function PinnedPlaces({
       });
     },
   });
-
 
   const handleDeletePlace = () => {
     if (!placeToDelete) return;
@@ -421,11 +433,21 @@ export function PinnedPlaces({
   const handleUpdatePlace = (data: EditPinnedPlaceForm) => {
     if (!placeToEdit) return;
 
+    if (!editedPlaceCoordinates) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select a location",
+      });
+      return;
+    }
+
     updatePinnedPlaceMutation.mutate({
       placeId: placeToEdit.id,
       data: {
-        notes: data.notes,
-        category: data.category,
+        ...data,
+        name: editedPlaceName,
+        coordinates: editedPlaceCoordinates,
       },
     });
   };
@@ -613,7 +635,7 @@ export function PinnedPlaces({
       </CardContent>
 
       <Dialog open={!!placeToEdit} onOpenChange={(open) => !open && setPlaceToEdit(null)}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[800px]">
           <DialogHeader>
             <DialogTitle>Edit {placeToEdit?.name}</DialogTitle>
             <DialogDescription>
@@ -622,6 +644,35 @@ export function PinnedPlaces({
           </DialogHeader>
           <Form {...editForm}>
             <form onSubmit={editForm.handleSubmit(handleUpdatePlace)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location</FormLabel>
+                    <FormControl>
+                      <div className="h-[400px] w-full">
+                        <MapPicker
+                          value={field.value}
+                          onChange={(address, coordinates, name) => {
+                            field.onChange(address);
+                            setEditedPlaceCoordinates(coordinates);
+                            setEditedPlaceName(name || address);
+                          }}
+                          placeholder="Search for a place to pin..."
+                          existingPins={pinnedPlacesQuery.data?.filter(p => p.id !== placeToEdit?.id) || []}
+                          initialCenter={placeToEdit?.coordinates}
+                          searchBias={tripCoordinates ? {
+                            ...tripCoordinates,
+                            radius: 50000
+                          } : undefined}
+                          onSearchInputRef={setSearchInputRef}
+                        />
+                      </div>
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={editForm.control}
                 name="category"
