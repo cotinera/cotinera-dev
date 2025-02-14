@@ -52,18 +52,6 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
     }
   };
 
-  // Format dates for display
-  const formatDateForDisplay = (dateString: string | Date | null) => {
-    if (!dateString) return "";
-    try {
-      const date = typeof dateString === 'string' ? parseISO(dateString) : dateString;
-      return format(date, 'MMM d, yyyy');
-    } catch (error) {
-      console.error('Date parsing error:', error);
-      return "";
-    }
-  };
-
   // Initialize form with existing trip data
   const form = useForm<EditTripData>({
     resolver: zodResolver(editTripSchema),
@@ -134,7 +122,7 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
         <div className="flex items-center justify-center gap-2 text-muted-foreground mt-1 hover:text-primary/80 transition-colors">
           <Calendar className="h-4 w-4" />
           <span>
-            {formatDateForDisplay(trip.startDate)} - {formatDateForDisplay(trip.endDate)}
+            {formatDateForInput(trip.startDate)} - {formatDateForInput(trip.endDate)}
           </span>
         </div>
         <div className="mt-4">
