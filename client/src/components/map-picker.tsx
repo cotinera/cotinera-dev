@@ -26,11 +26,6 @@ interface MapPickerProps {
   onSearchInputRef?: (ref: HTMLInputElement | null) => void;
 }
 
-const DEFAULT_CENTER = {
-  lat: 37.7749,
-  lng: -122.4194, // San Francisco - a more central default location
-};
-
 export function MapPicker({
   value,
   onChange,
@@ -42,7 +37,7 @@ export function MapPicker({
   onSearchInputRef,
 }: MapPickerProps) {
   const [coordinates, setCoordinates] = useState<google.maps.LatLngLiteral>(
-    initialCenter && initialCenter.lat && initialCenter.lng ? initialCenter : DEFAULT_CENTER
+    initialCenter || { lat: 37.7749, lng: -122.4194 } // Default to San Francisco only if no initial center provided
   );
   const [mapCenter, setMapCenter] = useState<google.maps.LatLngLiteral>(coordinates);
   const [map, setMap] = useState<google.maps.Map | null>(null);

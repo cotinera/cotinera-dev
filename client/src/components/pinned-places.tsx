@@ -196,17 +196,15 @@ export function PinnedPlaces({
   }, [placeToEdit, editForm]);
 
   useEffect(() => {
-    if (isAddPlaceOpen) {
+    if (isAddPlaceOpen && tripCoordinates) {
       form.reset({
         address: "",
         notes: "",
         category: PlaceCategory.TOURIST,
       });
-      if (tripCoordinates) {
-        setSelectedCoordinates(tripCoordinates);
-      }
+      setSelectedCoordinates(tripCoordinates);
     }
-  }, [isAddPlaceOpen, tripCoordinates]);
+  }, [isAddPlaceOpen, tripCoordinates, form]);
 
   const pinnedPlacesQuery = useQuery<{ tripLocation: { lat: number; lng: number } | null; places: PinnedPlace[] }>({
     queryKey: [`/api/trips/${tripId}/pinned-places`, destinationId],
