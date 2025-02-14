@@ -1029,7 +1029,7 @@ export function registerRoutes(app: Express): Server {
         notes,
         coordinates,
         destinationId: destinationId || null,
-        category,
+        category: category || 'tourist',
         addedToChecklist: false,
       }).returning();
 
