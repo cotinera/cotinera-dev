@@ -59,11 +59,11 @@ export function Checklist({ tripId }: ChecklistProps) {
       }
 
       if (!res.ok) {
-        const errorData = await res.json();
+        const errorData = await res.json().catch(() => ({ message: "Failed to delete checklist item" }));
         throw new Error(errorData.message || "Failed to delete checklist item");
       }
 
-      return res.json();
+      return res.json().catch(() => ({}));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
