@@ -900,8 +900,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Add a new destination to a trip
-  app.post("/api/trips/:tripId/destinations", async (req, res) => {    try {
-      const tripId = parseInt(req.params.tripId);
+  app.post("/api/trips/:tripId/destinations", async (req, res) => {    try {      const tripId = parseInt(req.params.tripId);
 
       // Get current max order
       const [result] = await db
@@ -1143,6 +1142,38 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error deleting pinned place:', error);
       res.status(500).json({ error: 'Failed to delete pinned place' });
+    }
+  });
+
+  // Add this route after the other pinned places routes
+  app.patch("/api/trips/:tripId/pinned-places/:placeId/update", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const placeId = parseInt(req.params.placeId);
+      const { notes, category } = req.body;
+
+      const [updatedPlace] = await db
+        .update(pinnedPlaces)
+        .set({
+          notes: notes || null,
+          category: category || 'tourist',
+        })
+        .where(
+          and(
+            eq(pinnedPlaces.id, placeId),
+            eq(pinnedPlaces.tripId, tripId)
+          )
+        )
+        .returning();
+
+      if (!updatedPlace) {
+        return res.status(404).json({ error: "Pinned place not found" });
+      }
+
+      res.json(updatedPlace);
+    } catch (error) {
+      console.error('Error updating pinned place:', error);
+      res.status(500).json({ error: 'Failed to update pinned place' });
     }
   });
 

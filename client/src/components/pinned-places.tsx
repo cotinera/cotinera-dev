@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Plus, CheckCircle, Trash2, Coffee, UtensilsCrossed, Wine, Beer, Building2, ShoppingBag, Theater, Palmtree, History, Building } from "lucide-react";
+import { MapPin, Plus, CheckCircle, Trash2, Coffee, UtensilsCrossed, Wine, Beer, Building2, ShoppingBag, Theater, Palmtree, History, Building, Pencil } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -133,6 +133,11 @@ interface AddPinnedPlaceForm {
   category: PlaceCategory;
 }
 
+interface EditPinnedPlaceForm {
+  notes?: string;
+  category: PlaceCategory;
+}
+
 interface PinnedPlacesProps {
   tripId: number;
   destinationId?: number;
@@ -155,6 +160,7 @@ export function PinnedPlaces({
   const [isAddPlaceOpen, setIsAddPlaceOpen] = useState(false);
   const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [placeToDelete, setPlaceToDelete] = useState<PinnedPlace | null>(null);
+  const [placeToEdit, setPlaceToEdit] = useState<PinnedPlace | null>(null);
   const [selectedPlaceName, setSelectedPlaceName] = useState<string>("");
   const [searchInputRef, setSearchInputRef] = useState<HTMLInputElement | null>(null);
 
@@ -165,6 +171,22 @@ export function PinnedPlaces({
       category: PlaceCategory.TOURIST,
     },
   });
+
+  const editForm = useForm<EditPinnedPlaceForm>({
+    defaultValues: {
+      notes: "",
+      category: PlaceCategory.TOURIST,
+    },
+  });
+
+  useEffect(() => {
+    if (placeToEdit) {
+      editForm.reset({
+        notes: placeToEdit.notes || "",
+        category: placeToEdit.category,
+      });
+    }
+  }, [placeToEdit, editForm]);
 
   const pinnedPlacesQuery = useQuery<PinnedPlace[]>({
     queryKey: [`/api/trips/${tripId}/pinned-places`, destinationId],
@@ -327,6 +349,48 @@ export function PinnedPlaces({
     },
   });
 
+  const updatePinnedPlaceMutation = useMutation({
+    mutationFn: async (variables: { placeId: number; data: EditPinnedPlaceForm }) => {
+      const res = await fetch(`/api/trips/${tripId}/pinned-places/${variables.placeId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify(variables.data),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || "Failed to update pinned place");
+      }
+
+      return res.json();
+    },
+    onSuccess: (updatedPlace) => {
+      queryClient.setQueryData<PinnedPlace[]>(
+        [`/api/trips/${tripId}/pinned-places`, destinationId],
+        (old) => old?.map(place =>
+          place.id === updatedPlace.id ? updatedPlace : place
+        ) || []
+      );
+
+      setPlaceToEdit(null);
+      editForm.reset();
+
+      toast({
+        title: "Success",
+        description: "Place updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to update place",
+      });
+    },
+  });
+
+
   const handleDeletePlace = () => {
     if (!placeToDelete) return;
     deletePinnedPlaceMutation.mutate(placeToDelete.id);
@@ -352,6 +416,18 @@ export function PinnedPlaces({
     if (!place.addedToChecklist) {
       addToChecklistMutation.mutate(place.id);
     }
+  };
+
+  const handleUpdatePlace = (data: EditPinnedPlaceForm) => {
+    if (!placeToEdit) return;
+
+    updatePinnedPlaceMutation.mutate({
+      placeId: placeToEdit.id,
+      data: {
+        notes: data.notes,
+        category: data.category,
+      },
+    });
   };
 
   const getIconComponent = (category: PlaceCategory) => {
@@ -497,6 +573,14 @@ export function PinnedPlaces({
                     <Button
                       variant="ghost"
                       size="sm"
+                      onClick={() => setPlaceToEdit(place)}
+                      className="p-0 h-8 w-8 text-muted-foreground hover:text-primary"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => handleAddToChecklist(place)}
                       className={cn(
                         "p-0 h-8 w-8",
@@ -527,6 +611,77 @@ export function PinnedPlaces({
           <ScrollBar orientation="vertical" />
         </ScrollArea>
       </CardContent>
+
+      <Dialog open={!!placeToEdit} onOpenChange={(open) => !open && setPlaceToEdit(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit {placeToEdit?.name}</DialogTitle>
+            <DialogDescription>
+              Update the details for this pinned place.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(handleUpdatePlace)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(CATEGORY_GROUPS).map(([groupName, categories]) => (
+                          <SelectGroup key={groupName}>
+                            <SelectLabel>{groupName}</SelectLabel>
+                            {categories.map((category) => {
+                              const Icon = getIconComponent(category);
+                              return (
+                                <SelectItem key={category} value={category}>
+                                  <div className="flex items-center gap-2">
+                                    <Icon className="h-4 w-4" />
+                                    <span>{category.replace(/_/g, ' ').toLowerCase()}</span>
+                                  </div>
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectGroup>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes</FormLabel>
+                    <FormControl>
+                      <Textarea {...field} placeholder="Add any notes about this place..." />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button
+                  type="submit"
+                  variant="default"
+                  disabled={updatePinnedPlaceMutation.isPending}
+                >
+                  {updatePinnedPlaceMutation.isPending ? "Updating..." : "Update Place"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!placeToDelete} onOpenChange={() => setPlaceToDelete(null)}>
         <AlertDialogContent>
