@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Plus, CheckCircle, Trash2, Coffee, UtensilsCrossed, Wine, Beer, Building2, ShoppingBag, Theater, Palmtree, History, Building, Pencil } from "lucide-react";
+import { MapPin, Plus, Trash2, Coffee, UtensilsCrossed, Wine, Beer, Building2, ShoppingBag, Theater, Palmtree, History, Building, Pencil } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -44,7 +44,6 @@ import { useForm } from "react-hook-form";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import type { ChecklistItem } from "@db/schema";
 
 export enum PlaceCategory {
   FOOD = "food",
@@ -125,8 +124,6 @@ interface PinnedPlace {
   };
   tripId: number;
   destinationId?: number;
-  addedToChecklist: boolean;
-  checklistItemId?: number;  // Add this field to track the linked checklist item
 }
 
 interface AddPinnedPlaceForm {
@@ -157,7 +154,6 @@ const formatCategoryName = (category: string): string => {
     .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
 };
-
 
 export function PinnedPlaces({
   tripId,
@@ -263,7 +259,6 @@ export function PinnedPlaces({
           coordinates: selectedCoordinates,
           category: data.category,
           destinationId,
-          addedToChecklist: false,
         }),
       });
 
@@ -344,118 +339,6 @@ export function PinnedPlaces({
     },
   });
 
-  const addToChecklistMutation = useMutation({
-    mutationFn: async (placeId: number) => {
-      // First create the checklist item
-      const checklistRes = await fetch(`/api/trips/${tripId}/checklist`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: 'include',
-        body: JSON.stringify({
-          title: `Visit ${pinnedPlacesQuery.data?.places.find(p => p.id === placeId)?.name || 'place'}`,
-        }),
-      });
-
-      if (!checklistRes.ok) {
-        const error = await checklistRes.text();
-        throw new Error(error);
-      }
-
-      const checklistItem = await checklistRes.json();
-
-      // Then update the pinned place with the checklist item reference
-      const updateRes = await fetch(`/api/trips/${tripId}/pinned-places/${placeId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: 'include',
-        body: JSON.stringify({
-          addedToChecklist: true,
-          checklistItemId: checklistItem.id,
-        }),
-      });
-
-      if (!updateRes.ok) {
-        const error = await updateRes.text();
-        throw new Error(error);
-      }
-
-      return updateRes.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [`/api/trips/${tripId}/pinned-places`]
-      });
-      queryClient.invalidateQueries({
-        queryKey: [`/api/trips/${tripId}/checklist`]
-      });
-      toast({
-        title: "Success",
-        description: "Place added to checklist",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to add place to checklist",
-      });
-    },
-  });
-
-  const removeFromChecklistMutation = useMutation({
-    mutationFn: async (place: PinnedPlace) => {
-      if (!place.checklistItemId) {
-        throw new Error("No checklist item associated with this place");
-      }
-
-      // Delete the checklist item
-      const deleteRes = await fetch(`/api/trips/${tripId}/checklist/${place.checklistItemId}`, {
-        method: "DELETE",
-        credentials: 'include',
-      });
-
-      if (!deleteRes.ok) {
-        throw new Error("Failed to delete checklist item");
-      }
-
-      // Update the pinned place to remove the checklist reference
-      const updateRes = await fetch(`/api/trips/${tripId}/pinned-places/${place.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: 'include',
-        body: JSON.stringify({
-          addedToChecklist: false,
-          checklistItemId: null,
-        }),
-      });
-
-      if (!updateRes.ok) {
-        throw new Error("Failed to update pinned place");
-      }
-
-      return updateRes.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [`/api/trips/${tripId}/pinned-places`]
-      });
-      queryClient.invalidateQueries({
-        queryKey: [`/api/trips/${tripId}/checklist`]
-      });
-      toast({
-        title: "Success",
-        description: "Place removed from checklist",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to remove place from checklist",
-      });
-    },
-  });
-
   const updatePinnedPlaceMutation = useMutation({
     mutationFn: async (variables: { placeId: number; data: EditPinnedPlaceForm & { coordinates?: { lat: number; lng: number }, name?: string } }) => {
       const res = await fetch(`/api/trips/${tripId}/pinned-places/${variables.placeId}`, {
@@ -525,14 +408,6 @@ export function PinnedPlaces({
       ...data,
       address: selectedPlaceName,
     });
-  };
-
-  const handleAddToChecklist = (place: PinnedPlace) => {
-    if (!place.addedToChecklist) {
-      addToChecklistMutation.mutate(place.id);
-    } else {
-      removeFromChecklistMutation.mutate(place);
-    }
   };
 
   const handleUpdatePlace = (data: EditPinnedPlaceForm) => {
@@ -705,24 +580,6 @@ export function PinnedPlaces({
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleAddToChecklist(place)}
-                        className={cn(
-                          "p-0 h-8 w-8",
-                          place.addedToChecklist 
-                            ? "text-primary hover:text-primary" 
-                            : "text-muted-foreground hover:text-muted-foreground"
-                        )}
-                        disabled={addToChecklistMutation.isPending || removeFromChecklistMutation.isPending}
-                        title={place.addedToChecklist ? "Remove from checklist" : "Add to checklist"}
-                      >
-                        <CheckCircle className={cn(
-                          "h-4 w-4",
-                          place.addedToChecklist ? "fill-current" : "fill-none"
-                        )} />
-                      </Button>
                     <Button
                       variant="ghost"
                       size="sm"
