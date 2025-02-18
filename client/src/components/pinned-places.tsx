@@ -236,7 +236,11 @@ export function PinnedPlaces({
   });
 
   const existingPins = pinnedPlacesQuery.data?.places || [];
-  const tripLocation = tripCoordinates || pinnedPlacesQuery.data?.tripLocation;
+  const tripLocation = tripCoordinates || 
+    (pinnedPlacesQuery.data?.tripLocation && {
+      lat: pinnedPlacesQuery.data.tripLocation.lat,
+      lng: pinnedPlacesQuery.data.tripLocation.lng
+    });
   console.log('Trip location being used:', tripLocation);
 
   const addPinnedPlaceMutation = useMutation({
