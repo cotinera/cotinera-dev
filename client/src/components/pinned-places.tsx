@@ -712,13 +712,16 @@ export function PinnedPlaces({
                       className={cn(
                         "p-0 h-8 w-8",
                         place.addedToChecklist
-                          ? "text-green-600 hover:text-destructive"
-                          : "text-muted-foreground hover:text-green-600"
+                          ? "text-primary bg-primary/10 hover:bg-destructive/10 hover:text-destructive"
+                          : "text-muted-foreground hover:text-primary hover:bg-primary/10"
                       )}
                       disabled={addToChecklistMutation.isPending || removeFromChecklistMutation.isPending}
                       title={place.addedToChecklist ? "Remove from checklist" : "Add to checklist"}
                     >
-                      <CheckCircle className="h-4 w-4" />
+                      <CheckCircle className={cn(
+                        "h-4 w-4",
+                        place.addedToChecklist ? "fill-current" : "fill-none"
+                      )} />
                     </Button>
                     <Button
                       variant="ghost"
