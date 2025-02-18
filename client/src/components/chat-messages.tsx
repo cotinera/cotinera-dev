@@ -17,6 +17,29 @@ interface ChatFormData {
   message: string;
 }
 
+// Function to convert URLs in text to clickable links
+function linkifyText(text: string) {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+
+  return parts.map((part, index) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary hover:underline"
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+}
+
 export function ChatMessages({ tripId }: ChatMessagesProps) {
   const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -86,7 +109,7 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
                     }) : ''}
                   </span>
                 </div>
-                <p className="text-sm mt-1">{message.message}</p>
+                <p className="text-sm mt-1">{linkifyText(message.message)}</p>
               </div>
             </div>
           ))}
