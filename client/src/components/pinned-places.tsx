@@ -44,6 +44,7 @@ import { useForm } from "react-hook-form";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import type { ChecklistItem } from "@db/schema";
 
 export enum PlaceCategory {
   FOOD = "food",
@@ -449,9 +450,9 @@ export function PinnedPlaces({
         throw new Error("Failed to fetch checklist items");
       }
 
-      const checklistItems = await checklistRes.json();
+      const checklistItems: ChecklistItem[] = await checklistRes.json();
       const place = pinnedPlacesQuery.data?.places.find(p => p.id === placeId);
-      const checklistItem = checklistItems.find(item =>
+      const checklistItem = checklistItems.find((item: ChecklistItem) =>
         item.title === `Visit ${place?.name || 'place'}`
       );
 
