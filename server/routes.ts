@@ -718,6 +718,7 @@ export function registerRoutes(app: Express): Server {
         id: participants.id,
         name: participants.name,
         tripId: participants.tripId,
+        status: participants.status, // Added status field
         arrivalDate: participants.arrivalDate,
         departureDate: participants.departureDate,
         flightStatus: participants.flightStatus,
@@ -762,6 +763,8 @@ export function registerRoutes(app: Express): Server {
       const participantId = parseInt(req.params.participantId);
       const tripId = parseInt(req.params.tripId);
 
+      console.log('Updating participant status:', { participantId, tripId, status });
+
       const [updatedParticipant] = await db
         .update(participants)
         .set({ status })
@@ -775,6 +778,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: 'Participant not found' });
       }
 
+      console.log('Updated participant:', updatedParticipant);
       res.json(updatedParticipant);
     } catch (error) {
       console.error('Error updating participant status:', error);
