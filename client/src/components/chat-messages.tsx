@@ -75,10 +75,10 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
     },
   });
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to top when new messages arrive
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTop = 0;
     }
   }, [messages]);
 
@@ -91,7 +91,7 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
     <div className="flex flex-col h-[400px] border rounded-lg bg-background">
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         <div className="space-y-4">
-          {messages.map((message) => (
+          {[...messages].reverse().map((message) => (
             <div key={message.id} className="flex items-start gap-2">
               <Avatar className="h-8 w-8">
                 <AvatarFallback>
