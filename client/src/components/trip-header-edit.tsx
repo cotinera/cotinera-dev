@@ -45,7 +45,7 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
     resolver: zodResolver(editTripSchema),
     defaultValues: {
       title: trip.title,
-      location: trip.location,
+      location: trip.location || "",
       startDate: trip.startDate.split('T')[0], // Ensure we get just the date part
       endDate: trip.endDate.split('T')[0],     // Ensure we get just the date part
     },
@@ -53,7 +53,6 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
 
   const updateTripMutation = useMutation({
     mutationFn: async (data: EditTripData) => {
-      console.log('Sending dates to server:', data.startDate, data.endDate); // Debug log
       const res = await fetch(`/api/trips/${trip.id}`, {
         method: "PATCH",
         headers: {
@@ -71,14 +70,10 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
         throw new Error(await res.text());
       }
       const updatedTrip = await res.json();
-      console.log('Received updated trip:', updatedTrip); // Debug log
       return updatedTrip;
     },
     onSuccess: (updatedTrip) => {
-      // Update both the detailed trip view and the trips list cache
       queryClient.setQueryData(["/api/trips", trip.id], updatedTrip);
-
-      // Update the trip in the trips list cache
       queryClient.setQueryData(["/api/trips"], (oldData: Trip[] | undefined) => {
         if (!oldData) return oldData;
         return oldData.map(t => t.id === trip.id ? updatedTrip : t);
@@ -161,6 +156,7 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
                       setCoordinates(coords);
                     }}
                     placeholder="Search for a location..."
+                    initialCenter={trip.coordinates}
                   />
                 </FormControl>
                 <FormMessage />
