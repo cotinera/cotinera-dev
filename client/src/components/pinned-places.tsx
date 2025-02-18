@@ -507,18 +507,6 @@ export function PinnedPlaces({
                 />
                 <FormField
                   control={form.control}
-                  name="notes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Notes</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} placeholder="Add any notes about this place..." />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
                   name="category"
                   render={({ field }) => (
                     <FormItem>
@@ -527,7 +515,7 @@ export function PinnedPlaces({
                         onValueChange={field.onChange}
                         defaultValue={field.value}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger tabIndex="-1">
                           <SelectValue placeholder="Select a category" />
                         </SelectTrigger>
                         <SelectContent>
@@ -549,6 +537,18 @@ export function PinnedPlaces({
                           ))}
                         </SelectContent>
                       </Select>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notes</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} placeholder="Add any notes about this place..." tabIndex="-1" />
+                      </FormControl>
                     </FormItem>
                   )}
                 />
