@@ -507,6 +507,18 @@ export function PinnedPlaces({
                 />
                 <FormField
                   control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notes</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} placeholder="Add any notes about this place..." />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
                   name="category"
                   render={({ field }) => (
                     <FormItem>
@@ -537,18 +549,6 @@ export function PinnedPlaces({
                           ))}
                         </SelectContent>
                       </Select>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="notes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Notes</FormLabel>
-                      <FormControl>
-                        <Textarea {...field} placeholder="Add any notes about this place..." />
-                      </FormControl>
                     </FormItem>
                   )}
                 />
