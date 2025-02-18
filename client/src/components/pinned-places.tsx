@@ -662,7 +662,7 @@ export function PinnedPlaces({
                       onValueChange={field.onChange}
                       defaultValue={field.value}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger tabIndex="-1">
                         <SelectValue placeholder="Select a category" />
                       </SelectTrigger>
                       <SelectContent>
@@ -694,7 +694,7 @@ export function PinnedPlaces({
                   <FormItem>
                     <FormLabel>Notes</FormLabel>
                     <FormControl>
-                      <Textarea {...field} placeholder="Add any notes about this place..." />
+                      <Textarea {...field} placeholder="Add any notes about this place..." tabIndex="-1" />
                     </FormControl>
                   </FormItem>
                 )}
