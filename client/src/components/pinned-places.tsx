@@ -229,12 +229,15 @@ export function PinnedPlaces({
         const error = await res.text();
         throw new Error(error);
       }
-      return res.json();
+      const data = await res.json();
+      console.log('Pinned places query response:', data);
+      return data;
     },
   });
 
   const existingPins = pinnedPlacesQuery.data?.places || [];
   const tripLocation = pinnedPlacesQuery.data?.tripLocation || tripCoordinates;
+  console.log('Trip location being used:', tripLocation);
 
   const addPinnedPlaceMutation = useMutation({
     mutationFn: async (data: AddPinnedPlaceForm) => {
