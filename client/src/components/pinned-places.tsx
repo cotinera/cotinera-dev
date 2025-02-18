@@ -706,23 +706,23 @@ export function PinnedPlaces({
                       <Pencil className="h-4 w-4" />
                     </Button>
                     <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleAddToChecklist(place)}
-                      className={cn(
-                        "p-0 h-8 w-8",
-                        place.addedToChecklist
-                          ? "text-primary bg-primary/10 hover:bg-destructive/10 hover:text-destructive"
-                          : "text-muted-foreground hover:text-primary hover:bg-primary/10"
-                      )}
-                      disabled={addToChecklistMutation.isPending || removeFromChecklistMutation.isPending}
-                      title={place.addedToChecklist ? "Remove from checklist" : "Add to checklist"}
-                    >
-                      <CheckCircle className={cn(
-                        "h-4 w-4",
-                        place.addedToChecklist ? "fill-current" : "fill-none"
-                      )} />
-                    </Button>
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleAddToChecklist(place)}
+                        className={cn(
+                          "p-0 h-8 w-8",
+                          place.addedToChecklist 
+                            ? "text-primary hover:text-primary" 
+                            : "text-muted-foreground hover:text-muted-foreground"
+                        )}
+                        disabled={addToChecklistMutation.isPending || removeFromChecklistMutation.isPending}
+                        title={place.addedToChecklist ? "Remove from checklist" : "Add to checklist"}
+                      >
+                        <CheckCircle className={cn(
+                          "h-4 w-4",
+                          place.addedToChecklist ? "fill-current" : "fill-none"
+                        )} />
+                      </Button>
                     <Button
                       variant="ghost"
                       size="sm"
