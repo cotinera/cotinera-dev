@@ -21,6 +21,7 @@ import { ShareTripDialog } from "@/components/share-trip-dialog";
 import { useLocation } from "wouter";
 import { ImageUpload } from "@/components/image-upload";
 import { useState } from "react";
+import { cn } from "@/lib/utils";
 
 const THUMBNAILS = [
   "https://images.unsplash.com/photo-1605130284535-11dd9eedc58a",
@@ -69,7 +70,7 @@ export function TripCard({ trip }: TripCardProps) {
 
   return (
     <Card className="overflow-hidden">
-      <div 
+      <div
         className="relative h-48 cursor-pointer"
         onClick={handleNavigate}
       >
@@ -81,7 +82,7 @@ export function TripCard({ trip }: TripCardProps) {
       </div>
       <CardHeader>
         <div className="flex justify-between items-start">
-          <div 
+          <div
             className="cursor-pointer"
             onClick={handleNavigate}
           >
@@ -154,13 +155,24 @@ export function TripCard({ trip }: TripCardProps) {
                     <div className="space-y-2">
                       <h4 className="text-sm font-semibold">Trip Participants</h4>
                       <div className="space-y-1">
-                        {participants.map((participant, i) => (
+                        {participants.sort((a, b) => {
+                          const nameA = a.name || 'Unknown';
+                          const nameB = b.name || 'Unknown';
+                          return nameA.localeCompare(nameB);
+                        }).map((participant, i) => (
                           <div key={i} className="flex items-center gap-2">
                             <Avatar className="h-6 w-6">
                               <AvatarFallback>{getInitial(participant)}</AvatarFallback>
                             </Avatar>
                             <span className="text-sm">{participant.name || 'Unknown'}</span>
-                            <span className="text-xs text-muted-foreground ml-auto">
+                            <span className={cn(
+                              "text-xs ml-auto",
+                              {
+                                "text-green-500": participant.status === 'yes',
+                                "text-red-500": participant.status === 'no',
+                                "text-muted-foreground": participant.status === 'pending'
+                              }
+                            )}>
                               {participant.status === 'yes' && 'Confirmed'}
                               {participant.status === 'no' && 'Declined'}
                               {participant.status === 'pending' && 'Pending'}
@@ -177,8 +189,8 @@ export function TripCard({ trip }: TripCardProps) {
         )}
       </CardContent>
       <CardFooter>
-        <Button 
-          variant="outline" 
+        <Button
+          variant="outline"
           className="w-full"
           onClick={handleNavigate}
         >
