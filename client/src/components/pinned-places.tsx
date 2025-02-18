@@ -237,7 +237,8 @@ export function PinnedPlaces({
     },
   });
 
-  const existingPins = pinnedPlacesQuery.data?.places || [];
+  const existingPins = [...(pinnedPlacesQuery.data?.places || [])]
+    .sort((a, b) => a.name.localeCompare(b.name));
   const tripLocation = tripCoordinates ||
     (pinnedPlacesQuery.data?.tripLocation && {
       lat: pinnedPlacesQuery.data.tripLocation.lat,
@@ -715,6 +716,7 @@ export function PinnedPlaces({
                           : "text-muted-foreground hover:text-green-600"
                       )}
                       disabled={addToChecklistMutation.isPending || removeFromChecklistMutation.isPending}
+                      title={place.addedToChecklist ? "Remove from checklist" : "Add to checklist"}
                     >
                       <CheckCircle className="h-4 w-4" />
                     </Button>
