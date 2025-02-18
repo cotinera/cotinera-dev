@@ -457,96 +457,99 @@ export function PinnedPlaces({
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[800px] h-[90vh] p-0">
-            <DialogHeader className="p-6 pb-2">
-              <DialogTitle>Pin a New Place</DialogTitle>
-              <DialogDescription>
-                Search and select a location to pin on your trip map.
-              </DialogDescription>
-            </DialogHeader>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                <div className="relative h-[50vh]">
-                  <div className="absolute top-4 left-4 right-4 z-10">
-                    <MapPicker
-                      value={form.getValues("address")}
-                      onChange={(address, coordinates, name) => {
-                        form.setValue("address", address);
-                        setSelectedCoordinates(coordinates);
-                        setSelectedPlaceName(name || address);
-                      }}
-                      placeholder="Search for a place to pin..."
-                      existingPins={existingPins}
-                      initialCenter={tripLocation || tripCoordinates || undefined}
-                      searchBias={tripLocation || tripCoordinates ? {
-                        ...((tripLocation || tripCoordinates) as { lat: number; lng: number }),
-                        radius: 50000
-                      } : undefined}
-                      onSearchInputRef={setSearchInputRef}
-                      className="w-full shadow-lg bg-background/95 backdrop-blur"
-                    />
-                  </div>
-                </div>
+            <div className="flex flex-col h-full">
+              <DialogHeader className="px-6 py-4">
+                <DialogTitle>Pin a New Place</DialogTitle>
+                <DialogDescription>
+                  Search and select a location to pin on your trip map.
+                </DialogDescription>
+              </DialogHeader>
 
-                <div className="p-6 space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="category"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Category</FormLabel>
-                        <Select
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a category" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Object.entries(CATEGORY_GROUPS).map(([groupName, categories]) => (
-                              <SelectGroup key={groupName}>
-                                <SelectLabel>{groupName}</SelectLabel>
-                                {[...categories].sort((a, b) => formatCategoryName(a).localeCompare(formatCategoryName(b))).map((category) => {
-                                  const Icon = getIconComponent(category);
-                                  return (
-                                    <SelectItem key={category} value={category}>
-                                      <div className="flex items-center gap-2">
-                                        <Icon className="h-4 w-4" />
-                                        <span>{formatCategoryName(category)}</span>
-                                      </div>
-                                    </SelectItem>
-                                  );
-                                })}
-                              </SelectGroup>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="notes"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Notes</FormLabel>
-                        <FormControl>
-                          <Textarea {...field} placeholder="Add any notes about this place..." />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <DialogFooter>
-                    <Button
-                      type="submit"
-                      variant="default"
-                      disabled={!selectedCoordinates || addPinnedPlaceMutation.isPending}
-                    >
-                      {addPinnedPlaceMutation.isPending ? "Pinning..." : "Pin Place"}
-                    </Button>
-                  </DialogFooter>
-                </div>
-              </form>
-            </Form>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1">
+                  <div className="relative flex-1 min-h-0">
+                    <div className="absolute top-4 left-4 right-4 z-10">
+                      <MapPicker
+                        value={form.getValues("address")}
+                        onChange={(address, coordinates, name) => {
+                          form.setValue("address", address);
+                          setSelectedCoordinates(coordinates);
+                          setSelectedPlaceName(name || address);
+                        }}
+                        placeholder="Search for a place to pin..."
+                        existingPins={existingPins}
+                        initialCenter={tripLocation || tripCoordinates || undefined}
+                        searchBias={tripLocation || tripCoordinates ? {
+                          ...((tripLocation || tripCoordinates) as { lat: number; lng: number }),
+                          radius: 50000
+                        } : undefined}
+                        onSearchInputRef={setSearchInputRef}
+                        className="w-full shadow-lg bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-6 space-y-4 border-t">
+                    <FormField
+                      control={form.control}
+                      name="category"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Category</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Object.entries(CATEGORY_GROUPS).map(([groupName, categories]) => (
+                                <SelectGroup key={groupName}>
+                                  <SelectLabel>{groupName}</SelectLabel>
+                                  {[...categories].sort((a, b) => formatCategoryName(a).localeCompare(formatCategoryName(b))).map((category) => {
+                                    const Icon = getIconComponent(category);
+                                    return (
+                                      <SelectItem key={category} value={category}>
+                                        <div className="flex items-center gap-2">
+                                          <Icon className="h-4 w-4" />
+                                          <span>{formatCategoryName(category)}</span>
+                                        </div>
+                                      </SelectItem>
+                                    );
+                                  })}
+                                </SelectGroup>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="notes"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Notes</FormLabel>
+                          <FormControl>
+                            <Textarea {...field} placeholder="Add any notes about this place..." />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <DialogFooter>
+                      <Button
+                        type="submit"
+                        variant="default"
+                        disabled={!selectedCoordinates || addPinnedPlaceMutation.isPending}
+                      >
+                        {addPinnedPlaceMutation.isPending ? "Pinning..." : "Pin Place"}
+                      </Button>
+                    </DialogFooter>
+                  </div>
+                </form>
+              </Form>
+            </div>
           </DialogContent>
         </Dialog>
       </CardHeader>
