@@ -236,7 +236,7 @@ export function PinnedPlaces({
   });
 
   const existingPins = pinnedPlacesQuery.data?.places || [];
-  const tripLocation = tripCoordinates || 
+  const tripLocation = tripCoordinates ||
     (pinnedPlacesQuery.data?.tripLocation && {
       lat: pinnedPlacesQuery.data.tripLocation.lat,
       lng: pinnedPlacesQuery.data.tripLocation.lng
@@ -439,6 +439,71 @@ export function PinnedPlaces({
     },
   });
 
+  const removeFromChecklistMutation = useMutation({
+    mutationFn: async (placeId: number) => {
+      const checklistRes = await fetch(`/api/trips/${tripId}/checklist`, {
+        credentials: 'include',
+      });
+
+      if (!checklistRes.ok) {
+        throw new Error("Failed to fetch checklist items");
+      }
+
+      const checklistItems = await checklistRes.json();
+      const place = pinnedPlacesQuery.data?.places.find(p => p.id === placeId);
+      const checklistItem = checklistItems.find(item =>
+        item.title === `Visit ${place?.name || 'place'}`
+      );
+
+      if (!checklistItem) {
+        throw new Error("Checklist item not found");
+      }
+
+      const deleteRes = await fetch(`/api/trips/${tripId}/checklist/${checklistItem.id}`, {
+        method: "DELETE",
+        credentials: 'include',
+      });
+
+      if (!deleteRes.ok) {
+        throw new Error("Failed to delete checklist item");
+      }
+
+      const updateRes = await fetch(`/api/trips/${tripId}/pinned-places/${placeId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify({
+          addedToChecklist: false,
+        }),
+      });
+
+      if (!updateRes.ok) {
+        throw new Error("Failed to update pinned place");
+      }
+
+      return updateRes.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [`/api/trips/${tripId}/pinned-places`]
+      });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/trips/${tripId}/checklist`]
+      });
+      toast({
+        title: "Success",
+        description: "Place removed from checklist",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to remove place from checklist",
+      });
+    },
+  });
+
   const handleDeletePlace = () => {
     if (!placeToDelete) return;
     deletePinnedPlaceMutation.mutate(placeToDelete.id);
@@ -463,6 +528,8 @@ export function PinnedPlaces({
   const handleAddToChecklist = (place: PinnedPlace) => {
     if (!place.addedToChecklist) {
       addToChecklistMutation.mutate(place.id);
+    } else {
+      removeFromChecklistMutation.mutate(place.id);
     }
   };
 
@@ -642,9 +709,11 @@ export function PinnedPlaces({
                       onClick={() => handleAddToChecklist(place)}
                       className={cn(
                         "p-0 h-8 w-8",
-                        place.addedToChecklist ? "text-green-600" : "text-muted-foreground hover:text-green-600"
+                        place.addedToChecklist
+                          ? "text-green-600 hover:text-destructive"
+                          : "text-muted-foreground hover:text-green-600"
                       )}
-                      disabled={place.addedToChecklist}
+                      disabled={addToChecklistMutation.isPending || removeFromChecklistMutation.isPending}
                     >
                       <CheckCircle className="h-4 w-4" />
                     </Button>
