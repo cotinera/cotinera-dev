@@ -174,6 +174,17 @@ export function PinnedPlaces({
   const [editedPlaceName, setEditedPlaceName] = useState<string>("");
   const [searchInputRef, setSearchInputRef] = useState<HTMLInputElement | null>(null);
 
+  // Add effect to focus search input when dialog opens
+  useEffect(() => {
+    if (isAddPlaceOpen && searchInputRef) {
+      // Small delay to ensure dialog is fully rendered
+      const timeoutId = setTimeout(() => {
+        searchInputRef.focus();
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isAddPlaceOpen, searchInputRef]);
+
   const form = useForm<AddPinnedPlaceForm>({
     defaultValues: {
       address: "",
