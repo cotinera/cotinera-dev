@@ -126,6 +126,7 @@ interface PinnedPlace {
   tripId: number;
   destinationId?: number;
   addedToChecklist: boolean;
+  checklistItemId?: number;  // Add this field to track the linked checklist item
 }
 
 interface AddPinnedPlaceForm {
@@ -344,7 +345,8 @@ export function PinnedPlaces({
 
   const addToChecklistMutation = useMutation({
     mutationFn: async (placeId: number) => {
-      const res = await fetch(`/api/trips/${tripId}/checklist`, {
+      // First create the checklist item
+      const checklistRes = await fetch(`/api/trips/${tripId}/checklist`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: 'include',
@@ -353,21 +355,30 @@ export function PinnedPlaces({
         }),
       });
 
-      if (!res.ok) {
-        const error = await res.text();
+      if (!checklistRes.ok) {
+        const error = await checklistRes.text();
         throw new Error(error);
       }
 
-      await fetch(`/api/trips/${tripId}/pinned-places/${placeId}`, {
+      const checklistItem = await checklistRes.json();
+
+      // Then update the pinned place with the checklist item reference
+      const updateRes = await fetch(`/api/trips/${tripId}/pinned-places/${placeId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: 'include',
         body: JSON.stringify({
           addedToChecklist: true,
+          checklistItemId: checklistItem.id,
         }),
       });
 
-      return res.json();
+      if (!updateRes.ok) {
+        const error = await updateRes.text();
+        throw new Error(error);
+      }
+
+      return updateRes.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -386,6 +397,60 @@ export function PinnedPlaces({
         variant: "destructive",
         title: "Error",
         description: error.message || "Failed to add place to checklist",
+      });
+    },
+  });
+
+  const removeFromChecklistMutation = useMutation({
+    mutationFn: async (place: PinnedPlace) => {
+      if (!place.checklistItemId) {
+        throw new Error("No checklist item associated with this place");
+      }
+
+      // Delete the checklist item
+      const deleteRes = await fetch(`/api/trips/${tripId}/checklist/${place.checklistItemId}`, {
+        method: "DELETE",
+        credentials: 'include',
+      });
+
+      if (!deleteRes.ok) {
+        throw new Error("Failed to delete checklist item");
+      }
+
+      // Update the pinned place to remove the checklist reference
+      const updateRes = await fetch(`/api/trips/${tripId}/pinned-places/${place.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify({
+          addedToChecklist: false,
+          checklistItemId: null,
+        }),
+      });
+
+      if (!updateRes.ok) {
+        throw new Error("Failed to update pinned place");
+      }
+
+      return updateRes.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [`/api/trips/${tripId}/pinned-places`]
+      });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/trips/${tripId}/checklist`]
+      });
+      toast({
+        title: "Success",
+        description: "Place removed from checklist",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to remove place from checklist",
       });
     },
   });
@@ -440,71 +505,6 @@ export function PinnedPlaces({
     },
   });
 
-  const removeFromChecklistMutation = useMutation({
-    mutationFn: async (placeId: number) => {
-      const checklistRes = await fetch(`/api/trips/${tripId}/checklist`, {
-        credentials: 'include',
-      });
-
-      if (!checklistRes.ok) {
-        throw new Error("Failed to fetch checklist items");
-      }
-
-      const checklistItems: ChecklistItem[] = await checklistRes.json();
-      const place = pinnedPlacesQuery.data?.places.find(p => p.id === placeId);
-      const checklistItem = checklistItems.find((item: ChecklistItem) =>
-        item.title === `Visit ${place?.name || 'place'}`
-      );
-
-      if (!checklistItem) {
-        throw new Error("Checklist item not found");
-      }
-
-      const deleteRes = await fetch(`/api/trips/${tripId}/checklist/${checklistItem.id}`, {
-        method: "DELETE",
-        credentials: 'include',
-      });
-
-      if (!deleteRes.ok) {
-        throw new Error("Failed to delete checklist item");
-      }
-
-      const updateRes = await fetch(`/api/trips/${tripId}/pinned-places/${placeId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        credentials: 'include',
-        body: JSON.stringify({
-          addedToChecklist: false,
-        }),
-      });
-
-      if (!updateRes.ok) {
-        throw new Error("Failed to update pinned place");
-      }
-
-      return updateRes.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [`/api/trips/${tripId}/pinned-places`]
-      });
-      queryClient.invalidateQueries({
-        queryKey: [`/api/trips/${tripId}/checklist`]
-      });
-      toast({
-        title: "Success",
-        description: "Place removed from checklist",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to remove place from checklist",
-      });
-    },
-  });
-
   const handleDeletePlace = () => {
     if (!placeToDelete) return;
     deletePinnedPlaceMutation.mutate(placeToDelete.id);
@@ -530,7 +530,7 @@ export function PinnedPlaces({
     if (!place.addedToChecklist) {
       addToChecklistMutation.mutate(place.id);
     } else {
-      removeFromChecklistMutation.mutate(place.id);
+      removeFromChecklistMutation.mutate(place);
     }
   };
 
