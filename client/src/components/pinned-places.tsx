@@ -464,40 +464,30 @@ export function PinnedPlaces({
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 h-full">
-                <FormField
-                  control={form.control}
-                  name="address"
-                  render={({ field }) => (
-                    <FormItem className="space-y-0 flex-1">
-                      <FormControl>
-                        <div className="relative h-[calc(90vh-220px)]">
-                          <div className="absolute top-4 left-4 right-4 z-10">
-                            <MapPicker
-                              value={field.value}
-                              onChange={(address, coordinates, name) => {
-                                field.onChange(address);
-                                setSelectedCoordinates(coordinates);
-                                setSelectedPlaceName(name || address);
-                              }}
-                              placeholder="Search for a place to pin..."
-                              existingPins={existingPins}
-                              initialCenter={tripLocation || tripCoordinates || undefined}
-                              searchBias={tripLocation || tripCoordinates ? {
-                                ...((tripLocation || tripCoordinates) as { lat: number; lng: number }),
-                                radius: 50000
-                              } : undefined}
-                              onSearchInputRef={setSearchInputRef}
-                              className="w-full shadow-lg"
-                            />
-                          </div>
-                        </div>
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <div className="relative h-[50vh]">
+                  <div className="absolute top-4 left-4 right-4 z-10">
+                    <MapPicker
+                      value={form.getValues("address")}
+                      onChange={(address, coordinates, name) => {
+                        form.setValue("address", address);
+                        setSelectedCoordinates(coordinates);
+                        setSelectedPlaceName(name || address);
+                      }}
+                      placeholder="Search for a place to pin..."
+                      existingPins={existingPins}
+                      initialCenter={tripLocation || tripCoordinates || undefined}
+                      searchBias={tripLocation || tripCoordinates ? {
+                        ...((tripLocation || tripCoordinates) as { lat: number; lng: number }),
+                        radius: 50000
+                      } : undefined}
+                      onSearchInputRef={setSearchInputRef}
+                      className="w-full shadow-lg bg-background/95 backdrop-blur"
+                    />
+                  </div>
+                </div>
 
-                <div className="p-6 pt-2 space-y-4">
+                <div className="p-6 space-y-4">
                   <FormField
                     control={form.control}
                     name="category"
