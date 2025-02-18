@@ -560,7 +560,7 @@ export function PinnedPlaces({
                           {Object.entries(CATEGORY_GROUPS).map(([groupName, categories]) => (
                             <SelectGroup key={groupName}>
                               <SelectLabel>{groupName}</SelectLabel>
-                              {categories.map((category) => {
+                              {[...categories].sort((a, b) => formatCategoryName(a).localeCompare(formatCategoryName(b))).map((category) => {
                                 const Icon = getIconComponent(category);
                                 return (
                                   <SelectItem key={category} value={category}>
@@ -719,7 +719,7 @@ export function PinnedPlaces({
                         {Object.entries(CATEGORY_GROUPS).map(([groupName, categories]) => (
                           <SelectGroup key={groupName}>
                             <SelectLabel>{groupName}</SelectLabel>
-                            {categories.map((category) => {
+                            {[...categories].sort((a, b) => formatCategoryName(a).localeCompare(formatCategoryName(b))).map((category) => {
                               const Icon = getIconComponent(category);
                               return (
                                 <SelectItem key={category} value={category}>
