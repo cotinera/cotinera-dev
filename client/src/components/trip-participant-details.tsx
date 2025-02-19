@@ -422,12 +422,12 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   <TableCell>
                     {participant.arrivalDate && format(new Date(participant.arrivalDate), "dd/MM/yyyy")}
                   </TableCell>
-                  <TableCell>{participant.flightNumber || "-"}</TableCell>
+                  <TableCell>{participant.flightStatus || "-"}</TableCell>
                   <TableCell>
                     {participant.departureDate && format(new Date(participant.departureDate), "dd/MM/yyyy")}
                   </TableCell>
-                  <TableCell>{participant.flightNumber || "-"}</TableCell>
-                  <TableCell>{participant.accommodation || "-"}</TableCell>
+                  <TableCell>{participant.flightStatus || "-"}</TableCell>
+                  <TableCell>{participant.hotelStatus || "-"}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
