@@ -75,6 +75,16 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
   const [updatingParticipants, setUpdatingParticipants] = useState<number[]>([]);
 
+  // Fetch trip details to get dates
+  const { data: trip } = useQuery<Trip>({
+    queryKey: ["/api/trips", tripId],
+    queryFn: async () => {
+      const res = await fetch(`/api/trips/${tripId}`);
+      if (!res.ok) throw new Error("Failed to fetch trip");
+      return res.json();
+    },
+  });
+
   const { data: participants = [] } = useQuery<Participant[]>({
     queryKey: [`/api/trips/${tripId}/participants`],
     queryFn: async () => {
@@ -228,11 +238,12 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
   });
 
+  // Initialize form with trip dates
   const addForm = useForm<ParticipantForm>({
     defaultValues: {
       name: "",
-      arrivalDate: "",
-      departureDate: "",
+      arrivalDate: trip?.startDate ? format(new Date(trip.startDate), "yyyy-MM-dd") : "",
+      departureDate: trip?.endDate ? format(new Date(trip.endDate), "yyyy-MM-dd") : "",
       flightNumber: "",
       airline: "",
       accommodation: "",
