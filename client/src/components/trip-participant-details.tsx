@@ -427,7 +427,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                     {participant.departureDate && format(new Date(participant.departureDate), "dd/MM/yyyy")}
                   </TableCell>
                   <TableCell>{participant.flightNumber || "-"}</TableCell>
-                  <TableCell>{participant.accommodation || "-"}</TableCell>
+                  <TableCell>{participant.accommodation?.name || "-"}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
