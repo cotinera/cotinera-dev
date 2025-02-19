@@ -357,7 +357,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                     name="flightStatus"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Flight Status</FormLabel>
+                        <FormLabel>Flight</FormLabel>
                         <FormControl>
                           <Input placeholder="Enter flight details" {...field} />
                         </FormControl>
@@ -369,7 +369,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                     name="hotelStatus"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Hotel Status</FormLabel>
+                        <FormLabel>Hotel</FormLabel>
                         <FormControl>
                           <Input placeholder="Enter hotel details" {...field} />
                         </FormControl>
@@ -543,7 +543,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                                 name="flightStatus"
                                 render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel>Flight Status</FormLabel>
+                                    <FormLabel>Flight</FormLabel>
                                     <FormControl>
                                       <Input placeholder="Enter flight details" {...field} />
                                     </FormControl>
@@ -555,7 +555,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                                 name="hotelStatus"
                                 render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel>Hotel Status</FormLabel>
+                                    <FormLabel>Hotel</FormLabel>
                                     <FormControl>
                                       <Input placeholder="Enter hotel details" {...field} />
                                     </FormControl>
