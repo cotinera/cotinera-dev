@@ -51,9 +51,8 @@ interface ParticipantForm {
   name: string;
   arrivalDate?: string;
   departureDate?: string;
-  flightNumber?: string;
-  airline?: string;
-  accommodation?: string;
+  flightStatus?: string;
+  hotelStatus?: string;
 }
 
 const STATUS_CYCLE = ['pending', 'yes', 'no'] as const;
@@ -244,9 +243,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       name: "",
       arrivalDate: trip?.startDate ? format(new Date(trip.startDate), "yyyy-MM-dd") : "",
       departureDate: trip?.endDate ? format(new Date(trip.endDate), "yyyy-MM-dd") : "",
-      flightNumber: "",
-      airline: "",
-      accommodation: "",
+      flightStatus: "pending",
+      hotelStatus: "pending",
     },
   });
 
@@ -255,9 +253,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       name: editingParticipant?.name || "",
       arrivalDate: editingParticipant?.arrivalDate || "",
       departureDate: editingParticipant?.departureDate || "",
-      flightNumber: editingParticipant?.flightNumber || "",
-      airline: editingParticipant?.airline || "",
-      accommodation: editingParticipant?.accommodation || "",
+      flightStatus: editingParticipant?.flightStatus || "pending",
+      hotelStatus: editingParticipant?.hotelStatus || "pending",
     },
   });
 
@@ -357,36 +354,24 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   </div>
                   <FormField
                     control={addForm.control}
-                    name="flightNumber"
+                    name="flightStatus"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Flight Number</FormLabel>
+                        <FormLabel>Flight Status</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter flight number" {...field} />
+                          <Input placeholder="Enter flight details" {...field} />
                         </FormControl>
                       </FormItem>
                     )}
                   />
                   <FormField
                     control={addForm.control}
-                    name="airline"
+                    name="hotelStatus"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Airline</FormLabel>
+                        <FormLabel>Hotel Status</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter airline" {...field} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={addForm.control}
-                    name="accommodation"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Accommodation</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter hotel or accommodation" {...field} />
+                          <Input placeholder="Enter hotel details" {...field} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -486,9 +471,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                               name: participant.name || "",
                               arrivalDate: participant.arrivalDate || "",
                               departureDate: participant.departureDate || "",
-                              flightNumber: participant.flightNumber || "",
-                              airline: participant.airline || "",
-                              accommodation: participant.accommodation || "",
+                              flightStatus: participant.flightStatus || "pending",
+                              hotelStatus: participant.hotelStatus || "pending",
                             });
                           }
                         }}
@@ -556,36 +540,24 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                               </div>
                               <FormField
                                 control={editForm.control}
-                                name="flightNumber"
+                                name="flightStatus"
                                 render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel>Flight Number</FormLabel>
+                                    <FormLabel>Flight Status</FormLabel>
                                     <FormControl>
-                                      <Input placeholder="Enter flight number" {...field} />
+                                      <Input placeholder="Enter flight details" {...field} />
                                     </FormControl>
                                   </FormItem>
                                 )}
                               />
                               <FormField
                                 control={editForm.control}
-                                name="airline"
+                                name="hotelStatus"
                                 render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel>Airline</FormLabel>
+                                    <FormLabel>Hotel Status</FormLabel>
                                     <FormControl>
-                                      <Input placeholder="Enter airline" {...field} />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={editForm.control}
-                                name="accommodation"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Accommodation</FormLabel>
-                                    <FormControl>
-                                      <Input placeholder="Enter hotel or accommodation" {...field} />
+                                      <Input placeholder="Enter hotel details" {...field} />
                                     </FormControl>
                                   </FormItem>
                                 )}
