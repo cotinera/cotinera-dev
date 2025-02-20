@@ -129,6 +129,59 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
   });
 
+  // Initialize form with trip dates
+  const addForm = useForm<ParticipantForm>({
+    defaultValues: {
+      name: "",
+      arrivalDate: trip?.startDate ? format(new Date(trip.startDate), "yyyy-MM-dd") : "",
+      departureDate: trip?.endDate ? format(new Date(trip.endDate), "yyyy-MM-dd") : "",
+      flightIn: "",
+      flightOut: "",
+      accommodation: "",
+    },
+  });
+
+  const editForm = useForm<ParticipantForm>({
+    defaultValues: {
+      name: editingParticipant?.name || "",
+      arrivalDate: editingParticipant?.arrivalDate || "",
+      departureDate: editingParticipant?.departureDate || "",
+      flightIn: editingParticipant?.flightIn || "",
+      flightOut: editingParticipant?.flightOut || "",
+      accommodation: editingParticipant?.accommodation?.name || "",
+    },
+  });
+
+  const addParticipantMutation = useMutation({
+    mutationFn: async (data: ParticipantForm) => {
+      const res = await fetch(`/api/trips/${tripId}/participants`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...data, status: 'pending' as Status }),
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to add participant");
+      }
+
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      setIsAddParticipantOpen(false);
+      addForm.reset();
+      toast({ title: "Success", description: "Person added successfully" });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to add person",
+      });
+    },
+  });
+
   const updateStatusMutation = useMutation({
     mutationFn: async ({ participantId, status }: { participantId: number; status: Status }) => {
       setUpdatingParticipants(prev => [...prev, participantId]);
@@ -208,58 +261,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
   });
 
-  const addParticipantMutation = useMutation({
-    mutationFn: async (data: ParticipantForm) => {
-      const res = await fetch(`/api/trips/${tripId}/participants`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, status: 'pending' as Status }),
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Failed to add participant");
-      }
-
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-      setIsAddParticipantOpen(false);
-      addForm.reset();
-      toast({ title: "Success", description: "Person added successfully" });
-    },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to add person",
-      });
-    },
-  });
-
-  // Initialize form with trip dates
-  const addForm = useForm<ParticipantForm>({
-    defaultValues: {
-      name: "",
-      arrivalDate: trip?.startDate ? format(new Date(trip.startDate), "yyyy-MM-dd") : "",
-      departureDate: trip?.endDate ? format(new Date(trip.endDate), "yyyy-MM-dd") : "",
-      flightIn: "",
-      flightOut: "",
-      accommodation: "",
-    },
-  });
-
-  const editForm = useForm<ParticipantForm>({
-    defaultValues: {
-      name: editingParticipant?.name || "",
-      arrivalDate: editingParticipant?.arrivalDate || "",
-      departureDate: editingParticipant?.departureDate || "",
-      flightIn: editingParticipant?.flightNumber || "",
-      flightOut: editingParticipant?.flightNumber || "",
-      accommodation: editingParticipant?.accommodation || "",
-    },
-  });
 
   const getStatusBadgeVariant = (status: Status) => {
     switch (status) {
@@ -413,7 +414,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Arrival</TableHead>
-              <TableHead>Flight in</TableHead>
+              <TableHead>Flight In</TableHead>
               <TableHead>Departure</TableHead>
               <TableHead>Flight Out</TableHead>
               <TableHead>Hotel</TableHead>
@@ -495,7 +496,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                               departureDate: participant.departureDate || "",
                               flightIn: participant.flightIn || "",
                               flightOut: participant.flightOut || "",
-                              accommodation: participant.accommodation || "",
+                              accommodation: participant.accommodation?.name || "",
                             });
                           }
                         }}
@@ -561,30 +562,32 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                                   )}
                                 />
                               </div>
-                              <FormField
-                                control={editForm.control}
-                                name="flightIn"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Flight In</FormLabel>
-                                    <FormControl>
-                                      <Input placeholder="Enter flight number" {...field} />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                              <FormField
-                                control={editForm.control}
-                                name="flightOut"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Flight Out</FormLabel>
-                                    <FormControl>
-                                      <Input placeholder="Enter flight number" {...field} />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
+                              <div className="grid grid-cols-2 gap-4">
+                                <FormField
+                                  control={editForm.control}
+                                  name="flightIn"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Flight In</FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="Enter arrival flight" {...field} />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                                <FormField
+                                  control={editForm.control}
+                                  name="flightOut"
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Flight Out</FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="Enter departure flight" {...field} />
+                                      </FormControl>
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
                               <FormField
                                 control={editForm.control}
                                 name="accommodation"
