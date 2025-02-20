@@ -185,6 +185,7 @@ export const participants = pgTable("participants", {
   departureDate: date("departure_date"),
   flightStatus: text("flight_status").notNull().default('pending'),
   hotelStatus: text("hotel_status").notNull().default('pending'),
+  accommodationId: integer("accommodation_id").references(() => accommodations.id), // Add this field
 });
 
 export const activities = pgTable("activities", {
@@ -292,7 +293,7 @@ export const shareLinksRelations = relations(shareLinks, ({ one }) => ({
   }),
 }));
 
-export const participantsRelations = relations(participants, ({ one, many }) => ({
+export const participantsRelations = relations(participants, ({ one }) => ({
   trip: one(trips, {
     fields: [participants.tripId],
     references: [trips.id],
@@ -301,8 +302,10 @@ export const participantsRelations = relations(participants, ({ one, many }) => 
     fields: [participants.userId],
     references: [users.id],
   }),
-  flights: many(flights),
-  accommodation: one(accommodations),
+  accommodation: one(accommodations, {
+    fields: [participants.accommodationId],
+    references: [accommodations.id],
+  }),
 }));
 
 export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({

@@ -637,71 +637,56 @@ export function registerRoutes(app: Express): Server {
   // Add participant to trip
   app.post("/api/trips/:tripId/participants", async (req, res) => {
     try {
-      console.log('Received participant creation request:', req.body);
-
-      // Validate input
       const tripId = parseInt(req.params.tripId);
-      const { name, email, passportNumber, arrivalDate, departureDate, flightNumber, airline, accommodation } = req.body;
+      const { name, email, arrivalDate, departureDate, flightNumber, airline, accommodation } = req.body;
 
       if (!name) {
-        console.log('Validation failed: missing name');
         return res.status(400).json({ error: "Name is required" });
       }
 
-      // Create participant entry without requiring user account
-      console.log('Creating participant entry');
-      try {
-        const participantData = {
+      // Create participant without automatically creating accommodation
+      const [newParticipant] = await db.insert(participants)
+        .values({
           tripId,
           name,
-          status: 'pending', // Changed from 'confirmed' to 'pending'
+          status: 'pending',
           arrivalDate: arrivalDate ? new Date(arrivalDate) : null,
           departureDate: departureDate ? new Date(departureDate) : null,
           flightStatus: 'pending',
           hotelStatus: 'pending',
-        };
+          // Only set accommodationId if explicitly provided
+          accommodationId: null
+        })
+        .returning();
 
-        const [newParticipant] = await db.insert(participants).values(participantData).returning();
-        console.log('Created participant:', newParticipant);
-
-        // If flight details provided, create flight entry
-        if (airline && flightNumber) {
-          console.log('Creating flight entry');
-          await db.insert(flights).values({
+      // Create flight if details provided
+      if (airline && flightNumber) {
+        await db.insert(flights)
+          .values({
             tripId,
             airline,
             flightNumber,
-            departureAirport: '', // These can be updated later
+            departureAirport: '',
             arrivalAirport: '',
-            departureDate: newParticipant.arrivalDate,
-            departureTime: '12:00', // Default time, can be updated later
-            arrivalDate: newParticipant.arrivalDate,
-            arrivalTime: '14:00', // Default time, can be updated later
+            departureDate: arrivalDate ? new Date(arrivalDate) : new Date(),
+            departureTime: '12:00',
+            arrivalDate: arrivalDate ? new Date(arrivalDate) : new Date(),
+            arrivalTime: '14:00',
             bookingReference: flightNumber,
             bookingStatus: 'pending',
+            participantId: newParticipant.id // Add participantId here
           });
-        }
-
-        // If accommodation details provided, create accommodation entry
-        if (accommodation) {
-          console.log('Creating accommodation entry');
-          await db.insert(accommodations).values({
-            tripId,
-            name: accommodation,
-            type: 'hotel', // Default type
-            address: '', // Can be updated later
-            checkInDate: newParticipant.arrivalDate || new Date(),
-            checkOutDate: newParticipant.departureDate || new Date(),
-            bookingReference: 'TBD',
-            bookingStatus: 'pending',
-          });
-        }
-
-        res.json(newParticipant);
-      } catch (error) {
-        console.error('Error creating participant:', error);
-        return res.status(500).json({ error: "Failed to create participant entry" });
       }
+
+      // Fetch complete participant data with relations
+      const participantWithDetails = await db.query.participants.findFirst({
+        where: eq(participants.id, newParticipant.id),
+        with: {
+          accommodation: true,
+        },
+      });
+
+      res.json(participantWithDetails);
     } catch (error) {
       console.error('Error creating participant:', error);
       res.status(500).json({ error: 'Failed to create participant: ' + (error instanceof Error ? error.message : 'Unknown error') });
@@ -718,11 +703,12 @@ export function registerRoutes(app: Express): Server {
         id: participants.id,
         name: participants.name,
         tripId: participants.tripId,
-        status: participants.status, // Added status field
+        status: participants.status,
         arrivalDate: participants.arrivalDate,
         departureDate: participants.departureDate,
         flightStatus: participants.flightStatus,
         hotelStatus: participants.hotelStatus,
+        accommodationId: participants.accommodationId
       })
         .from(participants)
         .where(eq(participants.tripId, tripId));
@@ -738,8 +724,8 @@ export function registerRoutes(app: Express): Server {
       // Map the participants with their details
       const participantsWithDetails = tripParticipants.map((participant) => ({
         ...participant,
-        flights: tripFlights,
-        accommodation: tripAccommodations[0] // Using first accommodation for now
+        flights: tripFlights.filter(flight => flight.participantId === participant.id),
+        accommodation: tripAccommodations.find(accommodation => accommodation.id === participant.accommodationId)
       }));
 
       console.log('Returning participants with details:', participantsWithDetails);
@@ -786,7 +772,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add this endpoint right after the participant status update endpoint
+  // Update participant endpoint
   app.patch("/api/trips/:tripId/participants/:participantId", async (req, res) => {
     try {
       const tripId = parseInt(req.params.tripId);
@@ -800,94 +786,96 @@ export function registerRoutes(app: Express): Server {
         accommodation
       } = req.body;
 
-      const [updatedParticipant] = await db
-        .update(participants)
-        .set({
-          name: name || undefined,
-          arrivalDate: arrivalDate ? new Date(arrivalDate) : undefined,
-          departureDate: departureDate ? new Date(departureDate) : undefined,
-          flightStatus: flightNumber || airline ? 'pending' : undefined,
-          hotelStatus: accommodation ? 'pending' : undefined,
-        })
-        .where(
-          and(
-            eq(participants.id, participantId),
-            eq(participants.tripId, tripId)
-          )
-        )
-        .returning();
+      // Start a transaction to handle both participant and accommodation updates
+      await db.transaction(async (tx) => {
+        let accommodationId = null;
 
-      if (!updatedParticipant) {
-        return res.status(404).json({ error: "Participant not found" });
-      }
-
-      // If flight details are provided, update or create flight entry
-      if (flightNumber || airline) {
-        const existingFlight = await db
+        // Get current participant to check existing accommodation
+        const [currentParticipant] = await tx
           .select()
-          .from(flights)
+          .from(participants)
           .where(
             and(
-              eq(flights.tripId, tripId),
-              eq(flights.flightNumber, flightNumber || '')
+              eq(participants.id, participantId),
+              eq(participants.tripId, tripId)
             )
-          )
-          .limit(1);
+          );
 
-        if (existingFlight.length > 0) {
-          await db
-            .update(flights)
-            .set({
-              airline: airline || undefined,
-              flightNumber: flightNumber || undefined,
-              departureDate: arrivalDate ? new Date(arrivalDate) : undefined,
-            })
-            .where(eq(flights.id, existingFlight[0].id));
-        } else {
-          await db.insert(flights).values({
-            tripId,
-            airline: airline || '',
-            flightNumber: flightNumber || '',
-            departureDate: arrivalDate ? new Date(arrivalDate) : new Date(),
-            bookingStatus: 'pending',
-          });
+        if (!currentParticipant) {
+          throw new Error("Participant not found");
         }
-      }
 
-      // If accommodation details are provided, update or create accommodation entry
-      if (accommodation) {
-        const existingAccommodation = await db
-          .select()
-          .from(accommodations)
-          .where(eq(accommodations.tripId, tripId))
-          .limit(1);
-
-        if (existingAccommodation.length > 0) {
-          await db
-            .update(accommodations)
-            .set({
+        // If accommodation is provided and different from current
+        if (accommodation && (currentParticipant.accommodationId === null || currentParticipant.accommodation.name !== accommodation)) {
+          // Create new accommodation entry
+          const [newAccommodation] = await tx
+            .insert(accommodations)
+            .values({
+              tripId,
               name: accommodation,
-              checkInDate: arrivalDate ? new Date(arrivalDate) : undefined,
-              checkOutDate: departureDate ? new Date(departureDate) : undefined,
+              type: 'hotel',
+              address: '',
+              checkInDate: arrivalDate ? new Date(arrivalDate) : new Date(),
+              checkOutDate: departureDate ? new Date(departureDate) : new Date(),
+              bookingReference: 'TBD',
+              bookingStatus: 'pending',
             })
-            .where(eq(accommodations.id, existingAccommodation[0].id));
-        } else {
-          await db.insert(accommodations).values({
-            tripId,
-            name: accommodation,
-            checkInDate: arrivalDate ? new Date(arrivalDate) : new Date(),
-            checkOutDate: departureDate ? new Date(departureDate) : new Date(),
-            bookingStatus: 'pending',
-          });
-        }
-      }
+            .returning();
 
-      // Fetch the updated participant with all related details
-      const participantWithDetails = {
-        ...updatedParticipant,
-        flights: await db.select().from(flights).where(eq(flights.tripId, tripId)),
-        accommodation: (await db.select().from(accommodations).where(eq(accommodations.tripId, tripId)))[0],
-      };
+          accommodationId = newAccommodation.id;
+        }
+
+        // Update participant
+        await tx
+          .update(participants)
+          .set({
+            name: name || undefined,
+            arrivalDate: arrivalDate ? new Date(arrivalDate) : undefined,
+            departureDate: departureDate ? new Date(departureDate) : undefined,
+            flightStatus: flightNumber || airline ? 'pending' : undefined,
+            hotelStatus: accommodation ? 'pending' : undefined,
+            // Only update accommodationId if new accommodation was created
+            ...(accommodationId && { accommodationId }),
+          })
+          .where(
+            and(
+              eq(participants.id, participantId),
+              eq(participants.tripId, tripId)
+            )
+          );
+
+        // Update or create flight if details provided
+        if (flightNumber || airline) {
+          await tx
+            .insert(flights)
+            .values({
+              tripId,
+              airline: airline || '',
+              flightNumber: flightNumber || '',
+              departureAirport: '',
+              arrivalAirport: '',
+              departureDate: arrivalDate ? new Date(arrivalDate) : new Date(),
+              departureTime: '12:00',
+              arrivalDate: arrivalDate ? new Date(arrivalDate) : new Date(),
+              arrivalTime: '14:00',
+              bookingReference: flightNumber || 'TBD',
+              bookingStatus: 'pending',
+              participantId: participantId
+            });
+        }
+      });
+
+      // Fetch updated participant with all relations
+      const participantWithDetails = await db.query.participants.findFirst({
+        where: and(
+          eq(participants.id, participantId),
+          eq(participants.tripId, tripId)
+        ),
+        with: {
+          accommodation: true,
+          flights: true,
+        },
+      });
 
       res.json(participantWithDetails);
     } catch (error) {
@@ -896,7 +884,7 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add this endpoint right after the other participant routes, before the destinations routes
+  // Delete participant endpoint
   app.delete("/api/trips/:tripId/participants/:participantId", async (req, res) => {
     try {
       const tripId = parseInt(req.params.tripId);
@@ -931,7 +919,9 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Add a new destination to a trip
-  app.post("/api/trips/:tripId/destinations", async (req, res) => {    try {      const tripId= parseInt(req.params.tripId);
+  app.post("/api/trips/:tripId/destinations", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
 
 
       // Get current max order
