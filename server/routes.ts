@@ -786,7 +786,7 @@ export function registerRoutes(app: Express): Server {
         accommodation
       } = req.body;
 
-      // Start a transaction to handle both participant and accommodation updates
+      // Start a transaction to handle participant and accommodation updates
       await db.transaction(async (tx) => {
         let accommodationId = null;
 
@@ -822,17 +822,21 @@ export function registerRoutes(app: Express): Server {
               .insert(accommodations)
               .values({
                 tripId,
-                name: accommodation,
+                name: accommodation.trim(), // Store just the name string
                 type: 'hotel',
                 address: '',
-                checkInDate: arrivalDate || new Date(),
-                checkOutDate: departureDate || new Date(),
+                checkInDate: arrivalDate ? new Date(arrivalDate) : new Date(),
+                checkOutDate: departureDate ? new Date(departureDate) : new Date(),
                 bookingReference: 'TBD',
                 bookingStatus: 'pending',
+                currency: 'USD'
               })
               .returning();
 
             accommodationId = newAccommodation.id;
+          } else {
+            // Keep the existing accommodation
+            accommodationId = currentParticipant.accommodationId;
           }
         }
 
@@ -845,7 +849,7 @@ export function registerRoutes(app: Express): Server {
             departureDate: departureDate ? new Date(departureDate) : undefined,
             flightStatus: flightNumber || airline ? 'pending' : undefined,
             hotelStatus: accommodation ? 'pending' : undefined,
-            accommodationId: accommodationId !== null ? accommodationId : undefined
+            accommodationId: accommodation ? accommodationId : null // Clear accommodation if none provided
           })
           .where(
             and(
@@ -924,7 +928,7 @@ export function registerRoutes(app: Express): Server {
         error: 'Failed to update participant', 
         details: error instanceof Error ? error.message : 'Unknown error'
       });
-        }
+    }
   });
 
   // Delete participant endpoint
