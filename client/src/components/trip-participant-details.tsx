@@ -29,7 +29,15 @@ import {
   FormField,
   FormItem,
   FormLabel,
+  FormDescription,
 } from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,9 +47,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { format } from "date-fns";
-import { Plus, X, Check, X as XIcon, Clock, Edit2 } from "lucide-react";
+import { Plus, X, Check, X as XIcon, Clock, Edit2, Settings2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
 
 interface TripParticipantDetailsProps {
   tripId: number;
@@ -102,14 +111,27 @@ const sortParticipants = (a: Participant, b: Participant) => {
   return statusOrder[a.status as Status] - statusOrder[b.status as Status];
 };
 
+interface CustomColumn {
+  id: string;
+  name: string;
+  type: 'boolean' | 'text';
+}
+
+const customColumnSchema = z.object({
+  name: z.string().min(1, "Column name is required"),
+  type: z.enum(['boolean', 'text']),
+});
+
 export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
   const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
   const [updatingParticipants, setUpdatingParticipants] = useState<number[]>([]);
+  const [customColumns, setCustomColumns] = useState<CustomColumn[]>([]);
+  const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
+  const [customValues, setCustomValues] = useState<Record<string, Record<number, string | boolean>>>({});
 
-  // Fetch trip details to get dates
   const { data: trip } = useQuery<Trip>({
     queryKey: ["/api/trips", tripId],
     queryFn: async () => {
@@ -131,7 +153,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
   });
 
-  // Initialize form with trip dates
   const addForm = useForm<ParticipantForm>({
     defaultValues: {
       name: "",
@@ -161,7 +182,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         status: 'pending' as Status,
         flightStatus: 'pending',
         hotelStatus: 'pending',
-        // Only include accommodation if explicitly provided and not empty
         accommodation: data.accommodation?.trim()
           ? {
               name: data.accommodation,
@@ -212,10 +232,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
   const updateParticipantMutation = useMutation({
     mutationFn: async ({ participantId, data }: { participantId: number; data: Partial<ParticipantForm> }) => {
-      // Only include accommodation data if it's actually provided and not empty
       const formattedData = {
         ...data,
-        // Only include accommodation if a name is provided and not empty
         accommodation: data.accommodation?.trim()
           ? {
               name: data.accommodation,
@@ -364,113 +382,238 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     updateStatusMutation.mutate({ participantId, status: newStatus });
   };
 
+  const customColumnForm = useForm({
+    defaultValues: {
+      name: "",
+      type: "text" as const,
+    },
+  });
+
+  const handleAddCustomColumn = (data: { name: string; type: 'boolean' | 'text' }) => {
+    const newColumn: CustomColumn = {
+      id: `custom-${Date.now()}`,
+      name: data.name,
+      type: data.type,
+    };
+    setCustomColumns(prev => [...prev, newColumn]);
+    customColumnForm.reset();
+    setCustomValues(prev => ({
+      ...prev,
+      [newColumn.id]: {},
+    }));
+  };
+
+  const handleRemoveCustomColumn = (columnId: string) => {
+    setCustomColumns(prev => prev.filter(col => col.id !== columnId));
+    setCustomValues(prev => {
+      const { [columnId]: _, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  const handleCustomValueChange = (participantId: number, columnId: string, value: string | boolean) => {
+    setCustomValues(prev => ({
+      ...prev,
+      [columnId]: {
+        ...prev[columnId],
+        [participantId]: value,
+      },
+    }));
+  };
+
   return (
     <Card>
       <CardHeader className="pb-3">
         <div className="flex justify-between items-center">
           <CardTitle>People</CardTitle>
-          <Dialog open={isAddParticipantOpen} onOpenChange={setIsAddParticipantOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Person
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Person</DialogTitle>
-              </DialogHeader>
-              <Form {...addForm}>
-                <form onSubmit={addForm.handleSubmit(data => addParticipantMutation.mutate(data))}
-                      className="space-y-4">
-                  <FormField
-                    control={addForm.control}
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter name" {...field} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={addForm.control}
-                        name="arrivalDate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Arrival Date</FormLabel>
-                            <FormControl>
-                              <Input type="date" {...field} />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={addForm.control}
-                        name="departureDate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Departure Date</FormLabel>
-                            <FormControl>
-                              <Input type="date" {...field} />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={addForm.control}
-                        name="flightIn"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Flight In</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Enter arrival flight" {...field} />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={addForm.control}
-                        name="flightOut"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Flight Out</FormLabel>
-                            <FormControl>
-                              <Input placeholder="Enter departure flight" {...field} />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
+          <div className="flex gap-2">
+            <Dialog open={isCustomizeOpen} onOpenChange={setIsCustomizeOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Settings2 className="h-4 w-4 mr-2" />
+                  Customize Columns
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Customize Table Columns</DialogTitle>
+                </DialogHeader>
+                <Form {...customColumnForm}>
+                  <form
+                    onSubmit={customColumnForm.handleSubmit(handleAddCustomColumn)}
+                    className="space-y-4"
+                  >
+                    <FormField
+                      control={customColumnForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Column Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter column name" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={customColumnForm.control}
+                      name="type"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Column Type</FormLabel>
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select column type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="text">Text Input</SelectItem>
+                              <SelectItem value="boolean">Yes/No</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            Choose how data will be entered in this column
+                          </FormDescription>
+                        </FormItem>
+                      )}
+                    />
+                    <Button type="submit">Add Column</Button>
+                  </form>
+                </Form>
+                {customColumns.length > 0 && (
+                  <div className="mt-6 space-y-2">
+                    <h4 className="text-sm font-medium">Custom Columns</h4>
+                    <div className="space-y-2">
+                      {customColumns.map((column) => (
+                        <div
+                          key={column.id}
+                          className="flex items-center justify-between p-2 border rounded-md"
+                        >
+                          <div>
+                            <span className="font-medium">{column.name}</span>
+                            <span className="ml-2 text-sm text-muted-foreground">
+                              ({column.type})
+                            </span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveCustomColumn(column.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
                     </div>
                   </div>
+                )}
+              </DialogContent>
+            </Dialog>
+            <Dialog open={isAddParticipantOpen} onOpenChange={setIsAddParticipantOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Person
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Person</DialogTitle>
+                </DialogHeader>
+                <Form {...addForm}>
+                  <form onSubmit={addForm.handleSubmit(data => addParticipantMutation.mutate(data))}
+                        className="space-y-4">
+                    <FormField
+                      control={addForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter name" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
 
-                  <FormField
-                    control={addForm.control}
-                    name="accommodation"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Accommodation</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Enter hotel or accommodation" {...field} />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
-                  <Button type="submit" className="w-full">
-                    {addParticipantMutation.isPending ? "Adding..." : "Add Person"}
-                  </Button>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={addForm.control}
+                          name="arrivalDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Arrival Date</FormLabel>
+                              <FormControl>
+                                <Input type="date" {...field} />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={addForm.control}
+                          name="departureDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Departure Date</FormLabel>
+                              <FormControl>
+                                <Input type="date" {...field} />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={addForm.control}
+                          name="flightIn"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Flight In</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Enter arrival flight" {...field} />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={addForm.control}
+                          name="flightOut"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Flight Out</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Enter departure flight" {...field} />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    <FormField
+                      control={addForm.control}
+                      name="accommodation"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Accommodation</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter hotel or accommodation" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <Button type="submit" className="w-full">
+                      {addParticipantMutation.isPending ? "Adding..." : "Add Person"}
+                    </Button>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -483,6 +626,9 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
               <TableHead>Departure</TableHead>
               <TableHead>Flight Out</TableHead>
               <TableHead>Hotel</TableHead>
+              {customColumns.map((column) => (
+                <TableHead key={column.id}>{column.name}</TableHead>
+              ))}
               <TableHead className="w-[100px]">Status</TableHead>
               <TableHead className="w-[100px]">Actions</TableHead>
             </TableRow>
@@ -501,6 +647,30 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   </TableCell>
                   <TableCell>{participant.flightOut || "-"}</TableCell>
                   <TableCell>{participant.accommodation?.name || "-"}</TableCell>
+                  {customColumns.map((column) => (
+                    <TableCell key={column.id}>
+                      {column.type === 'boolean' ? (
+                        <Select
+                          value={String(customValues[column.id]?.[participant.id] ?? '')}
+                          onValueChange={(value) => handleCustomValueChange(participant.id, column.id, value === 'true')}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="-" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="true">Yes</SelectItem>
+                            <SelectItem value="false">No</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Input
+                          value={String(customValues[column.id]?.[participant.id] ?? '')}
+                          onChange={(e) => handleCustomValueChange(participant.id, column.id, e.target.value)}
+                          className="h-8"
+                        />
+                      )}
+                    </TableCell>
+                  ))}
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -686,7 +856,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-4 text-muted-foreground">
+                <TableCell colSpan={8 + customColumns.length} className="text-center py-4 text-muted-foreground">
                   No people added yet
                 </TableCell>
               </TableRow>
