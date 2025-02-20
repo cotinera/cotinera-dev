@@ -43,8 +43,23 @@ import { Plus, X, Check, X as XIcon, Clock, Edit2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
-interface TripParticipantDetailsProps {
+interface Accommodation {
+  id: number;
   tripId: number;
+  name: string;
+  type: string;
+  address: string;
+  checkInDate: string;
+  checkOutDate: string;
+  checkInTime: string | null;
+  checkOutTime: string | null;
+  bookingReference: string;
+  bookingStatus: string;
+  price: number | null;
+  currency: string;
+  roomType: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 interface Participant {
@@ -57,9 +72,9 @@ interface Participant {
   departureDate: string | null;
   flightStatus: string;
   hotelStatus: string;
-  flightIn?: string;
-  flightOut?: string;
-  accommodation?: string;
+  flightIn: string | null;
+  flightOut: string | null;
+  accommodation: Accommodation | null;
 }
 
 interface ParticipantForm {
@@ -131,7 +146,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       departureDate: editingParticipant?.departureDate || "",
       flightIn: editingParticipant?.flightIn || "",
       flightOut: editingParticipant?.flightOut || "",
-      accommodation: editingParticipant?.accommodation || "",
+      accommodation: editingParticipant?.accommodation?.name || "",
     },
   });
 
@@ -439,7 +454,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                     {participant.departureDate && format(new Date(participant.departureDate), "dd/MM/yyyy")}
                   </TableCell>
                   <TableCell>{participant.flightOut || "-"}</TableCell>
-                  <TableCell>{participant.accommodation || "-"}</TableCell>
+                  <TableCell>{participant.accommodation?.name || "-"}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -500,7 +515,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                               departureDate: participant.departureDate || "",
                               flightIn: participant.flightIn || "",
                               flightOut: participant.flightOut || "",
-                              accommodation: participant.accommodation || "",
+                              accommodation: participant.accommodation?.name || "",
                             });
                           }
                         }}
