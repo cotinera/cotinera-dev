@@ -43,6 +43,10 @@ import { Plus, X, Check, X as XIcon, Clock, Edit2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 
+interface TripParticipantDetailsProps {
+  tripId: number;
+}
+
 interface Accommodation {
   id: number;
   tripId: number;
@@ -187,10 +191,27 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
   const updateParticipantMutation = useMutation({
     mutationFn: async ({ participantId, data }: { participantId: number; data: Partial<ParticipantForm> }) => {
+      // Structure the accommodation data properly if it exists
+      const formattedData = {
+        ...data,
+        accommodation: data.accommodation ? {
+          name: data.accommodation,
+          // Set minimal required fields for accommodation
+          tripId: tripId,
+          type: 'hotel',
+          address: '',
+          checkInDate: data.arrivalDate || new Date().toISOString(),
+          checkOutDate: data.departureDate || new Date().toISOString(),
+          bookingReference: '',
+          bookingStatus: 'pending',
+          currency: 'USD'
+        } : null
+      };
+
       const res = await fetch(`/api/trips/${tripId}/participants/${participantId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(formattedData),
       });
 
       if (!res.ok) {
