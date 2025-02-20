@@ -97,38 +97,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
   });
 
-  const updateParticipantMutation = useMutation({
-    mutationFn: async ({ participantId, data }: { participantId: number; data: Partial<ParticipantForm> }) => {
-      const res = await fetch(`/api/trips/${tripId}/participants/${participantId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to update participant");
-      }
-
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-      setEditingParticipant(null);
-      toast({
-        title: "Success",
-        description: "Participant updated successfully",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to update participant",
-      });
-    },
-  });
-
   // Initialize form with trip dates
   const addForm = useForm<ParticipantForm>({
     defaultValues: {
@@ -146,8 +114,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       name: editingParticipant?.name || "",
       arrivalDate: editingParticipant?.arrivalDate || "",
       departureDate: editingParticipant?.departureDate || "",
-      flightIn: editingParticipant?.flightIn || "",
-      flightOut: editingParticipant?.flightOut || "",
+      flightIn: editingParticipant?.flights?.[0]?.flightNumber || "",
+      flightOut: editingParticipant?.flights?.[1]?.flightNumber || "",
       accommodation: editingParticipant?.accommodation?.name || "",
     },
   });
@@ -178,6 +146,38 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         variant: "destructive",
         title: "Error",
         description: error.message || "Failed to add person",
+      });
+    },
+  });
+
+  const updateParticipantMutation = useMutation({
+    mutationFn: async ({ participantId, data }: { participantId: number; data: Partial<ParticipantForm> }) => {
+      const res = await fetch(`/api/trips/${tripId}/participants/${participantId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to update participant");
+      }
+
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      setEditingParticipant(null);
+      toast({
+        title: "Success",
+        description: "Participant updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to update participant",
       });
     },
   });
@@ -430,11 +430,11 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   <TableCell>
                     {participant.arrivalDate && format(new Date(participant.arrivalDate), "dd/MM/yyyy")}
                   </TableCell>
-                  <TableCell>{participant.flightIn || "-"}</TableCell>
+                  <TableCell>{participant.flights?.[0]?.flightNumber || "-"}</TableCell>
                   <TableCell>
                     {participant.departureDate && format(new Date(participant.departureDate), "dd/MM/yyyy")}
                   </TableCell>
-                  <TableCell>{participant.flightOut || "-"}</TableCell>
+                  <TableCell>{participant.flights?.[1]?.flightNumber || "-"}</TableCell>
                   <TableCell>{participant.accommodation?.name || "-"}</TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -494,8 +494,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                               name: participant.name || "",
                               arrivalDate: participant.arrivalDate || "",
                               departureDate: participant.departureDate || "",
-                              flightIn: participant.flightIn || "",
-                              flightOut: participant.flightOut || "",
+                              flightIn: participant.flights?.[0]?.flightNumber || "",
+                              flightOut: participant.flights?.[1]?.flightNumber || "",
                               accommodation: participant.accommodation?.name || "",
                             });
                           }
