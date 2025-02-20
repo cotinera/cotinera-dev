@@ -640,67 +640,111 @@ export function registerRoutes(app: Express): Server {
       const tripId = parseInt(req.params.tripId);
       const { name, email, arrivalDate, departureDate, flightNumber, airline, accommodation } = req.body;
 
+      console.log('Creating participant with data:', {
+        tripId,
+        name,
+        arrivalDate,
+        departureDate,
+        accommodation,
+        flightNumber,
+        airline
+      });
+
       if (!name) {
         return res.status(400).json({ error: "Name is required" });
       }
 
-      // Create participant with transaction
+      if (!tripId || isNaN(tripId)) {
+        return res.status(400).json({ error: "Invalid trip ID" });
+      }
+
+      // Validate dates if provided
+      if (arrivalDate && !Date.parse(arrivalDate)) {
+        return res.status(400).json({ error: "Invalid arrival date format" });
+      }
+      if (departureDate && !Date.parse(departureDate)) {
+        return res.status(400).json({ error: "Invalid departure date format" });
+      }
+
+      // Start transaction
       const newParticipant = await db.transaction(async (tx) => {
         let accommodationId = null;
 
         // Create accommodation if provided
         if (accommodation) {
-          const [newAccommodation] = await tx
-            .insert(accommodations)
-            .values({
-              tripId,
-              name: accommodation,
-              type: 'hotel',
-              address: '',
-              checkInDate: arrivalDate ? new Date(arrivalDate) : new Date(),
-              checkOutDate: departureDate ? new Date(departureDate) : new Date(),
-              bookingReference: 'TBD',
-              bookingStatus: 'pending',
-              currency: 'USD'
-            })
-            .returning();
+          try {
+            const [newAccommodation] = await tx
+              .insert(accommodations)
+              .values({
+                tripId,
+                name: accommodation,
+                type: 'hotel',
+                address: 'TBD',
+                checkInDate: arrivalDate ? new Date(arrivalDate) : new Date(),
+                checkOutDate: departureDate ? new Date(departureDate) : new Date(),
+                bookingReference: 'TBD',
+                bookingStatus: 'pending',
+                currency: 'USD'
+              })
+              .returning();
 
-          accommodationId = newAccommodation.id;
+            console.log('Created accommodation:', newAccommodation);
+            accommodationId = newAccommodation.id;
+          } catch (error) {
+            console.error('Error creating accommodation:', error);
+            throw new Error('Failed to create accommodation');
+          }
         }
 
         // Create participant
-        const [participant] = await tx
-          .insert(participants)
-          .values({
-            tripId,
-            name,
-            status: 'pending',
-            arrivalDate: arrivalDate ? new Date(arrivalDate) : null,
-            departureDate: departureDate ? new Date(departureDate) : null,
-            flightStatus: flightNumber ? 'pending' : 'pending',
-            hotelStatus: accommodation ? 'pending' : 'pending',
-            accommodationId
-          })
-          .returning();
-
-        // Create flight if details provided
-        if (flightNumber || airline) {
-          await tx
-            .insert(flights)
+        let participant;
+        try {
+          [participant] = await tx
+            .insert(participants)
             .values({
               tripId,
-              airline: airline || '',
-              flightNumber: flightNumber || '',
-              departureAirport: '',
-              arrivalAirport: '',
-              departureDate: arrivalDate ? new Date(arrivalDate) : new Date(),
-              departureTime: '12:00',
-              arrivalDate: arrivalDate ? new Date(arrivalDate) : new Date(),
-              arrivalTime: '14:00',
-              bookingReference: flightNumber || 'TBD',
-              bookingStatus: 'pending',
-              currency: 'USD'
-            });
+              name,
+              status: 'pending',
+              arrivalDate: arrivalDate ? new Date(arrivalDate) : null,
+              departureDate: departureDate ? new Date(departureDate) : null,
+              flightStatus: flightNumber ? 'pending' : 'pending',
+              hotelStatus: accommodation ? 'pending' : 'pending',
+              accommodationId
+            })
+            .returning();
+
+          console.log('Created participant:', participant);
+        } catch (error) {
+          console.error('Error creating participant:', error);
+          throw new Error('Failed to create participant record');
+        }
+
+        // Create flight if needed
+        if (flightNumber || airline) {
+          try {
+            const [flight] = await tx
+              .insert(flights)
+              .values({
+                tripId,
+                airline: airline || '',
+                flightNumber: flightNumber || '',
+                departureAirport: 'TBD',
+                arrivalAirport: 'TBD',
+                departureDate: arrivalDate ? new Date(arrivalDate) : new Date(),
+                departureTime: '12:00',
+                arrivalDate: arrivalDate ? new Date(arrivalDate) : new Date(),
+                arrivalTime: '14:00',
+                bookingReference: flightNumber || 'TBD',
+                bookingStatus: 'pending',
+                currency: 'USD'
+              })
+              .returning();
+
+            console.log('Created flight:', flight);
+          } catch (error) {
+            console.error('Error creating flight:', error);
+            throw new Error('Failed to create flight record');
+          }
         }
 
         return participant;
@@ -715,6 +759,11 @@ export function registerRoutes(app: Express): Server {
         }
       });
 
+      if (!participantWithDetails) {
+        throw new Error('Failed to fetch participant details after creation');
+      }
+
+      console.log('Returning participant with details:', participantWithDetails);
       res.json(participantWithDetails);
     } catch (error) {
       console.error('Error creating participant:', error);
@@ -818,13 +867,13 @@ export function registerRoutes(app: Express): Server {
         accommodation
       } = req.body;
 
-      console.log('Updating participant:', { 
-        participantId, 
-        tripId, 
-        name, 
-        arrivalDate, 
-        departureDate, 
-        accommodation 
+      console.log('Updating participant:', {
+        participantId,
+        tripId,
+        name,
+        arrivalDate,
+        departureDate,
+        accommodation
       });
 
       // Start a transaction to handle all updates
@@ -926,8 +975,7 @@ export function registerRoutes(app: Express): Server {
       });
 
       res.json(participantWithDetails);
-    } catch (error) {
-      console.error('Error updating participant:', error);
+    } catch (error) {      console.error('Error updating participant:', error);
       res.status(500).json({
         error: 'Failed to update participant',
         details: error instanceof Error ? error.message : 'Unknown error'
