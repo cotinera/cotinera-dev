@@ -786,11 +786,20 @@ export function registerRoutes(app: Express): Server {
         accommodation
       } = req.body;
 
-      console.log('Updating participant:', { participantId, tripId, name, arrivalDate, departureDate, accommodation });
+      console.log('Updating participant:', { 
+        participantId, 
+        tripId, 
+        name, 
+        arrivalDate, 
+        departureDate, 
+        accommodation,
+        flightNumber,
+        airline 
+      });
 
       // Start a transaction to handle participant and accommodation updates
       await db.transaction(async (tx) => {
-        // Get current participant
+        // Get current participant to check existing data
         const [currentParticipant] = await tx
           .select()
           .from(participants)
@@ -805,10 +814,15 @@ export function registerRoutes(app: Express): Server {
           throw new Error("Participant not found");
         }
 
+        console.log('Current participant:', currentParticipant);
+
+        // Handle accommodation updates
         let accommodationId = currentParticipant.accommodationId;
 
-        // Handle accommodation update
-        if (accommodation?.trim()) {
+        if (accommodation === null || accommodation === '') {
+          // If accommodation is explicitly set to null/empty, remove the association
+          accommodationId = null;
+        } else if (accommodation?.trim()) {
           // Create new accommodation entry
           const [newAccommodation] = await tx
             .insert(accommodations)
@@ -825,13 +839,11 @@ export function registerRoutes(app: Express): Server {
             })
             .returning();
 
+          console.log('Created new accommodation:', newAccommodation);
           accommodationId = newAccommodation.id;
-        } else {
-          // If no accommodation provided, remove the association
-          accommodationId = null;
         }
 
-        // Update participant
+        // Update participant with accommodation
         const [updatedParticipant] = await tx
           .update(participants)
           .set({
@@ -839,7 +851,7 @@ export function registerRoutes(app: Express): Server {
             ...(arrivalDate && { arrivalDate: new Date(arrivalDate) }),
             ...(departureDate && { departureDate: new Date(departureDate) }),
             ...(flightNumber && { flightStatus: 'pending' }),
-            ...(accommodation && { hotelStatus: 'pending' }),
+            ...(accommodation !== undefined && { hotelStatus: 'pending' }),
             accommodationId
           })
           .where(
@@ -854,7 +866,9 @@ export function registerRoutes(app: Express): Server {
           throw new Error("Failed to update participant");
         }
 
-        // Update or create flight if details provided
+        console.log('Updated participant:', updatedParticipant);
+
+        // Handle flight updates if needed
         if (flightNumber || airline) {
           const existingFlight = await tx
             .select()
@@ -903,7 +917,7 @@ export function registerRoutes(app: Express): Server {
         ),
         with: {
           accommodation: true,
-          user: true
+          flights: true
         }
       });
 
@@ -911,12 +925,12 @@ export function registerRoutes(app: Express): Server {
         throw new Error("Failed to fetch updated participant details");
       }
 
+      console.log('Returning updated participant:', participantWithDetails);
       res.json(participantWithDetails);
     } catch (error) {
       console.error('Error updating participant:', error);
       res.status(500).json({
-        error: 'Failed to update participant',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        error: 'Failed to update participant',        details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   });
@@ -928,7 +942,7 @@ export function registerRoutes(app: Express): Server {
       const participantId = parseInt(req.params.participantId);
 
       // Delete the participant first since it's the main entity
-      const [deletedParticipant] = awaitdb.delete(participants)
+      const [deletedParticipant] = await db.delete(participants)
         .where(and(eq(participants.id, participantId), eq(participants.tripId, tripId)))
         .returning();
 
