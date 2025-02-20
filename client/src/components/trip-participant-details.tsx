@@ -78,7 +78,7 @@ interface Participant {
   hotelStatus: string;
   flightIn: string | null;
   flightOut: string | null;
-  accommodationId: number | null;
+  accommodation: Accommodation | null;
 }
 
 interface ParticipantForm {
@@ -150,51 +150,33 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       departureDate: editingParticipant?.departureDate || "",
       flightIn: editingParticipant?.flightIn || "",
       flightOut: editingParticipant?.flightOut || "",
-      accommodation: editingParticipant?.accommodationId ? editingParticipant.accommodationId : "",
+      accommodation: editingParticipant?.accommodation?.name || "",
     },
   });
 
   const addParticipantMutation = useMutation({
     mutationFn: async (data: ParticipantForm) => {
-      // Only create accommodation if one is specified
-      let accommodationData = null;
-
-      if (data.accommodation?.trim()) {
-        // Create the accommodation first
-        const accommodationRes = await fetch(`/api/trips/${tripId}/accommodations`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: data.accommodation,
-            tripId: tripId,
-            type: 'hotel',
-            address: '',
-            checkInDate: data.arrivalDate || null,
-            checkOutDate: data.departureDate || null,
-            checkInTime: null,
-            checkOutTime: null,
-            bookingReference: '',
-            bookingStatus: 'pending',
-            currency: 'USD'
-          }),
-          credentials: "include",
-        });
-
-        if (!accommodationRes.ok) {
-          const error = await accommodationRes.json();
-          throw new Error(error.message || "Failed to create accommodation");
-        }
-
-        accommodationData = await accommodationRes.json();
-      }
-
-      // Then create the participant with the accommodation ID if one was created
       const formattedData = {
         ...data,
         status: 'pending' as Status,
         flightStatus: 'pending',
         hotelStatus: 'pending',
-        accommodationId: accommodationData?.id || null,
+        // Only include accommodation if explicitly provided and not empty
+        accommodation: data.accommodation?.trim()
+          ? {
+              name: data.accommodation,
+              tripId: tripId,
+              type: 'hotel',
+              address: '',
+              checkInDate: data.arrivalDate || null,
+              checkOutDate: data.departureDate || null,
+              checkInTime: null,
+              checkOutTime: null,
+              bookingReference: '',
+              bookingStatus: 'pending',
+              currency: 'USD'
+            }
+          : null
       };
 
       const res = await fetch(`/api/trips/${tripId}/participants`, {
@@ -205,8 +187,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       });
 
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to add participant");
+        const errorData = await res.json();
+        throw new Error(errorData.error || "Failed to add participant");
       }
 
       return res.json();
@@ -230,41 +212,25 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
   const updateParticipantMutation = useMutation({
     mutationFn: async ({ participantId, data }: { participantId: number; data: Partial<ParticipantForm> }) => {
-      let accommodationData = null;
-
-      if (data.accommodation?.trim()) {
-        // Create or update accommodation
-        const accommodationRes = await fetch(`/api/trips/${tripId}/accommodations`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: data.accommodation,
-            tripId: tripId,
-            type: 'hotel',
-            address: '',
-            checkInDate: data.arrivalDate || null,
-            checkOutDate: data.departureDate || null,
-            checkInTime: null,
-            checkOutTime: null,
-            bookingReference: '',
-            bookingStatus: 'pending',
-            currency: 'USD'
-          }),
-          credentials: "include",
-        });
-
-        if (!accommodationRes.ok) {
-          const error = await accommodationRes.json();
-          throw new Error(error.message || "Failed to create accommodation");
-        }
-
-        accommodationData = await accommodationRes.json();
-      }
-
-      // Update participant with new data and accommodation ID
+      // Only include accommodation data if it's actually provided and not empty
       const formattedData = {
         ...data,
-        accommodationId: data.accommodation?.trim() ? accommodationData?.id : null,
+        // Only include accommodation if a name is provided and not empty
+        accommodation: data.accommodation?.trim()
+          ? {
+              name: data.accommodation,
+              tripId: tripId,
+              type: 'hotel',
+              address: '',
+              checkInDate: data.arrivalDate || null,
+              checkOutDate: data.departureDate || null,
+              checkInTime: null,
+              checkOutTime: null,
+              bookingReference: '',
+              bookingStatus: 'pending',
+              currency: 'USD'
+            }
+          : null
       };
 
       const res = await fetch(`/api/trips/${tripId}/participants/${participantId}`, {
@@ -534,7 +500,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                     {participant.departureDate && format(new Date(participant.departureDate), "dd/MM/yyyy")}
                   </TableCell>
                   <TableCell>{participant.flightOut || "-"}</TableCell>
-                  <TableCell>{participant.accommodationId ? participant.accommodationId.toString() : "-"}</TableCell>
+                  <TableCell>{participant.accommodation?.name || "-"}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -595,7 +561,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                               departureDate: participant.departureDate || "",
                               flightIn: participant.flightIn || "",
                               flightOut: participant.flightOut || "",
-                              accommodation: participant.accommodationId ? participant.accommodationId.toString() : "",
+                              accommodation: participant.accommodation?.name || "",
                             });
                           }
                         }}

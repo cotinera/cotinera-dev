@@ -185,7 +185,6 @@ export const participants = pgTable("participants", {
   departureDate: date("departure_date"),
   flightStatus: text("flight_status").notNull().default('pending'),
   hotelStatus: text("hotel_status").notNull().default('pending'),
-  accommodationId: integer("accommodation_id").references(() => accommodations.id),
 });
 
 export const activities = pgTable("activities", {
@@ -228,7 +227,7 @@ export const pinnedPlaces = pgTable("pinned_places", {
   }>(),
   destinationId: integer("destination_id").references(() => destinations.id),
   addedToChecklist: boolean("added_to_checklist").notNull().default(false),
-  category: text("category").notNull().default('other'), 
+  category: text("category").notNull().default('other'), // Adding category field
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -303,10 +302,7 @@ export const participantsRelations = relations(participants, ({ one, many }) => 
     references: [users.id],
   }),
   flights: many(flights),
-  accommodation: one(accommodations, {
-    fields: [participants.accommodationId],
-    references: [accommodations.id],
-  }),
+  accommodation: one(accommodations),
 }));
 
 export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
