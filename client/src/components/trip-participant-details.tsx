@@ -191,17 +191,18 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
   const updateParticipantMutation = useMutation({
     mutationFn: async ({ participantId, data }: { participantId: number; data: Partial<ParticipantForm> }) => {
-      // Structure the accommodation data properly if it exists
+      // Only include accommodation data if a name is provided
       const formattedData = {
         ...data,
         accommodation: data.accommodation ? {
           name: data.accommodation,
-          // Set minimal required fields for accommodation
           tripId: tripId,
           type: 'hotel',
           address: '',
-          checkInDate: data.arrivalDate || new Date().toISOString(),
-          checkOutDate: data.departureDate || new Date().toISOString(),
+          checkInDate: data.arrivalDate || null,
+          checkOutDate: data.departureDate || null,
+          checkInTime: null,
+          checkOutTime: null,
           bookingReference: '',
           bookingStatus: 'pending',
           currency: 'USD'
