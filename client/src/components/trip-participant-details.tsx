@@ -156,15 +156,34 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
   const addParticipantMutation = useMutation({
     mutationFn: async (data: ParticipantForm) => {
+      const formattedData = {
+        ...data,
+        status: 'pending' as Status,
+        flightStatus: 'pending',
+        hotelStatus: 'pending',
+        // Only include accommodation if explicitly provided and not empty
+        accommodation: data.accommodation?.trim()
+          ? {
+              name: data.accommodation,
+              tripId: tripId,
+              type: 'hotel',
+              address: '',
+              checkInDate: data.arrivalDate || null,
+              checkOutDate: data.departureDate || null,
+              checkInTime: null,
+              checkOutTime: null,
+              bookingReference: '',
+              bookingStatus: 'pending',
+              currency: 'USD'
+            }
+          : null
+      };
+
       const res = await fetch(`/api/trips/${tripId}/participants`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...data,
-          status: 'pending' as Status,
-          flightStatus: 'pending',
-          hotelStatus: 'pending'
-        }),
+        body: JSON.stringify(formattedData),
+        credentials: "include",
       });
 
       if (!res.ok) {
@@ -175,7 +194,9 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      queryClient.invalidateQueries({
+        queryKey: [`/api/trips/${tripId}/participants`],
+      });
       setIsAddParticipantOpen(false);
       addForm.reset();
       toast({ title: "Success", description: "Person added successfully" });
@@ -191,22 +212,25 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
   const updateParticipantMutation = useMutation({
     mutationFn: async ({ participantId, data }: { participantId: number; data: Partial<ParticipantForm> }) => {
-      // Only include accommodation data if a name is provided
+      // Only include accommodation data if it's actually provided and not empty
       const formattedData = {
         ...data,
-        accommodation: data.accommodation ? {
-          name: data.accommodation,
-          tripId: tripId,
-          type: 'hotel',
-          address: '',
-          checkInDate: data.arrivalDate || null,
-          checkOutDate: data.departureDate || null,
-          checkInTime: null,
-          checkOutTime: null,
-          bookingReference: '',
-          bookingStatus: 'pending',
-          currency: 'USD'
-        } : null
+        // Only include accommodation if a name is provided and not empty
+        accommodation: data.accommodation?.trim()
+          ? {
+              name: data.accommodation,
+              tripId: tripId,
+              type: 'hotel',
+              address: '',
+              checkInDate: data.arrivalDate || null,
+              checkOutDate: data.departureDate || null,
+              checkInTime: null,
+              checkOutTime: null,
+              bookingReference: '',
+              bookingStatus: 'pending',
+              currency: 'USD'
+            }
+          : null
       };
 
       const res = await fetch(`/api/trips/${tripId}/participants/${participantId}`, {
