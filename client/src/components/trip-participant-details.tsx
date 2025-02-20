@@ -651,11 +651,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => {
-                          if (window.confirm('Are you sure you want to remove this person?')) {
-                            deleteParticipantMutation.mutate(participant.id);
-                          }
-                        }}
+                        onClick={() => deleteParticipantMutation.mutate(participant.id)}
                       >
                         <X className="h-4 w-4" />
                       </Button>
