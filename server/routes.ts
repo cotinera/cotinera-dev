@@ -786,10 +786,10 @@ export function registerRoutes(app: Express): Server {
         accommodation
       } = req.body;
 
+      console.log('Updating participant:', { participantId, tripId, name, arrivalDate, departureDate, accommodation });
+
       // Start a transaction to handle participant and accommodation updates
       await db.transaction(async (tx) => {
-        let accommodationId = null;
-
         // Get current participant
         const [currentParticipant] = await tx
           .select()
@@ -805,51 +805,42 @@ export function registerRoutes(app: Express): Server {
           throw new Error("Participant not found");
         }
 
-        // If accommodation is provided, create new accommodation entry
+        let accommodationId = currentParticipant.accommodationId;
+
+        // Handle accommodation update
         if (accommodation?.trim()) {
-          // Get current accommodation if exists
-          const currentAccommodation = currentParticipant.accommodationId 
-            ? await tx
-                .select()
-                .from(accommodations)
-                .where(eq(accommodations.id, currentParticipant.accommodationId))
-                .limit(1)
-            : null;
+          // Create new accommodation entry
+          const [newAccommodation] = await tx
+            .insert(accommodations)
+            .values({
+              tripId,
+              name: accommodation.trim(),
+              type: 'hotel',
+              address: '',
+              checkInDate: arrivalDate ? new Date(arrivalDate) : new Date(),
+              checkOutDate: departureDate ? new Date(departureDate) : new Date(),
+              bookingReference: 'TBD',
+              bookingStatus: 'pending',
+              currency: 'USD'
+            })
+            .returning();
 
-          // Only create new accommodation if name is different
-          if (!currentAccommodation?.[0] || currentAccommodation[0].name !== accommodation) {
-            const [newAccommodation] = await tx
-              .insert(accommodations)
-              .values({
-                tripId,
-                name: accommodation.trim(), // Store just the name string
-                type: 'hotel',
-                address: '',
-                checkInDate: arrivalDate ? new Date(arrivalDate) : new Date(),
-                checkOutDate: departureDate ? new Date(departureDate) : new Date(),
-                bookingReference: 'TBD',
-                bookingStatus: 'pending',
-                currency: 'USD'
-              })
-              .returning();
-
-            accommodationId = newAccommodation.id;
-          } else {
-            // Keep the existing accommodation
-            accommodationId = currentParticipant.accommodationId;
-          }
+          accommodationId = newAccommodation.id;
+        } else {
+          // If no accommodation provided, remove the association
+          accommodationId = null;
         }
 
         // Update participant
         const [updatedParticipant] = await tx
           .update(participants)
           .set({
-            name: name || undefined,
-            arrivalDate: arrivalDate ? new Date(arrivalDate) : undefined,
-            departureDate: departureDate ? new Date(departureDate) : undefined,
-            flightStatus: flightNumber || airline ? 'pending' : undefined,
-            hotelStatus: accommodation ? 'pending' : undefined,
-            accommodationId: accommodation ? accommodationId : null // Clear accommodation if none provided
+            ...(name && { name }),
+            ...(arrivalDate && { arrivalDate: new Date(arrivalDate) }),
+            ...(departureDate && { departureDate: new Date(departureDate) }),
+            ...(flightNumber && { flightStatus: 'pending' }),
+            ...(accommodation && { hotelStatus: 'pending' }),
+            accommodationId
           })
           .where(
             and(
@@ -865,7 +856,6 @@ export function registerRoutes(app: Express): Server {
 
         // Update or create flight if details provided
         if (flightNumber || airline) {
-          // First try to find existing flight
           const existingFlight = await tx
             .select()
             .from(flights)
@@ -880,7 +870,7 @@ export function registerRoutes(app: Express): Server {
                 airline: airline || existingFlight[0].airline,
                 flightNumber: flightNumber || existingFlight[0].flightNumber,
                 departureDate: arrivalDate ? new Date(arrivalDate) : existingFlight[0].departureDate,
-                arrivalDate: arrivalDate ? new Date(arrivalDate) : existingFlight[0].arrivalDate,
+                arrivalDate: arrivalDate ? new Date(arrivalDate) : existingFlight[0].arrivalDate
               })
               .where(eq(flights.id, existingFlight[0].id));
           } else {
@@ -913,8 +903,8 @@ export function registerRoutes(app: Express): Server {
         ),
         with: {
           accommodation: true,
-          flights: true,
-        },
+          user: true
+        }
       });
 
       if (!participantWithDetails) {
@@ -924,8 +914,8 @@ export function registerRoutes(app: Express): Server {
       res.json(participantWithDetails);
     } catch (error) {
       console.error('Error updating participant:', error);
-      res.status(500).json({ 
-        error: 'Failed to update participant', 
+      res.status(500).json({
+        error: 'Failed to update participant',
         details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
@@ -938,7 +928,7 @@ export function registerRoutes(app: Express): Server {
       const participantId = parseInt(req.params.participantId);
 
       // Delete the participant first since it's the main entity
-      const [deletedParticipant] = await db.delete(participants)
+      const [deletedParticipant] = awaitdb.delete(participants)
         .where(and(eq(participants.id, participantId), eq(participants.tripId, tripId)))
         .returning();
 
