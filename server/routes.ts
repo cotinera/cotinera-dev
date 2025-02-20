@@ -634,35 +634,27 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Add participant to trip
+  // Create participant endpoint
   app.post("/api/trips/:tripId/participants", async (req, res) => {
     try {
       const tripId = parseInt(req.params.tripId);
       const { name, email, arrivalDate, departureDate, flightNumber, airline, accommodation } = req.body;
 
-      console.log('Creating participant:', { 
-        name, 
-        email, 
-        arrivalDate, 
-        departureDate, 
-        accommodation 
-      });
-
       if (!name) {
         return res.status(400).json({ error: "Name is required" });
       }
 
-      let accommodationId = null;
+      // Create participant with transaction
+      const newParticipant = await db.transaction(async (tx) => {
+        let accommodationId = null;
 
-      // Start a transaction to handle both participant and accommodation creation
-      await db.transaction(async (tx) => {
-        // Create accommodation first if provided
-        if (accommodation?.trim()) {
+        // Create accommodation if provided
+        if (accommodation) {
           const [newAccommodation] = await tx
             .insert(accommodations)
             .values({
               tripId,
-              name: accommodation.trim(),
+              name: accommodation,
               type: 'hotel',
               address: '',
               checkInDate: arrivalDate ? new Date(arrivalDate) : new Date(),
@@ -673,12 +665,11 @@ export function registerRoutes(app: Express): Server {
             })
             .returning();
 
-          console.log('Created accommodation:', newAccommodation);
           accommodationId = newAccommodation.id;
         }
 
-        // Create participant with accommodation reference
-        const [newParticipant] = await tx
+        // Create participant
+        const [participant] = await tx
           .insert(participants)
           .values({
             tripId,
@@ -692,10 +683,8 @@ export function registerRoutes(app: Express): Server {
           })
           .returning();
 
-        console.log('Created participant:', newParticipant);
-
         // Create flight if details provided
-        if (airline || flightNumber) {
+        if (flightNumber || airline) {
           await tx
             .insert(flights)
             .values({
@@ -713,29 +702,25 @@ export function registerRoutes(app: Express): Server {
               currency: 'USD'
             });
         }
+
+        return participant;
       });
 
       // Fetch complete participant data with relations
       const participantWithDetails = await db.query.participants.findFirst({
-        where: eq(participants.tripId, tripId),
-        orderBy: (participants, { desc }) => [desc(participants.id)],
+        where: eq(participants.id, newParticipant.id),
         with: {
           accommodation: true,
           flights: true
         }
       });
 
-      if (!participantWithDetails) {
-        throw new Error("Failed to fetch created participant details");
-      }
-
-      console.log('Returning participant with details:', participantWithDetails);
       res.json(participantWithDetails);
     } catch (error) {
       console.error('Error creating participant:', error);
-      res.status(500).json({ 
-        error: 'Failed to create participant', 
-        details: error instanceof Error ? error.message : 'Unknown error' 
+      res.status(500).json({
+        error: 'Failed to create participant',
+        details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   });
@@ -839,14 +824,12 @@ export function registerRoutes(app: Express): Server {
         name, 
         arrivalDate, 
         departureDate, 
-        accommodation,
-        flightNumber,
-        airline 
+        accommodation 
       });
 
-      // Start a transaction to handle participant and accommodation updates
-      await db.transaction(async (tx) => {
-        // Get current participant to check existing data
+      // Start a transaction to handle all updates
+      const updatedParticipant = await db.transaction(async (tx) => {
+        // Get current participant
         const [currentParticipant] = await tx
           .select()
           .from(participants)
@@ -861,21 +844,15 @@ export function registerRoutes(app: Express): Server {
           throw new Error("Participant not found");
         }
 
-        console.log('Current participant:', currentParticipant);
-
-        // Handle accommodation updates
         let accommodationId = currentParticipant.accommodationId;
 
-        if (accommodation === null || accommodation === '') {
-          // If accommodation is explicitly set to null/empty, remove the association
-          accommodationId = null;
-        } else if (accommodation?.trim()) {
-          // Create new accommodation entry
+        // Handle accommodation update if provided
+        if (accommodation) {
           const [newAccommodation] = await tx
             .insert(accommodations)
             .values({
               tripId,
-              name: accommodation.trim(),
+              name: accommodation,
               type: 'hotel',
               address: '',
               checkInDate: arrivalDate ? new Date(arrivalDate) : new Date(),
@@ -886,19 +863,21 @@ export function registerRoutes(app: Express): Server {
             })
             .returning();
 
-          console.log('Created new accommodation:', newAccommodation);
           accommodationId = newAccommodation.id;
+        } else if (accommodation === null) {
+          // Explicitly remove accommodation
+          accommodationId = null;
         }
 
-        // Update participant with accommodation
-        const [updatedParticipant] = await tx
+        // Update participant
+        const [participant] = await tx
           .update(participants)
           .set({
             ...(name && { name }),
             ...(arrivalDate && { arrivalDate: new Date(arrivalDate) }),
             ...(departureDate && { departureDate: new Date(departureDate) }),
-            ...(flightNumber && { flightStatus: 'pending' }),
-            ...(accommodation !== undefined && { hotelStatus: 'pending' }),
+            hotelStatus: accommodation ? 'pending' : currentParticipant.hotelStatus,
+            flightStatus: (flightNumber || airline) ? 'pending' : currentParticipant.flightStatus,
             accommodationId
           })
           .where(
@@ -909,75 +888,49 @@ export function registerRoutes(app: Express): Server {
           )
           .returning();
 
-        if (!updatedParticipant) {
+        if (!participant) {
           throw new Error("Failed to update participant");
         }
 
-        console.log('Updated participant:', updatedParticipant);
-
-        // Handle flight updates if needed
+        // Handle flight information if provided
         if (flightNumber || airline) {
-          const existingFlight = await tx
-            .select()
-            .from(flights)
-            .where(eq(flights.participantId, participantId))
-            .limit(1);
-
-          if (existingFlight.length > 0) {
-            // Update existing flight
-            await tx
-              .update(flights)
-              .set({
-                airline: airline || existingFlight[0].airline,
-                flightNumber: flightNumber || existingFlight[0].flightNumber,
-                departureDate: arrivalDate ? new Date(arrivalDate) : existingFlight[0].departureDate,
-                arrivalDate: arrivalDate ? new Date(arrivalDate) : existingFlight[0].arrivalDate
-              })
-              .where(eq(flights.id, existingFlight[0].id));
-          } else {
-            // Create new flight
-            await tx
-              .insert(flights)
-              .values({
-                tripId,
-                airline: airline || '',
-                flightNumber: flightNumber || '',
-                departureAirport: '',
-                arrivalAirport: '',
-                departureDate: arrivalDate ? new Date(arrivalDate) : new Date(),
-                departureTime: '12:00',
-                arrivalDate: arrivalDate ? new Date(arrivalDate) : new Date(),
-                arrivalTime: '14:00',
-                bookingReference: flightNumber || 'TBD',
-                bookingStatus: 'pending',
-                participantId
-              });
-          }
+          await tx
+            .insert(flights)
+            .values({
+              tripId,
+              airline: airline || '',
+              flightNumber: flightNumber || '',
+              departureAirport: '',
+              arrivalAirport: '',
+              departureDate: arrivalDate ? new Date(arrivalDate) : new Date(),
+              departureTime: '12:00',
+              arrivalDate: arrivalDate ? new Date(arrivalDate) : new Date(),
+              arrivalTime: '14:00',
+              bookingReference: flightNumber || 'TBD',
+              bookingStatus: 'pending',
+              currency: 'USD',
+              participantId: participant.id // Added participantId here
+            });
         }
+
+        return participant;
       });
 
-      // Fetch updated participant with all relations
+      // Fetch updated participant with all details
       const participantWithDetails = await db.query.participants.findFirst({
-        where: and(
-          eq(participants.id, participantId),
-          eq(participants.tripId, tripId)
-        ),
+        where: eq(participants.id, updatedParticipant.id),
         with: {
           accommodation: true,
           flights: true
         }
       });
 
-      if (!participantWithDetails) {
-        throw new Error("Failed to fetch updated participant details");
-      }
-
-      console.log('Returning updated participant:', participantWithDetails);
       res.json(participantWithDetails);
     } catch (error) {
       console.error('Error updating participant:', error);
       res.status(500).json({
-        error: 'Failed to update participant',        details: error instanceof Error ? error.message : 'Unknown error'
+        error: 'Failed to update participant',
+        details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
   });
