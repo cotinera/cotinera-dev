@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Trip, Participant } from "@db/schema";
+import type { Trip } from "@db/schema";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -45,6 +45,21 @@ import { useToast } from "@/hooks/use-toast";
 
 interface TripParticipantDetailsProps {
   tripId: number;
+}
+
+interface Participant {
+  id: number;
+  name: string | null;
+  tripId: number;
+  userId: number | null;
+  status: string;
+  arrivalDate: string | null;
+  departureDate: string | null;
+  flightStatus: string;
+  hotelStatus: string;
+  flightIn?: string;
+  flightOut?: string;
+  accommodation?: string;
 }
 
 interface ParticipantForm {
@@ -114,9 +129,9 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       name: editingParticipant?.name || "",
       arrivalDate: editingParticipant?.arrivalDate || "",
       departureDate: editingParticipant?.departureDate || "",
-      flightIn: editingParticipant?.flights?.[0]?.flightNumber || "",
-      flightOut: editingParticipant?.flights?.[1]?.flightNumber || "",
-      accommodation: editingParticipant?.accommodation?.name || "",
+      flightIn: editingParticipant?.flightIn || "",
+      flightOut: editingParticipant?.flightOut || "",
+      accommodation: editingParticipant?.accommodation || "",
     },
   });
 
@@ -125,7 +140,12 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       const res = await fetch(`/api/trips/${tripId}/participants`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, status: 'pending' as Status }),
+        body: JSON.stringify({
+          ...data,
+          status: 'pending' as Status,
+          flightStatus: 'pending',
+          hotelStatus: 'pending'
+        }),
       });
 
       if (!res.ok) {
@@ -203,28 +223,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         setUpdatingParticipants(prev => prev.filter(id => id !== participantId));
       }
     },
-    onMutate: async ({ participantId, status }) => {
-      await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-      const previousParticipants = queryClient.getQueryData<Participant[]>([`/api/trips/${tripId}/participants`]);
-      queryClient.setQueryData<Participant[]>(
-        [`/api/trips/${tripId}/participants`],
-        (old) => old?.map(p => (p.id === participantId ? { ...p, status } : p)) ?? []
-      );
-      return { previousParticipants };
-    },
-    onError: (err, { participantId }, context) => {
-      if (context?.previousParticipants) {
-        queryClient.setQueryData(
-          [`/api/trips/${tripId}/participants`],
-          context.previousParticipants
-        );
-      }
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: err instanceof Error ? err.message : "Failed to update status",
-      });
-    },
     onSuccess: (data) => {
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
@@ -233,6 +231,13 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       toast({
         title: "Success",
         description: "Status updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to update status",
       });
     },
   });
@@ -260,7 +265,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       });
     },
   });
-
 
   const getStatusBadgeVariant = (status: Status) => {
     switch (status) {
@@ -430,12 +434,12 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   <TableCell>
                     {participant.arrivalDate && format(new Date(participant.arrivalDate), "dd/MM/yyyy")}
                   </TableCell>
-                  <TableCell>{participant.flights?.[0]?.flightNumber || "-"}</TableCell>
+                  <TableCell>{participant.flightIn || "-"}</TableCell>
                   <TableCell>
                     {participant.departureDate && format(new Date(participant.departureDate), "dd/MM/yyyy")}
                   </TableCell>
-                  <TableCell>{participant.flights?.[1]?.flightNumber || "-"}</TableCell>
-                  <TableCell>{participant.accommodation?.name || "-"}</TableCell>
+                  <TableCell>{participant.flightOut || "-"}</TableCell>
+                  <TableCell>{participant.accommodation || "-"}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -494,9 +498,9 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                               name: participant.name || "",
                               arrivalDate: participant.arrivalDate || "",
                               departureDate: participant.departureDate || "",
-                              flightIn: participant.flights?.[0]?.flightNumber || "",
-                              flightOut: participant.flights?.[1]?.flightNumber || "",
-                              accommodation: participant.accommodation?.name || "",
+                              flightIn: participant.flightIn || "",
+                              flightOut: participant.flightOut || "",
+                              accommodation: participant.accommodation || "",
                             });
                           }
                         }}
