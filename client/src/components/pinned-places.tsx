@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MapPicker } from "@/components/map-picker";
@@ -174,16 +174,50 @@ export function PinnedPlaces({
   const [editedPlaceName, setEditedPlaceName] = useState<string>("");
   const [searchInputRef, setSearchInputRef] = useState<HTMLInputElement | null>(null);
 
-  // Add effect to focus search input when dialog opens
+  // Add debug logging for coordinates
   useEffect(() => {
-    if (isAddPlaceOpen && searchInputRef) {
-      // Small delay to ensure dialog is fully rendered
-      const timeoutId = setTimeout(() => {
-        searchInputRef.focus();
-      }, 100);
-      return () => clearTimeout(timeoutId);
+    console.log('Trip coordinates:', tripCoordinates);
+    console.log('Selected coordinates:', selectedCoordinates);
+  }, [tripCoordinates, selectedCoordinates]);
+
+  const pinnedPlacesQuery = useQuery<{ tripLocation: { lat: number; lng: number } | null; places: PinnedPlace[] }>({
+    queryKey: [`/api/trips/${tripId}/pinned-places`, destinationId],
+    queryFn: async () => {
+      const url = new URL(`/api/trips/${tripId}/pinned-places`, window.location.origin);
+      if (destinationId) {
+        url.searchParams.append('destinationId', destinationId.toString());
+      }
+      const res = await fetch(url, {
+        credentials: 'include'
+      });
+      if (!res.ok) {
+        const error = await res.text();
+        throw new Error(error);
+      }
+      const data = await res.json();
+      console.log('Pinned places query response:', data);
+      return data;
+    },
+  });
+
+  const existingPins = [...(pinnedPlacesQuery.data?.places || [])]
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  // Ensure we use the most specific location coordinates available
+  const effectiveLocation = useMemo(() => {
+    if (tripCoordinates) {
+      return tripCoordinates;
     }
-  }, [isAddPlaceOpen, searchInputRef]);
+    if (pinnedPlacesQuery.data?.tripLocation) {
+      return {
+        lat: pinnedPlacesQuery.data.tripLocation.lat,
+        lng: pinnedPlacesQuery.data.tripLocation.lng
+      };
+    }
+    return null;
+  }, [tripCoordinates, pinnedPlacesQuery.data?.tripLocation]);
+
+  console.log('Effective location being used:', effectiveLocation);
 
   const form = useForm<AddPinnedPlaceForm>({
     defaultValues: {
@@ -223,35 +257,6 @@ export function PinnedPlaces({
       setSelectedCoordinates(null);
     }
   }, [isAddPlaceOpen, form]);
-
-  const pinnedPlacesQuery = useQuery<{ tripLocation: { lat: number; lng: number } | null; places: PinnedPlace[] }>({
-    queryKey: [`/api/trips/${tripId}/pinned-places`, destinationId],
-    queryFn: async () => {
-      const url = new URL(`/api/trips/${tripId}/pinned-places`, window.location.origin);
-      if (destinationId) {
-        url.searchParams.append('destinationId', destinationId.toString());
-      }
-      const res = await fetch(url, {
-        credentials: 'include'
-      });
-      if (!res.ok) {
-        const error = await res.text();
-        throw new Error(error);
-      }
-      const data = await res.json();
-      console.log('Pinned places query response:', data);
-      return data;
-    },
-  });
-
-  const existingPins = [...(pinnedPlacesQuery.data?.places || [])]
-    .sort((a, b) => a.name.localeCompare(b.name));
-  const tripLocation = tripCoordinates ||
-    (pinnedPlacesQuery.data?.tripLocation && {
-      lat: pinnedPlacesQuery.data.tripLocation.lat,
-      lng: pinnedPlacesQuery.data.tripLocation.lng
-    });
-  console.log('Trip location being used:', tripLocation);
 
   const addPinnedPlaceMutation = useMutation({
     mutationFn: async (data: AddPinnedPlaceForm) => {
@@ -493,10 +498,10 @@ export function PinnedPlaces({
                             }}
                             placeholder="Search for a place to pin..."
                             existingPins={existingPins}
-                            initialCenter={tripLocation || tripCoordinates || undefined}
-                            searchBias={tripLocation || tripCoordinates ? {
-                              ...((tripLocation || tripCoordinates) as { lat: number; lng: number }),
-                              radius: 50000 // 50km radius around trip location
+                            initialCenter={effectiveLocation}
+                            searchBias={effectiveLocation ? {
+                              ...effectiveLocation,
+                              radius: 50000 // 50km radius around location
                             } : undefined}
                             onSearchInputRef={setSearchInputRef}
                           />
@@ -640,9 +645,9 @@ export function PinnedPlaces({
                           }}
                           placeholder="Search for a place to pin..."
                           existingPins={existingPins.filter(p => p.id !== placeToEdit?.id)}
-                          initialCenter={placeToEdit?.coordinates || tripLocation || tripCoordinates || undefined}
-                          searchBias={tripLocation || tripCoordinates ? {
-                            ...((tripLocation || tripCoordinates) as { lat: number; lng: number }),
+                          initialCenter={placeToEdit?.coordinates || effectiveLocation}
+                          searchBias={effectiveLocation ? {
+                            ...effectiveLocation,
                             radius: 50000
                           } : undefined}
                           onSearchInputRef={setSearchInputRef}

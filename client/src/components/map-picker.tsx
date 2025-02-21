@@ -1,16 +1,10 @@
 import { useLoadScript, GoogleMap, MarkerF } from "@react-google-maps/api";
 import { Loader2 } from "lucide-react";
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LocationSearchBar } from "./location-search-bar";
 
 const libraries: ("places")[] = ["places"];
-
-// Default to London if no valid coordinates are provided
-const DEFAULT_CENTER = {
-  lat: 51.5074,
-  lng: -0.1278
-};
 
 interface PinnedPlace {
   id: number;
@@ -32,6 +26,12 @@ interface MapPickerProps {
   onSearchInputRef?: (ref: HTMLInputElement | null) => void;
 }
 
+// Default to London if no valid coordinates are provided
+const DEFAULT_CENTER = {
+  lat: 51.5074,
+  lng: -0.1278
+};
+
 export function MapPicker({
   value,
   onChange,
@@ -42,56 +42,58 @@ export function MapPicker({
   searchBias,
   onSearchInputRef,
 }: MapPickerProps) {
-  // Initialize coordinates with initialCenter if valid, otherwise use search bias or default
-  const [coordinates, setCoordinates] = useState<google.maps.LatLngLiteral | null>(
-    initialCenter && isValidCoordinates(initialCenter) ? initialCenter :
-    searchBias && isValidCoordinates(searchBias) ? searchBias :
-    null
-  );
-
-  const [mapCenter, setMapCenter] = useState<google.maps.LatLngLiteral>(
-    initialCenter && isValidCoordinates(initialCenter) ? initialCenter :
-    searchBias && isValidCoordinates(searchBias) ? searchBias :
-    DEFAULT_CENTER
-  );
-
+  const [coordinates, setCoordinates] = useState<google.maps.LatLngLiteral | null>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
 
   // Helper function to validate coordinates
-  function isValidCoordinates(coords: { lat: number; lng: number }): boolean {
-    return coords && 
-           typeof coords.lat === 'number' && 
+  const isValidCoordinates = useCallback((coords: { lat: number; lng: number } | null | undefined): coords is { lat: number; lng: number } => {
+    return !!coords &&
+           typeof coords.lat === 'number' &&
            typeof coords.lng === 'number' &&
-           coords.lat !== 0 && 
-           coords.lng !== 0 &&
-           !isNaN(coords.lat) && 
-           !isNaN(coords.lng);
-  }
+           !isNaN(coords.lat) &&
+           !isNaN(coords.lng) &&
+           coords.lat !== 0 &&
+           coords.lng !== 0;
+  }, []);
 
-  // Update coordinates and map center when initialCenter or searchBias changes
+  // Determine effective center based on props and state
+  const effectiveCenter = useMemo(() => {
+    if (coordinates && isValidCoordinates(coordinates)) {
+      return coordinates;
+    }
+    if (initialCenter && isValidCoordinates(initialCenter)) {
+      return initialCenter;
+    }
+    if (searchBias && isValidCoordinates(searchBias)) {
+      return searchBias;
+    }
+    return DEFAULT_CENTER;
+  }, [coordinates, initialCenter, searchBias, isValidCoordinates]);
+
+  // Update coordinates when initialCenter changes
   useEffect(() => {
     if (initialCenter && isValidCoordinates(initialCenter)) {
-      setMapCenter(initialCenter);
-      if (!coordinates) {
-        setCoordinates(initialCenter);
-      }
-    } else if (searchBias && isValidCoordinates(searchBias)) {
-      setMapCenter(searchBias);
-      if (!coordinates) {
-        setCoordinates(searchBias);
-      }
+      setCoordinates(initialCenter);
     }
-  }, [initialCenter, searchBias, coordinates]);
+  }, [initialCenter, isValidCoordinates]);
 
   // Handle map load
-  const onLoad = useCallback((map: google.maps.Map) => {
-    setMap(map);
-    const center = initialCenter && isValidCoordinates(initialCenter) ? initialCenter :
-                  searchBias && isValidCoordinates(searchBias) ? searchBias :
-                  DEFAULT_CENTER;
-    map.panTo(center);
-    setMapCenter(center);
-  }, [initialCenter, searchBias]);
+  const onLoad = useCallback((newMap: google.maps.Map) => {
+    setMap(newMap);
+
+    // Center map on load using effectiveCenter
+    if (effectiveCenter) {
+      newMap.setCenter(effectiveCenter);
+      newMap.setZoom(13); // Set appropriate zoom level
+    }
+  }, [effectiveCenter]);
+
+  // Update map center when coordinates change
+  useEffect(() => {
+    if (map && effectiveCenter) {
+      map.panTo(effectiveCenter);
+    }
+  }, [map, effectiveCenter]);
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
@@ -107,7 +109,6 @@ export function MapPicker({
     const newCoords = { lat, lng };
 
     setCoordinates(newCoords);
-    setMapCenter(newCoords);
 
     try {
       const response = await fetch(
@@ -127,15 +128,6 @@ export function MapPicker({
       console.error("Reverse geocoding error:", err);
     }
   };
-
-  // Handle map idle event to update center
-  const onIdle = useCallback(() => {
-    if (!map) return;
-    const center = map.getCenter();
-    if (center) {
-      setMapCenter({ lat: center.lat(), lng: center.lng() });
-    }
-  }, [map]);
 
   if (loadError) {
     return (
@@ -164,9 +156,8 @@ export function MapPicker({
           onChange={(address, coords, name) => {
             if (coords) {
               setCoordinates(coords);
-              setMapCenter(coords);
             }
-            onChange(address, coords || mapCenter, name);
+            onChange(address, coords || effectiveCenter, name);
           }}
           placeholder={placeholder}
           className="flex-1"
@@ -178,10 +169,9 @@ export function MapPicker({
         <GoogleMap
           mapContainerStyle={{ width: "100%", height: "100%" }}
           zoom={13}
-          center={mapCenter}
+          center={effectiveCenter}
           onClick={handleMapClick}
           onLoad={onLoad}
-          onIdle={onIdle}
           options={{
             disableDefaultUI: true,
             zoomControl: true,
