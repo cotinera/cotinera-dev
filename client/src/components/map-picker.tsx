@@ -42,9 +42,6 @@ export function MapPicker({
   searchBias,
   onSearchInputRef,
 }: MapPickerProps) {
-  const [coordinates, setCoordinates] = useState<google.maps.LatLngLiteral | null>(null);
-  const [map, setMap] = useState<google.maps.Map | null>(null);
-
   // Helper function to validate coordinates
   const isValidCoordinates = useCallback((coords: { lat: number; lng: number } | null | undefined): coords is { lat: number; lng: number } => {
     return !!coords &&
@@ -54,45 +51,59 @@ export function MapPicker({
            !isNaN(coords.lng);
   }, []);
 
-  // Determine effective center based on props and state
-  const effectiveCenter = useMemo(() => {
-    // If we have valid initial coordinates, use those first
+  // Initialize coordinates state with initialCenter if valid
+  const [coordinates, setCoordinates] = useState<google.maps.LatLngLiteral | null>(() => {
     if (initialCenter && isValidCoordinates(initialCenter)) {
+      console.log('Initializing coordinates with:', initialCenter);
       return initialCenter;
     }
-    // Then check for selected coordinates
+    return null;
+  });
+
+  const [map, setMap] = useState<google.maps.Map | null>(null);
+
+  // Determine effective center based on props and state
+  const effectiveCenter = useMemo(() => {
+    // Always use initialCenter first if it's valid
+    if (initialCenter && isValidCoordinates(initialCenter)) {
+      console.log('Using initial center:', initialCenter);
+      return initialCenter;
+    }
+    // Then use selected coordinates
     if (coordinates && isValidCoordinates(coordinates)) {
+      console.log('Using selected coordinates:', coordinates);
       return coordinates;
     }
-    // Then check search bias
+    // Then try search bias
     if (searchBias && isValidCoordinates(searchBias)) {
+      console.log('Using search bias:', searchBias);
       return searchBias;
     }
-    // Default to London only if no other valid coordinates are available
+    // Only use default as last resort
+    console.log('Using default center (London)');
     return DEFAULT_CENTER;
   }, [coordinates, initialCenter, searchBias, isValidCoordinates]);
 
   // Update coordinates when initialCenter changes
   useEffect(() => {
     if (initialCenter && isValidCoordinates(initialCenter)) {
+      console.log('Updating coordinates from initialCenter:', initialCenter);
       setCoordinates(initialCenter);
     }
   }, [initialCenter, isValidCoordinates]);
 
   // Handle map load
   const onLoad = useCallback((newMap: google.maps.Map) => {
+    console.log('Map loaded, setting center to:', effectiveCenter);
     setMap(newMap);
-
-    // Center map on load using effectiveCenter
-    if (effectiveCenter) {
-      newMap.setCenter(effectiveCenter);
-      newMap.setZoom(13); // Set appropriate zoom level
-    }
+    newMap.setCenter(effectiveCenter);
+    newMap.setZoom(13);
   }, [effectiveCenter]);
 
   // Update map center when coordinates change
   useEffect(() => {
     if (map && effectiveCenter) {
+      console.log('Panning map to:', effectiveCenter);
       map.panTo(effectiveCenter);
     }
   }, [map, effectiveCenter]);
@@ -110,6 +121,7 @@ export function MapPicker({
     const lng = e.latLng.lng();
     const newCoords = { lat, lng };
 
+    console.log('Map clicked at:', newCoords);
     setCoordinates(newCoords);
 
     try {
@@ -157,6 +169,7 @@ export function MapPicker({
           value={value}
           onChange={(address, coords, name) => {
             if (coords) {
+              console.log('Location search selected:', coords);
               setCoordinates(coords);
             }
             onChange(address, coords || effectiveCenter, name);

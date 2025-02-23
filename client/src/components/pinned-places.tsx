@@ -205,12 +205,17 @@ export function PinnedPlaces({
 
   // Ensure we use the most specific location coordinates available
   const effectiveLocation = useMemo(() => {
+    // Always prioritize explicit trip coordinates
     if (tripCoordinates) {
+      console.log('Using trip coordinates:', tripCoordinates);
       return tripCoordinates;
     }
+    // Then use destination-specific location if available
     if (destinationId && pinnedPlacesQuery.data?.tripLocation) {
+      console.log('Using destination location:', pinnedPlacesQuery.data.tripLocation);
       return pinnedPlacesQuery.data.tripLocation;
     }
+    console.log('No location coordinates available');
     return null;
   }, [tripCoordinates, destinationId, pinnedPlacesQuery.data?.tripLocation]);
 
