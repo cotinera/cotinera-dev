@@ -51,22 +51,24 @@ export function MapPicker({
            typeof coords.lat === 'number' &&
            typeof coords.lng === 'number' &&
            !isNaN(coords.lat) &&
-           !isNaN(coords.lng) &&
-           coords.lat !== 0 &&
-           coords.lng !== 0;
+           !isNaN(coords.lng);
   }, []);
 
   // Determine effective center based on props and state
   const effectiveCenter = useMemo(() => {
-    if (coordinates && isValidCoordinates(coordinates)) {
-      return coordinates;
-    }
+    // If we have valid initial coordinates, use those first
     if (initialCenter && isValidCoordinates(initialCenter)) {
       return initialCenter;
     }
+    // Then check for selected coordinates
+    if (coordinates && isValidCoordinates(coordinates)) {
+      return coordinates;
+    }
+    // Then check search bias
     if (searchBias && isValidCoordinates(searchBias)) {
       return searchBias;
     }
+    // Default to London only if no other valid coordinates are available
     return DEFAULT_CENTER;
   }, [coordinates, initialCenter, searchBias, isValidCoordinates]);
 

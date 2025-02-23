@@ -208,14 +208,11 @@ export function PinnedPlaces({
     if (tripCoordinates) {
       return tripCoordinates;
     }
-    if (pinnedPlacesQuery.data?.tripLocation) {
-      return {
-        lat: pinnedPlacesQuery.data.tripLocation.lat,
-        lng: pinnedPlacesQuery.data.tripLocation.lng
-      };
+    if (destinationId && pinnedPlacesQuery.data?.tripLocation) {
+      return pinnedPlacesQuery.data.tripLocation;
     }
     return null;
-  }, [tripCoordinates, pinnedPlacesQuery.data?.tripLocation]);
+  }, [tripCoordinates, destinationId, pinnedPlacesQuery.data?.tripLocation]);
 
   console.log('Effective location being used:', effectiveLocation);
 
