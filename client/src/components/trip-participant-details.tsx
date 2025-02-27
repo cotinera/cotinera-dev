@@ -330,7 +330,16 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         throw new Error(responseData.message || responseData.error || "Failed to update participant");
       }
 
-      return responseData;
+      // Ensure the accommodation is properly structured in the response
+      return {
+        ...responseData,
+        accommodation: responseData.accommodation ? {
+          ...responseData.accommodation,
+          name: typeof responseData.accommodation === 'string' 
+            ? JSON.parse(responseData.accommodation).name 
+            : responseData.accommodation.name
+        } : null
+      };
     },
     onMutate: async ({ participantId, data }) => {
       await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
@@ -378,38 +387,18 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         [`/api/trips/${tripId}/participants`],
         context?.previousParticipants
       );
-
-      if (err instanceof Error) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: err.message,
-        });
-      }
       setEditingParticipant(null);
     },
     onSuccess: (data) => {
-      try {
-        // Parse accommodation if it's a string
-        const parsedData = {
-          ...data,
-          accommodation: typeof data.accommodation === 'string' 
-            ? JSON.parse(data.accommodation)
-            : data.accommodation
-        };
-
-        queryClient.setQueryData<Participant[]>(
-          [`/api/trips/${tripId}/participants`],
-          old => {
-            if (!old) return [parsedData];
-            return old.map(p => p.id === parsedData.id ? parsedData : p);
-          }
-        );
-        setEditingParticipant(null);
-        editForm.reset();
-      } catch (e) {
-        console.error('Error updating participant data:', e);
-      }
+      queryClient.setQueryData<Participant[]>(
+        [`/api/trips/${tripId}/participants`],
+        old => {
+          if (!old) return [data];
+          return old.map(p => p.id === data.id ? data : p);
+        }
+      );
+      setEditingParticipant(null);
+      editForm.reset();
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
@@ -800,18 +789,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   </TableCell>
                   <TableCell>{participant.flightOut || "-"}</TableCell>
                   <TableCell>
-                    {(() => {
-                      try {
-                        if (!participant.accommodation) return "-";
-                        const accommodation = typeof participant.accommodation === 'string'
-                          ? JSON.parse(participant.accommodation)
-                          : participant.accommodation;
-                        return accommodation.name || "-";
-                      } catch (e) {
-                        console.error('Error parsing accommodation:', e);
-                        return "-";
-                      }
-                    })()}
+                    {participant.accommodation?.name || "-"}
                   </TableCell>
                   {customColumns.map((column) => (
                     <TableCell key={column.id}>
