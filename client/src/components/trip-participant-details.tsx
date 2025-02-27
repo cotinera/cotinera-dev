@@ -390,14 +390,19 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
     onSuccess: (data) => {
       try {
+        // Parse accommodation if it's a string
+        const parsedData = {
+          ...data,
+          accommodation: typeof data.accommodation === 'string' 
+            ? JSON.parse(data.accommodation)
+            : data.accommodation
+        };
+
         queryClient.setQueryData<Participant[]>(
           [`/api/trips/${tripId}/participants`],
           old => {
-            if (!old) return [data];
-            return old.map(p => p.id === data.id ? {
-              ...data,
-              accommodation: data.accommodation
-            } : p);
+            if (!old) return [parsedData];
+            return old.map(p => p.id === parsedData.id ? parsedData : p);
           }
         );
         setEditingParticipant(null);
@@ -429,7 +434,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         const updatedParticipant = await res.json();
         return { participantId, status: updatedParticipant.status };
       } finally {
-        setUpdatingParticipants(prev => prev.filter(id => id !== participantId));
+        setUpdatingParticipants(prev => prev.filter(id => id !== participant.id));
       }
     },
     onSuccess: (data) => {
@@ -795,7 +800,18 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   </TableCell>
                   <TableCell>{participant.flightOut || "-"}</TableCell>
                   <TableCell>
-                    {participant.accommodation?.name || "-"}
+                    {(() => {
+                      try {
+                        if (!participant.accommodation) return "-";
+                        const accommodation = typeof participant.accommodation === 'string'
+                          ? JSON.parse(participant.accommodation)
+                          : participant.accommodation;
+                        return accommodation.name || "-";
+                      } catch (e) {
+                        console.error('Error parsing accommodation:', e);
+                        return "-";
+                      }
+                    })()}
                   </TableCell>
                   {customColumns.map((column) => (
                     <TableCell key={column.id}>
