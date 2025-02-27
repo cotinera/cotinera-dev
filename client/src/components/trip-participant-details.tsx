@@ -178,10 +178,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         status: 'pending' as Status,
         flightStatus: 'pending',
         hotelStatus: 'pending',
-        accommodation: data.accommodation
-          ? {
-              name: data.accommodation,
-            }
+        accommodation: data.accommodation?.trim()
+          ? { name: data.accommodation }
           : null,
       };
 
@@ -192,12 +190,13 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         credentials: "include",
       });
 
+      const responseData = await res.json();
+
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || error.error || "Failed to add participant");
+        throw new Error(responseData.message || responseData.error || "Unable to add participant");
       }
 
-      return res.json();
+      return responseData;
     },
     onMutate: async (newParticipant) => {
       await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
@@ -215,11 +214,9 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         hotelStatus: 'pending',
         flightIn: newParticipant.flightIn || null,
         flightOut: newParticipant.flightOut || null,
-        accommodation: newParticipant.accommodation ? {
-          id: -Date.now(),
-          tripId,
-          name: newParticipant.accommodation,
-        } : null,
+        accommodation: newParticipant.accommodation?.trim()
+          ? { name: newParticipant.accommodation }
+          : null
       };
 
       queryClient.setQueryData<Participant[]>(
@@ -235,18 +232,18 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         context?.previousParticipants
       );
 
-      // Improve error handling and display
-      const errorMessage = err instanceof Error
+      // Only show error toast if there's an actual error message
+      const errorMessage = err instanceof Error && err.message
         ? err.message
-        : 'Failed to add participant. Please try again.';
+        : null;
 
-      toast({
-        variant: "destructive",
-        title: "Could not add participant",
-        description: errorMessage,
-      });
-
-      console.error('Error adding participant:', errorMessage);
+      if (errorMessage) {
+        toast({
+          variant: "destructive",
+          title: "Could not add participant",
+          description: errorMessage
+        });
+      }
     },
     onSuccess: (data) => {
       queryClient.setQueryData<Participant[]>(
@@ -257,6 +254,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         }
       );
       addForm.reset();
+      setIsAddParticipantOpen(false);
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
