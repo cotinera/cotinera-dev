@@ -232,6 +232,26 @@ export const pinnedPlaces = pgTable("pinned_places", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Add these new tables after the existing tables
+export const polls = pgTable("polls", {
+  id: serial("id").primaryKey(),
+  tripId: integer("trip_id").notNull().references(() => trips.id),
+  userId: integer("user_id").notNull().references(() => users.id),
+  question: text("question").notNull(),
+  options: json("options").$type<string[]>().notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  endTime: timestamp("end_time"),
+  isClosed: boolean("is_closed").default(false),
+});
+
+export const pollVotes = pgTable("poll_votes", {
+  id: serial("id").primaryKey(),
+  pollId: integer("poll_id").notNull().references(() => polls.id),
+  userId: integer("user_id").notNull().references(() => users.id),
+  optionIndex: integer("option_index").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const tripsRelations = relations(trips, ({ one, many }) => ({
   owner: one(users, {
     fields: [trips.ownerId],
@@ -366,6 +386,30 @@ export const pinnedPlacesRelations = relations(pinnedPlaces, ({ one }) => ({
   }),
 }));
 
+// Add relations
+export const pollsRelations = relations(polls, ({ one, many }) => ({
+  trip: one(trips, {
+    fields: [polls.tripId],
+    references: [trips.id],
+  }),
+  user: one(users, {
+    fields: [polls.userId],
+    references: [users.id],
+  }),
+  votes: many(pollVotes),
+}));
+
+export const pollVotesRelations = relations(pollVotes, ({ one }) => ({
+  poll: one(polls, {
+    fields: [pollVotes.pollId],
+    references: [polls.id],
+  }),
+  user: one(users, {
+    fields: [pollVotes.userId],
+    references: [users.id],
+  }),
+}));
+
 export const insertUserSchema = createInsertSchema(users, {
   email: z.string().email("Invalid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
@@ -393,6 +437,11 @@ export const insertTaskAssignmentSchema = createInsertSchema(taskAssignments);
 export const selectTaskAssignmentSchema = createSelectSchema(taskAssignments);
 export const insertDestinationSchema = createInsertSchema(destinations);
 export const selectDestinationSchema = createSelectSchema(destinations);
+// Add Zod schemas
+export const insertPollSchema = createInsertSchema(polls);
+export const selectPollSchema = createSelectSchema(polls);
+export const insertPollVoteSchema = createInsertSchema(pollVotes);
+export const selectPollVoteSchema = createSelectSchema(pollVotes);
 
 export type User = typeof users.$inferSelect;
 export type Trip = typeof trips.$inferSelect;
@@ -411,3 +460,6 @@ export type ExpenseSplit = typeof expenseSplits.$inferSelect;
 export type TaskAssignment = typeof taskAssignments.$inferSelect;
 export type Destination = typeof destinations.$inferSelect;
 export type PinnedPlace = typeof pinnedPlaces.$inferSelect;
+// Add types for the new tables
+export type Poll = typeof polls.$inferSelect;
+export type PollVote = typeof pollVotes.$inferSelect;

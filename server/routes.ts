@@ -7,7 +7,7 @@ import { crypto } from "./auth.js";
 import express from "express";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations, chatMessages, users, destinations, pinnedPlaces } from "@db/schema";
+import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations, chatMessages, users, destinations, pinnedPlaces, polls, pollVotes } from "@db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { addDays } from "date-fns";
 
@@ -280,6 +280,9 @@ export function registerRoutes(app: Express): Server {
 
         // Delete pinned places
         await tx.delete(pinnedPlaces).where(eq(pinnedPlaces.tripId, tripId));
+
+        // Delete polls
+        await tx.delete(polls).where(eq(polls.tripId, tripId));
 
         // Finally, delete the trip
         const [deletedTrip] = await tx.delete(trips)
@@ -921,7 +924,7 @@ export function registerRoutes(app: Express): Server {
 
           accommodationId = newAccommodation.id;
         } else if (accommodation === null) {
-          // Explicitly remove accommodation
+                    // Explicitly remove accommodation
           accommodationId = null;
         }
 
@@ -930,7 +933,7 @@ export function registerRoutes(app: Express): Server {
           .update(participants)
           .set({
             ...(name && { name }),
-            ...(arrivalDate && { arrivalDate: new Date(arrivalDate) }),
+            ...(arrivalDate &&{ arrivalDate: new Date(arrivalDate) }),
             ...(departureDate && { departureDate: new Date(departureDate) }),
             hotelStatus: accommodation ? 'pending' : currentParticipant.hotelStatus,
             flightStatus: (flightNumber || airline) ? 'pending' : currentParticipant.flightStatus,
@@ -1311,6 +1314,143 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error updating pinned place:', error);
       res.status(500).json({ error: 'Failed to update pinned place' });
+    }
+  });
+
+  // Add these new routes after the existing chat message routes
+
+  // Create a new poll
+  app.post("/api/trips/:tripId/polls", async (req, res) => {
+    try {
+      const userId = req.user?.id || 1;
+      const tripId = parseInt(req.params.tripId);
+      const { question, options, endTime } = req.body;
+
+      const [poll] = await db.insert(polls).values({
+        tripId,
+        userId,
+        question,
+        options,
+        endTime: endTime ? new Date(endTime) : null,
+      }).returning();
+
+      // Also create a chat message to show the poll
+      const [message] = await db.insert(chatMessages).values({
+        tripId,
+        userId,
+        message: JSON.stringify({
+          type: 'poll',
+          pollId: poll.id,
+          question,
+          options,
+        }),
+      }).returning();
+
+      const messageWithUser = await db.query.chatMessages.findFirst({
+        where: eq(chatMessages.id, message.id),
+        with: {
+          user: {
+            columns: {
+              id: true,
+              name: true,
+              email: true
+            }
+          }
+        },
+      });
+
+      res.json({ poll, message: messageWithUser });
+    } catch (error) {
+      console.error('Error creating poll:', error);
+      res.status(500).json({ error: 'Failed to create poll' });
+    }
+  });
+
+  // Get polls for a trip
+  app.get("/api/trips/:tripId/polls", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const tripPolls = await db.query.polls.findMany({
+        where: eq(polls.tripId, tripId),
+        with: {
+          user: {
+            columns: {
+              id: true,
+              name: true,
+              email: true
+            }
+          },
+          votes: {
+            with: {
+              user: {
+                columns: {
+                  id: true,
+                  name: true,
+                  email: true
+                }
+              }
+            }
+          }
+        },
+      });
+      res.json(tripPolls);
+    } catch (error) {
+      console.error('Error fetching polls:', error);
+      res.status(500).json({ error: 'Failed to fetch polls' });
+    }
+  });
+
+  // Vote on a poll
+  app.post("/api/trips/:tripId/polls/:pollId/vote", async (req, res) => {
+    try {
+      const userId = req.user?.id || 1;
+      const pollId = parseInt(req.params.pollId);
+      const { optionIndex } = req.body;
+
+      // Check if user has already voted
+      const existingVote = await db.query.pollVotes.findFirst({
+        where: and(
+          eq(pollVotes.pollId, pollId),
+          eq(pollVotes.userId, userId)
+        ),
+      });
+
+      if (existingVote) {
+        // Update existing vote
+        const [updatedVote] = await db
+          .update(pollVotes)
+          .set({ optionIndex })
+          .where(eq(pollVotes.id, existingVote.id))
+          .returning();
+        res.json(updatedVote);
+      } else {
+        // Create new vote
+        const [newVote] = await db.insert(pollVotes).values({
+          pollId,
+          userId,
+          optionIndex,
+        }).returning();
+        res.json(newVote);
+      }
+    } catch (error) {
+      console.error('Error voting on poll:', error);
+      res.status(500).json({ error: 'Failed to vote on poll' });
+    }
+  });
+
+  // Close a poll
+  app.patch("/api/trips/:tripId/polls/:pollId", async (req, res) => {
+    try {
+      const pollId = parseInt(req.params.pollId);
+      const [updatedPoll] = await db
+        .update(polls)
+        .set({ isClosed: true })
+        .where(eq(polls.id, pollId))
+        .returning();
+      res.json(updatedPoll);
+    } catch (error) {
+      console.error('Error closing poll:', error);
+      res.status(500).json({ error: 'Failed to close poll' });
     }
   });
 
