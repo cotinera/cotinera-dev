@@ -219,11 +219,68 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
       return responseData;
     },
-    onSuccess: (data) => {
-      // Update the participants list immediately
+    onMutate: async (newParticipant) => {
+      await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      const previousParticipants = queryClient.getQueryData<Participant[]>([`/api/trips/${tripId}/participants`]);
+
+      const optimisticParticipant: Participant = {
+        id: -Date.now(), 
+        name: newParticipant.name,
+        tripId,
+        userId: null,
+        status: 'pending',
+        arrivalDate: newParticipant.arrivalDate || null,
+        departureDate: newParticipant.departureDate || null,
+        flightStatus: 'pending',
+        hotelStatus: 'pending',
+        flightIn: newParticipant.flightIn || null,
+        flightOut: newParticipant.flightOut || null,
+        accommodation: newParticipant.accommodation ? {
+          id: -Date.now(),
+          name: newParticipant.accommodation,
+          tripId,
+          type: 'hotel',
+          address: 'TBD',
+          checkInDate: newParticipant.arrivalDate || null,
+          checkOutDate: newParticipant.departureDate || null,
+          checkInTime: null,
+          checkOutTime: null,
+          bookingReference: 'TBD',
+          bookingStatus: 'pending',
+          price: null,
+          currency: 'USD',
+          roomType: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } : null,
+      };
+
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
-        (old) => old ? [...old, data] : [data]
+        old => [...(old || []), optimisticParticipant]
+      );
+
+      return { previousParticipants };
+    },
+    onError: (err, newParticipant, context) => {
+      queryClient.setQueryData(
+        [`/api/trips/${tripId}/participants`],
+        context?.previousParticipants
+      );
+
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to add participant",
+      });
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData<Participant[]>(
+        [`/api/trips/${tripId}/participants`],
+        old => {
+          const withoutOptimistic = old?.filter(p => p.id > 0) || [];
+          return [...withoutOptimistic, data];
+        }
       );
 
       toast({
@@ -231,17 +288,12 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         description: "Person added successfully"
       });
 
-      // Clean up form and close dialog
-      addForm.reset();
       setIsAddParticipantOpen(false);
+      addForm.reset();
     },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to add participant",
-      });
-    }
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+    },
   });
 
   const updateParticipantMutation = useMutation({
