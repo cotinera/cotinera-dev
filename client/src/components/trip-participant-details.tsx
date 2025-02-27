@@ -204,8 +204,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
           : undefined,
       };
 
-      console.log('Adding participant with data:', formattedData);
-
       const res = await fetch(`/api/trips/${tripId}/participants`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -214,7 +212,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       });
 
       const responseData = await res.json();
-      console.log('Server response:', responseData);
 
       if (!res.ok) {
         throw new Error(responseData.message || responseData.error || "Failed to add participant");
@@ -222,90 +219,30 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
       return responseData;
     },
-    onMutate: async (newParticipant) => {
-      await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-
-      const previousParticipants = queryClient.getQueryData<Participant[]>([`/api/trips/${tripId}/participants`]);
-
-      const optimisticParticipant: Participant = {
-        id: -1, // Temporary ID that won't conflict with real IDs
-        name: newParticipant.name,
-        tripId,
-        userId: null,
-        status: 'pending',
-        arrivalDate: newParticipant.arrivalDate || null,
-        departureDate: newParticipant.departureDate || null,
-        flightStatus: 'pending',
-        hotelStatus: 'pending',
-        flightIn: newParticipant.flightIn || null,
-        flightOut: newParticipant.flightOut || null,
-        accommodation: newParticipant.accommodation ? {
-          id: -1,
-          name: newParticipant.accommodation,
-          tripId,
-          type: 'hotel',
-          address: 'TBD',
-          checkInDate: newParticipant.arrivalDate || null,
-          checkOutDate: newParticipant.departureDate || null,
-          checkInTime: null,
-          checkOutTime: null,
-          bookingReference: 'TBD',
-          bookingStatus: 'pending',
-          price: null,
-          currency: 'USD',
-          roomType: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        } : null,
-      };
-
-      queryClient.setQueryData<Participant[]>(
-        [`/api/trips/${tripId}/participants`],
-        old => [...(old || []), optimisticParticipant]
-      );
-
-      return { previousParticipants };
-    },
-    onError: (error, variables, context) => {
-      console.error('Mutation error:', error);
-
-      // Revert optimistic update
-      queryClient.setQueryData(
-        [`/api/trips/${tripId}/participants`],
-        context?.previousParticipants
-      );
-
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to add participant",
-      });
-    },
-    onSuccess: (newParticipant) => {
-      console.log('Mutation succeeded:', newParticipant);
-
-      // Update cache with actual data
+    onSuccess: (data) => {
+      // Update cache with the new participant
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
         old => {
-          // Remove optimistic entry and add real one
-          const withoutOptimistic = old?.filter(p => p.id !== -1) || [];
-          return [...withoutOptimistic, newParticipant];
+          const currentParticipants = old || [];
+          return [...currentParticipants, data];
         }
       );
-
-      // Close dialog and reset form
-      setIsAddParticipantOpen(false);
-      addForm.reset();
 
       toast({
         title: "Success",
         description: "Person added successfully"
       });
-    },
-    onSettled: () => {
-      // Always refetch after settling to ensure consistency
+
+      // Refetch to ensure we have the latest data
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to add participant",
+      });
     },
   });
 
@@ -502,10 +439,14 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
   const handleSubmit = async (data: ParticipantForm) => {
     try {
-      await addParticipantMutation.mutateAsync(data);
+      const result = await addParticipantMutation.mutateAsync(data);
+      if (result) {
+        setIsAddParticipantOpen(false);
+        addForm.reset();
+      }
     } catch (error) {
-      // Errors are handled in onError callback
       console.error("Submit error:", error);
+      // Error is handled in onError callback
     }
   };
 
@@ -515,7 +456,10 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         <div className="flex justify-between items-center">
           <CardTitle>People</CardTitle>
           <div className="flex gap-2">
-            <Dialog open={isCustomizeOpen} onOpenChange={setIsCustomizeOpen}>
+            <Dialog 
+              open={isCustomizeOpen} 
+              onOpenChange={setIsCustomizeOpen}
+            >
               <DialogTrigger asChild>
                 <Button variant="outline">
                   <Settings2 className="h-4 w-4 mr-2" />
@@ -599,7 +543,15 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                 )}
               </DialogContent>
             </Dialog>
-            <Dialog open={isAddParticipantOpen} onOpenChange={setIsAddParticipantOpen}>
+            <Dialog 
+              open={isAddParticipantOpen} 
+              onOpenChange={(open) => {
+                if (!open) {
+                  addForm.reset();
+                }
+                setIsAddParticipantOpen(open);
+              }}
+            >
               <DialogTrigger asChild>
                 <Button>
                   <Plus className="h-4 w-4 mr-2" />
