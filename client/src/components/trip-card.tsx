@@ -16,7 +16,7 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Calendar, Users, ImageIcon } from "lucide-react";
+import { MapPin, Calendar, Users, ImageIcon, Trash2, Check } from "lucide-react";
 import { ShareTripDialog } from "@/components/share-trip-dialog";
 import { useLocation } from "wouter";
 import { ImageUpload } from "@/components/image-upload";
@@ -34,9 +34,13 @@ interface TripCardProps {
   trip: Trip & {
     participants?: { userId: number | null; name?: string; status: string }[];
   };
+  selectable?: boolean;
+  selected?: boolean;
+  onSelect?: (tripId: number) => void;
+  onDelete?: (tripId: number) => void;
 }
 
-export function TripCard({ trip }: TripCardProps) {
+export function TripCard({ trip, selectable, selected, onSelect, onDelete }: TripCardProps) {
   const [, setLocation] = useLocation();
   const [isEditingImage, setIsEditingImage] = useState(false);
   const thumbnailIndex = trip.id % THUMBNAILS.length;
@@ -56,8 +60,10 @@ export function TripCard({ trip }: TripCardProps) {
   });
 
   const handleNavigate = () => {
-    setLocation(`/trips/${trip.id}`);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (!selectable) {
+      setLocation(`/trips/${trip.id}`);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   // Get initial for avatar fallback
@@ -69,22 +75,31 @@ export function TripCard({ trip }: TripCardProps) {
   };
 
   return (
-    <Card className="overflow-hidden">
+    <Card className={cn(
+      "overflow-hidden",
+      selectable && "cursor-pointer hover:border-primary/50",
+      selected && "border-primary"
+    )}>
       <div
         className="relative h-48 cursor-pointer"
-        onClick={handleNavigate}
+        onClick={selectable ? () => onSelect?.(trip.id) : handleNavigate}
       >
         <img
           src={thumbnail}
           alt={trip.title}
           className="w-full h-full object-cover"
         />
+        {selected && (
+          <div className="absolute top-2 right-2 bg-primary text-primary-foreground rounded-full p-1">
+            <Check className="h-4 w-4" />
+          </div>
+        )}
       </div>
       <CardHeader>
         <div className="flex justify-between items-start">
           <div
             className="cursor-pointer"
-            onClick={handleNavigate}
+            onClick={selectable ? () => onSelect?.(trip.id) : handleNavigate}
           >
             <CardTitle>{trip.title}</CardTitle>
             <CardDescription className="flex items-center gap-1">
@@ -101,6 +116,16 @@ export function TripCard({ trip }: TripCardProps) {
             >
               <ImageIcon className="h-4 w-4" />
             </Button>
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => onDelete(trip.id)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
             <ShareTripDialog tripId={trip.id} />
           </div>
         </div>
@@ -188,15 +213,17 @@ export function TripCard({ trip }: TripCardProps) {
           </div>
         )}
       </CardContent>
-      <CardFooter>
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={handleNavigate}
-        >
-          View Details
-        </Button>
-      </CardFooter>
+      {!selectable && (
+        <CardFooter>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={handleNavigate}
+          >
+            View Details
+          </Button>
+        </CardFooter>
+      )}
     </Card>
   );
 }
