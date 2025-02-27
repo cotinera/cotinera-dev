@@ -267,7 +267,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         context?.previousParticipants
       );
 
-      // Only show error toast for actual errors
       if (err instanceof Error) {
         toast({
           variant: "destructive",
@@ -482,8 +481,14 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     }));
   };
 
-  const handleSubmit = (data: ParticipantForm) => {
-    addParticipantMutation.mutate(data);
+  const handleSubmit = async (data: ParticipantForm) => {
+    try {
+      await addParticipantMutation.mutateAsync(data);
+      setIsAddParticipantOpen(false);  // Explicitly close dialog after successful mutation
+    } catch (error) {
+      // Error will be handled by mutation's onError
+      console.error('Failed to add participant:', error);
+    }
   };
 
   return (
@@ -493,100 +498,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
           <CardTitle>People</CardTitle>
           <div className="flex gap-2">
             <Dialog 
-              open={isCustomizeOpen} 
-              onOpenChange={setIsCustomizeOpen}
-            >
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Settings2 className="h-4 w-4 mr-2" />
-                  Customize Columns
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Customize Table Columns</DialogTitle>
-                </DialogHeader>
-                <Form {...customColumnForm}>
-                  <form
-                    onSubmit={customColumnForm.handleSubmit(handleAddCustomColumn)}
-                    className="space-y-4"
-                  >
-                    <FormField
-                      control={customColumnForm.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Column Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter column name" {...field} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={customColumnForm.control}
-                      name="type"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Column Type</FormLabel>
-                          <Select
-                            value={field.value}
-                            onValueChange={field.onChange}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select column type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="text">Text Input</SelectItem>
-                              <SelectItem value="boolean">Yes/No</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>
-                            Choose how data will be entered in this column
-                          </FormDescription>
-                        </FormItem>
-                      )}
-                    />
-                    <Button type="submit">Add Column</Button>
-                  </form>
-                </Form>
-                {customColumns.length > 0 && (
-                  <div className="mt-6 space-y-2">
-                    <h4 className="text-sm font-medium">Custom Columns</h4>
-                    <div className="space-y-2">
-                      {customColumns.map((column) => (
-                        <div
-                          key={column.id}
-                          className="flex items-center justify-between p-2 border rounded-md"
-                        >
-                          <div>
-                            <span className="font-medium">{column.name}</span>
-                            <span className="ml-2 text-sm text-muted-foreground">
-                              ({column.type})
-                            </span>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveCustomColumn(column.id)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </DialogContent>
-            </Dialog>
-            <Dialog 
               open={isAddParticipantOpen}
-              onOpenChange={(open) => {
-                setIsAddParticipantOpen(open);
-                if (!open) {
-                  addForm.reset();
-                }
-              }}
+              onOpenChange={setIsAddParticipantOpen}
             >
               <DialogTrigger asChild>
                 <Button>
@@ -690,6 +603,93 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                     </Button>
                   </form>
                 </Form>
+              </DialogContent>
+            </Dialog>
+            <Dialog 
+              open={isCustomizeOpen} 
+              onOpenChange={setIsCustomizeOpen}
+            >
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Settings2 className="h-4 w-4 mr-2" />
+                  Customize Columns
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Customize Table Columns</DialogTitle>
+                </DialogHeader>
+                <Form {...customColumnForm}>
+                  <form
+                    onSubmit={customColumnForm.handleSubmit(handleAddCustomColumn)}
+                    className="space-y-4"
+                  >
+                    <FormField
+                      control={customColumnForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Column Name</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter column name" {...field} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={customColumnForm.control}
+                      name="type"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Column Type</FormLabel>
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select column type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="text">Text Input</SelectItem>
+                              <SelectItem value="boolean">Yes/No</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormDescription>
+                            Choose how data will be entered in this column
+                          </FormDescription>
+                        </FormItem>
+                      )}
+                    />
+                    <Button type="submit">Add Column</Button>
+                  </form>
+                </Form>
+                {customColumns.length > 0 && (
+                  <div className="mt-6 space-y-2">
+                    <h4 className="text-sm font-medium">Custom Columns</h4>
+                    <div className="space-y-2">
+                      {customColumns.map((column) => (
+                        <div
+                          key={column.id}
+                          className="flex items-center justify-between p-2 border rounded-md"
+                        >
+                          <div>
+                            <span className="font-medium">{column.name}</span>
+                            <span className="ml-2 text-sm text-muted-foreground">
+                              ({column.type})
+                            </span>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleRemoveCustomColumn(column.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </DialogContent>
             </Dialog>
           </div>
