@@ -300,6 +300,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         flightOut: data.flightOut || null,
         accommodation: data.accommodation?.trim()
           ? {
+              tripId,
               name: data.accommodation,
               type: 'hotel',
               address: 'TBD',
@@ -311,20 +312,21 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
               bookingStatus: 'pending',
               price: null,
               currency: 'USD',
-              roomType: null,
+              roomType: null
             }
-          : null,
+          : null
       };
 
       const res = await fetch(`/api/trips/${tripId}/participants/${participantId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formattedData),
+        credentials: "include"
       });
 
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.message || "Failed to update participant");
+        throw new Error(error.message || error.error || "Failed to update participant");
       }
 
       return res.json();
@@ -333,7 +335,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
       const previousParticipants = queryClient.getQueryData<Participant[]>([`/api/trips/${tripId}/participants`]);
 
-      // Create optimistic update
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
         old => old?.map(p => (p.id === participantId
@@ -346,12 +347,24 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
               flightOut: data.flightOut || p.flightOut,
               accommodation: data.accommodation?.trim()
                 ? {
-                    ...(p.accommodation || {}),
+                    id: p.accommodation?.id || -1,
+                    tripId,
                     name: data.accommodation,
+                    type: 'hotel',
+                    address: 'TBD',
                     checkInDate: data.arrivalDate || p.arrivalDate || '',
                     checkOutDate: data.departureDate || p.departureDate || '',
+                    checkInTime: null,
+                    checkOutTime: null,
+                    bookingReference: 'TBD',
+                    bookingStatus: 'pending',
+                    price: null,
+                    currency: 'USD',
+                    roomType: null,
+                    createdAt: p.accommodation?.createdAt || new Date(),
+                    updatedAt: new Date()
                   }
-                : null,
+                : null
             }
           : p
         )) || []
@@ -359,7 +372,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
       return { previousParticipants };
     },
-    onError: (err, { participantId }, context) => {
+    onError: (err, variables, context) => {
       queryClient.setQueryData(
         [`/api/trips/${tripId}/participants`],
         context?.previousParticipants
@@ -378,13 +391,11 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         [`/api/trips/${tripId}/participants`],
         old => old?.map(p => p.id === data.id ? data : p) || []
       );
-
       setEditingParticipant(null);
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
     }
-
   });
 
   const updateStatusMutation = useMutation({
