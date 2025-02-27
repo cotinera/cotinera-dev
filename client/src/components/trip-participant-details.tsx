@@ -273,6 +273,10 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         title: "Error",
         description: err instanceof Error ? err.message : "Failed to add participant",
       });
+
+      // Close dialog and reset form even on error
+      setIsAddParticipantOpen(false);
+      addForm.reset();
     },
     onSuccess: (data) => {
       queryClient.setQueryData<Participant[]>(
@@ -287,13 +291,11 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         title: "Success",
         description: "Person added successfully"
       });
-    },
-    onSettled: () => {
-      // Close dialog and reset form after mutation is settled (success or error)
+
+      // Close dialog and reset form
       setIsAddParticipantOpen(false);
       addForm.reset();
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-    },
+    }
   });
 
   const updateParticipantMutation = useMutation({
@@ -488,11 +490,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   };
 
   const handleSubmit = async (data: ParticipantForm) => {
-    try {
-      await addParticipantMutation.mutateAsync(data);
-    } catch (error) {
-      console.error("Submit error:", error);
-    }
+    addParticipantMutation.mutate(data);
   };
 
   return (
