@@ -731,18 +731,17 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                       try {
                         if (!participant.accommodation) return "-";
 
-                        // Handle different data formats
+                        // Handle different data formats and extract only the name
                         let hotelName;
                         if (typeof participant.accommodation === 'string') {
-                          // If it's a JSON string
-                          const parsed = JSON.parse(participant.accommodation);
-                          hotelName = parsed.name;
+                          // If it's a JSON string, parse and get name value only
+                          hotelName = JSON.parse(participant.accommodation).name;
                         } else {
-                          // If it's already an object
+                          // If it's an object, get name value only
                           hotelName = participant.accommodation.name;
                         }
 
-                        // Return just the name value
+                        // Return the raw name string without any JSON formatting
                         return hotelName || "-";
                       } catch (e) {
                         console.error('Error displaying accommodation:', e);
