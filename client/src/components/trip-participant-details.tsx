@@ -60,19 +60,7 @@ interface Accommodation {
   id: number;
   tripId: number;
   name: string;
-  type: string;
-  address: string;
-  checkInDate: string;
-  checkOutDate: string;
-  checkInTime: string | null;
-  checkOutTime: string | null;
-  bookingReference: string;
-  bookingStatus: string;
-  price: number | null;
-  currency: string;
-  roomType: string | null;
-  createdAt: Date;
-  updatedAt: Date;
+  // Removed unnecessary properties
 }
 
 interface Participant {
@@ -330,22 +318,22 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         throw new Error(responseData.message || responseData.error || "Failed to update participant");
       }
 
-      // Normalize the response data to ensure accommodation is properly structured
-      return {
+      // Extract only necessary data from the response
+      const simplifiedData = {
         ...responseData,
-        accommodation: responseData.accommodation
-          ? { name: typeof responseData.accommodation === 'string'
-              ? JSON.parse(responseData.accommodation).name
-              : responseData.accommodation.name
-            }
-          : null
+        accommodation: responseData.accommodation ? {
+          name: typeof responseData.accommodation === 'string'
+            ? JSON.parse(responseData.accommodation).name
+            : responseData.accommodation.name
+        } : null
       };
+
+      return simplifiedData;
     },
     onMutate: async ({ participantId, data }) => {
       await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
       const previousParticipants = queryClient.getQueryData<Participant[]>([`/api/trips/${tripId}/participants`]);
 
-      // Simplified optimistic update with minimal accommodation data
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
         old => old?.map(p => (p.id === participantId
@@ -376,15 +364,10 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     onSuccess: (data) => {
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
-        old => old?.map(p => p.id === data.id
-          ? {
-              ...data,
-              accommodation: data.accommodation
-                ? { name: data.accommodation.name }
-                : null
-            }
-          : p
-        ) || []
+        old => old?.map(p => p.id === data.id ? {
+          ...data,
+          accommodation: data.accommodation ? { name: data.accommodation.name } : null
+        } : p) || []
       );
       setEditingParticipant(null);
       editForm.reset();
@@ -778,20 +761,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   </TableCell>
                   <TableCell>{participant.flightOut || "-"}</TableCell>
                   <TableCell>
-                    {(() => {
-                      try {
-                        if (!participant.accommodation) return "-";
-                        // Handle both string and object formats
-                        const acc = typeof participant.accommodation === 'string'
-                          ? JSON.parse(participant.accommodation)
-                          : participant.accommodation;
-                        // Only display the name, regardless of other fields
-                        return acc.name || "-";
-                      } catch (e) {
-                        console.error('Error displaying accommodation:', e);
-                        return "-";
-                      }
-                    })()}
+                    {participant.accommodation?.name || "-"}
                   </TableCell>
                   {customColumns.map((column) => (
                     <TableCell key={column.id}>
