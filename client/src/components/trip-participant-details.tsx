@@ -235,13 +235,18 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         context?.previousParticipants
       );
 
-      if (err instanceof Error) {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: err.message,
-        });
-      }
+      // Improve error handling and display
+      const errorMessage = err instanceof Error
+        ? err.message
+        : 'Failed to add participant. Please try again.';
+
+      toast({
+        variant: "destructive",
+        title: "Could not add participant",
+        description: errorMessage,
+      });
+
+      console.error('Error adding participant:', errorMessage);
     },
     onSuccess: (data) => {
       queryClient.setQueryData<Participant[]>(
