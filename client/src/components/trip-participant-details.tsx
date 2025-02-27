@@ -93,7 +93,14 @@ const sortParticipants = (a: Participant, b: Participant) => {
     pending: 1,
     no: 2
   };
-  return statusOrder[a.status as Status] - statusOrder[b.status as Status];
+  // First sort by status
+  const statusDiff = statusOrder[a.status as Status] - statusOrder[b.status as Status];
+
+  // If status is the same, sort alphabetically by name
+  if (statusDiff === 0) {
+    return (a.name || '').localeCompare(b.name || '');
+  }
+  return statusDiff;
 };
 
 interface CustomColumn {
