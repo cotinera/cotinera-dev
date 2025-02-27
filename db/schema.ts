@@ -301,9 +301,11 @@ export const participantsRelations = relations(participants, ({ one }) => ({
     fields: [participants.userId],
     references: [users.id],
   }),
+  // Make accommodation relation nullable and properly referenced
   accommodation: one(accommodations, {
     fields: [participants.accommodationId],
     references: [accommodations.id],
+    relationName: "participant_accommodation"
   }),
 }));
 

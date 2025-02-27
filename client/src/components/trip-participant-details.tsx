@@ -182,10 +182,11 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         status: 'pending' as Status,
         flightStatus: 'pending',
         hotelStatus: 'pending',
+        // Only include accommodation if it exists and has required fields
         accommodation: data.accommodation?.trim()
           ? {
               name: data.accommodation,
-              tripId: tripId,
+              tripId,
               type: 'hotel',
               address: '',
               checkInDate: data.arrivalDate || null,
@@ -194,7 +195,9 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
               checkOutTime: null,
               bookingReference: '',
               bookingStatus: 'pending',
-              currency: 'USD'
+              price: null,
+              currency: 'USD',
+              roomType: null,
             }
           : null
       };
