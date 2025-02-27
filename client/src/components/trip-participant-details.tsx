@@ -57,10 +57,7 @@ interface TripParticipantDetailsProps {
 }
 
 interface Accommodation {
-  id: number;
-  tripId: number;
   name: string;
-  // Removed unnecessary properties
 }
 
 interface Participant {
@@ -177,17 +174,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         accommodation: data.accommodation
           ? {
               name: data.accommodation,
-              type: 'hotel',
-              address: 'TBD',
-              checkInDate: data.arrivalDate || '',
-              checkOutDate: data.departureDate || '',
-              checkInTime: null,
-              checkOutTime: null,
-              bookingReference: 'TBD',
-              bookingStatus: 'pending',
-              price: null,
-              currency: 'USD',
-              roomType: null,
             }
           : null,
       };
@@ -226,19 +212,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
           id: -Date.now(),
           tripId,
           name: newParticipant.accommodation,
-          type: 'hotel',
-          address: 'TBD',
-          checkInDate: newParticipant.arrivalDate || '',
-          checkOutDate: newParticipant.departureDate || '',
-          checkInTime: null,
-          checkOutTime: null,
-          bookingReference: 'TBD',
-          bookingStatus: 'pending',
-          price: null,
-          currency: 'USD',
-          roomType: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
         } : null,
       };
 
@@ -288,19 +261,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         flightOut: data.flightOut || null,
         accommodation: data.accommodation?.trim()
           ? {
-              tripId,
-              name: data.accommodation,
-              type: 'hotel',
-              address: 'TBD',
-              checkInDate: data.arrivalDate || '',
-              checkOutDate: data.departureDate || '',
-              checkInTime: null,
-              checkOutTime: null,
-              bookingReference: 'TBD',
-              bookingStatus: 'pending',
-              price: null,
-              currency: 'USD',
-              roomType: null
+              name: data.accommodation
             }
           : null
       };
@@ -318,17 +279,17 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         throw new Error(responseData.message || responseData.error || "Failed to update participant");
       }
 
-      // Extract only necessary data from the response
-      const simplifiedData = {
+      // Extract only the name from accommodation data
+      return {
         ...responseData,
-        accommodation: responseData.accommodation ? {
-          name: typeof responseData.accommodation === 'string'
-            ? JSON.parse(responseData.accommodation).name
-            : responseData.accommodation.name
-        } : null
+        accommodation: responseData.accommodation
+          ? {
+              name: typeof responseData.accommodation === 'string'
+                ? JSON.parse(responseData.accommodation).name
+                : responseData.accommodation.name
+            }
+          : null
       };
-
-      return simplifiedData;
     },
     onMutate: async ({ participantId, data }) => {
       await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
@@ -364,10 +325,15 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     onSuccess: (data) => {
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
-        old => old?.map(p => p.id === data.id ? {
-          ...data,
-          accommodation: data.accommodation ? { name: data.accommodation.name } : null
-        } : p) || []
+        old => old?.map(p => p.id === data.id
+          ? {
+              ...data,
+              accommodation: data.accommodation
+                ? { name: data.accommodation.name }
+                : null
+            }
+          : p
+        ) || []
       );
       setEditingParticipant(null);
       editForm.reset();
@@ -761,7 +727,14 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   </TableCell>
                   <TableCell>{participant.flightOut || "-"}</TableCell>
                   <TableCell>
-                    {participant.accommodation?.name || "-"}
+                    {(() => {
+                      if (!participant.accommodation) return "-";
+                      // Handle both string and object formats, extracting only the name
+                      const accName = typeof participant.accommodation === 'string'
+                        ? JSON.parse(participant.accommodation).name
+                        : participant.accommodation.name;
+                      return accName || "-";
+                    })()}
                   </TableCell>
                   {customColumns.map((column) => (
                     <TableCell key={column.id}>
