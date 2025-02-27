@@ -53,14 +53,15 @@ const pollFormSchema = z.object({
   endTime: z.string().optional(),
 });
 
-function PollMessage({ poll, message, tripId }: { poll: Poll; message: ChatMessage; tripId: number }) {
+function PollMessage({ message, tripId }: { message: ChatMessage; tripId: number }) {
   const queryClient = useQueryClient();
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
 
   // Parse poll data from message
   const pollData = useMemo(() => {
     try {
-      return JSON.parse(message.message);
+      const data = JSON.parse(message.message);
+      return data.type === 'poll' ? data : null;
     } catch (e) {
       console.error('Error parsing poll data:', e);
       return null;
@@ -100,7 +101,7 @@ function PollMessage({ poll, message, tripId }: { poll: Poll; message: ChatMessa
   if (!pollData || !pollDetails) return null;
 
   const { votes = [] } = pollDetails;
-  const optionVotes = pollData.options.map((_, index) =>
+  const optionVotes = pollData.options.map((_: string, index: number) =>
     votes.filter((vote: any) => vote.optionIndex === index).length
   );
   const totalVotes = votes.length;
@@ -249,15 +250,23 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
     sendMessage(data);
   };
 
-  const onSubmitPoll = (data: PollFormData) => {
-    const filteredOptions = data.options.filter(option => option.trim());
-    if (filteredOptions.length < 2) {
-      pollForm.setError("options", {
-        message: "At least 2 non-empty options are required",
+  const onSubmitPoll = async (data: PollFormData) => {
+    try {
+      const filteredOptions = data.options.filter(option => option.trim());
+      if (filteredOptions.length < 2) {
+        pollForm.setError("options", {
+          message: "At least 2 non-empty options are required",
+        });
+        return;
+      }
+      await createPoll({
+        question: data.question,
+        options: filteredOptions,
+        endTime: data.endTime,
       });
-      return;
+    } catch (error) {
+      console.error('Error creating poll:', error);
     }
-    createPoll(data);
   };
 
   return (
@@ -286,10 +295,12 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
                   try {
                     const data = JSON.parse(message.message);
                     if (data.type === 'poll') {
-                      return <PollMessage poll={data} message={message} tripId={tripId} />;
+                      return <PollMessage message={message} tripId={tripId} />;
                     }
-                  } catch {
                     return <p className="text-sm mt-1">{linkifyText(message.message)}</p>;
+                  } catch (error) {
+                    console.error("Error parsing message:", error);
+                    return <p>Error parsing message</p>;
                   }
                 })()}
               </div>

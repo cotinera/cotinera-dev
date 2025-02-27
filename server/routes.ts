@@ -924,7 +924,7 @@ export function registerRoutes(app: Express): Server {
 
           accommodationId = newAccommodation.id;
         } else if (accommodation === null) {
-                    // Explicitly remove accommodation
+          // Explicitly remove accommodation
           accommodationId = null;
         }
 
@@ -932,8 +932,8 @@ export function registerRoutes(app: Express): Server {
         const [participant] = await tx
           .update(participants)
           .set({
-            ...(name && { name }),
-            ...(arrivalDate &&{ arrivalDate: new Date(arrivalDate) }),
+            ...(name &&{ name }),
+            ...(arrivalDate && { arrivalDate: new Date(arrivalDate) }),
             ...(departureDate && { departureDate: new Date(departureDate) }),
             hotelStatus: accommodation ? 'pending' : currentParticipant.hotelStatus,
             flightStatus: (flightNumber || airline) ? 'pending' : currentParticipant.flightStatus,
@@ -1326,6 +1326,7 @@ export function registerRoutes(app: Express): Server {
       const tripId = parseInt(req.params.tripId);
       const { question, options, endTime } = req.body;
 
+      // Create the poll
       const [poll] = await db.insert(polls).values({
         tripId,
         userId,
@@ -1334,19 +1335,21 @@ export function registerRoutes(app: Express): Server {
         endTime: endTime ? new Date(endTime) : null,
       }).returning();
 
-      // Also create a chat message to show the poll
+      // Create a chat message for the poll
+      const pollMessage = {
+        type: 'poll',
+        pollId: poll.id,
+        question: poll.question,
+        options: poll.options,
+      };
+
       const [message] = await db.insert(chatMessages).values({
         tripId,
         userId,
-        message: JSON.stringify({
-          type: 'poll',
-          pollId: poll.id,
-          question,
-          options,
-        }),
+        message: JSON.stringify(pollMessage),
       }).returning();
 
-      const messageWithUser = await db.query.chatMessages.findFirst({
+      const fullMessage = await db.query.chatMessages.findFirst({
         where: eq(chatMessages.id, message.id),
         with: {
           user: {
@@ -1359,10 +1362,49 @@ export function registerRoutes(app: Express): Server {
         },
       });
 
-      res.json({ poll, message: messageWithUser });
+      res.json({ poll, message: fullMessage });
     } catch (error) {
       console.error('Error creating poll:', error);
       res.status(500).json({ error: 'Failed to create poll' });
+    }
+  });
+
+  // Get poll details with votes
+  app.get("/api/trips/:tripId/polls/:pollId", async (req, res) => {
+    try {
+      const pollId = parseInt(req.params.pollId);
+      const poll = await db.query.polls.findFirst({
+        where: eq(polls.id, pollId),
+        with: {
+          votes: {
+            with: {
+              user: {
+                columns: {
+                  id: true,
+                  name: true,
+                  email: true
+                }
+              }
+            }
+          },
+          user: {
+            columns: {
+              id: true,
+              name: true,
+              email: true
+            }
+          }
+        }
+      });
+
+      if (!poll) {
+        return res.status(404).json({ error: 'Poll not found' });
+      }
+
+      res.json(poll);
+    } catch (error) {
+      console.error('Error fetching poll:', error);
+      res.status(500).json({ error: 'Failed to fetch poll' });
     }
   });
 
