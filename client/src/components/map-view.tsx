@@ -137,31 +137,32 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
 
       placeDetailsRef.current = placeDetailsElement;
     };
-  }, []);
 
-  // Handle map click events
-  const handleMapClick = useCallback(async (e: google.maps.MapMouseEvent) => {
-    const event = e as unknown as { placeId?: string };
-    if (!placeDetailsRef.current || !event.placeId) {
-      if (placeDetailsRef.current) {
-        (placeDetailsRef.current.parentElement as HTMLElement).style.display = 'none';
+    // Add click event listener to the map
+    map.addListener('click', (e: google.maps.MapMouseEvent) => {
+      const event = e as unknown as { placeId?: string };
+      if (!placeDetailsRef.current || !event.placeId) {
+        if (placeDetailsRef.current) {
+          (placeDetailsRef.current.parentElement as HTMLElement).style.display = 'none';
+        }
+        return;
       }
-      return;
-    }
 
-    try {
       // Show place details
       const placeDetails = placeDetailsRef.current as HTMLElement & {
         configureFromPlaceId?: (placeId: string) => Promise<void>;
       };
 
       if (placeDetails.configureFromPlaceId) {
-        await placeDetails.configureFromPlaceId(event.placeId);
-        (placeDetails.parentElement as HTMLElement).style.display = 'block';
+        placeDetails.configureFromPlaceId(event.placeId)
+          .then(() => {
+            (placeDetails.parentElement as HTMLElement).style.display = 'block';
+          })
+          .catch((error) => {
+            console.error('Error showing place details:', error);
+          });
       }
-    } catch (error) {
-      console.error('Error showing place details:', error);
-    }
+    });
   }, []);
 
   useEffect(() => {
@@ -230,10 +231,9 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         center={coordinates}
         options={defaultOptions}
         onLoad={onMapLoad}
-        onClick={handleMapClick}
       >
         {/* Main location marker */}
-        <MarkerF 
+        <MarkerF
           position={coordinates}
           icon={{
             path: google.maps.SymbolPath.CIRCLE,
@@ -258,8 +258,13 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 };
 
                 if (placeDetails.configureFromPlaceId) {
-                  placeDetails.configureFromPlaceId(place.placeId);
-                  (placeDetails.parentElement as HTMLElement).style.display = 'block';
+                  placeDetails.configureFromPlaceId(place.placeId)
+                    .then(() => {
+                      (placeDetails.parentElement as HTMLElement).style.display = 'block';
+                    })
+                    .catch((error) => {
+                      console.error('Error showing place details:', error);
+                    });
                 }
               }
               onPinClick?.(place);
