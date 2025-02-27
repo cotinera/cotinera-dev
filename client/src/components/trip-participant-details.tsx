@@ -330,17 +330,22 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         throw new Error(responseData.message || responseData.error || "Failed to update participant");
       }
 
-      // Parse and normalize the accommodation data
-      const normalizedData = {
-        ...responseData,
-        accommodation: responseData.accommodation 
-          ? (typeof responseData.accommodation === 'string' 
-              ? JSON.parse(responseData.accommodation) 
-              : responseData.accommodation)
-          : null
-      };
+      // Normalize accommodation data from response
+      let parsedAccommodation = null;
+      if (responseData.accommodation) {
+        try {
+          parsedAccommodation = typeof responseData.accommodation === 'string'
+            ? JSON.parse(responseData.accommodation)
+            : responseData.accommodation;
+        } catch (e) {
+          console.error('Error parsing accommodation:', e);
+        }
+      }
 
-      return normalizedData;
+      return {
+        ...responseData,
+        accommodation: parsedAccommodation
+      };
     },
     onMutate: async ({ participantId, data }) => {
       await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
@@ -790,7 +795,18 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   </TableCell>
                   <TableCell>{participant.flightOut || "-"}</TableCell>
                   <TableCell>
-                    {participant.accommodation?.name || "-"}
+                    {(() => {
+                      if (!participant.accommodation) return "-";
+                      try {
+                        const accommodationData = typeof participant.accommodation === 'string'
+                          ? JSON.parse(participant.accommodation)
+                          : participant.accommodation;
+                        return accommodationData.name || "-";
+                      } catch (e) {
+                        console.error('Error displaying accommodation:', e);
+                        return "-";
+                      }
+                    })()}
                   </TableCell>
                   {customColumns.map((column) => (
                     <TableCell key={column.id}>
