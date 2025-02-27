@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { CATEGORY_ICONS, PlaceCategory } from "./pinned-places";
 import type { LucideIcon } from "lucide-react";
 
+const libraries: ("places")[] = ["places"];
+
 const mapContainerStyle = {
   width: "100%",
   height: "400px",
@@ -18,8 +20,11 @@ const defaultOptions = {
   scrollwheel: true,
 };
 
-// Define libraries array outside component to prevent recreation
-const libraries: ("places")[] = ["places"];
+// Default to London if no valid coordinates are provided
+const DEFAULT_CENTER = {
+  lat: 51.5074,
+  lng: -0.1278
+};
 
 interface PinnedPlace {
   id: number;
@@ -136,10 +141,11 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   }
 
   const renderMarkerIcon = (Icon: LucideIcon) => {
-    return Icon({
-      size: 24,
-      absoluteStrokeWidth: true,
-    });
+    const svg = Icon({ size: 24, absoluteStrokeWidth: true });
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(svg);
+    return svgString;
+
   };
 
   return (
@@ -167,7 +173,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         {/* Render all pinned places with category-specific styling */}
         {allPinnedPlaces.map((place: PinnedPlace) => {
           const Icon = CATEGORY_ICONS[place.category] || CATEGORY_ICONS[PlaceCategory.TOURIST];
-          const svgIcon = renderMarkerIcon(Icon);
 
           return (
             <MarkerF
@@ -176,11 +181,9 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
               title={place.name}
               onClick={() => onPinClick?.(place)}
               icon={{
-                url: `data:image/svg+xml,${encodeURIComponent(`
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#4f46e5" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    ${svgIcon}
-                  </svg>
-                `)}`,
+                url: `data:image/svg+xml,${encodeURIComponent(
+                  `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="hsl(var(--primary))" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${renderMarkerIcon(Icon)}</svg>`
+                )}`,
                 scaledSize: new google.maps.Size(24, 24),
               }}
             />
