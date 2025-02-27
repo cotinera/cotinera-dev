@@ -182,24 +182,23 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         status: 'pending' as Status,
         flightStatus: 'pending',
         hotelStatus: 'pending',
-        // Only include accommodation if it exists and has required fields
-        accommodation: data.accommodation?.trim()
+        // Only include accommodation if it exists and has a name
+        accommodation: data.accommodation
           ? {
               name: data.accommodation,
-              tripId,
               type: 'hotel',
-              address: '',
+              address: 'TBD',
               checkInDate: data.arrivalDate || null,
               checkOutDate: data.departureDate || null,
               checkInTime: null,
               checkOutTime: null,
-              bookingReference: '',
+              bookingReference: 'TBD',
               bookingStatus: 'pending',
               price: null,
               currency: 'USD',
               roomType: null,
             }
-          : null
+          : undefined
       };
 
       const res = await fetch(`/api/trips/${tripId}/participants`, {

@@ -671,20 +671,24 @@ export function registerRoutes(app: Express): Server {
         let accommodationId = null;
 
         // Create accommodation if provided
-        if (accommodation) {
+        if (accommodation?.name) {
           try {
             const [newAccommodation] = await tx
               .insert(accommodations)
               .values({
                 tripId,
-                name: accommodation,
-                type: 'hotel',
-                address: 'TBD',
+                name: accommodation.name,
+                type: accommodation.type || 'hotel',
+                address: accommodation.address || 'TBD',
                 checkInDate: arrivalDate ? new Date(arrivalDate) : new Date(),
                 checkOutDate: departureDate ? new Date(departureDate) : new Date(),
-                bookingReference: 'TBD',
-                bookingStatus: 'pending',
-                currency: 'USD'
+                checkInTime: accommodation.checkInTime || null,
+                checkOutTime: accommodation.checkOutTime || null,
+                bookingReference: accommodation.bookingReference || 'TBD',
+                bookingStatus: accommodation.bookingStatus || 'pending',
+                price: accommodation.price || null,
+                currency: accommodation.currency || 'USD',
+                roomType: accommodation.roomType || null
               })
               .returning();
 
@@ -692,7 +696,7 @@ export function registerRoutes(app: Express): Server {
             accommodationId = newAccommodation.id;
           } catch (error) {
             console.error('Error creating accommodation:', error);
-            throw new Error('Failed to create accommodation');
+            throw new Error('Failed to create accommodation: ' + error.message);
           }
         }
 
@@ -709,14 +713,15 @@ export function registerRoutes(app: Express): Server {
               departureDate: departureDate ? new Date(departureDate) : null,
               flightStatus: flightNumber ? 'pending' : 'pending',
               hotelStatus: accommodation ? 'pending' : 'pending',
-              accommodationId
+              accommodationId,
+              userId: req.user?.id
             })
             .returning();
 
           console.log('Created participant:', participant);
         } catch (error) {
           console.error('Error creating participant:', error);
-          throw new Error('Failed to create participant record');
+          throw new Error('Failed to create participant record: ' + error.message);
         }
 
         // Create flight if needed
@@ -736,14 +741,15 @@ export function registerRoutes(app: Express): Server {
                 arrivalTime: '14:00',
                 bookingReference: flightNumber || 'TBD',
                 bookingStatus: 'pending',
-                currency: 'USD'
+                currency: 'USD',
+                participantId: participant.id
               })
               .returning();
 
             console.log('Created flight:', flight);
           } catch (error) {
             console.error('Error creating flight:', error);
-            throw new Error('Failed to create flight record');
+            throw new Error('Failed to create flight record: ' + error.message);
           }
         }
 
@@ -908,7 +914,8 @@ export function registerRoutes(app: Express): Server {
               checkOutDate: departureDate ? new Date(departureDate) : new Date(),
               bookingReference: 'TBD',
               bookingStatus: 'pending',
-              currency: 'USD'
+              currency: 'USD',
+              roomType: null
             })
             .returning();
 
@@ -958,7 +965,7 @@ export function registerRoutes(app: Express): Server {
               bookingReference: flightNumber || 'TBD',
               bookingStatus: 'pending',
               currency: 'USD',
-              participantId: participant.id // Added participantId here
+              participantId: participant.id
             });
         }
 
