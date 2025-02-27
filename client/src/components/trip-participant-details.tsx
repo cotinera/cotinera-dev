@@ -284,8 +284,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
           return [...withoutOptimistic, data].sort(sortParticipants);
         }
       );
-
-      setIsAddParticipantOpen(false);
       addForm.reset();
     },
     onSettled: () => {
@@ -584,10 +582,10 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
             <Dialog 
               open={isAddParticipantOpen}
               onOpenChange={(open) => {
-                if (!open && !addParticipantMutation.isPending) {
+                setIsAddParticipantOpen(open);
+                if (!open) {
                   addForm.reset();
                 }
-                setIsAddParticipantOpen(open);
               }}
             >
               <DialogTrigger asChild>
@@ -683,7 +681,11 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                         </FormItem>
                       )}
                     />
-                    <Button type="submit" className="w-full">
+                    <Button 
+                      type="submit" 
+                      className="w-full"
+                      disabled={addParticipantMutation.isPending}
+                    >
                       {addParticipantMutation.isPending ? "Adding..." : "Add Person"}
                     </Button>
                   </form>
