@@ -330,7 +330,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         throw new Error(responseData.message || responseData.error || "Failed to update participant");
       }
 
-      // Parse accommodation if it's a string
       let parsedResponse = {
         ...responseData,
         accommodation: null
@@ -338,9 +337,14 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
       if (responseData.accommodation) {
         try {
-          parsedResponse.accommodation = typeof responseData.accommodation === 'string'
+          const accommodationData = typeof responseData.accommodation === 'string'
             ? JSON.parse(responseData.accommodation)
             : responseData.accommodation;
+
+          parsedResponse.accommodation = {
+            ...accommodationData,
+            name: accommodationData.name
+          };
         } catch (e) {
           console.error('Error parsing accommodation:', e);
         }
@@ -352,7 +356,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
       const previousParticipants = queryClient.getQueryData<Participant[]>([`/api/trips/${tripId}/participants`]);
 
-      // Optimistic update with properly structured data
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
         old => old?.map(p => (p.id === participantId
@@ -365,22 +368,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
               flightOut: data.flightOut || p.flightOut,
               accommodation: data.accommodation?.trim()
                 ? {
-                    id: p.accommodation?.id || -1,
-                    tripId,
-                    name: data.accommodation,
-                    type: 'hotel',
-                    address: 'TBD',
-                    checkInDate: data.arrivalDate || p.arrivalDate || '',
-                    checkOutDate: data.departureDate || p.departureDate || '',
-                    checkInTime: null,
-                    checkOutTime: null,
-                    bookingReference: 'TBD',
-                    bookingStatus: 'pending',
-                    price: null,
-                    currency: 'USD',
-                    roomType: null,
-                    createdAt: p.accommodation?.createdAt || new Date(),
-                    updatedAt: new Date()
+                    name: data.accommodation
                   }
                 : null
             }
@@ -799,16 +787,10 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   <TableCell>
                     {(() => {
                       if (!participant.accommodation) return "-";
-                      if (typeof participant.accommodation === 'string') {
-                        try {
-                          const parsed = JSON.parse(participant.accommodation);
-                          return parsed.name || "-";
-                        } catch (e) {
-                          console.error('Error parsing accommodation:', e);
-                          return "-";
-                        }
-                      }
-                      return participant.accommodation.name || "-";
+                      const accommodationName = typeof participant.accommodation === 'string'
+                        ? JSON.parse(participant.accommodation).name
+                        : participant.accommodation.name;
+                      return accommodationName || "-";
                     })()}
                   </TableCell>
                   {customColumns.map((column) => (
