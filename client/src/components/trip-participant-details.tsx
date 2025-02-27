@@ -178,7 +178,11 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   const addParticipantMutation = useMutation({
     mutationFn: async (data: ParticipantForm) => {
       const formattedData = {
-        ...data,
+        name: data.name,
+        arrivalDate: data.arrivalDate,
+        departureDate: data.departureDate,
+        flightIn: data.flightIn,
+        flightOut: data.flightOut,
         status: 'pending' as Status,
         flightStatus: 'pending',
         hotelStatus: 'pending',
@@ -200,98 +204,50 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
           : undefined,
       };
 
-      try {
-        const res = await fetch(`/api/trips/${tripId}/participants`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formattedData),
-          credentials: "include",
-        });
-
-        if (!res.ok) {
-          const errorData = await res.json();
-          throw new Error(errorData.message || errorData.error || "Failed to add participant");
-        }
-
-        const responseData = await res.json();
-        return responseData;
-      } catch (error) {
-        console.error("Error adding participant:", error);
-        throw error;
-      }
-    },
-    onMutate: async (newParticipant) => {
-      await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-      const previousParticipants = queryClient.getQueryData<Participant[]>([`/api/trips/${tripId}/participants`]);
-
-      const optimisticParticipant: Participant = {
-        id: Date.now(),
-        name: newParticipant.name,
-        tripId,
-        userId: null,
-        status: 'pending',
-        arrivalDate: newParticipant.arrivalDate || null,
-        departureDate: newParticipant.departureDate || null,
-        flightStatus: 'pending',
-        hotelStatus: 'pending',
-        flightIn: newParticipant.flightIn || null,
-        flightOut: newParticipant.flightOut || null,
-        accommodation: newParticipant.accommodation ? {
-          id: Date.now(),
-          name: newParticipant.accommodation,
-          tripId,
-          type: 'hotel',
-          address: 'TBD',
-          checkInDate: newParticipant.arrivalDate || null,
-          checkOutDate: newParticipant.departureDate || null,
-          checkInTime: null,
-          checkOutTime: null,
-          bookingReference: 'TBD',
-          bookingStatus: 'pending',
-          price: null,
-          currency: 'USD',
-          roomType: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        } : null,
-      };
-
-      queryClient.setQueryData<Participant[]>(
-        [`/api/trips/${tripId}/participants`],
-        old => [...(old || []), optimisticParticipant]
-      );
-
-      return { previousParticipants };
-    },
-    onError: (err, newParticipant, context) => {
-      queryClient.setQueryData(
-        [`/api/trips/${tripId}/participants`],
-        context?.previousParticipants
-      );
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: err instanceof Error ? err.message : "Failed to add participant",
+      const res = await fetch(`/api/trips/${tripId}/participants`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formattedData),
+        credentials: "include",
       });
+
+      const responseData = await res.json();
+
+      if (!res.ok) {
+        throw new Error(responseData.message || responseData.error || "Failed to add participant");
+      }
+
+      return responseData;
     },
     onSuccess: (data) => {
+      // Update the query cache with the new participant
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
-        old => {
+        (old) => {
           const filtered = old?.filter(p => p.id !== Date.now()) || [];
           return [...filtered, data];
         }
       );
 
+      // Close the dialog and reset the form
       setIsAddParticipantOpen(false);
       addForm.reset();
+
+      // Show success message
       toast({
         title: "Success",
         description: "Person added successfully"
       });
-    },
-    onSettled: () => {
+
+      // Refetch to ensure we have the latest data
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to add participant",
+      });
     },
   });
 
@@ -487,12 +443,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   };
 
   const handleSubmit = async (data: ParticipantForm) => {
-    try {
-      await addParticipantMutation.mutateAsync(data);
-    } catch (error) {
-      console.error("Submit error:", error);
-      // Error is already handled in onError
-    }
+    await addParticipantMutation.mutate(data);
   };
 
   return (
