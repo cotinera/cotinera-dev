@@ -122,10 +122,9 @@ interface PinnedPlace {
     lat: number;
     lng: number;
   };
-  placeId?: string; // Add placeId field
+  placeId?: string; 
   tripId: number;
   destinationId?: number;
-  // Add place details fields
   phone?: string;
   website?: string;
   rating?: number;
@@ -154,13 +153,30 @@ interface PinnedPlacesProps {
   tripCoordinates?: { lat: number; lng: number };
 }
 
-// Add helper function for formatting category names
 const formatCategoryName = (category: string): string => {
   return category
     .split('_')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
 };
+
+interface PlaceDetailsWithPhotos extends PinnedPlace {
+  photos?: {
+    getUrl: () => string;
+    height: number;
+    width: number;
+    html_attributions: string[];
+  }[];
+  price_level?: number;
+  reviews?: {
+    author_name: string;
+    rating: number;
+    text: string;
+    time: number;
+  }[];
+  url?: string;
+}
+
 
 export function PinnedPlaces({
   tripId,
@@ -181,7 +197,6 @@ export function PinnedPlaces({
   const [editedPlaceName, setEditedPlaceName] = useState<string>("");
   const [searchInputRef, setSearchInputRef] = useState<HTMLInputElement | null>(null);
 
-  // Add debug logging for coordinates
   useEffect(() => {
     console.log('Trip coordinates:', tripCoordinates);
     console.log('Selected coordinates:', selectedCoordinates);
@@ -210,14 +225,11 @@ export function PinnedPlaces({
   const existingPins = [...(pinnedPlacesQuery.data?.places || [])]
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  // Ensure we use the most specific location coordinates available
   const effectiveLocation = useMemo(() => {
-    // Always prioritize explicit trip coordinates
     if (tripCoordinates) {
       console.log('Using trip coordinates:', tripCoordinates);
       return tripCoordinates;
     }
-    // Then use destination-specific location if available
     if (destinationId && pinnedPlacesQuery.data?.tripLocation) {
       console.log('Using destination location:', pinnedPlacesQuery.data.tripLocation);
       return pinnedPlacesQuery.data.tripLocation;
@@ -461,11 +473,9 @@ export function PinnedPlaces({
     return CATEGORY_ICONS[category] || MapPin;
   };
 
-  // Add new state for place details dialog
   const [selectedPlace, setSelectedPlace] = useState<PinnedPlace | null>(null);
   const [isPlaceDetailsOpen, setIsPlaceDetailsOpen] = useState(false);
 
-  // Add handler for place clicks
   const handlePlaceClick = (place: PinnedPlace) => {
     setSelectedPlace(place);
     setIsPlaceDetailsOpen(true);
@@ -520,7 +530,7 @@ export function PinnedPlaces({
                             initialCenter={effectiveLocation}
                             searchBias={effectiveLocation ? {
                               ...effectiveLocation,
-                              radius: 50000 // 50km radius around location
+                              radius: 50000 
                             } : undefined}
                             onSearchInputRef={setSearchInputRef}
                           />
@@ -638,9 +648,8 @@ export function PinnedPlaces({
         </ScrollArea>
       </CardContent>
 
-      {/* Add Place Details Dialog */}
       <Dialog open={isPlaceDetailsOpen} onOpenChange={setIsPlaceDetailsOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[800px]">
           <DialogHeader>
             <DialogTitle>{selectedPlace?.name}</DialogTitle>
             <DialogDescription>
@@ -648,22 +657,38 @@ export function PinnedPlaces({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            {/* Basic Information */}
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Address</p>
-              <p className="text-sm text-muted-foreground">{selectedPlace?.address}</p>
+          <div className="space-y-6">
+            {selectedPlace?.photos && selectedPlace.photos.length > 0 && (
+              <div className="relative h-64 overflow-hidden rounded-lg">
+                <div className="flex space-x-4 overflow-x-auto pb-4">
+                  {selectedPlace.photos.map((photo, index) => (
+                    <img
+                      key={index}
+                      src={photo}
+                      alt={`${selectedPlace.name} photo ${index + 1}`}
+                      className="h-60 w-auto object-cover rounded-lg"
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-medium">Address</h4>
+                <p className="text-sm text-muted-foreground">{selectedPlace?.address}</p>
+              </div>
 
               {selectedPlace?.phone && (
-                <>
-                  <p className="text-sm font-medium">Phone</p>
+                <div>
+                  <h4 className="text-sm font-medium">Phone</h4>
                   <p className="text-sm text-muted-foreground">{selectedPlace.phone}</p>
-                </>
+                </div>
               )}
 
               {selectedPlace?.website && (
-                <>
-                  <p className="text-sm font-medium">Website</p>
+                <div>
+                  <h4 className="text-sm font-medium">Website</h4>
                   <a 
                     href={selectedPlace.website}
                     target="_blank"
@@ -672,39 +697,54 @@ export function PinnedPlaces({
                   >
                     Visit Website
                   </a>
-                </>
+                </div>
+              )}
+
+              {selectedPlace?.rating && (
+                <div>
+                  <h4 className="text-sm font-medium">Rating</h4>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      {selectedPlace.rating} / 5
+                    </span>
+                    <div className="flex text-yellow-400">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <svg
+                          key={i}
+                          className={cn(
+                            "h-4 w-4",
+                            i < Math.floor(selectedPlace.rating)
+                              ? "fill-current"
+                              : "fill-muted stroke-muted"
+                          )}
+                          viewBox="0 0 24 24"
+                        >
+                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                        </svg>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {selectedPlace?.openingHours && selectedPlace.openingHours.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium">Opening Hours</h4>
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    {selectedPlace.openingHours.map((hours, index) => (
+                      <p key={index}>{hours}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {selectedPlace?.notes && (
+                <div>
+                  <h4 className="text-sm font-medium">Notes</h4>
+                  <p className="text-sm text-muted-foreground">{selectedPlace.notes}</p>
+                </div>
               )}
             </div>
-
-            {/* Rating */}
-            {selectedPlace?.rating && (
-              <div>
-                <p className="text-sm font-medium">Rating</p>
-                <p className="text-sm text-muted-foreground">
-                  {selectedPlace.rating} / 5
-                </p>
-              </div>
-            )}
-
-            {/* Opening Hours */}
-            {selectedPlace?.openingHours && selectedPlace.openingHours.length > 0 && (
-              <div>
-                <p className="text-sm font-medium">Opening Hours</p>
-                <div className="text-sm text-muted-foreground space-y-1">
-                  {selectedPlace.openingHours.map((hours, index) => (
-                    <p key={index}>{hours}</p>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Notes */}
-            {selectedPlace?.notes && (
-              <div>
-                <p className="text-sm font-medium">Notes</p>
-                <p className="text-sm text-muted-foreground">{selectedPlace.notes}</p>
-              </div>
-            )}
           </div>
 
           <DialogFooter>

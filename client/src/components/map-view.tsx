@@ -62,6 +62,30 @@ interface MapViewProps {
   className?: string;
 }
 
+// Map of category colors
+const CATEGORY_COLORS: Record<PlaceCategory, string> = {
+  [PlaceCategory.FOOD]: "#FF5722",
+  [PlaceCategory.BAR]: "#795548",
+  [PlaceCategory.CAFE]: "#FFA000",
+  [PlaceCategory.WINE]: "#8E24AA",
+  [PlaceCategory.SHOPPING]: "#1E88E5",
+  [PlaceCategory.GROCERY]: "#43A047",
+  [PlaceCategory.ARTS]: "#D81B60",
+  [PlaceCategory.LIGHTHOUSE]: "#00ACC1",
+  [PlaceCategory.THEATRE]: "#6D4C41",
+  [PlaceCategory.TOURIST]: "#7CB342",
+  [PlaceCategory.CASINO]: "#FFB300",
+  [PlaceCategory.AQUARIUM]: "#039BE5",
+  [PlaceCategory.EVENT_VENUE]: "#C0CA33",
+  [PlaceCategory.AMUSEMENT_PARK]: "#FB8C00",
+  [PlaceCategory.HISTORIC]: "#8D6E63",
+  [PlaceCategory.MUSEUM]: "#5E35B1",
+  [PlaceCategory.MOVIE_THEATRE]: "#EC407A",
+  [PlaceCategory.MONUMENT]: "#00897B",
+  [PlaceCategory.MUSIC]: "#3949AB",
+  [PlaceCategory.RELIC]: "#8E24AA"
+};
+
 // Map of icon paths by category
 const ICON_PATHS: Record<PlaceCategory, string> = {
   [PlaceCategory.FOOD]: "M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.46L23 5.05h-5V1h-1.97v4.05h-4.97l.3 2.34c1.71.47 3.31 1.32 4.27 2.26 1.44 1.42 2.43 2.89 2.43 5.29v8.05zM1 21.99V21h15.03v.99c0 .55-.45 1-1.01 1H2.01c-.56 0-1.01-.45-1.01-1zm15.03-7c0-8-15.03-8-15.03 0h15.03zM1.02 17h15v2h-15z",
@@ -139,7 +163,10 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
             'rating',
             'opening_hours',
             'website',
-            'photos'
+            'photos',
+            'price_level',
+            'reviews',
+            'url'
           ]
         },
         (result, status) => {
@@ -166,10 +193,12 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
 
   // Handle map click events
   const handleMapClick = useCallback(async (e: google.maps.MapMouseEvent) => {
-    if (!e.placeId) return;
+    // Cast the event to include placeId
+    const event = e as unknown as { placeId?: string };
+    if (!event.placeId) return;
 
     try {
-      const placeDetails = await fetchPlaceDetails(e.placeId);
+      const placeDetails = await fetchPlaceDetails(event.placeId);
       console.log('Place details:', placeDetails);
       // You can use these details in your UI or pass them to a parent component
     } catch (error) {
@@ -269,19 +298,19 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         <MarkerF 
           position={coordinates}
           icon={{
-            url: `data:image/svg+xml,${encodeURIComponent(`
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10" fill="#000000"/>
-                <circle cx="12" cy="12" r="3" fill="#ffffff"/>
-              </svg>
-            `)}`,
-            scaledSize: new google.maps.Size(30, 30),
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 10,
+            fillColor: "#1E88E5",
+            fillOpacity: 1,
+            strokeWeight: 2,
+            strokeColor: "#FFFFFF",
           }}
         />
 
         {/* Render all pinned places with category-specific styling */}
         {allPinnedPlaces.map((place: PinnedPlace) => {
           const iconPath = ICON_PATHS[place.category] || ICON_PATHS[PlaceCategory.TOURIST];
+          const color = CATEGORY_COLORS[place.category] || "#000000";
 
           return (
             <MarkerF
@@ -291,11 +320,11 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
               onClick={() => handleMarkerClick(place)}
               icon={{
                 url: `data:image/svg+xml,${encodeURIComponent(
-                  `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="hsl(var(--primary))" stroke="white" stroke-width="2">
+                  `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="${color}" stroke="white" stroke-width="1">
                     <path d="${iconPath}"/>
                   </svg>`
                 )}`,
-                scaledSize: new google.maps.Size(24, 24),
+                scaledSize: new google.maps.Size(32, 32),
               }}
             />
           );
