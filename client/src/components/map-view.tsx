@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { CATEGORY_ICONS, PlaceCategory } from "./pinned-places";
 
-// Add Places and PlacesUI libraries to the libraries array
+// Libraries for Google Maps
 const libraries: ("places")[] = ["places"];
 
 const mapContainerStyle = {
@@ -104,36 +104,38 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
 
     // Load the Places UI library
     const script = document.createElement('script');
-    script.src = 'https://maps.googleapis.com/maps/api/js?key=' + import.meta.env.VITE_GOOGLE_MAPS_API_KEY + '&libraries=places&components=Places';
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&libraries=places&v=beta`;
     script.async = true;
     script.defer = true;
     document.head.appendChild(script);
 
     script.onload = () => {
+      console.log('Places UI library loaded');
+
+      // Create a container for the place details
+      const container = document.createElement('div');
+      container.style.position = 'absolute';
+      container.style.top = '0';
+      container.style.left = '0';
+      container.style.right = '0';
+      container.style.maxWidth = '400px';
+      container.style.margin = '10px';
+      container.style.zIndex = '1';
+      map.getDiv().appendChild(container);
+
       // Create and configure place details element
       const placeDetailsElement = document.createElement('gmp-place-details') as HTMLElement & {
+        place?: string;
+        full?: boolean;
         configureFromPlaceId?: (placeId: string) => Promise<void>;
       };
 
       // Configure the place details element
       placeDetailsElement.setAttribute('place', '');
       placeDetailsElement.setAttribute('full', '');
-      placeDetailsElement.style.position = 'absolute';
-      placeDetailsElement.style.top = '0';
-      placeDetailsElement.style.left = '0';
-      placeDetailsElement.style.right = '0';
-      placeDetailsElement.style.maxWidth = '400px';
-      placeDetailsElement.style.maxHeight = '100%';
-      placeDetailsElement.style.margin = '10px';
-      placeDetailsElement.style.backgroundColor = 'white';
-      placeDetailsElement.style.borderRadius = '8px';
-      placeDetailsElement.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
-      placeDetailsElement.style.overflow = 'auto';
-      placeDetailsElement.style.display = 'none';
-      placeDetailsElement.style.zIndex = '1';
+      container.appendChild(placeDetailsElement);
 
       placeDetailsRef.current = placeDetailsElement;
-      map.getDiv().appendChild(placeDetailsElement);
     };
   }, []);
 
@@ -142,7 +144,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     const event = e as unknown as { placeId?: string };
     if (!placeDetailsRef.current || !event.placeId) {
       if (placeDetailsRef.current) {
-        placeDetailsRef.current.style.display = 'none';
+        (placeDetailsRef.current.parentElement as HTMLElement).style.display = 'none';
       }
       return;
     }
@@ -155,7 +157,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
 
       if (placeDetails.configureFromPlaceId) {
         await placeDetails.configureFromPlaceId(event.placeId);
-        placeDetails.style.display = 'block';
+        (placeDetails.parentElement as HTMLElement).style.display = 'block';
       }
     } catch (error) {
       console.error('Error showing place details:', error);
@@ -257,7 +259,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
 
                 if (placeDetails.configureFromPlaceId) {
                   placeDetails.configureFromPlaceId(place.placeId);
-                  placeDetails.style.display = 'block';
+                  (placeDetails.parentElement as HTMLElement).style.display = 'block';
                 }
               }
               onPinClick?.(place);
