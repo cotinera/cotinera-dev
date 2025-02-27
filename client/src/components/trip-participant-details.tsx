@@ -224,7 +224,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       const previousParticipants = queryClient.getQueryData<Participant[]>([`/api/trips/${tripId}/participants`]);
 
       const optimisticParticipant: Participant = {
-        id: -Date.now(), 
+        id: -Date.now(),
         name: newParticipant.name,
         tripId,
         userId: null,
@@ -287,11 +287,11 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         title: "Success",
         description: "Person added successfully"
       });
-
-      setIsAddParticipantOpen(false);
-      addForm.reset();
     },
     onSettled: () => {
+      // Close dialog and reset form after mutation is settled (success or error)
+      setIsAddParticipantOpen(false);
+      addForm.reset();
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
     },
   });
@@ -591,7 +591,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
             <Dialog 
               open={isAddParticipantOpen}
               onOpenChange={(open) => {
-                if (!open) {
+                if (!open && !addParticipantMutation.isPending) {
                   addForm.reset();
                 }
                 setIsAddParticipantOpen(open);
