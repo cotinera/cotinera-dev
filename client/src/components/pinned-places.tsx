@@ -122,8 +122,15 @@ interface PinnedPlace {
     lat: number;
     lng: number;
   };
+  placeId?: string; // Add placeId field
   tripId: number;
   destinationId?: number;
+  // Add place details fields
+  phone?: string;
+  website?: string;
+  rating?: number;
+  openingHours?: string[];
+  photos?: string[];
 }
 
 interface AddPinnedPlaceForm {
@@ -454,6 +461,16 @@ export function PinnedPlaces({
     return CATEGORY_ICONS[category] || MapPin;
   };
 
+  // Add new state for place details dialog
+  const [selectedPlace, setSelectedPlace] = useState<PinnedPlace | null>(null);
+  const [isPlaceDetailsOpen, setIsPlaceDetailsOpen] = useState(false);
+
+  // Add handler for place clicks
+  const handlePlaceClick = (place: PinnedPlace) => {
+    setSelectedPlace(place);
+    setIsPlaceDetailsOpen(true);
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -581,7 +598,8 @@ export function PinnedPlaces({
               return (
                 <div
                   key={place.id}
-                  className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted/70 transition-colors"
+                  className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer"
+                  onClick={() => handlePlaceClick(place)}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -619,6 +637,83 @@ export function PinnedPlaces({
           <ScrollBar orientation="vertical" />
         </ScrollArea>
       </CardContent>
+
+      {/* Add Place Details Dialog */}
+      <Dialog open={isPlaceDetailsOpen} onOpenChange={setIsPlaceDetailsOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>{selectedPlace?.name}</DialogTitle>
+            <DialogDescription>
+              Place details and information
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Basic Information */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Address</p>
+              <p className="text-sm text-muted-foreground">{selectedPlace?.address}</p>
+
+              {selectedPlace?.phone && (
+                <>
+                  <p className="text-sm font-medium">Phone</p>
+                  <p className="text-sm text-muted-foreground">{selectedPlace.phone}</p>
+                </>
+              )}
+
+              {selectedPlace?.website && (
+                <>
+                  <p className="text-sm font-medium">Website</p>
+                  <a 
+                    href={selectedPlace.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Visit Website
+                  </a>
+                </>
+              )}
+            </div>
+
+            {/* Rating */}
+            {selectedPlace?.rating && (
+              <div>
+                <p className="text-sm font-medium">Rating</p>
+                <p className="text-sm text-muted-foreground">
+                  {selectedPlace.rating} / 5
+                </p>
+              </div>
+            )}
+
+            {/* Opening Hours */}
+            {selectedPlace?.openingHours && selectedPlace.openingHours.length > 0 && (
+              <div>
+                <p className="text-sm font-medium">Opening Hours</p>
+                <div className="text-sm text-muted-foreground space-y-1">
+                  {selectedPlace.openingHours.map((hours, index) => (
+                    <p key={index}>{hours}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Notes */}
+            {selectedPlace?.notes && (
+              <div>
+                <p className="text-sm font-medium">Notes</p>
+                <p className="text-sm text-muted-foreground">{selectedPlace.notes}</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsPlaceDetailsOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!placeToEdit} onOpenChange={(open) => !open && setPlaceToEdit(null)}>
         <DialogContent className="sm:max-w-[800px]">
