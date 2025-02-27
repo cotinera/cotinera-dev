@@ -220,18 +220,11 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       return responseData;
     },
     onSuccess: (data) => {
-      // Update the query cache with the new participant
+      // Update the participants list
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
-        (old) => {
-          const filtered = old?.filter(p => p.id !== Date.now()) || [];
-          return [...filtered, data];
-        }
+        (old) => [...(old || []), data]
       );
-
-      // Close the dialog and reset the form
-      setIsAddParticipantOpen(false);
-      addForm.reset();
 
       // Show success message
       toast({
@@ -239,8 +232,9 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         description: "Person added successfully"
       });
 
-      // Refetch to ensure we have the latest data
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      // Close dialog and reset form
+      setIsAddParticipantOpen(false);
+      addForm.reset();
     },
     onError: (error: Error) => {
       toast({
@@ -443,7 +437,12 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   };
 
   const handleSubmit = async (data: ParticipantForm) => {
-    await addParticipantMutation.mutate(data);
+    try {
+      await addParticipantMutation.mutateAsync(data);
+    } catch (error) {
+      // Error is handled in onError callback
+      console.error("Failed to add participant:", error);
+    }
   };
 
   return (
