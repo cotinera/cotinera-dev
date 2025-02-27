@@ -255,9 +255,12 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         } : null,
       };
 
+      // Add the optimistic participant and sort the array
+      const updatedParticipants = [...(previousParticipants || []), optimisticParticipant].sort(sortParticipants);
+
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
-        old => [...(old || []), optimisticParticipant]
+        updatedParticipants
       );
 
       return { previousParticipants };
@@ -275,11 +278,13 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       });
     },
     onSuccess: (data) => {
+      // Update the cache with the server response
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
         old => {
-          const withoutOptimistic = old?.filter(p => p.id > 0) || [];
-          return [...withoutOptimistic, data];
+          // Remove optimistic entry and add the real one
+          const withoutOptimistic = (old || []).filter(p => p.id > 0);
+          return [...withoutOptimistic, data].sort(sortParticipants);
         }
       );
 
