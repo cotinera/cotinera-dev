@@ -182,7 +182,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         status: 'pending' as Status,
         flightStatus: 'pending',
         hotelStatus: 'pending',
-        // Only include accommodation if it exists and has a name
         accommodation: data.accommodation
           ? {
               name: data.accommodation,
@@ -198,7 +197,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
               currency: 'USD',
               roomType: null,
             }
-          : undefined
+          : undefined,
       };
 
       const res = await fetch(`/api/trips/${tripId}/participants`, {
@@ -210,25 +209,80 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
       if (!res.ok) {
         const errorData = await res.json();
-        throw new Error(errorData.error || "Failed to add participant");
+        throw new Error(errorData.message || errorData.error || "Failed to add participant");
       }
 
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: [`/api/trips/${tripId}/participants`],
+    onMutate: async (newParticipant) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+
+      // Snapshot the previous value
+      const previousParticipants = queryClient.getQueryData<Participant[]>([`/api/trips/${tripId}/participants`]);
+
+      // Optimistically update to the new value
+      const optimisticParticipant: Participant = {
+        id: Date.now(), // Temporary ID
+        name: newParticipant.name,
+        tripId: tripId,
+        userId: null,
+        status: 'pending',
+        arrivalDate: newParticipant.arrivalDate || null,
+        departureDate: newParticipant.departureDate || null,
+        flightStatus: 'pending',
+        hotelStatus: 'pending',
+        accommodation: newParticipant.accommodation ? {
+          id: Date.now(),
+          name: newParticipant.accommodation,
+          tripId: tripId,
+          type: 'hotel',
+          address: 'TBD',
+          checkInDate: newParticipant.arrivalDate || null,
+          checkOutDate: newParticipant.departureDate || null,
+          checkInTime: null,
+          checkOutTime: null,
+          bookingReference: 'TBD',
+          bookingStatus: 'pending',
+          price: null,
+          currency: 'USD',
+          roomType: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } : null,
+      };
+
+      queryClient.setQueryData<Participant[]>(
+        [`/api/trips/${tripId}/participants`],
+        old => [...(old || []), optimisticParticipant]
+      );
+
+      return { previousParticipants };
+    },
+    onError: (err, newParticipant, context) => {
+      // Rollback to the previous value
+      queryClient.setQueryData(
+        [`/api/trips/${tripId}/participants`],
+        context?.previousParticipants
+      );
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to add participant",
       });
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData<Participant[]>(
+        [`/api/trips/${tripId}/participants`],
+        old => old?.map(p => p.id === Date.now() ? data : p) || [data]
+      );
       setIsAddParticipantOpen(false);
       addForm.reset();
       toast({ title: "Success", description: "Person added successfully" });
     },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to add person",
-      });
+    onSettled: () => {
+      // Always refetch after error or success
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
     },
   });
 
