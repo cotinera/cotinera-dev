@@ -358,7 +358,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         const updatedParticipant = await res.json();
         return { participantId, status: updatedParticipant.status };
       } finally {
-        setUpdatingParticipants(prev => prev.filter(id => id !== participant.id));
+        setUpdatingParticipants(prev => prev.filter(id => id !== participantId));
       }
     },
     onSuccess: (data) => {
