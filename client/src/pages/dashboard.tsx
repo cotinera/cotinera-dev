@@ -80,17 +80,31 @@ export default function Dashboard() {
     mutationFn: async (tripIds: number[]) => {
       const results = await Promise.all(
         tripIds.map(async (id) => {
-          const res = await fetch(`/api/trips/${id}`, {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-          });
+          try {
+            const res = await fetch(`/api/trips/${id}`, {
+              method: "DELETE",
+              headers: { "Content-Type": "application/json" },
+              credentials: 'include'
+            });
 
-          if (!res.ok) {
-            const error = await res.json();
-            throw new Error(error.message || `Failed to delete trip ${id}`);
+            if (!res.ok) {
+              // Try to parse error response as JSON
+              let errorMessage = `Failed to delete trip ${id}`;
+              try {
+                const errorData = await res.json();
+                errorMessage = errorData.message || errorData.error || errorMessage;
+              } catch {
+                // If response is not JSON, use text
+                const errorText = await res.text();
+                errorMessage = errorText || errorMessage;
+              }
+              throw new Error(errorMessage);
+            }
+
+            return id;
+          } catch (error) {
+            throw error instanceof Error ? error : new Error(`Failed to delete trip ${id}`);
           }
-
-          return id;
         })
       );
       return results;
@@ -118,6 +132,7 @@ export default function Dashboard() {
         title: "Error",
         description: error.message || "Failed to delete trips",
       });
+      setShowDeleteDialog(false);
     },
   });
 
