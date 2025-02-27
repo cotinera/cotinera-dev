@@ -283,21 +283,113 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
               placeholder="Type a message..."
               className="flex-1"
             />
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon">
-                  <ChevronDown className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DialogTrigger asChild onClick={() => setIsPollDialogOpen(true)}>
-                  <DropdownMenuItem>
+            <Dialog open={isPollDialogOpen} onOpenChange={setIsPollDialogOpen}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => setIsPollDialogOpen(true)}>
                     <BarChart className="h-4 w-4 mr-2" />
                     Create Poll
                   </DropdownMenuItem>
-                </DialogTrigger>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create a Poll</DialogTitle>
+                </DialogHeader>
+                <Form {...pollForm}>
+                  <form onSubmit={pollForm.handleSubmit(onSubmitPoll)} className="space-y-4">
+                    <FormField
+                      control={pollForm.control}
+                      name="question"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Question</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="What's your question?" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="space-y-2">
+                      <FormLabel>Options</FormLabel>
+                      {optionFields.map((field, index) => (
+                        <FormField
+                          key={field.id}
+                          control={pollForm.control}
+                          name={`options.${index}`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <div className="flex gap-2">
+                                <FormControl>
+                                  <Input {...field} placeholder={`Option ${index + 1}`} />
+                                </FormControl>
+                                {index >= 2 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => remove(index)}
+                                  >
+                                    ×
+                                  </Button>
+                                )}
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => append("")}
+                      >
+                        Add Option
+                      </Button>
+                    </div>
+
+                    <FormField
+                      control={pollForm.control}
+                      name="endTime"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>End Time (Optional)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="datetime-local"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsPollDialogOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={isCreatingPoll}>
+                        Create Poll
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
           </div>
           <Button
             type="submit"
@@ -308,100 +400,6 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
           </Button>
         </form>
       </div>
-
-      <Dialog open={isPollDialogOpen} onOpenChange={setIsPollDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create a Poll</DialogTitle>
-          </DialogHeader>
-          <Form {...pollForm}>
-            <form onSubmit={pollForm.handleSubmit(onSubmitPoll)} className="space-y-4">
-              <FormField
-                control={pollForm.control}
-                name="question"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Question</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="What's your question?" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="space-y-2">
-                <FormLabel>Options</FormLabel>
-                {optionFields.map((field, index) => (
-                  <FormField
-                    key={field.id}
-                    control={pollForm.control}
-                    name={`options.${index}`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <div className="flex gap-2">
-                          <FormControl>
-                            <Input {...field} placeholder={`Option ${index + 1}`} />
-                          </FormControl>
-                          {index >= 2 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => remove(index)}
-                            >
-                              ×
-                            </Button>
-                          )}
-                        </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => append("")}
-                >
-                  Add Option
-                </Button>
-              </div>
-
-              <FormField
-                control={pollForm.control}
-                name="endTime"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>End Time (Optional)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="datetime-local"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="flex justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsPollDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isCreatingPoll}>
-                  Create Poll
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
