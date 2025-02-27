@@ -179,10 +179,10 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     mutationFn: async (data: ParticipantForm) => {
       const formattedData = {
         name: data.name,
-        arrivalDate: data.arrivalDate,
-        departureDate: data.departureDate,
-        flightIn: data.flightIn,
-        flightOut: data.flightOut,
+        arrivalDate: data.arrivalDate || null,
+        departureDate: data.departureDate || null,
+        flightIn: data.flightIn || null,
+        flightOut: data.flightOut || null,
         status: 'pending' as Status,
         flightStatus: 'pending',
         hotelStatus: 'pending',
@@ -191,8 +191,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
               name: data.accommodation,
               type: 'hotel',
               address: 'TBD',
-              checkInDate: data.arrivalDate || '', // Ensure not null
-              checkOutDate: data.departureDate || '', // Ensure not null
+              checkInDate: data.arrivalDate || '',
+              checkOutDate: data.departureDate || '',
               checkInTime: null,
               checkOutTime: null,
               bookingReference: 'TBD',
@@ -201,7 +201,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
               currency: 'USD',
               roomType: null,
             }
-          : undefined,
+          : null,
       };
 
       const res = await fetch(`/api/trips/${tripId}/participants`, {
@@ -211,20 +211,22 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         credentials: "include",
       });
 
-      const responseData = await res.json();
-
       if (!res.ok) {
-        throw new Error(responseData.message || responseData.error || "Failed to add participant");
+        const error = await res.json();
+        throw new Error(error.message || error.error || "Failed to add participant");
       }
 
-      return responseData;
+      return res.json();
     },
     onMutate: async (newParticipant) => {
+      // Cancel any outgoing refetches so they don't overwrite our optimistic update
       await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+
+      // Snapshot the previous value
       const previousParticipants = queryClient.getQueryData<Participant[]>([`/api/trips/${tripId}/participants`]);
 
       const optimisticParticipant: Participant = {
-        id: -Date.now(),
+        id: -Date.now(), // Temporary negative ID to identify optimistic update
         name: newParticipant.name,
         tripId,
         userId: null,
@@ -237,12 +239,12 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         flightOut: newParticipant.flightOut || null,
         accommodation: newParticipant.accommodation ? {
           id: -Date.now(),
-          name: newParticipant.accommodation,
           tripId,
+          name: newParticipant.accommodation,
           type: 'hotel',
           address: 'TBD',
-          checkInDate: newParticipant.arrivalDate || '', // Ensure not null
-          checkOutDate: newParticipant.departureDate || '', // Ensure not null
+          checkInDate: newParticipant.arrivalDate || '',
+          checkOutDate: newParticipant.departureDate || '',
           checkInTime: null,
           checkOutTime: null,
           bookingReference: 'TBD',
@@ -255,17 +257,16 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         } : null,
       };
 
-      // Add the optimistic participant and sort the array
-      const updatedParticipants = [...(previousParticipants || []), optimisticParticipant].sort(sortParticipants);
-
+      // Optimistically update the cache
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
-        updatedParticipants
+        (old = []) => [...old, optimisticParticipant].sort(sortParticipants)
       );
 
       return { previousParticipants };
     },
     onError: (err, newParticipant, context) => {
+      // Rollback on error
       queryClient.setQueryData(
         [`/api/trips/${tripId}/participants`],
         context?.previousParticipants
@@ -278,12 +279,11 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       });
     },
     onSuccess: (data) => {
-      // Update the cache with the server response
+      // Update cache with actual server data and ensure proper sorting
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
-        old => {
-          // Remove optimistic entry and add the real one
-          const withoutOptimistic = (old || []).filter(p => p.id > 0);
+        (old = []) => {
+          const withoutOptimistic = old.filter(p => p.id > 0);
           return [...withoutOptimistic, data].sort(sortParticipants);
         }
       );
@@ -295,6 +295,10 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
       setIsAddParticipantOpen(false);
       addForm.reset();
+    },
+    onSettled: () => {
+      // Always refetch after error or success to ensure cache is in sync
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
     }
   });
 
