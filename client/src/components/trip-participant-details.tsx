@@ -220,13 +220,10 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       return responseData;
     },
     onSuccess: (data) => {
-      // Update cache with the new participant
+      // Update the participants list immediately
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
-        old => {
-          const currentParticipants = old || [];
-          return [...currentParticipants, data];
-        }
+        (old) => old ? [...old, data] : [data]
       );
 
       toast({
@@ -234,8 +231,9 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         description: "Person added successfully"
       });
 
-      // Refetch to ensure we have the latest data
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      // Clean up form and close dialog
+      addForm.reset();
+      setIsAddParticipantOpen(false);
     },
     onError: (error: Error) => {
       toast({
@@ -243,7 +241,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         title: "Error",
         description: error.message || "Failed to add participant",
       });
-    },
+    }
   });
 
   const updateParticipantMutation = useMutation({
@@ -439,14 +437,9 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
   const handleSubmit = async (data: ParticipantForm) => {
     try {
-      const result = await addParticipantMutation.mutateAsync(data);
-      if (result) {
-        setIsAddParticipantOpen(false);
-        addForm.reset();
-      }
+      await addParticipantMutation.mutateAsync(data);
     } catch (error) {
       console.error("Submit error:", error);
-      // Error is handled in onError callback
     }
   };
 
@@ -544,7 +537,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
               </DialogContent>
             </Dialog>
             <Dialog 
-              open={isAddParticipantOpen} 
+              open={isAddParticipantOpen}
               onOpenChange={(open) => {
                 if (!open) {
                   addForm.reset();
