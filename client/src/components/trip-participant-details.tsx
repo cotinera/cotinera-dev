@@ -386,7 +386,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
           description: err.message,
         });
       }
-      setEditingParticipant(null); // Close dialog even on error
+      setEditingParticipant(null);
     },
     onSuccess: (data) => {
       try {
@@ -396,9 +396,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
             if (!old) return [data];
             return old.map(p => p.id === data.id ? {
               ...data,
-              accommodation: typeof data.accommodation === 'string'
-                ? JSON.parse(data.accommodation)
-                : data.accommodation
+              accommodation: data.accommodation
             } : p);
           }
         );
@@ -556,9 +554,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   const handleSubmit = async (data: ParticipantForm) => {
     try {
       await addParticipantMutation.mutateAsync(data);
-      setIsAddParticipantOpen(false);  // Explicitly close dialog after successful mutation
+      setIsAddParticipantOpen(false);  
     } catch (error) {
-      // Error will be handled by mutation's onError
       console.error('Failed to add participant:', error);
     }
   };
@@ -798,13 +795,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   </TableCell>
                   <TableCell>{participant.flightOut || "-"}</TableCell>
                   <TableCell>
-                    {(() => {
-                      if (!participant.accommodation) return "-";
-                      const accommodation = typeof participant.accommodation === 'string'
-                        ? JSON.parse(participant.accommodation)
-                        : participant.accommodation;
-                      return accommodation.name || "-";
-                    })()}
+                    {participant.accommodation?.name || "-"}
                   </TableCell>
                   {customColumns.map((column) => (
                     <TableCell key={column.id}>
