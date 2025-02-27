@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { CATEGORY_ICONS, PlaceCategory } from "./pinned-places";
 
-// Add Places library to the libraries array
+// Add Places and PlacesUI libraries to the libraries array
 const libraries: ("places")[] = ["places"];
 
 const mapContainerStyle = {
@@ -102,21 +102,39 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
 
-    // Create and configure place details element
-    const placeDetailsElement = document.createElement('gmp-place-details');
-    placeDetailsElement.setAttribute('size', 'medium');
-    placeDetailsElement.setAttribute('slot', 'control-inline-start-block-start');
-    placeDetailsElement.style.position = 'absolute';
-    placeDetailsElement.style.top = '0';
-    placeDetailsElement.style.left = '0';
-    placeDetailsElement.style.zIndex = '1';
-    placeDetailsElement.style.backgroundColor = 'white';
-    placeDetailsElement.style.borderRadius = '8px';
-    placeDetailsElement.style.margin = '10px';
-    placeDetailsElement.style.display = 'none';
+    // Load the Places UI library
+    const script = document.createElement('script');
+    script.src = 'https://maps.googleapis.com/maps/api/js?key=' + import.meta.env.VITE_GOOGLE_MAPS_API_KEY + '&libraries=places&components=Places';
+    script.async = true;
+    script.defer = true;
+    document.head.appendChild(script);
 
-    placeDetailsRef.current = placeDetailsElement;
-    map.getDiv().appendChild(placeDetailsElement);
+    script.onload = () => {
+      // Create and configure place details element
+      const placeDetailsElement = document.createElement('gmp-place-details') as HTMLElement & {
+        configureFromPlaceId?: (placeId: string) => Promise<void>;
+      };
+
+      // Configure the place details element
+      placeDetailsElement.setAttribute('place', '');
+      placeDetailsElement.setAttribute('full', '');
+      placeDetailsElement.style.position = 'absolute';
+      placeDetailsElement.style.top = '0';
+      placeDetailsElement.style.left = '0';
+      placeDetailsElement.style.right = '0';
+      placeDetailsElement.style.maxWidth = '400px';
+      placeDetailsElement.style.maxHeight = '100%';
+      placeDetailsElement.style.margin = '10px';
+      placeDetailsElement.style.backgroundColor = 'white';
+      placeDetailsElement.style.borderRadius = '8px';
+      placeDetailsElement.style.boxShadow = '0 2px 6px rgba(0,0,0,0.3)';
+      placeDetailsElement.style.overflow = 'auto';
+      placeDetailsElement.style.display = 'none';
+      placeDetailsElement.style.zIndex = '1';
+
+      placeDetailsRef.current = placeDetailsElement;
+      map.getDiv().appendChild(placeDetailsElement);
+    };
   }, []);
 
   // Handle map click events
@@ -131,8 +149,14 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
 
     try {
       // Show place details
-      await (placeDetailsRef.current as any).configureFromPlaceId(event.placeId);
-      placeDetailsRef.current.style.display = 'block';
+      const placeDetails = placeDetailsRef.current as HTMLElement & {
+        configureFromPlaceId?: (placeId: string) => Promise<void>;
+      };
+
+      if (placeDetails.configureFromPlaceId) {
+        await placeDetails.configureFromPlaceId(event.placeId);
+        placeDetails.style.display = 'block';
+      }
     } catch (error) {
       console.error('Error showing place details:', error);
     }
@@ -227,8 +251,14 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
             title={place.name}
             onClick={() => {
               if (placeDetailsRef.current && place.placeId) {
-                (placeDetailsRef.current as any).configureFromPlaceId(place.placeId);
-                placeDetailsRef.current.style.display = 'block';
+                const placeDetails = placeDetailsRef.current as HTMLElement & {
+                  configureFromPlaceId?: (placeId: string) => Promise<void>;
+                };
+
+                if (placeDetails.configureFromPlaceId) {
+                  placeDetails.configureFromPlaceId(place.placeId);
+                  placeDetails.style.display = 'block';
+                }
               }
               onPinClick?.(place);
             }}
