@@ -68,7 +68,7 @@ export enum PlaceCategory {
   RELIC = "relic"
 }
 
-const CATEGORY_ICONS: Record<PlaceCategory, typeof MapPin> = {
+export const CATEGORY_ICONS: Record<PlaceCategory, typeof MapPin> = {
   [PlaceCategory.FOOD]: UtensilsCrossed,
   [PlaceCategory.BAR]: Beer,
   [PlaceCategory.CAFE]: Coffee,

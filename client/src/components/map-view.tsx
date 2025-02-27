@@ -1,7 +1,11 @@
 import { useLoadScript, GoogleMap, MarkerF } from "@react-google-maps/api";
 import { Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { cn } from "@/lib/utils";
+import { CATEGORY_ICONS, PlaceCategory } from "./pinned-places";
+import type { LucideIcon } from "lucide-react";
 
 const mapContainerStyle = {
   width: "100%",
@@ -20,6 +24,7 @@ const libraries: ("places")[] = ["places"];
 interface PinnedPlace {
   id: number;
   name: string;
+  category: PlaceCategory;
   coordinates: {
     lat: number;
     lng: number;
@@ -28,7 +33,10 @@ interface PinnedPlace {
 
 interface MapViewProps {
   location: string;
+  tripId: number;
   pinnedPlaces?: PinnedPlace[] | { places: PinnedPlace[] };
+  onPinClick?: (place: PinnedPlace) => void;
+  className?: string;
 }
 
 interface Coordinates {
@@ -36,7 +44,7 @@ interface Coordinates {
   lng: number;
 }
 
-export function MapView({ location, pinnedPlaces = [] }: MapViewProps) {
+export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, className }: MapViewProps) {
   const [coordinates, setCoordinates] = useState<Coordinates>({
     lat: 37.7749,
     lng: -122.4194, // Default to San Francisco
@@ -48,6 +56,25 @@ export function MapView({ location, pinnedPlaces = [] }: MapViewProps) {
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     libraries,
   });
+
+  // Fetch all pinned places for the trip if not provided
+  const { data: fetchedPinnedPlaces } = useQuery({
+    queryKey: [`/api/trips/${tripId}/pinned-places`],
+    queryFn: async () => {
+      if (Array.isArray(pinnedPlaces) || 'places' in pinnedPlaces) return null;
+      const res = await fetch(`/api/trips/${tripId}/pinned-places`);
+      if (!res.ok) throw new Error("Failed to fetch pinned places");
+      return res.json();
+    },
+    enabled: tripId > 0 && !Array.isArray(pinnedPlaces) && !('places' in pinnedPlaces),
+  });
+
+  // Combine provided and fetched pinned places
+  const allPinnedPlaces = useMemo(() => {
+    if (Array.isArray(pinnedPlaces)) return pinnedPlaces;
+    if ('places' in pinnedPlaces) return pinnedPlaces.places;
+    return fetchedPinnedPlaces?.places || [];
+  }, [pinnedPlaces, fetchedPinnedPlaces]);
 
   useEffect(() => {
     async function geocodeLocation() {
@@ -108,26 +135,57 @@ export function MapView({ location, pinnedPlaces = [] }: MapViewProps) {
     );
   }
 
-  const places = Array.isArray(pinnedPlaces) 
-    ? pinnedPlaces 
-    : (pinnedPlaces as { places: PinnedPlace[] }).places || [];
+  const renderMarkerIcon = (Icon: LucideIcon) => {
+    return Icon({
+      size: 24,
+      absoluteStrokeWidth: true,
+    });
+  };
 
   return (
-    <Card className="overflow-hidden">
+    <Card className={cn("overflow-hidden", className)}>
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
         zoom={13}
         center={coordinates}
         options={defaultOptions}
       >
-        <MarkerF position={coordinates} />
-        {places.map((place) => (
-          <MarkerF
-            key={place.id}
-            position={place.coordinates}
-            title={place.name}
-          />
-        ))}
+        {/* Main location marker */}
+        <MarkerF 
+          position={coordinates}
+          icon={{
+            url: `data:image/svg+xml,${encodeURIComponent(`
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10" fill="#000000"/>
+                <circle cx="12" cy="12" r="3" fill="#ffffff"/>
+              </svg>
+            `)}`,
+            scaledSize: new google.maps.Size(30, 30),
+          }}
+        />
+
+        {/* Render all pinned places with category-specific styling */}
+        {allPinnedPlaces.map((place: PinnedPlace) => {
+          const Icon = CATEGORY_ICONS[place.category] || CATEGORY_ICONS[PlaceCategory.TOURIST];
+          const svgIcon = renderMarkerIcon(Icon);
+
+          return (
+            <MarkerF
+              key={place.id}
+              position={place.coordinates}
+              title={place.name}
+              onClick={() => onPinClick?.(place)}
+              icon={{
+                url: `data:image/svg+xml,${encodeURIComponent(`
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#4f46e5" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    ${svgIcon}
+                  </svg>
+                `)}`,
+                scaledSize: new google.maps.Size(24, 24),
+              }}
+            />
+          );
+        })}
       </GoogleMap>
     </Card>
   );
