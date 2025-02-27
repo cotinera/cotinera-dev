@@ -330,11 +330,15 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         throw new Error(responseData.message || responseData.error || "Failed to update participant");
       }
 
-      // Normalize accommodation data from response
-      let parsedAccommodation = null;
+      // Parse accommodation if it's a string
+      let parsedResponse = {
+        ...responseData,
+        accommodation: null
+      };
+
       if (responseData.accommodation) {
         try {
-          parsedAccommodation = typeof responseData.accommodation === 'string'
+          parsedResponse.accommodation = typeof responseData.accommodation === 'string'
             ? JSON.parse(responseData.accommodation)
             : responseData.accommodation;
         } catch (e) {
@@ -342,15 +346,13 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         }
       }
 
-      return {
-        ...responseData,
-        accommodation: parsedAccommodation
-      };
+      return parsedResponse;
     },
     onMutate: async ({ participantId, data }) => {
       await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
       const previousParticipants = queryClient.getQueryData<Participant[]>([`/api/trips/${tripId}/participants`]);
 
+      // Optimistic update with properly structured data
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
         old => old?.map(p => (p.id === participantId
@@ -797,15 +799,16 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   <TableCell>
                     {(() => {
                       if (!participant.accommodation) return "-";
-                      try {
-                        const accommodationData = typeof participant.accommodation === 'string'
-                          ? JSON.parse(participant.accommodation)
-                          : participant.accommodation;
-                        return accommodationData.name || "-";
-                      } catch (e) {
-                        console.error('Error displaying accommodation:', e);
-                        return "-";
+                      if (typeof participant.accommodation === 'string') {
+                        try {
+                          const parsed = JSON.parse(participant.accommodation);
+                          return parsed.name || "-";
+                        } catch (e) {
+                          console.error('Error parsing accommodation:', e);
+                          return "-";
+                        }
                       }
+                      return participant.accommodation.name || "-";
                     })()}
                   </TableCell>
                   {customColumns.map((column) => (
