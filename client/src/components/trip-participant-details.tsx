@@ -215,27 +215,25 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       return res.json();
     },
     onMutate: async (newParticipant) => {
-      // Cancel any outgoing refetches
       await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-
-      // Snapshot the previous value
       const previousParticipants = queryClient.getQueryData<Participant[]>([`/api/trips/${tripId}/participants`]);
 
-      // Optimistically update to the new value
       const optimisticParticipant: Participant = {
-        id: Date.now(), // Temporary ID
+        id: Date.now(),
         name: newParticipant.name,
-        tripId: tripId,
+        tripId,
         userId: null,
         status: 'pending',
         arrivalDate: newParticipant.arrivalDate || null,
         departureDate: newParticipant.departureDate || null,
         flightStatus: 'pending',
         hotelStatus: 'pending',
+        flightIn: newParticipant.flightIn || null,
+        flightOut: newParticipant.flightOut || null,
         accommodation: newParticipant.accommodation ? {
           id: Date.now(),
           name: newParticipant.accommodation,
-          tripId: tripId,
+          tripId,
           type: 'hotel',
           address: 'TBD',
           checkInDate: newParticipant.arrivalDate || null,
@@ -260,7 +258,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       return { previousParticipants };
     },
     onError: (err, newParticipant, context) => {
-      // Rollback to the previous value
       queryClient.setQueryData(
         [`/api/trips/${tripId}/participants`],
         context?.previousParticipants
@@ -274,14 +271,19 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     onSuccess: (data) => {
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
-        old => old?.map(p => p.id === Date.now() ? data : p) || [data]
+        old => {
+          const filtered = old?.filter(p => p.id !== Date.now()) || [];
+          return [...filtered, data];
+        }
       );
       setIsAddParticipantOpen(false);
       addForm.reset();
-      toast({ title: "Success", description: "Person added successfully" });
+      toast({
+        title: "Success",
+        description: "Person added successfully"
+      });
     },
     onSettled: () => {
-      // Always refetch after error or success
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
     },
   });
