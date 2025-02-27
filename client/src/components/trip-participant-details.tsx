@@ -484,12 +484,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     }));
   };
 
-  const handleSubmit = async (data: ParticipantForm) => {
-    try {
-      addParticipantMutation.mutate(data);
-    } catch (error) {
-      // Errors are handled in mutation's onError callback
-    }
+  const handleSubmit = (data: ParticipantForm) => {
+    addParticipantMutation.mutate(data);
   };
 
   return (
