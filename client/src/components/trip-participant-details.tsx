@@ -191,8 +191,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
               name: data.accommodation,
               type: 'hotel',
               address: 'TBD',
-              checkInDate: data.arrivalDate || null,
-              checkOutDate: data.departureDate || null,
+              checkInDate: data.arrivalDate || '', // Ensure not null
+              checkOutDate: data.departureDate || '', // Ensure not null
               checkInTime: null,
               checkOutTime: null,
               bookingReference: 'TBD',
@@ -241,8 +241,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
           tripId,
           type: 'hotel',
           address: 'TBD',
-          checkInDate: newParticipant.arrivalDate || null,
-          checkOutDate: newParticipant.departureDate || null,
+          checkInDate: newParticipant.arrivalDate || '', // Ensure not null
+          checkOutDate: newParticipant.departureDate || '', // Ensure not null
           checkInTime: null,
           checkOutTime: null,
           bookingReference: 'TBD',
