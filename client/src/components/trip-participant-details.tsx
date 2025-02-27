@@ -324,12 +324,13 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         credentials: "include"
       });
 
+      const responseData = await res.json();
+
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || error.error || "Failed to update participant");
+        throw new Error(responseData.message || responseData.error || "Failed to update participant");
       }
 
-      return res.json();
+      return responseData;
     },
     onMutate: async ({ participantId, data }) => {
       await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
@@ -385,13 +386,15 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
           description: err.message,
         });
       }
+      setEditingParticipant(null); // Close dialog even on error
     },
     onSuccess: (data) => {
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
         old => old?.map(p => p.id === data.id ? data : p) || []
       );
-      setEditingParticipant(null);
+      setEditingParticipant(null); // Close dialog on success
+      editForm.reset(); // Reset form
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
