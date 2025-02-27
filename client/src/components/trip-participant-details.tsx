@@ -293,22 +293,27 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   const updateParticipantMutation = useMutation({
     mutationFn: async ({ participantId, data }: { participantId: number; data: Partial<ParticipantForm> }) => {
       const formattedData = {
-        ...data,
+        name: data.name,
+        arrivalDate: data.arrivalDate || null,
+        departureDate: data.departureDate || null,
+        flightIn: data.flightIn || null,
+        flightOut: data.flightOut || null,
         accommodation: data.accommodation?.trim()
           ? {
               name: data.accommodation,
-              tripId: tripId,
               type: 'hotel',
-              address: '',
-              checkInDate: data.arrivalDate || null,
-              checkOutDate: data.departureDate || null,
+              address: 'TBD',
+              checkInDate: data.arrivalDate || '',
+              checkOutDate: data.departureDate || '',
               checkInTime: null,
               checkOutTime: null,
-              bookingReference: '',
+              bookingReference: 'TBD',
               bookingStatus: 'pending',
-              currency: 'USD'
+              price: null,
+              currency: 'USD',
+              roomType: null,
             }
-          : null
+          : null,
       };
 
       const res = await fetch(`/api/trips/${tripId}/participants/${participantId}`, {
@@ -324,21 +329,62 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+    onMutate: async ({ participantId, data }) => {
+      await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      const previousParticipants = queryClient.getQueryData<Participant[]>([`/api/trips/${tripId}/participants`]);
+
+      // Create optimistic update
+      queryClient.setQueryData<Participant[]>(
+        [`/api/trips/${tripId}/participants`],
+        old => old?.map(p => (p.id === participantId
+          ? {
+              ...p,
+              name: data.name || p.name,
+              arrivalDate: data.arrivalDate || p.arrivalDate,
+              departureDate: data.departureDate || p.departureDate,
+              flightIn: data.flightIn || p.flightIn,
+              flightOut: data.flightOut || p.flightOut,
+              accommodation: data.accommodation?.trim()
+                ? {
+                    ...(p.accommodation || {}),
+                    name: data.accommodation,
+                    checkInDate: data.arrivalDate || p.arrivalDate || '',
+                    checkOutDate: data.departureDate || p.departureDate || '',
+                  }
+                : null,
+            }
+          : p
+        )) || []
+      );
+
+      return { previousParticipants };
+    },
+    onError: (err, { participantId }, context) => {
+      queryClient.setQueryData(
+        [`/api/trips/${tripId}/participants`],
+        context?.previousParticipants
+      );
+
+      if (err instanceof Error) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: err.message,
+        });
+      }
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData<Participant[]>(
+        [`/api/trips/${tripId}/participants`],
+        old => old?.map(p => p.id === data.id ? data : p) || []
+      );
+
       setEditingParticipant(null);
-      toast({
-        title: "Success",
-        description: "Participant updated successfully",
-      });
     },
-    onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to update participant",
-      });
-    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+    }
+
   });
 
   const updateStatusMutation = useMutation({
