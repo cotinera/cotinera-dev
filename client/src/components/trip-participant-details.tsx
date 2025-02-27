@@ -277,23 +277,19 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         throw new Error(responseData.message || responseData.error || "Failed to update participant");
       }
 
-      let accommodationName = null;
+      // Normalize the accommodation data to ensure we only have the name
+      let accommodationData = null;
       if (responseData.accommodation) {
-        if (typeof responseData.accommodation === 'string') {
-          try {
-            const parsed = JSON.parse(responseData.accommodation);
-            accommodationName = parsed.name;
-          } catch (e) {
-            console.error('Error parsing accommodation:', e);
-          }
-        } else {
-          accommodationName = responseData.accommodation.name;
-        }
+        const accData = typeof responseData.accommodation === 'string'
+          ? JSON.parse(responseData.accommodation)
+          : responseData.accommodation;
+
+        accommodationData = accData.name ? { name: accData.name } : null;
       }
 
       return {
         ...responseData,
-        accommodation: accommodationName ? { name: accommodationName } : null
+        accommodation: accommodationData
       };
     },
     onMutate: async ({ participantId, data }) => {
@@ -727,7 +723,12 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                     {(() => {
                       if (!participant.accommodation) return "-";
 
-                      return participant.accommodation.name || "-";
+                      // Ensure we only display the name string
+                      const accName = typeof participant.accommodation === 'string'
+                        ? JSON.parse(participant.accommodation).name
+                        : participant.accommodation.name;
+
+                      return accName || "-";
                     })()}
                   </TableCell>
                   {customColumns.map((column) => (
