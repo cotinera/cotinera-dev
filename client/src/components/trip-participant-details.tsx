@@ -200,19 +200,25 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
           : undefined,
       };
 
-      const res = await fetch(`/api/trips/${tripId}/participants`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formattedData),
-        credentials: "include",
-      });
+      try {
+        const res = await fetch(`/api/trips/${tripId}/participants`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formattedData),
+          credentials: "include",
+        });
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.message || errorData.error || "Failed to add participant");
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.message || errorData.error || "Failed to add participant");
+        }
+
+        const responseData = await res.json();
+        return responseData;
+      } catch (error) {
+        console.error("Error adding participant:", error);
+        throw error;
       }
-
-      return res.json();
     },
     onMutate: async (newParticipant) => {
       await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
@@ -276,6 +282,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
           return [...filtered, data];
         }
       );
+
       setIsAddParticipantOpen(false);
       addForm.reset();
       toast({
@@ -479,6 +486,15 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     }));
   };
 
+  const handleSubmit = async (data: ParticipantForm) => {
+    try {
+      await addParticipantMutation.mutateAsync(data);
+    } catch (error) {
+      console.error("Submit error:", error);
+      // Error is already handled in onError
+    }
+  };
+
   return (
     <Card>
       <CardHeader className="pb-3">
@@ -581,8 +597,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   <DialogTitle>Add New Person</DialogTitle>
                 </DialogHeader>
                 <Form {...addForm}>
-                  <form onSubmit={addForm.handleSubmit(data => addParticipantMutation.mutate(data))}
-                        className="space-y-4">
+                  <form onSubmit={addForm.handleSubmit(handleSubmit)} className="space-y-4">
                     <FormField
                       control={addForm.control}
                       name="name"
