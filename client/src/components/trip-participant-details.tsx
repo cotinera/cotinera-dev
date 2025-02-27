@@ -728,15 +728,22 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   <TableCell>{participant.flightOut || "-"}</TableCell>
                   <TableCell>
                     {(() => {
-                      if (!participant.accommodation) return "-";
-
                       try {
-                        // If it's a string (JSON), parse it and get the name
+                        if (!participant.accommodation) return "-";
+
+                        // Handle different data formats
+                        let hotelName;
                         if (typeof participant.accommodation === 'string') {
-                          return JSON.parse(participant.accommodation).name;
+                          // If it's a JSON string
+                          const parsed = JSON.parse(participant.accommodation);
+                          hotelName = parsed.name;
+                        } else {
+                          // If it's already an object
+                          hotelName = participant.accommodation.name;
                         }
-                        // If it's already an object, just get the name
-                        return participant.accommodation.name;
+
+                        // Return just the name value
+                        return hotelName || "-";
                       } catch (e) {
                         console.error('Error displaying accommodation:', e);
                         return "-";
