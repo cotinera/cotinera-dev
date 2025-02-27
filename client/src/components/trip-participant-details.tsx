@@ -260,9 +260,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         flightIn: data.flightIn || null,
         flightOut: data.flightOut || null,
         accommodation: data.accommodation?.trim()
-          ? {
-              name: data.accommodation
-            }
+          ? { name: data.accommodation }
           : null
       };
 
@@ -279,16 +277,23 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         throw new Error(responseData.message || responseData.error || "Failed to update participant");
       }
 
-      // Extract only the name from accommodation data
+      let accommodationName = null;
+      if (responseData.accommodation) {
+        if (typeof responseData.accommodation === 'string') {
+          try {
+            const parsed = JSON.parse(responseData.accommodation);
+            accommodationName = parsed.name;
+          } catch (e) {
+            console.error('Error parsing accommodation:', e);
+          }
+        } else {
+          accommodationName = responseData.accommodation.name;
+        }
+      }
+
       return {
         ...responseData,
-        accommodation: responseData.accommodation
-          ? {
-              name: typeof responseData.accommodation === 'string'
-                ? JSON.parse(responseData.accommodation).name
-                : responseData.accommodation.name
-            }
-          : null
+        accommodation: accommodationName ? { name: accommodationName } : null
       };
     },
     onMutate: async ({ participantId, data }) => {
@@ -325,15 +330,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     onSuccess: (data) => {
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
-        old => old?.map(p => p.id === data.id
-          ? {
-              ...data,
-              accommodation: data.accommodation
-                ? { name: data.accommodation.name }
-                : null
-            }
-          : p
-        ) || []
+        old => old?.map(p => p.id === data.id ? data : p) || []
       );
       setEditingParticipant(null);
       editForm.reset();
@@ -728,25 +725,9 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   <TableCell>{participant.flightOut || "-"}</TableCell>
                   <TableCell>
                     {(() => {
-                      try {
-                        if (!participant.accommodation) return "-";
+                      if (!participant.accommodation) return "-";
 
-                        // Handle different data formats and extract only the name
-                        let hotelName;
-                        if (typeof participant.accommodation === 'string') {
-                          // If it's a JSON string, parse and get name value only
-                          hotelName = JSON.parse(participant.accommodation).name;
-                        } else {
-                          // If it's an object, get name value only
-                          hotelName = participant.accommodation.name;
-                        }
-
-                        // Return the raw name string without any JSON formatting
-                        return hotelName || "-";
-                      } catch (e) {
-                        console.error('Error displaying accommodation:', e);
-                        return "-";
-                      }
+                      return participant.accommodation.name || "-";
                     })()}
                   </TableCell>
                   {customColumns.map((column) => (
