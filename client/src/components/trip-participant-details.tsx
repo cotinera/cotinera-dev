@@ -219,14 +219,11 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       return res.json();
     },
     onMutate: async (newParticipant) => {
-      // Cancel any outgoing refetches so they don't overwrite our optimistic update
       await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-
-      // Snapshot the previous value
       const previousParticipants = queryClient.getQueryData<Participant[]>([`/api/trips/${tripId}/participants`]);
 
       const optimisticParticipant: Participant = {
-        id: -Date.now(), // Temporary negative ID to identify optimistic update
+        id: -Date.now(),
         name: newParticipant.name,
         tripId,
         userId: null,
@@ -257,7 +254,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         } : null,
       };
 
-      // Optimistically update the cache
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
         (old = []) => [...old, optimisticParticipant].sort(sortParticipants)
@@ -266,20 +262,21 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       return { previousParticipants };
     },
     onError: (err, newParticipant, context) => {
-      // Rollback on error
       queryClient.setQueryData(
         [`/api/trips/${tripId}/participants`],
         context?.previousParticipants
       );
 
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: err instanceof Error ? err.message : "Failed to add participant",
-      });
+      // Only show error toast for actual errors
+      if (err instanceof Error) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: err.message,
+        });
+      }
     },
     onSuccess: (data) => {
-      // Update cache with actual server data and ensure proper sorting
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
         (old = []) => {
@@ -288,16 +285,10 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         }
       );
 
-      toast({
-        title: "Success",
-        description: "Person added successfully"
-      });
-
       setIsAddParticipantOpen(false);
       addForm.reset();
     },
     onSettled: () => {
-      // Always refetch after error or success to ensure cache is in sync
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
     }
   });
