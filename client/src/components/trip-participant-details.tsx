@@ -389,12 +389,24 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       setEditingParticipant(null); // Close dialog even on error
     },
     onSuccess: (data) => {
-      queryClient.setQueryData<Participant[]>(
-        [`/api/trips/${tripId}/participants`],
-        old => old?.map(p => p.id === data.id ? data : p) || []
-      );
-      setEditingParticipant(null); // Close dialog on success
-      editForm.reset(); // Reset form
+      try {
+        queryClient.setQueryData<Participant[]>(
+          [`/api/trips/${tripId}/participants`],
+          old => {
+            if (!old) return [data];
+            return old.map(p => p.id === data.id ? {
+              ...data,
+              accommodation: typeof data.accommodation === 'string'
+                ? JSON.parse(data.accommodation)
+                : data.accommodation
+            } : p);
+          }
+        );
+        setEditingParticipant(null);
+        editForm.reset();
+      } catch (e) {
+        console.error('Error updating participant data:', e);
+      }
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
@@ -557,7 +569,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         <div className="flex justify-between items-center">
           <CardTitle>People</CardTitle>
           <div className="flex gap-2">
-            <Dialog 
+            <Dialog
               open={isAddParticipantOpen}
               onOpenChange={setIsAddParticipantOpen}
             >
@@ -654,8 +666,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                         </FormItem>
                       )}
                     />
-                    <Button 
-                      type="submit" 
+                    <Button
+                      type="submit"
                       className="w-full"
                       disabled={addParticipantMutation.isPending}
                     >
@@ -665,8 +677,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                 </Form>
               </DialogContent>
             </Dialog>
-            <Dialog 
-              open={isCustomizeOpen} 
+            <Dialog
+              open={isCustomizeOpen}
               onOpenChange={setIsCustomizeOpen}
             >
               <DialogTrigger asChild>
@@ -785,7 +797,15 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                     {participant.departureDate && format(new Date(participant.departureDate), "dd/MM/yyyy")}
                   </TableCell>
                   <TableCell>{participant.flightOut || "-"}</TableCell>
-                  <TableCell>{participant.accommodation?.name || "-"}</TableCell>
+                  <TableCell>
+                    {(() => {
+                      if (!participant.accommodation) return "-";
+                      const accommodation = typeof participant.accommodation === 'string'
+                        ? JSON.parse(participant.accommodation)
+                        : participant.accommodation;
+                      return accommodation.name || "-";
+                    })()}
+                  </TableCell>
                   {customColumns.map((column) => (
                     <TableCell key={column.id}>
                       {column.type === 'boolean' ? (
