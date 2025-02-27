@@ -330,16 +330,17 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         throw new Error(responseData.message || responseData.error || "Failed to update participant");
       }
 
-      // Ensure the accommodation is properly structured in the response
-      return {
+      // Parse and normalize the accommodation data
+      const normalizedData = {
         ...responseData,
-        accommodation: responseData.accommodation ? {
-          ...responseData.accommodation,
-          name: typeof responseData.accommodation === 'string' 
-            ? JSON.parse(responseData.accommodation).name 
-            : responseData.accommodation.name
-        } : null
+        accommodation: responseData.accommodation 
+          ? (typeof responseData.accommodation === 'string' 
+              ? JSON.parse(responseData.accommodation) 
+              : responseData.accommodation)
+          : null
       };
+
+      return normalizedData;
     },
     onMutate: async ({ participantId, data }) => {
       await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
