@@ -273,10 +273,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         title: "Error",
         description: err instanceof Error ? err.message : "Failed to add participant",
       });
-
-      // Close dialog and reset form even on error
-      setIsAddParticipantOpen(false);
-      addForm.reset();
     },
     onSuccess: (data) => {
       queryClient.setQueryData<Participant[]>(
@@ -292,7 +288,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         description: "Person added successfully"
       });
 
-      // Close dialog and reset form
       setIsAddParticipantOpen(false);
       addForm.reset();
     }
@@ -490,7 +485,11 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   };
 
   const handleSubmit = async (data: ParticipantForm) => {
-    addParticipantMutation.mutate(data);
+    try {
+      addParticipantMutation.mutate(data);
+    } catch (error) {
+      // Errors are handled in mutation's onError callback
+    }
   };
 
   return (
