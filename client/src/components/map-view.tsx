@@ -77,6 +77,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     libraries,
+    version: "beta" // Use beta version for Places UI components
   });
 
   // Fetch all pinned places for the trip if not provided
@@ -107,10 +108,11 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     container.style.position = 'absolute';
     container.style.top = '0';
     container.style.left = '0';
-    container.style.right = '0';
-    container.style.maxWidth = '400px';
+    container.style.width = '400px';
+    container.style.maxHeight = '100%';
     container.style.margin = '10px';
     container.style.zIndex = '1';
+    container.style.display = 'none';
     map.getDiv().appendChild(container);
 
     // Create and configure place details element
@@ -121,16 +123,16 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     };
 
     // Configure the place details element
-    placeDetailsElement.setAttribute('place', '');
     placeDetailsElement.setAttribute('full', '');
     container.appendChild(placeDetailsElement);
-    container.style.display = 'none';
 
     placeDetailsRef.current = placeDetailsElement;
 
     // Add click event listener to the map
-    map.addListener('click', (e: google.maps.MapMouseEvent) => {
+    map.addListener('click', async (e: google.maps.MapMouseEvent) => {
       const event = e as unknown as { placeId?: string };
+      event.stop(); // Prevent default click behavior
+
       if (!placeDetailsRef.current || !event.placeId) {
         if (placeDetailsRef.current?.parentElement) {
           placeDetailsRef.current.parentElement.style.display = 'none';
@@ -138,21 +140,19 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         return;
       }
 
-      // Show place details
-      const placeDetails = placeDetailsRef.current as HTMLElement & {
-        configureFromPlaceId?: (placeId: string) => Promise<void>;
-      };
+      try {
+        const placeDetails = placeDetailsRef.current as HTMLElement & {
+          configureFromPlaceId?: (placeId: string) => Promise<void>;
+        };
 
-      if (placeDetails.configureFromPlaceId) {
-        placeDetails.configureFromPlaceId(event.placeId)
-          .then(() => {
-            if (placeDetails.parentElement) {
-              placeDetails.parentElement.style.display = 'block';
-            }
-          })
-          .catch((error) => {
-            console.error('Error showing place details:', error);
-          });
+        if (placeDetails.configureFromPlaceId) {
+          await placeDetails.configureFromPlaceId(event.placeId);
+          if (placeDetails.parentElement) {
+            placeDetails.parentElement.style.display = 'block';
+          }
+        }
+      } catch (error) {
+        console.error('Error showing place details:', error);
       }
     });
   }, []);
@@ -243,22 +243,21 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
             key={place.id}
             position={place.coordinates}
             title={place.name}
-            onClick={() => {
+            onClick={async () => {
               if (placeDetailsRef.current && place.placeId) {
                 const placeDetails = placeDetailsRef.current as HTMLElement & {
                   configureFromPlaceId?: (placeId: string) => Promise<void>;
                 };
 
-                if (placeDetails.configureFromPlaceId) {
-                  placeDetails.configureFromPlaceId(place.placeId)
-                    .then(() => {
-                      if (placeDetails.parentElement) {
-                        placeDetails.parentElement.style.display = 'block';
-                      }
-                    })
-                    .catch((error) => {
-                      console.error('Error showing place details:', error);
-                    });
+                try {
+                  if (placeDetails.configureFromPlaceId) {
+                    await placeDetails.configureFromPlaceId(place.placeId);
+                    if (placeDetails.parentElement) {
+                      placeDetails.parentElement.style.display = 'block';
+                    }
+                  }
+                } catch (error) {
+                  console.error('Error showing place details:', error);
                 }
               }
               onPinClick?.(place);
