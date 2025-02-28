@@ -130,8 +130,8 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
 
     // Add click event listener to the map
     map.addListener('click', async (e: google.maps.MapMouseEvent) => {
-      const event = e as unknown as { placeId?: string };
-      event.stop(); // Prevent default click behavior
+      const event = e as unknown as { placeId?: string; stop?: () => void };
+      event.stop?.(); // Prevent default click behavior
 
       if (!placeDetailsRef.current || !event.placeId) {
         if (placeDetailsRef.current?.parentElement) {
