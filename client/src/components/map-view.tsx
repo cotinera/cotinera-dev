@@ -3,9 +3,7 @@ import { Loader2, Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import { CATEGORY_ICONS, PlaceCategory } from "./pinned-places";
 import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
 
 // Libraries for Google Maps
@@ -32,41 +30,17 @@ interface Coordinates {
 interface PinnedPlace {
   id: number;
   name: string;
-  address: string;
-  category: PlaceCategory;
   coordinates: Coordinates;
-  placeId?: string;
-  tripId: number;
-  destinationId?: number;
-  phone?: string;
-  website?: string;
-  rating?: number;
-  openingHours?: string[];
-  photos?: string[];
-}
-
-interface PlaceDetails {
-  name: string;
-  formatted_address: string;
-  formatted_phone_number?: string;
-  rating?: number;
-  opening_hours?: {
-    weekday_text: string[];
-    isOpen: () => boolean;
-  };
-  website?: string;
-  photos?: google.maps.places.PlacePhoto[];
 }
 
 interface MapViewProps {
   location: string;
-  tripId: number;
   pinnedPlaces?: PinnedPlace[] | { places: PinnedPlace[] };
-  onPinClick?: (place: PinnedPlace, details?: PlaceDetails) => void;
+  onPinClick?: (place: PinnedPlace) => void;
   className?: string;
 }
 
-export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, className }: MapViewProps) {
+export function MapView({ location, pinnedPlaces = [], onPinClick, className }: MapViewProps) {
   const [coordinates, setCoordinates] = useState<Coordinates>({
     lat: 37.7749,
     lng: -122.4194,
@@ -74,12 +48,10 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
-  const placeDetailsRef = useRef<HTMLElement | null>(null);
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     libraries,
-    version: "beta" // Use beta version for Places UI components
   });
 
   // Setup Places Autocomplete
@@ -89,18 +61,10 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     suggestions: { status, data },
     setValue,
     clearSuggestions,
-    init,
   } = usePlacesAutocomplete({
-    initOnMount: false, // Don't initialize until we have the map
     debounce: 300,
+    cache: 24 * 60 * 60,
   });
-
-  // Initialize Places Autocomplete after map is loaded
-  useEffect(() => {
-    if (isLoaded && mapRef.current) {
-      init();
-    }
-  }, [isLoaded, init]);
 
   const handleSearchSelect = async (placeId: string) => {
     clearSuggestions();
@@ -127,72 +91,10 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     return [];
   }, [pinnedPlaces]);
 
-  // Initialize map and place details
+  // Initialize map
   const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
-
-    // Create a container for place details
-    const container = document.createElement('div');
-    container.style.position = 'absolute';
-    container.style.top = '0';
-    container.style.left = '0';
-    container.style.width = '400px';
-    container.style.maxHeight = '100%';
-    container.style.margin = '10px';
-    container.style.zIndex = '1';
-    container.style.display = 'none';
-    map.getDiv().appendChild(container);
-
-    // Create place details element
-    const placeDetailsElement = document.createElement('gmp-place-details') as HTMLElement & {
-      configureFromPlaceId?: (placeId: string) => Promise<void>;
-    };
-
-    // Configure the place details element
-    placeDetailsElement.setAttribute('full', '');
-    container.appendChild(placeDetailsElement);
-
-    placeDetailsRef.current = placeDetailsElement;
   }, []);
-
-  // Handle map click events
-  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
-    const event = e as unknown as { placeId?: string; stop?: () => void };
-
-    if (event.stop) {
-      event.stop();
-    }
-
-    if (!placeDetailsRef.current || !event.placeId) {
-      if (placeDetailsRef.current?.parentElement) {
-        placeDetailsRef.current.parentElement.style.display = 'none';
-      }
-      return;
-    }
-
-    const placeDetails = placeDetailsRef.current as HTMLElement & {
-      configureFromPlaceId?: (placeId: string) => Promise<void>;
-    };
-
-    if (placeDetails.configureFromPlaceId) {
-      placeDetails.configureFromPlaceId(event.placeId)
-        .then(() => {
-          if (placeDetails.parentElement) {
-            placeDetails.parentElement.style.display = 'block';
-          }
-        })
-        .catch((error) => {
-          console.error('Error showing place details:', error);
-        });
-    }
-  }, []);
-
-  useEffect(() => {
-    if (mapRef.current) {
-      google.maps.event.clearListeners(mapRef.current, 'click');
-      mapRef.current.addListener('click', handleMapClick);
-    }
-  }, [handleMapClick]);
 
   useEffect(() => {
     async function geocodeLocation() {
@@ -255,21 +157,21 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   return (
     <Card className={cn("overflow-hidden relative", className)}>
       {/* Search bar overlay */}
-      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 w-[400px]">
+      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 w-[400px]">
         <div className="relative">
           <Input
             type="text"
             placeholder="Search on map"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            className="w-full h-12 pl-4 pr-10 rounded-lg shadow-lg bg-background/95"
+            className="w-full h-12 pl-4 pr-10 rounded-lg shadow-lg bg-background"
             disabled={!ready}
           />
           <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
 
           {/* Suggestions dropdown */}
           {status === "OK" && (
-            <ul className="absolute top-full left-0 right-0 mt-1 bg-background/95 rounded-lg shadow-lg overflow-hidden">
+            <ul className="absolute top-full left-0 right-0 mt-1 bg-background rounded-lg shadow-lg overflow-hidden z-50">
               {data.map(({ place_id, description }) => (
                 <li
                   key={place_id}
@@ -310,26 +212,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
             key={place.id}
             position={place.coordinates}
             title={place.name}
-            onClick={() => {
-              if (placeDetailsRef.current && place.placeId) {
-                const placeDetails = placeDetailsRef.current as HTMLElement & {
-                  configureFromPlaceId?: (placeId: string) => Promise<void>;
-                };
-
-                if (placeDetails.configureFromPlaceId) {
-                  placeDetails.configureFromPlaceId(place.placeId)
-                    .then(() => {
-                      if (placeDetails.parentElement) {
-                        placeDetails.parentElement.style.display = 'block';
-                      }
-                    })
-                    .catch((error) => {
-                      console.error('Error showing place details:', error);
-                    });
-                }
-              }
-              onPinClick?.(place);
-            }}
+            onClick={() => onPinClick?.(place)}
           />
         ))}
       </GoogleMap>
