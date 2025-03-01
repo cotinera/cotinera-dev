@@ -11,7 +11,6 @@ import {
   useGoogleMapsScript,
   useMapCoordinates,
   usePlacesService,
-  usePlacesAutocompleteWrapper,
   GoogleMap,
   MarkerF,
   MAP_CONTAINER_STYLE,
@@ -20,7 +19,7 @@ import {
   type PlaceDetails,
   type PinnedPlace,
 } from "@/lib/google-maps";
-import { getGeocode, getLatLng } from "use-places-autocomplete";
+import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
 
 interface MapViewProps {
   location: string;
@@ -31,24 +30,32 @@ interface MapViewProps {
 }
 
 export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, className }: MapViewProps) {
-  // Initialize hooks and services
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const mapRef = useRef<google.maps.Map | null>(null);
   const placeDetailsRef = useRef<HTMLDivElement | null>(null);
 
-  // State management
   const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
   const [expandedReviews, setExpandedReviews] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
 
-  // Initialize Google Maps services and hooks
   const { isLoaded, loadError } = useGoogleMapsScript();
   const { coordinates, setCoordinates } = useMapCoordinates(location);
   const { placesService, initPlacesService, getPlaceDetails } = usePlacesService();
-  const { ready, value, status, data, setValue, clearSuggestions } = usePlacesAutocompleteWrapper(coordinates);
 
-  // Process pinned places
+  const {
+    ready,
+    value,
+    suggestions: { status, data },
+    setValue,
+    clearSuggestions,
+  } = usePlacesAutocomplete({
+    requestOptions: {
+      types: ['establishment', 'geocode'],
+    },
+    debounce: 300,
+  });
+
   const allPinnedPlaces = useMemo(() => {
     console.log("Pinned places:", pinnedPlaces);
     if (Array.isArray(pinnedPlaces)) return pinnedPlaces;
@@ -56,7 +63,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     return [];
   }, [pinnedPlaces]);
 
-  // Handle fetching place details
   const fetchPlaceDetails = useCallback((placeId: string) => {
     getPlaceDetails(placeId, (place, status) => {
       if (status === google.maps.places.PlacesServiceStatus.OK && place) {
@@ -65,7 +71,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     });
   }, [getPlaceDetails]);
 
-  // Handle search selection
   const handleSearchSelect = useCallback(async (placeId: string) => {
     clearSuggestions();
     setValue("");
@@ -85,7 +90,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     }
   }, [clearSuggestions, setValue, setCoordinates, fetchPlaceDetails]);
 
-  // Handle map click events
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
     const event = e as unknown as { placeId?: string; stop?: () => void };
 
@@ -101,7 +105,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     fetchPlaceDetails(event.placeId);
   }, [fetchPlaceDetails]);
 
-  // Handle pinning places
   const handlePinPlace = useCallback(async () => {
     if (!selectedPlace || !tripId) return;
 
@@ -151,14 +154,12 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     }
   }, [selectedPlace, tripId, coordinates, toast, queryClient]);
 
-  // Initialize map
   const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
     initPlacesService(map);
     map.addListener('click', handleMapClick);
   }, [initPlacesService, handleMapClick]);
 
-  // Handle loading and error states
   if (loadError) {
     return (
       <Card className="p-4 text-center">
@@ -177,7 +178,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
 
   return (
     <Card className={cn("overflow-hidden relative", className)} ref={placeDetailsRef}>
-      {/* Search bar */}
       <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 w-[400px]">
         <div className="relative">
           <Input
@@ -190,7 +190,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
           />
           <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
 
-          {/* Search suggestions */}
           {status === "OK" && (
             <ul className="absolute top-full left-0 right-0 mt-1 bg-background rounded-lg shadow-lg overflow-hidden z-50">
               {data.map(({ place_id, description }) => (
@@ -207,10 +206,8 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         </div>
       </div>
 
-      {/* Place Details Sidebar */}
       {selectedPlace && (
         <div className="absolute top-0 left-0 bottom-0 w-[400px] bg-background shadow-lg z-40 flex flex-col">
-          {/* Sidebar header */}
           <div className="p-4 border-b flex justify-between items-center">
             <h2 className="text-xl font-semibold">{selectedPlace.name}</h2>
             <Button
@@ -222,10 +219,8 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
             </Button>
           </div>
 
-          {/* Sidebar content */}
           <ScrollArea className="flex-1">
             <div className="p-4 space-y-6">
-              {/* Pin button */}
               {tripId && (
                 <Button
                   className="w-full flex items-center justify-center gap-2"
@@ -236,7 +231,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </Button>
               )}
 
-              {/* Photos section */}
               {selectedPlace.photos && selectedPlace.photos.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -260,7 +254,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </div>
               )}
 
-              {/* Photo Gallery Modal */}
               {selectedPhotoIndex !== null && selectedPlace.photos && (
                 <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
                   <Button
@@ -282,7 +275,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </div>
               )}
 
-              {/* Place details */}
               <div className="flex items-start gap-2">
                 <MapPin className="h-5 w-5 mt-0.5 text-muted-foreground" />
                 <p>{selectedPlace.formatted_address}</p>
@@ -321,7 +313,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </div>
               )}
 
-              {/* Opening hours */}
               {selectedPlace.opening_hours && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -336,7 +327,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </div>
               )}
 
-              {/* Reviews */}
               {selectedPlace.reviews && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -372,7 +362,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         </div>
       )}
 
-      {/* Map Component */}
       <GoogleMap
         mapContainerStyle={MAP_CONTAINER_STYLE}
         zoom={13}
@@ -384,7 +373,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         }}
         onLoad={onMapLoad}
       >
-        {/* Main location marker */}
         <MarkerF
           position={coordinates}
           icon={{
@@ -397,7 +385,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
           }}
         />
 
-        {/* Pinned place markers */}
         {allPinnedPlaces.map((place: PinnedPlace) => (
           <MarkerF
             key={place.id}

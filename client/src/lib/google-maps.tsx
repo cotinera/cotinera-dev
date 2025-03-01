@@ -2,7 +2,6 @@
 import { useLoadScript, GoogleMap, MarkerF } from "@react-google-maps/api";
 import { MdRestaurant, MdHotel } from "react-icons/md";
 import { FaLandmark, FaShoppingBag, FaUmbrellaBeach, FaGlassCheers, FaStore, FaTree } from "react-icons/fa";
-import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 
 // Define the required Google Maps libraries
@@ -203,52 +202,6 @@ export const useMapCoordinates = (initialLocation: string) => {
     coordinates,
     setCoordinates,
     geocodeLocation,
-  };
-};
-
-/**
- * Custom hook for managing Places Autocomplete functionality
- * @param coordinates - Current map coordinates for location bias
- * @returns Object containing autocomplete methods and state
- */
-export const usePlacesAutocompleteWrapper = (coordinates: Coordinates) => {
-  // Initialize with the Google Maps script
-  const { isLoaded } = useGoogleMapsScript();
-
-  const {
-    ready,
-    value,
-    suggestions: { status, data },
-    setValue,
-    clearSuggestions,
-  } = usePlacesAutocomplete({
-    debounce: 300,
-    cache: 24 * 60 * 60,
-    requestOptions: useMemo(() => ({
-      ...(isLoaded && coordinates ? {
-        location: new google.maps.LatLng(coordinates.lat, coordinates.lng),
-        radius: 50000, // 50km radius
-      } : {}),
-      types: ['establishment', 'geocode']
-    }), [isLoaded, coordinates]),
-    initOnMount: false, // Don't initialize until the script is loaded
-  });
-
-  // Initialize Places Autocomplete when the script is loaded
-  useEffect(() => {
-    if (isLoaded) {
-      // Force re-initialization of Places Autocomplete
-      window.google?.maps?.places?.Autocomplete;
-    }
-  }, [isLoaded]);
-
-  return {
-    ready: ready && isLoaded,
-    value,
-    status,
-    data,
-    setValue,
-    clearSuggestions,
   };
 };
 
