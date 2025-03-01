@@ -54,7 +54,7 @@ export function MapView({ location, pinnedPlaces = [], onPinClick, className }: 
     libraries,
   });
 
-  // Setup Places Autocomplete
+  // Setup Places Autocomplete with location bias
   const {
     ready,
     value,
@@ -64,6 +64,11 @@ export function MapView({ location, pinnedPlaces = [], onPinClick, className }: 
   } = usePlacesAutocomplete({
     debounce: 300,
     cache: 24 * 60 * 60,
+    requestOptions: useMemo(() => ({
+      location: isLoaded ? new google.maps.LatLng(coordinates.lat, coordinates.lng) : undefined,
+      radius: 50000, // 50km radius
+      types: ['establishment', 'geocode']
+    }), [isLoaded, coordinates]),
   });
 
   const handleSearchSelect = async (placeId: string) => {
