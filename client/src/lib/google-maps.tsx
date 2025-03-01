@@ -212,11 +212,8 @@ export const useMapCoordinates = (initialLocation: string) => {
  * @returns Object containing autocomplete methods and state
  */
 export const usePlacesAutocompleteWrapper = (coordinates: Coordinates) => {
-  // Get the script loading status
-  const { isLoaded } = useLoadScript({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
-    libraries: GOOGLE_MAPS_LIBRARIES,
-  });
+  // Initialize with the Google Maps script
+  const { isLoaded } = useGoogleMapsScript();
 
   const {
     ready,
@@ -228,17 +225,25 @@ export const usePlacesAutocompleteWrapper = (coordinates: Coordinates) => {
     debounce: 300,
     cache: 24 * 60 * 60,
     requestOptions: useMemo(() => ({
-      // Only set location bias if Google Maps is loaded
       ...(isLoaded && coordinates ? {
         location: new google.maps.LatLng(coordinates.lat, coordinates.lng),
         radius: 50000, // 50km radius
       } : {}),
       types: ['establishment', 'geocode']
     }), [isLoaded, coordinates]),
+    initOnMount: false, // Don't initialize until the script is loaded
   });
 
+  // Initialize Places Autocomplete when the script is loaded
+  useEffect(() => {
+    if (isLoaded) {
+      // Force re-initialization of Places Autocomplete
+      window.google?.maps?.places?.Autocomplete;
+    }
+  }, [isLoaded]);
+
   return {
-    ready,
+    ready: ready && isLoaded,
     value,
     status,
     data,
