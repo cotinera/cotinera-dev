@@ -11,7 +11,7 @@ const libraries: ("places")[] = ["places"];
 
 const mapContainerStyle = {
   width: "100%",
-  height: "400px",
+  height: "600px", // Increased from 400px to make it more square-like
   position: "relative" as const,
 };
 
