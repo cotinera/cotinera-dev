@@ -1,7 +1,9 @@
 import { useLoadScript, GoogleMap, MarkerF } from "@react-google-maps/api";
-import { Loader2, Search } from "lucide-react";
+import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
 import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
@@ -33,6 +35,21 @@ interface PinnedPlace {
   coordinates: Coordinates;
 }
 
+interface PlaceDetails {
+  place_id: string;
+  name: string;
+  formatted_address: string;
+  formatted_phone_number?: string;
+  rating?: number;
+  opening_hours?: {
+    weekday_text: string[];
+    isOpen: () => boolean;
+  };
+  website?: string;
+  photos?: google.maps.places.PlacePhoto[];
+  reviews?: google.maps.places.PlaceReview[];
+}
+
 interface MapViewProps {
   location: string;
   pinnedPlaces?: PinnedPlace[] | { places: PinnedPlace[] };
@@ -48,6 +65,8 @@ export function MapView({ location, pinnedPlaces = [], onPinClick, className }: 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
+  const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
+  const placesService = useRef<google.maps.places.PlacesService | null>(null);
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
@@ -71,6 +90,31 @@ export function MapView({ location, pinnedPlaces = [], onPinClick, className }: 
     }), [isLoaded, coordinates]),
   });
 
+  const fetchPlaceDetails = useCallback((placeId: string) => {
+    if (!placesService.current) return;
+
+    const request = {
+      placeId,
+      fields: [
+        'name',
+        'formatted_address',
+        'formatted_phone_number',
+        'rating',
+        'opening_hours',
+        'website',
+        'photos',
+        'reviews',
+        'place_id'
+      ],
+    };
+
+    placesService.current.getDetails(request, (place, status) => {
+      if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+        setSelectedPlace(place as PlaceDetails);
+      }
+    });
+  }, []);
+
   const handleSearchSelect = async (placeId: string) => {
     clearSuggestions();
     setValue(""); // Clear input after selection
@@ -84,6 +128,7 @@ export function MapView({ location, pinnedPlaces = [], onPinClick, className }: 
         mapRef.current.panTo({ lat, lng });
         mapRef.current.setZoom(15);
       }
+      fetchPlaceDetails(placeId);
     } catch (error) {
       console.error("Error selecting place:", error);
     }
@@ -99,6 +144,7 @@ export function MapView({ location, pinnedPlaces = [], onPinClick, className }: 
   // Initialize map
   const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
+    placesService.current = new google.maps.places.PlacesService(map);
   }, []);
 
   useEffect(() => {
@@ -190,6 +236,118 @@ export function MapView({ location, pinnedPlaces = [], onPinClick, className }: 
           )}
         </div>
       </div>
+
+      {/* Place Details Sidebar */}
+      {selectedPlace && (
+        <div className="absolute top-0 right-0 bottom-0 w-[400px] bg-background shadow-lg z-40 flex flex-col">
+          <div className="p-4 border-b flex justify-between items-center">
+            <h2 className="text-xl font-semibold">{selectedPlace.name}</h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSelectedPlace(null)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <ScrollArea className="flex-1">
+            <div className="p-4 space-y-6">
+              {/* Photos */}
+              {selectedPlace.photos && selectedPlace.photos.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="font-semibold">Photos</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    {selectedPlace.photos.slice(0, 4).map((photo, index) => (
+                      <img
+                        key={index}
+                        src={photo.getUrl()}
+                        alt={`Place photo ${index + 1}`}
+                        className="w-full h-32 object-cover rounded-lg"
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Address */}
+              <div className="flex items-start gap-2">
+                <MapPin className="h-5 w-5 mt-0.5 text-muted-foreground" />
+                <p>{selectedPlace.formatted_address}</p>
+              </div>
+
+              {/* Phone */}
+              {selectedPlace.formatted_phone_number && (
+                <div className="flex items-center gap-2">
+                  <Phone className="h-5 w-5 text-muted-foreground" />
+                  <a
+                    href={`tel:${selectedPlace.formatted_phone_number}`}
+                    className="hover:underline"
+                  >
+                    {selectedPlace.formatted_phone_number}
+                  </a>
+                </div>
+              )}
+
+              {/* Website */}
+              {selectedPlace.website && (
+                <div className="flex items-center gap-2">
+                  <Globe className="h-5 w-5 text-muted-foreground" />
+                  <a
+                    href={selectedPlace.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:underline"
+                  >
+                    Website
+                  </a>
+                </div>
+              )}
+
+              {/* Rating */}
+              {selectedPlace.rating && (
+                <div className="flex items-center gap-2">
+                  <Star className="h-5 w-5 text-yellow-400 fill-current" />
+                  <span>{selectedPlace.rating} / 5</span>
+                </div>
+              )}
+
+              {/* Opening Hours */}
+              {selectedPlace.opening_hours && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-muted-foreground" />
+                    <h3 className="font-semibold">Opening Hours</h3>
+                  </div>
+                  <ul className="space-y-1 text-sm">
+                    {selectedPlace.opening_hours.weekday_text.map((hours, index) => (
+                      <li key={index}>{hours}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Reviews */}
+              {selectedPlace.reviews && (
+                <div className="space-y-4">
+                  <h3 className="font-semibold">Reviews</h3>
+                  {selectedPlace.reviews.map((review, index) => (
+                    <div key={index} className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{review.author_name}</span>
+                        <div className="flex items-center">
+                          <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                          <span className="ml-1">{review.rating}</span>
+                        </div>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{review.text}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
 
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
