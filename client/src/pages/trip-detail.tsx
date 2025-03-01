@@ -1,11 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Checklist } from "@/components/checklist";
-import { CalendarView } from "@/components/calendar-view";
-import { MapView } from "@/components/map-view";
-import { ChatMessages } from "@/components/chat-messages";
-import { Loader2, ArrowLeft, Trash2 } from "lucide-react";
 import { ViewToggle } from "@/components/view-toggle";
 import type { Trip } from "@db/schema";
 import { TripHeaderEdit } from "@/components/trip-header-edit";
@@ -13,6 +8,14 @@ import { TripParticipantDetails } from "@/components/trip-participant-details";
 import { TripDestinations } from "@/components/trip-destinations";
 import { TripTimeline } from "@/components/trip-timeline";
 import { MapRouteView } from "@/components/map-route-view";
+import { MapView } from "@/components/map-view";
+import { PinnedPlaces } from "@/components/pinned-places";
+import { Calendar, MapPin } from "lucide-react";
+import { Checklist } from "@/components/checklist";
+import { CalendarView } from "@/components/calendar-view";
+import { MapView as MapViewComp } from "@/components/map-view";
+import { ChatMessages } from "@/components/chat-messages";
+import { Loader2, ArrowLeft, Trash2 } from "lucide-react";
 import type { Destination } from "@db/schema";
 import {
   AlertDialog,
@@ -26,9 +29,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
-import { PinnedPlaces } from "@/components/pinned-places";
 
-// Add PinnedPlace type
+
 interface PinnedPlace {
   id: number;
   name: string;
@@ -69,7 +71,6 @@ export default function TripDetail() {
     enabled: !!tripId,
   });
 
-  // Add query for pinned places
   const { data: pinnedPlaces } = useQuery<PinnedPlace[]>({
     queryKey: [`/api/trips/${tripId}/pinned-places`, currentDestinationId],
     queryFn: async () => {
@@ -196,7 +197,21 @@ export default function TripDetail() {
               </Button>
             </div>
 
-            <div className="absolute right-4 top-0">
+            <div className="absolute right-4 top-0 flex items-center gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setLocation(`/trips/${tripId}/calendar`)}
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Calendar
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setLocation(`/trips/${tripId}/map`)}
+              >
+                <MapPin className="h-4 w-4 mr-2" />
+                Map
+              </Button>
               <TripDestinations tripId={trip.id} />
             </div>
 
@@ -228,14 +243,14 @@ export default function TripDetail() {
 
               <section>
                 {currentDestination ? (
-                  <MapView 
+                  <MapViewComp 
                     location={currentDestination.name || ""}
                     pinnedPlaces={pinnedPlaces || []}
                   />
                 ) : destinations && destinations.length >= 2 ? (
                   <MapRouteView destinations={destinations} />
                 ) : (
-                  <MapView 
+                  <MapViewComp 
                     location={trip.location || ""}
                     pinnedPlaces={pinnedPlaces || []}
                   />

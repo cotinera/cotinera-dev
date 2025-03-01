@@ -8,6 +8,7 @@ import Dashboard from "@/pages/dashboard";
 import SharedTrip from "@/pages/shared-trip";
 import TripDetail from "@/pages/trip-detail";
 import TripCalendar from "@/pages/trip-calendar";
+import TripMap from "@/pages/trip-map";
 import DestinationDetail from "@/pages/destination-detail";
 import AuthPage from "@/pages/auth-page";
 import { ProtectedRoute } from "./lib/protected-route";
@@ -20,6 +21,7 @@ function Router() {
       <ProtectedRoute path="/" component={Dashboard} />
       <ProtectedRoute path="/trips/:id" component={TripDetail} />
       <ProtectedRoute path="/trips/:id/calendar" component={TripCalendar} />
+      <ProtectedRoute path="/trips/:id/map" component={TripMap} />
       <ProtectedRoute path="/trips/:tripId/destinations/:destinationId" component={DestinationDetail} />
       <Route component={NotFound} />
     </Switch>
