@@ -40,9 +40,10 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
 
   const { isLoaded, loadError } = useGoogleMapsScript();
-  const { coordinates, setCoordinates } = useMapCoordinates(location);
+  const { coordinates, setCoordinates, geocodeLocation } = useMapCoordinates(location);
   const { placesService, initPlacesService, getPlaceDetails } = usePlacesService();
 
+  // Initialize Places Autocomplete with proper configuration
   const {
     ready,
     value,
@@ -52,12 +53,13 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   } = usePlacesAutocomplete({
     requestOptions: {
       types: ['establishment', 'geocode'],
+      location: isLoaded ? new google.maps.LatLng(coordinates.lat, coordinates.lng) : undefined,
+      radius: 50000, // 50km radius
     },
     debounce: 300,
   });
 
   const allPinnedPlaces = useMemo(() => {
-    console.log("Pinned places:", pinnedPlaces);
     if (Array.isArray(pinnedPlaces)) return pinnedPlaces;
     if ('places' in pinnedPlaces) return pinnedPlaces.places;
     return [];
@@ -71,11 +73,11 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     });
   }, [getPlaceDetails]);
 
-  const handleSearchSelect = useCallback(async (placeId: string) => {
-    clearSuggestions();
-    setValue("");
-
+  const handleSearchSelect = useCallback(async (placeId: string, description: string) => {
     try {
+      clearSuggestions();
+      setValue(description, false);
+
       const results = await getGeocode({ placeId });
       const { lat, lng } = await getLatLng(results[0]);
 
@@ -84,11 +86,16 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         mapRef.current.panTo({ lat, lng });
         mapRef.current.setZoom(15);
       }
+
       fetchPlaceDetails(placeId);
     } catch (error) {
       console.error("Error selecting place:", error);
     }
   }, [clearSuggestions, setValue, setCoordinates, fetchPlaceDetails]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setValue(e.target.value);
+  };
 
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
     const event = e as unknown as { placeId?: string; stop?: () => void };
@@ -184,7 +191,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
             type="text"
             placeholder="Search on map"
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={handleInputChange}
             className="w-full h-12 pl-4 pr-10 rounded-lg shadow-lg bg-background"
             disabled={!ready}
           />
@@ -195,7 +202,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
               {data.map(({ place_id, description }) => (
                 <li
                   key={place_id}
-                  onClick={() => handleSearchSelect(place_id)}
+                  onClick={() => handleSearchSelect(place_id, description)}
                   className="px-4 py-2 hover:bg-accent cursor-pointer"
                 >
                   {description}
@@ -233,7 +240,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
               <MapPin className="h-6 w-6 text-primary" />
               <span className="text-xs">Directions</span>
             </button>
-            <button 
+            <button
               className="flex flex-col items-center justify-center p-2 hover:bg-accent rounded-lg gap-1"
               onClick={tripId ? handlePinPlace : undefined}
             >
