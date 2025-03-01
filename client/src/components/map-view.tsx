@@ -109,6 +109,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
 
   const handleSearchSelect = async (placeId: string) => {
     clearSuggestions();
+    setValue(""); // Clear input after selection
 
     try {
       const results = await getGeocode({ placeId });
@@ -124,24 +125,12 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     }
   };
 
-  // Fetch all pinned places for the trip if not provided
-  const { data: fetchedPinnedPlaces } = useQuery({
-    queryKey: [`/api/trips/${tripId}/pinned-places`],
-    queryFn: async () => {
-      if (Array.isArray(pinnedPlaces) || 'places' in pinnedPlaces) return null;
-      const res = await fetch(`/api/trips/${tripId}/pinned-places`);
-      if (!res.ok) throw new Error("Failed to fetch pinned places");
-      return res.json();
-    },
-    enabled: tripId > 0 && !Array.isArray(pinnedPlaces) && !('places' in pinnedPlaces),
-  });
-
   // Combine provided and fetched pinned places
   const allPinnedPlaces = useMemo(() => {
     if (Array.isArray(pinnedPlaces)) return pinnedPlaces;
     if ('places' in pinnedPlaces) return pinnedPlaces.places;
-    return fetchedPinnedPlaces?.places || [];
-  }, [pinnedPlaces, fetchedPinnedPlaces]);
+    return [];
+  }, [pinnedPlaces]);
 
   // Initialize map and place details
   const onMapLoad = useCallback((map: google.maps.Map) => {
@@ -278,14 +267,14 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
             placeholder="Search on map"
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            className="w-full h-12 pl-4 pr-10 rounded-lg shadow-lg bg-background"
+            className="w-full h-12 pl-4 pr-10 rounded-lg shadow-lg bg-background/95"
             disabled={!ready}
           />
           <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
 
           {/* Suggestions dropdown */}
           {status === "OK" && (
-            <ul className="absolute top-full left-0 right-0 mt-1 bg-background rounded-lg shadow-lg overflow-hidden">
+            <ul className="absolute top-full left-0 right-0 mt-1 bg-background/95 rounded-lg shadow-lg overflow-hidden">
               {data.map(({ place_id, description }) => (
                 <li
                   key={place_id}
