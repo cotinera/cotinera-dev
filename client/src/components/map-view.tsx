@@ -64,15 +64,16 @@ interface MapViewProps {
 export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, className }: MapViewProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const placesService = useRef<google.maps.places.PlacesService | null>(null);
+
   const [coordinates, setCoordinates] = useState<Coordinates>({
     lat: 37.7749,
     lng: -122.4194,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const mapRef = useRef<google.maps.Map | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
-  const placesService = useRef<google.maps.places.PlacesService | null>(null);
   const [expandedReviews, setExpandedReviews] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
 
@@ -96,6 +97,12 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
       types: ['establishment', 'geocode']
     }), [isLoaded, coordinates]),
   });
+
+  const allPinnedPlaces = useMemo(() => {
+    if (Array.isArray(pinnedPlaces)) return pinnedPlaces;
+    if ('places' in pinnedPlaces) return pinnedPlaces.places;
+    return [];
+  }, [pinnedPlaces]);
 
   const fetchPlaceDetails = useCallback((placeId: string) => {
     if (!placesService.current) return;
@@ -123,7 +130,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     });
   }, []);
 
-  const handleSearchSelect = async (placeId: string) => {
+  const handleSearchSelect = useCallback(async (placeId: string) => {
     clearSuggestions();
     setValue(""); // Clear input after selection
 
@@ -140,49 +147,17 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     } catch (error) {
       console.error("Error selecting place:", error);
     }
-  };
+  }, [clearSuggestions, setValue, fetchPlaceDetails]);
 
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
     const event = e as unknown as { placeId?: string };
 
     if (!event.placeId || !placesService.current) return;
 
-    const request = {
-      placeId: event.placeId,
-      fields: [
-        'name',
-        'formatted_address',
-        'formatted_phone_number',
-        'rating',
-        'opening_hours',
-        'website',
-        'photos',
-        'reviews',
-        'place_id',
-        'geometry'
-      ],
-    };
+    fetchPlaceDetails(event.placeId);
+  }, [fetchPlaceDetails]);
 
-    placesService.current.getDetails(request, (place, status) => {
-      if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-        setSelectedPlace(place as PlaceDetails);
-      }
-    });
-  }, []);
-
-
-  const allPinnedPlaces = useMemo(() => {
-    if (Array.isArray(pinnedPlaces)) return pinnedPlaces;
-    if ('places' in pinnedPlaces) return pinnedPlaces.places;
-    return [];
-  }, [pinnedPlaces]);
-
-  const onMapLoad = useCallback((map: google.maps.Map) => {
-    mapRef.current = map;
-    placesService.current = new google.maps.places.PlacesService(map);
-  }, []);
-
-  const handlePinPlace = async () => {
+  const handlePinPlace = useCallback(async () => {
     if (!selectedPlace || !tripId) return;
 
     try {
@@ -229,8 +204,14 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         description: "Failed to pin place to your trip",
       });
     }
-  };
+  }, [selectedPlace, tripId, coordinates, toast, queryClient]);
 
+  const onMapLoad = useCallback((map: google.maps.Map) => {
+    mapRef.current = map;
+    placesService.current = new google.maps.places.PlacesService(map);
+  }, []);
+
+  // Effect for initial geocoding
   useEffect(() => {
     async function geocodeLocation() {
       try {
@@ -265,6 +246,14 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     }
   }, [location, isLoaded]);
 
+  // Effect for map click listener
+  useEffect(() => {
+    if (mapRef.current) {
+      google.maps.event.clearListeners(mapRef.current, 'click');
+      mapRef.current.addListener('click', handleMapClick);
+    }
+  }, [handleMapClick]);
+
   if (loadError) {
     return (
       <Card className="p-4 text-center">
@@ -288,14 +277,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
       </Card>
     );
   }
-
-  // Add click listener to map
-  useEffect(() => {
-    if (mapRef.current) {
-      google.maps.event.clearListeners(mapRef.current, 'click');
-      mapRef.current.addListener('click', handleMapClick);
-    }
-  }, [handleMapClick]);
 
   return (
     <Card className={cn("overflow-hidden relative", className)}>
