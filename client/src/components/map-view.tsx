@@ -1,10 +1,12 @@
 import { useLoadScript, GoogleMap, MarkerF } from "@react-google-maps/api";
-import { Loader2 } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { CATEGORY_ICONS, PlaceCategory } from "./pinned-places";
+import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
 
 // Libraries for Google Maps
 const libraries: ("places")[] = ["places"];
@@ -79,6 +81,40 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     libraries,
     version: "beta" // Use beta version for Places UI components
   });
+
+  // Setup Places Autocomplete
+  const {
+    ready,
+    value,
+    suggestions: { status, data },
+    setValue,
+    clearSuggestions,
+  } = usePlacesAutocomplete({
+    requestOptions: {
+      /* Define search area. The search will be centered on the current map location */
+      location: new google.maps.LatLng(coordinates.lat, coordinates.lng),
+      radius: 100 * 1000, // 100km radius
+    },
+    debounce: 300,
+  });
+
+  const handleSearchSelect = async (placeId: string) => {
+    // Close the suggestions
+    clearSuggestions();
+
+    try {
+      const results = await getGeocode({ placeId });
+      const { lat, lng } = await getLatLng(results[0]);
+
+      setCoordinates({ lat, lng });
+      if (mapRef.current) {
+        mapRef.current.panTo({ lat, lng });
+        mapRef.current.setZoom(15);
+      }
+    } catch (error) {
+      console.error("Error selecting place:", error);
+    }
+  };
 
   // Fetch all pinned places for the trip if not provided
   const { data: fetchedPinnedPlaces } = useQuery({
@@ -225,7 +261,37 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   }
 
   return (
-    <Card className={cn("overflow-hidden", className)}>
+    <Card className={cn("overflow-hidden relative", className)}>
+      {/* Search bar overlay */}
+      <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 w-[400px]">
+        <div className="relative">
+          <Input
+            type="text"
+            placeholder="Search on map"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="w-full h-12 pl-4 pr-10 rounded-lg shadow-lg bg-background"
+            disabled={!ready}
+          />
+          <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
+
+          {/* Suggestions dropdown */}
+          {status === "OK" && (
+            <ul className="absolute top-full left-0 right-0 mt-1 bg-background rounded-lg shadow-lg overflow-hidden">
+              {data.map(({ place_id, description }) => (
+                <li
+                  key={place_id}
+                  onClick={() => handleSearchSelect(place_id)}
+                  className="px-4 py-2 hover:bg-accent cursor-pointer"
+                >
+                  {description}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
       <GoogleMap
         mapContainerStyle={mapContainerStyle}
         zoom={13}
