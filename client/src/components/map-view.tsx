@@ -99,11 +99,11 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     return fetchedPinnedPlaces?.places || [];
   }, [pinnedPlaces, fetchedPinnedPlaces]);
 
-  // Initialize map and place details when map loads
+  // Initialize map and place details
   const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
 
-    // Create a container for the place details
+    // Create a container for place details
     const container = document.createElement('div');
     container.style.position = 'absolute';
     container.style.top = '0';
@@ -115,10 +115,8 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     container.style.display = 'none';
     map.getDiv().appendChild(container);
 
-    // Create and configure place details element
+    // Create place details element
     const placeDetailsElement = document.createElement('gmp-place-details') as HTMLElement & {
-      place?: string;
-      full?: boolean;
       configureFromPlaceId?: (placeId: string) => Promise<void>;
     };
 
@@ -131,7 +129,10 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     // Add click event listener to the map
     map.addListener('click', async (e: google.maps.MapMouseEvent) => {
       const event = e as unknown as { placeId?: string; stop?: () => void };
-      event.stop?.(); // Prevent default click behavior
+
+      if (event.stop) {
+        event.stop(); // Prevent default click behavior
+      }
 
       if (!placeDetailsRef.current || !event.placeId) {
         if (placeDetailsRef.current?.parentElement) {
@@ -141,14 +142,10 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
       }
 
       try {
-        const placeDetails = placeDetailsRef.current as HTMLElement & {
-          configureFromPlaceId?: (placeId: string) => Promise<void>;
-        };
-
-        if (placeDetails.configureFromPlaceId) {
-          await placeDetails.configureFromPlaceId(event.placeId);
-          if (placeDetails.parentElement) {
-            placeDetails.parentElement.style.display = 'block';
+        if (placeDetailsRef.current && typeof (placeDetailsRef.current as any).configureFromPlaceId === 'function') {
+          await (placeDetailsRef.current as any).configureFromPlaceId(event.placeId);
+          if (placeDetailsRef.current.parentElement) {
+            placeDetailsRef.current.parentElement.style.display = 'block';
           }
         }
       } catch (error) {
@@ -245,15 +242,11 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
             title={place.name}
             onClick={async () => {
               if (placeDetailsRef.current && place.placeId) {
-                const placeDetails = placeDetailsRef.current as HTMLElement & {
-                  configureFromPlaceId?: (placeId: string) => Promise<void>;
-                };
-
                 try {
-                  if (placeDetails.configureFromPlaceId) {
-                    await placeDetails.configureFromPlaceId(place.placeId);
-                    if (placeDetails.parentElement) {
-                      placeDetails.parentElement.style.display = 'block';
+                  if (typeof (placeDetailsRef.current as any).configureFromPlaceId === 'function') {
+                    await (placeDetailsRef.current as any).configureFromPlaceId(place.placeId);
+                    if (placeDetailsRef.current.parentElement) {
+                      placeDetailsRef.current.parentElement.style.display = 'block';
                     }
                   }
                 } catch (error) {
