@@ -1,5 +1,5 @@
 import { useLoadScript, GoogleMap, MarkerF } from "@react-google-maps/api";
-import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X } from "lucide-react";
+import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus, ChevronDown, ChevronUp, Image } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,7 @@ interface PlaceDetails {
   website?: string;
   photos?: google.maps.places.PlacePhoto[];
   reviews?: google.maps.places.PlaceReview[];
+  geometry?: google.maps.places.PlaceGeometry;
 }
 
 interface MapViewProps {
@@ -67,6 +68,8 @@ export function MapView({ location, pinnedPlaces = [], onPinClick, className }: 
   const mapRef = useRef<google.maps.Map | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
   const placesService = useRef<google.maps.places.PlacesService | null>(null);
+  const [expandedReviews, setExpandedReviews] = useState(false);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
@@ -104,7 +107,8 @@ export function MapView({ location, pinnedPlaces = [], onPinClick, className }: 
         'website',
         'photos',
         'reviews',
-        'place_id'
+        'place_id',
+        'geometry'
       ],
     };
 
@@ -146,6 +150,38 @@ export function MapView({ location, pinnedPlaces = [], onPinClick, className }: 
     mapRef.current = map;
     placesService.current = new google.maps.places.PlacesService(map);
   }, []);
+
+  const handlePinPlace = async () => {
+    if (!selectedPlace) return;
+
+    try {
+      const response = await fetch('/api/pinned-places', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: selectedPlace.name,
+          placeId: selectedPlace.place_id,
+          address: selectedPlace.formatted_address,
+          coordinates: {
+            lat: coordinates.lat,
+            lng: coordinates.lng,
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to pin place');
+      }
+
+      // Show success message or update UI
+      alert('Place pinned successfully!');
+    } catch (error) {
+      console.error('Error pinning place:', error);
+      alert('Failed to pin place');
+    }
+  };
 
   useEffect(() => {
     async function geocodeLocation() {
@@ -252,19 +288,57 @@ export function MapView({ location, pinnedPlaces = [], onPinClick, className }: 
           </div>
           <ScrollArea className="flex-1">
             <div className="p-4 space-y-6">
+              {/* Pin Place Button */}
+              <Button
+                className="w-full flex items-center justify-center gap-2"
+                onClick={handlePinPlace}
+              >
+                <Plus className="h-4 w-4" />
+                Pin this place
+              </Button>
+
               {/* Photos */}
               {selectedPlace.photos && selectedPlace.photos.length > 0 && (
                 <div className="space-y-2">
-                  <h3 className="font-semibold">Photos</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold">Photos</h3>
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedPhotoIndex(0)}>
+                      <Image className="h-4 w-4 mr-2" />
+                      View all
+                    </Button>
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
                     {selectedPlace.photos.slice(0, 4).map((photo, index) => (
                       <img
                         key={index}
                         src={photo.getUrl()}
                         alt={`Place photo ${index + 1}`}
-                        className="w-full h-32 object-cover rounded-lg"
+                        className="w-full h-32 object-cover rounded-lg cursor-pointer"
+                        onClick={() => setSelectedPhotoIndex(index)}
                       />
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Photo Gallery Modal */}
+              {selectedPhotoIndex !== null && selectedPlace.photos && (
+                <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-4 right-4 text-white"
+                    onClick={() => setSelectedPhotoIndex(null)}
+                  >
+                    <X className="h-6 w-6" />
+                  </Button>
+                  <img
+                    src={selectedPlace.photos[selectedPhotoIndex].getUrl({ maxWidth: 1200, maxHeight: 800 })}
+                    alt={`Photo ${selectedPhotoIndex + 1}`}
+                    className="max-w-[90vw] max-h-[90vh] object-contain"
+                  />
+                  <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white">
+                    {selectedPhotoIndex + 1} / {selectedPlace.photos.length}
                   </div>
                 </div>
               )}
@@ -329,8 +403,21 @@ export function MapView({ location, pinnedPlaces = [], onPinClick, className }: 
               {/* Reviews */}
               {selectedPlace.reviews && (
                 <div className="space-y-4">
-                  <h3 className="font-semibold">Reviews</h3>
-                  {selectedPlace.reviews.map((review, index) => (
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold">Reviews</h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setExpandedReviews(!expandedReviews)}
+                    >
+                      {expandedReviews ? (
+                        <ChevronUp className="h-4 w-4" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  {(expandedReviews ? selectedPlace.reviews : selectedPlace.reviews.slice(0, 2)).map((review, index) => (
                     <div key={index} className="space-y-2">
                       <div className="flex items-center gap-2">
                         <span className="font-medium">{review.author_name}</span>
