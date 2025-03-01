@@ -122,7 +122,7 @@ interface PinnedPlace {
     lat: number;
     lng: number;
   };
-  placeId?: string; 
+  placeId?: string;
   tripId: number;
   destinationId?: number;
   phone?: string;
@@ -481,6 +481,16 @@ export function PinnedPlaces({
     setIsPlaceDetailsOpen(true);
   };
 
+  const handleEditClick = (e: React.MouseEvent, place: PinnedPlace) => {
+    e.stopPropagation(); 
+    setPlaceToEdit(place);
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, place: PinnedPlace) => {
+    e.stopPropagation(); 
+    setPlaceToDelete(place);
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -621,7 +631,7 @@ export function PinnedPlaces({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setPlaceToEdit(place)}
+                      onClick={(e) => handleEditClick(e, place)}
                       className="p-0 h-8 w-8 text-muted-foreground hover:text-primary"
                     >
                       <Pencil className="h-4 w-4" />
@@ -629,7 +639,7 @@ export function PinnedPlaces({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setPlaceToDelete(place)}
+                      onClick={(e) => handleDeleteClick(e, place)}
                       className="p-0 h-8 w-8 text-destructive hover:text-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
