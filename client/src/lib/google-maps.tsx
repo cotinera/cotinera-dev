@@ -212,6 +212,12 @@ export const useMapCoordinates = (initialLocation: string) => {
  * @returns Object containing autocomplete methods and state
  */
 export const usePlacesAutocompleteWrapper = (coordinates: Coordinates) => {
+  // Get the script loading status
+  const { isLoaded } = useLoadScript({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
+    libraries: GOOGLE_MAPS_LIBRARIES,
+  });
+
   const {
     ready,
     value,
@@ -222,10 +228,13 @@ export const usePlacesAutocompleteWrapper = (coordinates: Coordinates) => {
     debounce: 300,
     cache: 24 * 60 * 60,
     requestOptions: useMemo(() => ({
-      location: new google.maps.LatLng(coordinates.lat, coordinates.lng),
-      radius: 50000, // 50km radius
+      // Only set location bias if Google Maps is loaded
+      ...(isLoaded && coordinates ? {
+        location: new google.maps.LatLng(coordinates.lat, coordinates.lng),
+        radius: 50000, // 50km radius
+      } : {}),
       types: ['establishment', 'geocode']
-    }), [coordinates]),
+    }), [isLoaded, coordinates]),
   });
 
   return {
