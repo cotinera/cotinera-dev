@@ -113,7 +113,11 @@ export const usePlacesService = () => {
     placeId: string,
     callback: (place: PlaceDetails | null, status: google.maps.places.PlacesServiceStatus) => void
   ) => {
-    if (!placesService.current) return;
+    if (!placesService.current) {
+      console.error('Places service not initialized');
+      callback(null, google.maps.places.PlacesServiceStatus.ERROR);
+      return;
+    }
 
     const request = {
       placeId,
@@ -135,6 +139,7 @@ export const usePlacesService = () => {
       if (status === google.maps.places.PlacesServiceStatus.OK && place) {
         callback(place as PlaceDetails, status);
       } else {
+        console.error('Failed to get place details:', status);
         callback(null, status);
       }
     });
@@ -178,7 +183,7 @@ export const useMapCoordinates = (initialLocation: string) => {
         setCoordinates({ lat, lng });
         return { lat, lng };
       }
-      
+
       console.warn("Location not found:", data.status);
       return null;
     } catch (err) {
