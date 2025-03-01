@@ -1,96 +1,26 @@
-import { useLoadScript, GoogleMap, MarkerF } from "@react-google-maps/api";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus, ChevronDown, ChevronUp, Image } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
-import { MdRestaurant, MdHotel } from "react-icons/md";
-import { FaLandmark, FaShoppingBag, FaUmbrellaBeach, FaGlassCheers, FaStore, FaTree } from "react-icons/fa";
-
-// Category icons mapping
-export const CATEGORY_ICONS = {
-  restaurant: MdRestaurant,
-  hotel: MdHotel,
-  attraction: FaLandmark,
-  shopping: FaShoppingBag,
-  beach: FaUmbrellaBeach,
-  nightlife: FaGlassCheers,
-  store: FaStore,
-  park: FaTree,
-} as const;
-
-export type PlaceCategory = keyof typeof CATEGORY_ICONS;
-
-// Function to generate SVG icon for a category
-const getCategoryIcon = (category: PlaceCategory = 'attraction') => {
-  const IconComponent = CATEGORY_ICONS[category];
-  const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-    ${IconComponent ? IconComponent({}).props.children : ''}
-  </svg>`;
-
-  return {
-    url: `data:image/svg+xml;base64,${btoa(svgString)}`,
-    scaledSize: new google.maps.Size(32, 32),
-    anchor: new google.maps.Point(16, 16),
-    fillColor: "#1E88E5",
-    fillOpacity: 1,
-    strokeWeight: 2,
-    strokeColor: "#FFFFFF",
-  };
-};
-
-// Libraries for Google Maps
-const libraries: ("places")[] = ["places"];
-
-const mapContainerStyle = {
-  width: "100%",
-  height: "600px",
-  position: "relative" as const,
-};
-
-const defaultOptions = {
-  disableDefaultUI: true,
-  zoomControl: true,
-  scrollwheel: true,
-  clickableIcons: true,
-};
-
-interface Coordinates {
-  lat: number;
-  lng: number;
-}
-
-interface PinnedPlace {
-  id: number;
-  name: string;
-  coordinates: {
-    lat: number;
-    lng: number;
-  };
-  category?: PlaceCategory;
-  placeId?: string;
-}
-
-interface PlaceDetails {
-  place_id: string;
-  name: string;
-  formatted_address: string;
-  formatted_phone_number?: string;
-  rating?: number;
-  opening_hours?: {
-    weekday_text: string[];
-    isOpen: () => boolean;
-  };
-  website?: string;
-  photos?: google.maps.places.PlacePhoto[];
-  reviews?: google.maps.places.PlaceReview[];
-  geometry?: google.maps.places.PlaceGeometry;
-}
+import { cn } from "@/lib/utils";
+import {
+  useGoogleMapsScript,
+  useMapCoordinates,
+  usePlacesService,
+  usePlacesAutocompleteWrapper,
+  GoogleMap,
+  MarkerF,
+  MAP_CONTAINER_STYLE,
+  DEFAULT_MAP_OPTIONS,
+  getCategoryIcon,
+  type PlaceDetails,
+  type PinnedPlace,
+} from "@/lib/google-maps";
+import { getGeocode, getLatLng } from "use-places-autocomplete";
 
 interface MapViewProps {
   location: string;
@@ -101,44 +31,24 @@ interface MapViewProps {
 }
 
 export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, className }: MapViewProps) {
+  // Initialize hooks and services
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const mapRef = useRef<google.maps.Map | null>(null);
-  const placesService = useRef<google.maps.places.PlacesService | null>(null);
   const placeDetailsRef = useRef<HTMLDivElement | null>(null);
 
-
-  const [coordinates, setCoordinates] = useState<Coordinates>({
-    lat: 37.7749,
-    lng: -122.4194,
-  });
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // State management
   const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
   const [expandedReviews, setExpandedReviews] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
 
-  const { isLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
-    libraries,
-  });
+  // Initialize Google Maps services and hooks
+  const { isLoaded, loadError } = useGoogleMapsScript();
+  const { coordinates, setCoordinates } = useMapCoordinates(location);
+  const { placesService, initPlacesService, getPlaceDetails } = usePlacesService();
+  const { ready, value, status, data, setValue, clearSuggestions } = usePlacesAutocompleteWrapper(coordinates);
 
-  const {
-    ready,
-    value,
-    suggestions: { status, data },
-    setValue,
-    clearSuggestions,
-  } = usePlacesAutocomplete({
-    debounce: 300,
-    cache: 24 * 60 * 60,
-    requestOptions: useMemo(() => ({
-      location: isLoaded ? new google.maps.LatLng(coordinates.lat, coordinates.lng) : undefined,
-      radius: 50000, // 50km radius
-      types: ['establishment', 'geocode']
-    }), [isLoaded, coordinates]),
-  });
-
+  // Process pinned places
   const allPinnedPlaces = useMemo(() => {
     console.log("Pinned places:", pinnedPlaces);
     if (Array.isArray(pinnedPlaces)) return pinnedPlaces;
@@ -146,35 +56,19 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     return [];
   }, [pinnedPlaces]);
 
+  // Handle fetching place details
   const fetchPlaceDetails = useCallback((placeId: string) => {
-    if (!placesService.current) return;
-
-    const request = {
-      placeId,
-      fields: [
-        'name',
-        'formatted_address',
-        'formatted_phone_number',
-        'rating',
-        'opening_hours',
-        'website',
-        'photos',
-        'reviews',
-        'place_id',
-        'geometry'
-      ],
-    };
-
-    placesService.current.getDetails(request, (place, status) => {
+    getPlaceDetails(placeId, (place, status) => {
       if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-        setSelectedPlace(place as PlaceDetails);
+        setSelectedPlace(place);
       }
     });
-  }, []);
+  }, [getPlaceDetails]);
 
+  // Handle search selection
   const handleSearchSelect = useCallback(async (placeId: string) => {
     clearSuggestions();
-    setValue(""); // Clear input after selection
+    setValue("");
 
     try {
       const results = await getGeocode({ placeId });
@@ -189,8 +83,9 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     } catch (error) {
       console.error("Error selecting place:", error);
     }
-  }, [clearSuggestions, setValue, fetchPlaceDetails]);
+  }, [clearSuggestions, setValue, setCoordinates, fetchPlaceDetails]);
 
+  // Handle map click events
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
     const event = e as unknown as { placeId?: string; stop?: () => void };
 
@@ -198,16 +93,15 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
       event.stop();
     }
 
-    if (!event.placeId || !placesService.current) {
-      if (placeDetailsRef.current?.parentElement) {
-        placeDetailsRef.current.parentElement.style.display = 'none';
-      }
+    if (!event.placeId) {
+      setSelectedPlace(null);
       return;
     }
 
     fetchPlaceDetails(event.placeId);
   }, [fetchPlaceDetails]);
 
+  // Handle pinning places
   const handlePinPlace = useCallback(async () => {
     if (!selectedPlace || !tripId) return;
 
@@ -246,7 +140,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         description: "Place has been pinned to your trip",
       });
 
-      // Use proper invalidation format
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/pinned-places`] });
     } catch (error) {
       console.error('Error pinning place:', error);
@@ -258,57 +151,14 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     }
   }, [selectedPlace, tripId, coordinates, toast, queryClient]);
 
+  // Initialize map
   const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
-    placesService.current = new google.maps.places.PlacesService(map);
+    initPlacesService(map);
+    map.addListener('click', handleMapClick);
+  }, [initPlacesService, handleMapClick]);
 
-    // Add click listener to handle place clicks
-    google.maps.event.addListener(map, 'click', handleMapClick);
-  }, [handleMapClick]);
-
-  // Effect for initial geocoding
-  useEffect(() => {
-    async function geocodeLocation() {
-      try {
-        const response = await fetch(
-          `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
-            location
-          )}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to geocode location");
-        }
-
-        const data = await response.json();
-
-        if (data.status === "OK" && data.results?.[0]?.geometry?.location) {
-          const { lat, lng } = data.results[0].geometry.location;
-          setCoordinates({ lat, lng });
-        } else {
-          console.warn("Location not found:", data.status);
-        }
-      } catch (err) {
-        console.error("Geocoding error:", err);
-        setError("Failed to load location");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    if (location && isLoaded) {
-      geocodeLocation();
-    }
-  }, [location, isLoaded]);
-
-  // Effect for map click listener - Removed as listener is now added in onMapLoad
-  //useEffect(() => {
-  //  if (mapRef.current) {
-  //    google.maps.event.clearListeners(mapRef.current, 'click');
-  //    mapRef.current.addListener('click', handleMapClick);
-  //  }
-  //}, [handleMapClick]);
-
+  // Handle loading and error states
   if (loadError) {
     return (
       <Card className="p-4 text-center">
@@ -317,7 +167,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     );
   }
 
-  if (!isLoaded || isLoading) {
+  if (!isLoaded) {
     return (
       <Card className="p-4 flex items-center justify-center h-[400px]">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -325,16 +175,9 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     );
   }
 
-  if (error) {
-    return (
-      <Card className="p-4 text-center">
-        <p className="text-destructive">{error}</p>
-      </Card>
-    );
-  }
-
   return (
     <Card className={cn("overflow-hidden relative", className)} ref={placeDetailsRef}>
+      {/* Search bar */}
       <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 w-[400px]">
         <div className="relative">
           <Input
@@ -347,6 +190,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
           />
           <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
 
+          {/* Search suggestions */}
           {status === "OK" && (
             <ul className="absolute top-full left-0 right-0 mt-1 bg-background rounded-lg shadow-lg overflow-hidden z-50">
               {data.map(({ place_id, description }) => (
@@ -363,8 +207,10 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         </div>
       </div>
 
+      {/* Place Details Sidebar */}
       {selectedPlace && (
         <div className="absolute top-0 left-0 bottom-0 w-[400px] bg-background shadow-lg z-40 flex flex-col">
+          {/* Sidebar header */}
           <div className="p-4 border-b flex justify-between items-center">
             <h2 className="text-xl font-semibold">{selectedPlace.name}</h2>
             <Button
@@ -375,8 +221,11 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
               <X className="h-4 w-4" />
             </Button>
           </div>
+
+          {/* Sidebar content */}
           <ScrollArea className="flex-1">
             <div className="p-4 space-y-6">
+              {/* Pin button */}
               {tripId && (
                 <Button
                   className="w-full flex items-center justify-center gap-2"
@@ -387,6 +236,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </Button>
               )}
 
+              {/* Photos section */}
               {selectedPlace.photos && selectedPlace.photos.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -410,6 +260,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </div>
               )}
 
+              {/* Photo Gallery Modal */}
               {selectedPhotoIndex !== null && selectedPlace.photos && (
                 <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
                   <Button
@@ -431,6 +282,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </div>
               )}
 
+              {/* Place details */}
               <div className="flex items-start gap-2">
                 <MapPin className="h-5 w-5 mt-0.5 text-muted-foreground" />
                 <p>{selectedPlace.formatted_address}</p>
@@ -469,6 +321,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </div>
               )}
 
+              {/* Opening hours */}
               {selectedPlace.opening_hours && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -483,6 +336,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </div>
               )}
 
+              {/* Reviews */}
               {selectedPlace.reviews && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -518,17 +372,19 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         </div>
       )}
 
+      {/* Map Component */}
       <GoogleMap
-        mapContainerStyle={mapContainerStyle}
+        mapContainerStyle={MAP_CONTAINER_STYLE}
         zoom={13}
         center={coordinates}
         options={{
-          ...defaultOptions,
+          ...DEFAULT_MAP_OPTIONS,
           clickableIcons: true,
           streetViewControl: false,
         }}
         onLoad={onMapLoad}
       >
+        {/* Main location marker */}
         <MarkerF
           position={coordinates}
           icon={{
@@ -541,6 +397,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
           }}
         />
 
+        {/* Pinned place markers */}
         {allPinnedPlaces.map((place: PinnedPlace) => (
           <MarkerF
             key={place.id}
