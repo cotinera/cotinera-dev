@@ -26,6 +26,24 @@ export const CATEGORY_ICONS = {
 
 export type PlaceCategory = keyof typeof CATEGORY_ICONS;
 
+// Function to generate SVG icon for a category
+const getCategoryIcon = (category: PlaceCategory = 'attraction') => {
+  const IconComponent = CATEGORY_ICONS[category];
+  const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+    ${IconComponent ? IconComponent({}).props.children : ''}
+  </svg>`;
+
+  return {
+    url: `data:image/svg+xml;base64,${btoa(svgString)}`,
+    scaledSize: new google.maps.Size(32, 32),
+    anchor: new google.maps.Point(16, 16),
+    fillColor: "#1E88E5",
+    fillOpacity: 1,
+    strokeWeight: 2,
+    strokeColor: "#FFFFFF",
+  };
+};
+
 // Libraries for Google Maps
 const libraries: ("places")[] = ["places"];
 
@@ -50,7 +68,10 @@ interface Coordinates {
 interface PinnedPlace {
   id: number;
   name: string;
-  coordinates: Coordinates;
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
   category?: PlaceCategory;
   placeId?: string;
 }
@@ -78,24 +99,6 @@ interface MapViewProps {
   onPinClick?: (place: PinnedPlace) => void;
   className?: string;
 }
-
-// Function to generate SVG icon for a category
-const getCategoryIcon = (category: PlaceCategory = 'attraction') => {
-  const IconComponent = CATEGORY_ICONS[category];
-  const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-    ${IconComponent ? IconComponent({}).props.children : ''}
-  </svg>`;
-
-  return {
-    url: `data:image/svg+xml;base64,${btoa(svgString)}`,
-    scaledSize: new google.maps.Size(32, 32),
-    anchor: new google.maps.Point(16, 16),
-    fillColor: "#1E88E5",
-    fillOpacity: 1,
-    strokeWeight: 2,
-    strokeColor: "#FFFFFF",
-  };
-};
 
 export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, className }: MapViewProps) {
   const { toast } = useToast();
@@ -135,6 +138,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   });
 
   const allPinnedPlaces = useMemo(() => {
+    console.log("Pinned places:", pinnedPlaces);
     if (Array.isArray(pinnedPlaces)) return pinnedPlaces;
     if ('places' in pinnedPlaces) return pinnedPlaces.places;
     return [];

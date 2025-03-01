@@ -22,7 +22,7 @@ export default function TripMap() {
     enabled: !!tripId,
   });
 
-  const { data: pinnedPlaces } = useQuery({
+  const { data: pinnedPlacesData } = useQuery({
     queryKey: [`/api/trips/${tripId}/pinned-places`],
     queryFn: async () => {
       const res = await fetch(`/api/trips/${tripId}/pinned-places`);
@@ -90,7 +90,7 @@ export default function TripMap() {
             <MapView 
               location={trip.location || ""} 
               tripId={trip.id} 
-              pinnedPlaces={pinnedPlaces || []}
+              pinnedPlaces={pinnedPlacesData?.places || []}
             />
           </section>
 
