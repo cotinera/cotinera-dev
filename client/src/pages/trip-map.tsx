@@ -22,6 +22,16 @@ export default function TripMap() {
     enabled: !!tripId,
   });
 
+  const { data: pinnedPlaces } = useQuery({
+    queryKey: [`/api/trips/${tripId}/pinned-places`],
+    queryFn: async () => {
+      const res = await fetch(`/api/trips/${tripId}/pinned-places`);
+      if (!res.ok) throw new Error("Failed to fetch pinned places");
+      return res.json();
+    },
+    enabled: !!tripId,
+  });
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -77,13 +87,17 @@ export default function TripMap() {
       <main className="container mx-auto px-4 py-8">
         <div className="space-y-8">
           <section>
-            <MapView location={trip.location} tripId={trip.id} />
+            <MapView 
+              location={trip.location || ""} 
+              tripId={trip.id} 
+              pinnedPlaces={pinnedPlaces || []}
+            />
           </section>
 
           <section>
             <PinnedPlaces
               tripId={trip.id}
-              defaultLocation={trip.location}
+              defaultLocation={trip.location || ""}
               showMap={false}
             />
           </section>

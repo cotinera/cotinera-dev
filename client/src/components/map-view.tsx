@@ -9,13 +9,29 @@ import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
+import { MdRestaurant, MdHotel } from "react-icons/md";
+import { FaLandmark, FaShoppingBag, FaUmbrellaBeach, FaGlassCheers, FaStore, FaTree } from "react-icons/fa";
+
+// Category icons mapping
+export const CATEGORY_ICONS = {
+  restaurant: MdRestaurant,
+  hotel: MdHotel,
+  attraction: FaLandmark,
+  shopping: FaShoppingBag,
+  beach: FaUmbrellaBeach,
+  nightlife: FaGlassCheers,
+  store: FaStore,
+  park: FaTree,
+} as const;
+
+export type PlaceCategory = keyof typeof CATEGORY_ICONS;
 
 // Libraries for Google Maps
 const libraries: ("places")[] = ["places"];
 
 const mapContainerStyle = {
   width: "100%",
-  height: "600px", // Increased from 400px to make it more square-like
+  height: "600px",
   position: "relative" as const,
 };
 
@@ -23,7 +39,7 @@ const defaultOptions = {
   disableDefaultUI: true,
   zoomControl: true,
   scrollwheel: true,
-  clickableIcons: true, // Enable clicking on POIs
+  clickableIcons: true,
 };
 
 interface Coordinates {
@@ -35,6 +51,8 @@ interface PinnedPlace {
   id: number;
   name: string;
   coordinates: Coordinates;
+  category?: PlaceCategory;
+  placeId?: string;
 }
 
 interface PlaceDetails {
@@ -60,6 +78,24 @@ interface MapViewProps {
   onPinClick?: (place: PinnedPlace) => void;
   className?: string;
 }
+
+// Function to generate SVG icon for a category
+const getCategoryIcon = (category: PlaceCategory = 'attraction') => {
+  const IconComponent = CATEGORY_ICONS[category];
+  const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+    ${IconComponent ? IconComponent({}).props.children : ''}
+  </svg>`;
+
+  return {
+    url: `data:image/svg+xml;base64,${btoa(svgString)}`,
+    scaledSize: new google.maps.Size(32, 32),
+    anchor: new google.maps.Point(16, 16),
+    fillColor: "#1E88E5",
+    fillOpacity: 1,
+    strokeWeight: 2,
+    strokeColor: "#FFFFFF",
+  };
+};
 
 export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, className }: MapViewProps) {
   const { toast } = useToast();
@@ -195,7 +231,8 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         description: "Place has been pinned to your trip",
       });
 
-      queryClient.invalidateQueries([`/api/trips/${tripId}/pinned-places`]);
+      // Use proper invalidation format
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/pinned-places`] });
     } catch (error) {
       console.error('Error pinning place:', error);
       toast({
@@ -485,7 +522,13 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
             key={place.id}
             position={place.coordinates}
             title={place.name}
-            onClick={() => onPinClick?.(place)}
+            icon={getCategoryIcon(place.category)}
+            onClick={() => {
+              if (place.placeId) {
+                fetchPlaceDetails(place.placeId);
+              }
+              onPinClick?.(place);
+            }}
           />
         ))}
       </GoogleMap>
