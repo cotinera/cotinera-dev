@@ -233,11 +233,12 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
               <MapPin className="h-6 w-6 text-primary" />
               <span className="text-xs">Directions</span>
             </button>
-            <button className="flex flex-col items-center justify-center p-2 hover:bg-accent rounded-lg gap-1">
-              <Button variant="ghost" size="icon">
-                <Plus className="h-6 w-6 text-primary" />
-              </Button>
-              <span className="text-xs">Save</span>
+            <button 
+              className="flex flex-col items-center justify-center p-2 hover:bg-accent rounded-lg gap-1"
+              onClick={tripId ? handlePinPlace : undefined}
+            >
+              <Plus className="h-6 w-6 text-primary" />
+              <span className="text-xs">Pin</span>
             </button>
             <button className="flex flex-col items-center justify-center p-2 hover:bg-accent rounded-lg gap-1">
               <Phone className="h-6 w-6 text-primary" />
@@ -251,17 +252,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
 
           <ScrollArea className="flex-1">
             <div className="p-6 space-y-6">
-              {/* Pin button if in trip context */}
-              {tripId && (
-                <Button
-                  className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground"
-                  onClick={handlePinPlace}
-                >
-                  <Plus className="h-4 w-4" />
-                  Pin this place
-                </Button>
-              )}
-
               {/* Photos grid */}
               {selectedPlace.photos && selectedPlace.photos.length > 0 && (
                 <div className="space-y-2">
