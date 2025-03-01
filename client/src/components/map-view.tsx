@@ -89,17 +89,25 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     suggestions: { status, data },
     setValue,
     clearSuggestions,
+    init,
   } = usePlacesAutocomplete({
-    requestOptions: {
-      /* Define search area. The search will be centered on the current map location */
-      location: new google.maps.LatLng(coordinates.lat, coordinates.lng),
-      radius: 100 * 1000, // 100km radius
-    },
+    initOnMount: false, // Don't initialize until we have the map
     debounce: 300,
   });
 
+  // Initialize Places Autocomplete after map is loaded
+  useEffect(() => {
+    if (isLoaded && mapRef.current) {
+      init({
+        requestOptions: {
+          location: new google.maps.LatLng(coordinates.lat, coordinates.lng),
+          radius: 100 * 1000, // 100km radius
+        },
+      });
+    }
+  }, [isLoaded, coordinates, init]);
+
   const handleSearchSelect = async (placeId: string) => {
-    // Close the suggestions
     clearSuggestions();
 
     try {
