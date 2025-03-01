@@ -105,6 +105,8 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   const queryClient = useQueryClient();
   const mapRef = useRef<google.maps.Map | null>(null);
   const placesService = useRef<google.maps.places.PlacesService | null>(null);
+  const placeDetailsRef = useRef<HTMLDivElement | null>(null);
+
 
   const [coordinates, setCoordinates] = useState<Coordinates>({
     lat: 37.7749,
@@ -190,9 +192,18 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   }, [clearSuggestions, setValue, fetchPlaceDetails]);
 
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
-    const event = e as unknown as { placeId?: string };
+    const event = e as unknown as { placeId?: string; stop?: () => void };
 
-    if (!event.placeId || !placesService.current) return;
+    if (event.stop) {
+      event.stop();
+    }
+
+    if (!event.placeId || !placesService.current) {
+      if (placeDetailsRef.current?.parentElement) {
+        placeDetailsRef.current.parentElement.style.display = 'none';
+      }
+      return;
+    }
 
     fetchPlaceDetails(event.placeId);
   }, [fetchPlaceDetails]);
@@ -250,7 +261,10 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
     placesService.current = new google.maps.places.PlacesService(map);
-  }, []);
+
+    // Add click listener to handle place clicks
+    google.maps.event.addListener(map, 'click', handleMapClick);
+  }, [handleMapClick]);
 
   // Effect for initial geocoding
   useEffect(() => {
@@ -287,13 +301,13 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     }
   }, [location, isLoaded]);
 
-  // Effect for map click listener
-  useEffect(() => {
-    if (mapRef.current) {
-      google.maps.event.clearListeners(mapRef.current, 'click');
-      mapRef.current.addListener('click', handleMapClick);
-    }
-  }, [handleMapClick]);
+  // Effect for map click listener - Removed as listener is now added in onMapLoad
+  //useEffect(() => {
+  //  if (mapRef.current) {
+  //    google.maps.event.clearListeners(mapRef.current, 'click');
+  //    mapRef.current.addListener('click', handleMapClick);
+  //  }
+  //}, [handleMapClick]);
 
   if (loadError) {
     return (
@@ -320,7 +334,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   }
 
   return (
-    <Card className={cn("overflow-hidden relative", className)}>
+    <Card className={cn("overflow-hidden relative", className)} ref={placeDetailsRef}>
       <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 w-[400px]">
         <div className="relative">
           <Input
@@ -363,13 +377,15 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
           </div>
           <ScrollArea className="flex-1">
             <div className="p-4 space-y-6">
-              <Button
-                className="w-full flex items-center justify-center gap-2"
-                onClick={handlePinPlace}
-              >
-                <Plus className="h-4 w-4" />
-                Pin this place
-              </Button>
+              {tripId && (
+                <Button
+                  className="w-full flex items-center justify-center gap-2"
+                  onClick={handlePinPlace}
+                >
+                  <Plus className="h-4 w-4" />
+                  Pin this place
+                </Button>
+              )}
 
               {selectedPlace.photos && selectedPlace.photos.length > 0 && (
                 <div className="space-y-2">
@@ -506,7 +522,11 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         mapContainerStyle={mapContainerStyle}
         zoom={13}
         center={coordinates}
-        options={defaultOptions}
+        options={{
+          ...defaultOptions,
+          clickableIcons: true,
+          streetViewControl: false,
+        }}
         onLoad={onMapLoad}
       >
         <MarkerF
