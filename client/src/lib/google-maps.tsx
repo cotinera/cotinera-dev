@@ -23,7 +23,7 @@ export const DEFAULT_MAP_OPTIONS = {
   streetViewControl: false,
 };
 
-// Category icons mapping for different place types
+// Category icons mapping with Google Places types
 export const CATEGORY_ICONS = {
   restaurant: MdRestaurant,
   hotel: MdHotel,
@@ -34,6 +34,25 @@ export const CATEGORY_ICONS = {
   store: FaStore,
   park: FaTree,
 } as const;
+
+// Google Places types to our categories mapping
+export const PLACE_TYPE_TO_CATEGORY: Record<string, keyof typeof CATEGORY_ICONS> = {
+  restaurant: 'restaurant',
+  cafe: 'restaurant',
+  bar: 'nightlife',
+  night_club: 'nightlife',
+  lodging: 'hotel',
+  hotel: 'hotel',
+  museum: 'attraction',
+  art_gallery: 'attraction',
+  tourist_attraction: 'attraction',
+  amusement_park: 'attraction',
+  shopping_mall: 'shopping',
+  store: 'store',
+  clothing_store: 'shopping',
+  park: 'park',
+  beach: 'beach',
+};
 
 // Type definition for place categories
 export type PlaceCategory = keyof typeof CATEGORY_ICONS;
@@ -71,6 +90,7 @@ export interface PlaceDetails {
   photos?: google.maps.places.PlacePhoto[];
   reviews?: google.maps.places.PlaceReview[];
   geometry?: google.maps.places.PlaceGeometry;
+  types?: string[];
 }
 
 /**
@@ -92,6 +112,41 @@ export const getCategoryIcon = (category: PlaceCategory = 'attraction') => {
     fillOpacity: 1,
     strokeWeight: 2,
     strokeColor: "#FFFFFF",
+  };
+};
+
+/**
+ * Gets the primary category from Google Places types
+ * @param types - Array of place types from Google Places API
+ * @returns The primary category for the place
+ */
+export const getPrimaryCategory = (types: string[] = []): { category: PlaceCategory, label: string } => {
+  // First check for exact matches
+  for (const type of types) {
+    if (type in PLACE_TYPE_TO_CATEGORY) {
+      return {
+        category: PLACE_TYPE_TO_CATEGORY[type],
+        label: type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+      };
+    }
+  }
+
+  // If no exact match, check for partial matches
+  for (const type of types) {
+    for (const [key, value] of Object.entries(PLACE_TYPE_TO_CATEGORY)) {
+      if (type.includes(key)) {
+        return {
+          category: value,
+          label: type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+        };
+      }
+    }
+  }
+
+  // Default to attraction if no match found
+  return {
+    category: 'attraction',
+    label: types[0]?.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') || 'Point of Interest'
   };
 };
 
@@ -130,7 +185,8 @@ export const usePlacesService = () => {
         'photos',
         'reviews',
         'place_id',
-        'geometry'
+        'geometry',
+        'types'
       ],
     };
 

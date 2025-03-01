@@ -16,6 +16,7 @@ import {
   MAP_CONTAINER_STYLE,
   DEFAULT_MAP_OPTIONS,
   getCategoryIcon,
+  getPrimaryCategory,
   type PlaceDetails,
   type PinnedPlace,
 } from "@/lib/google-maps";
@@ -28,6 +29,7 @@ interface MapViewProps {
   onPinClick?: (place: PinnedPlace) => void;
   className?: string;
 }
+
 
 export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, className }: MapViewProps) {
   const { toast } = useToast();
@@ -220,17 +222,24 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
           <div className="p-6 border-b">
             <div className="space-y-2">
               <h2 className="text-2xl font-semibold text-foreground">{selectedPlace.name}</h2>
-              {selectedPlace.rating && (
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center">
-                    <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                    <span className="ml-1 font-medium">{selectedPlace.rating}</span>
-                  </div>
-                  <span className="text-muted-foreground text-sm">
-                    {selectedPlace.reviews?.length} reviews
+              <div className="flex items-center gap-4">
+                {selectedPlace.types && (
+                  <span className="text-muted-foreground">
+                    {getPrimaryCategory(selectedPlace.types).label}
                   </span>
-                </div>
-              )}
+                )}
+                {selectedPlace.rating && (
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center">
+                      <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                      <span className="ml-1 font-medium">{selectedPlace.rating}</span>
+                    </div>
+                    <span className="text-muted-foreground text-sm">
+                      {selectedPlace.reviews?.length} reviews
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
