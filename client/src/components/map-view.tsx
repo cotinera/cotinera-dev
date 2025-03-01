@@ -98,14 +98,9 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   // Initialize Places Autocomplete after map is loaded
   useEffect(() => {
     if (isLoaded && mapRef.current) {
-      init({
-        requestOptions: {
-          location: new google.maps.LatLng(coordinates.lat, coordinates.lng),
-          radius: 100 * 1000, // 100km radius
-        },
-      });
+      init();
     }
-  }, [isLoaded, coordinates, init]);
+  }, [isLoaded, init]);
 
   const handleSearchSelect = async (placeId: string) => {
     clearSuggestions();
