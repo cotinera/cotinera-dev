@@ -299,8 +299,7 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
                     }
                     return <p className="text-sm mt-1">{linkifyText(message.message)}</p>;
                   } catch (error) {
-                    console.error("Error parsing message:", error);
-                    return <p>Error parsing message</p>;
+                    return <p className="text-sm mt-1">{linkifyText(message.message)}</p>;
                   }
                 })()}
               </div>
