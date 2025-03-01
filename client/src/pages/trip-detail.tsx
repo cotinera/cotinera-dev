@@ -231,6 +231,7 @@ export default function TripDetail() {
                 {currentDestination ? (
                   <MapViewComp 
                     location={currentDestination.name || ""}
+                    tripId={trip.id}
                     pinnedPlaces={pinnedPlaces || []}
                   />
                 ) : destinations && destinations.length >= 2 ? (
@@ -238,6 +239,7 @@ export default function TripDetail() {
                 ) : (
                   <MapViewComp 
                     location={trip.location || ""}
+                    tripId={trip.id}
                     pinnedPlaces={pinnedPlaces || []}
                   />
                 )}

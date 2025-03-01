@@ -5,7 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
 
 // Libraries for Google Maps
@@ -53,12 +55,15 @@ interface PlaceDetails {
 
 interface MapViewProps {
   location: string;
+  tripId?: number;
   pinnedPlaces?: PinnedPlace[] | { places: PinnedPlace[] };
   onPinClick?: (place: PinnedPlace) => void;
   className?: string;
 }
 
-export function MapView({ location, pinnedPlaces = [], onPinClick, className }: MapViewProps) {
+export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, className }: MapViewProps) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [coordinates, setCoordinates] = useState<Coordinates>({
     lat: 37.7749,
     lng: -122.4194,
@@ -152,10 +157,18 @@ export function MapView({ location, pinnedPlaces = [], onPinClick, className }: 
   }, []);
 
   const handlePinPlace = async () => {
-    if (!selectedPlace) return;
+    if (!selectedPlace || !tripId) return;
 
     try {
-      const response = await fetch('/api/pinned-places', {
+      // Get coordinates from the place's geometry
+      const placeCoordinates = selectedPlace.geometry?.location
+        ? {
+            lat: selectedPlace.geometry.location.lat(),
+            lng: selectedPlace.geometry.location.lng(),
+          }
+        : coordinates;
+
+      const response = await fetch(`/api/trips/${tripId}/pinned-places`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -164,10 +177,12 @@ export function MapView({ location, pinnedPlaces = [], onPinClick, className }: 
           name: selectedPlace.name,
           placeId: selectedPlace.place_id,
           address: selectedPlace.formatted_address,
-          coordinates: {
-            lat: coordinates.lat,
-            lng: coordinates.lng,
-          },
+          coordinates: placeCoordinates,
+          phone: selectedPlace.formatted_phone_number,
+          website: selectedPlace.website,
+          rating: selectedPlace.rating,
+          openingHours: selectedPlace.opening_hours?.weekday_text,
+          photos: selectedPlace.photos?.map(photo => photo.getUrl())
         }),
       });
 
@@ -175,11 +190,21 @@ export function MapView({ location, pinnedPlaces = [], onPinClick, className }: 
         throw new Error('Failed to pin place');
       }
 
-      // Show success message or update UI
-      alert('Place pinned successfully!');
+      // Show success message and update UI
+      toast({
+        title: "Success",
+        description: "Place has been pinned to your trip",
+      });
+
+      // Invalidate queries to refresh the pinned places list
+      queryClient.invalidateQueries([`/api/trips/${tripId}/pinned-places`]);
     } catch (error) {
       console.error('Error pinning place:', error);
-      alert('Failed to pin place');
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to pin place to your trip",
+      });
     }
   };
 
