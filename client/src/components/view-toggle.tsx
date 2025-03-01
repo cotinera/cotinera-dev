@@ -2,7 +2,7 @@ import {
   ToggleGroup,
   ToggleGroupItem,
 } from "@/components/ui/toggle-group";
-import { CalendarDays, LayoutDashboard } from "lucide-react";
+import { CalendarDays, LayoutDashboard, Map } from "lucide-react";
 import { useLocation } from "wouter";
 
 interface ViewToggleProps {
@@ -11,13 +11,24 @@ interface ViewToggleProps {
 
 export function ViewToggle({ tripId }: ViewToggleProps) {
   const [location, setLocation] = useLocation();
-  const isCalendarView = location.includes("/calendar");
+
+  const getCurrentView = () => {
+    if (location.includes("/calendar")) return "calendar";
+    if (location.includes("/map")) return "map";
+    return "details";
+  };
 
   const handleViewChange = (value: string) => {
-    if (value === "calendar") {
-      setLocation(`/trips/${tripId}/calendar`);
-    } else {
-      setLocation(`/trips/${tripId}`);
+    switch (value) {
+      case "calendar":
+        setLocation(`/trips/${tripId}/calendar`);
+        break;
+      case "map":
+        setLocation(`/trips/${tripId}/map`);
+        break;
+      default:
+        setLocation(`/trips/${tripId}`);
+        break;
     }
   };
 
@@ -25,9 +36,9 @@ export function ViewToggle({ tripId }: ViewToggleProps) {
     <div className="relative inline-flex rounded-lg bg-muted p-1">
       <ToggleGroup
         type="single"
-        value={isCalendarView ? "calendar" : "details"}
+        value={getCurrentView()}
         onValueChange={handleViewChange}
-        className="relative z-0 grid grid-cols-2"
+        className="relative z-0 grid grid-cols-3"
       >
         <ToggleGroupItem 
           value="details" 
@@ -50,6 +61,17 @@ export function ViewToggle({ tripId }: ViewToggleProps) {
         >
           <CalendarDays className="h-4 w-4 mr-2" />
           <span className="hidden sm:inline">Calendar</span>
+        </ToggleGroupItem>
+        <ToggleGroupItem 
+          value="map" 
+          aria-label="View trip map"
+          className="rounded-md px-3 py-2 transition-colors duration-200 ease-in-out
+            hover:bg-background/80 hover:text-foreground
+            data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:font-medium
+            data-[state=off]:text-muted-foreground/60"
+        >
+          <Map className="h-4 w-4 mr-2" />
+          <span className="hidden sm:inline">Map</span>
         </ToggleGroupItem>
       </ToggleGroup>
     </div>

@@ -10,7 +10,6 @@ import { TripTimeline } from "@/components/trip-timeline";
 import { MapRouteView } from "@/components/map-route-view";
 import { MapView } from "@/components/map-view";
 import { PinnedPlaces } from "@/components/pinned-places";
-import { Calendar, MapPin } from "lucide-react";
 import { Checklist } from "@/components/checklist";
 import { CalendarView } from "@/components/calendar-view";
 import { MapView as MapViewComp } from "@/components/map-view";
@@ -29,7 +28,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
-
 
 interface PinnedPlace {
   id: number;
@@ -168,15 +166,17 @@ export default function TripDetail() {
     <div className="min-h-screen bg-background">
       <header className="border-b">
         <div className="relative overflow-hidden py-12">
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{
-              backgroundImage: trip?.thumbnail ? `url(${trip.thumbnail})` : undefined,
-              filter: "blur(20px)",
-              transform: "scale(1.2)",
-              opacity: "0.9",
-            }}
-          />
+          {trip.thumbnail && (
+            <div 
+              className="absolute inset-0 bg-cover bg-center"
+              style={{ 
+                backgroundImage: `url(${trip.thumbnail})`,
+                filter: "blur(20px)",
+                transform: "scale(1.2)",
+                opacity: "0.9",
+              }} 
+            />
+          )}
           <div className="absolute inset-0 bg-gradient-to-b from-background/30 to-background/70" />
           <div className="container mx-auto px-4 relative z-10">
             <div className="flex justify-between items-center absolute left-4 top-0">
@@ -197,21 +197,7 @@ export default function TripDetail() {
               </Button>
             </div>
 
-            <div className="absolute right-4 top-0 flex items-center gap-2">
-              <Button
-                variant="ghost"
-                onClick={() => setLocation(`/trips/${tripId}/calendar`)}
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                Calendar
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={() => setLocation(`/trips/${tripId}/map`)}
-              >
-                <MapPin className="h-4 w-4 mr-2" />
-                Map
-              </Button>
+            <div className="absolute right-4 top-0">
               <TripDestinations tripId={trip.id} />
             </div>
 
