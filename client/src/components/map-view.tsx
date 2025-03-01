@@ -125,34 +125,46 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     container.appendChild(placeDetailsElement);
 
     placeDetailsRef.current = placeDetailsElement;
-
-    // Add click event listener to the map
-    map.addListener('click', async (e: google.maps.MapMouseEvent) => {
-      const event = e as unknown as { placeId?: string; stop?: () => void };
-
-      if (event.stop) {
-        event.stop(); // Prevent default click behavior
-      }
-
-      if (!placeDetailsRef.current || !event.placeId) {
-        if (placeDetailsRef.current?.parentElement) {
-          placeDetailsRef.current.parentElement.style.display = 'none';
-        }
-        return;
-      }
-
-      try {
-        if (placeDetailsRef.current && typeof (placeDetailsRef.current as any).configureFromPlaceId === 'function') {
-          await (placeDetailsRef.current as any).configureFromPlaceId(event.placeId);
-          if (placeDetailsRef.current.parentElement) {
-            placeDetailsRef.current.parentElement.style.display = 'block';
-          }
-        }
-      } catch (error) {
-        console.error('Error showing place details:', error);
-      }
-    });
   }, []);
+
+  // Handle map click events
+  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
+    const event = e as unknown as { placeId?: string; stop?: () => void };
+
+    if (event.stop) {
+      event.stop();
+    }
+
+    if (!placeDetailsRef.current || !event.placeId) {
+      if (placeDetailsRef.current?.parentElement) {
+        placeDetailsRef.current.parentElement.style.display = 'none';
+      }
+      return;
+    }
+
+    const placeDetails = placeDetailsRef.current as HTMLElement & {
+      configureFromPlaceId?: (placeId: string) => Promise<void>;
+    };
+
+    if (placeDetails.configureFromPlaceId) {
+      placeDetails.configureFromPlaceId(event.placeId)
+        .then(() => {
+          if (placeDetails.parentElement) {
+            placeDetails.parentElement.style.display = 'block';
+          }
+        })
+        .catch((error) => {
+          console.error('Error showing place details:', error);
+        });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (mapRef.current) {
+      google.maps.event.clearListeners(mapRef.current, 'click');
+      mapRef.current.addListener('click', handleMapClick);
+    }
+  }, [handleMapClick]);
 
   useEffect(() => {
     async function geocodeLocation() {
@@ -240,17 +252,22 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
             key={place.id}
             position={place.coordinates}
             title={place.name}
-            onClick={async () => {
+            onClick={() => {
               if (placeDetailsRef.current && place.placeId) {
-                try {
-                  if (typeof (placeDetailsRef.current as any).configureFromPlaceId === 'function') {
-                    await (placeDetailsRef.current as any).configureFromPlaceId(place.placeId);
-                    if (placeDetailsRef.current.parentElement) {
-                      placeDetailsRef.current.parentElement.style.display = 'block';
-                    }
-                  }
-                } catch (error) {
-                  console.error('Error showing place details:', error);
+                const placeDetails = placeDetailsRef.current as HTMLElement & {
+                  configureFromPlaceId?: (placeId: string) => Promise<void>;
+                };
+
+                if (placeDetails.configureFromPlaceId) {
+                  placeDetails.configureFromPlaceId(place.placeId)
+                    .then(() => {
+                      if (placeDetails.parentElement) {
+                        placeDetails.parentElement.style.display = 'block';
+                      }
+                    })
+                    .catch((error) => {
+                      console.error('Error showing place details:', error);
+                    });
                 }
               }
               onPinClick?.(place);
