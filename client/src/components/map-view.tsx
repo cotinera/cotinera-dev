@@ -33,18 +33,24 @@ interface MapViewProps {
 const StarRating = ({ rating }: { rating: number }) => {
   return (
     <div className="flex items-center">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <Star
-          key={star}
-          className={`h-3.5 w-3.5 -ml-0.5 first:ml-0 ${
-            star <= Math.floor(rating)
-              ? "text-yellow-400 fill-current"
-              : star - rating <= 0.5
-              ? "text-yellow-400 fill-[50%]"
-              : "text-gray-300 fill-current"
-          }`}
-        />
-      ))}
+      {[1, 2, 3, 4, 5].map((star) => {
+        const difference = star - rating;
+        let starClass = "text-yellow-400 fill-current"; // Full star
+
+        if (difference > 0) {
+          if (difference < 1 && difference > 0.2) {
+            // Empty star
+            starClass = "text-gray-300 fill-current";
+          }
+        }
+
+        return (
+          <Star
+            key={star}
+            className={`h-3.5 w-3.5 -ml-0.5 first:ml-0 ${starClass}`}
+          />
+        );
+      })}
     </div>
   );
 };
