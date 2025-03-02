@@ -17,12 +17,8 @@ import {
   MarkerF,
   MAP_CONTAINER_STYLE,
   DEFAULT_MAP_OPTIONS,
-  getCategoryIcon,
-  getPrimaryCategory,
-  CATEGORY_ICONS,
   type PlaceDetails,
   type PinnedPlace,
-  type PlaceCategory,
 } from "@/lib/google-maps";
 import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
 
@@ -33,11 +29,6 @@ interface MapViewProps {
   onPinClick?: (place: PinnedPlace) => void;
   className?: string;
 }
-
-const CategoryIcon = ({ category }: { category: PlaceCategory }) => {
-  const IconComponent = CATEGORY_ICONS[category];
-  return IconComponent ? <IconComponent className="h-4 w-4 text-[#70757a]" /> : null;
-};
 
 const StarRating = ({ rating }: { rating: number }) => {
   return (
@@ -302,26 +293,10 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
               <div className="flex flex-col gap-1">
                 {selectedPlace.rating && (
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-0.5">
-                      <StarRating rating={selectedPlace.rating} />
-                      <span className="ml-1 text-sm font-medium">{selectedPlace.rating}</span>
-                    </div>
-                    <span className="text-[#70757a] text-sm">
-                      ({selectedPlace.user_ratings_total?.toLocaleString()})
+                    <StarRating rating={selectedPlace.rating} />
+                    <span className="text-sm text-muted-foreground">
+                      ({selectedPlace.user_ratings_total?.toLocaleString()} reviews)
                     </span>
-                  </div>
-                )}
-                {selectedPlace.types && (
-                  <div className="flex items-center gap-2 text-[14px] text-[#70757a]">
-                    {(() => {
-                      const { category, label } = getPrimaryCategory(selectedPlace.types);
-                      return (
-                        <>
-                          <CategoryIcon category={category} />
-                          <span>{label}</span>
-                        </>
-                      );
-                    })()}
                   </div>
                 )}
               </div>
@@ -406,14 +381,8 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
             <div className="p-6 space-y-8">
               {selectedPlace.photos && selectedPlace.photos.length > 0 && (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium text-foreground">Photos</h3>
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedPhotoIndex(0)}>
-                      <Image className="h-4 w-4 mr-2" />
-                      View all
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-1">
+                  <h3 className="text-sm font-medium text-foreground">Photos</h3>
+                  <div className="grid grid-cols-2 gap-2">
                     {selectedPlace.photos.slice(0, 4).map((photo, index) => (
                       <img
                         key={index}
@@ -476,6 +445,10 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </div>
               )}
 
+              {selectedPlace.types?.includes('restaurant') && (
+                <RestaurantDetails place={selectedPlace} />
+              )}
+
               {selectedPlace.reviews && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -486,27 +459,31 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                       onClick={() => setExpandedReviews(!expandedReviews)}
                       className="text-primary text-sm font-medium px-2"
                     >
-                      {expandedReviews ? "Show less" : "More"}
+                      {expandedReviews ? (
+                        <>
+                          Show less
+                          <ChevronUp className="ml-1 h-4 w-4" />
+                        </>
+                      ) : (
+                        <>
+                          More
+                          <ChevronDown className="ml-1 h-4 w-4" />
+                        </>
+                      )}
                     </Button>
                   </div>
-                  <div className="space-y-6">
+                  <div className="space-y-4">
                     {(expandedReviews ? selectedPlace.reviews : selectedPlace.reviews.slice(0, 2)).map((review, index) => (
-                      <div key={index} className="space-y-1.5">
+                      <div key={index} className="space-y-2">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-[13px]">{review.author_name}</span>
                           <StarRating rating={review.rating || 0} />
                         </div>
-                        <p className="text-[13px] text-[#70757a] leading-5 line-clamp-3">{review.text}</p>
+                        <p className="text-[13px] text-muted-foreground leading-5">{review.text}</p>
                       </div>
                     ))}
                   </div>
                 </div>
-              )}
-
-              {selectedPlace.types?.includes('restaurant') && (
-                <section>
-                  <RestaurantDetails place={selectedPlace} />
-                </section>
               )}
             </div>
           </ScrollArea>
