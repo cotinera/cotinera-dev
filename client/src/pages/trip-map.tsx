@@ -6,11 +6,13 @@ import type { Trip } from "@db/schema";
 import { TripHeaderEdit } from "@/components/trip-header-edit";
 import { MapView } from "@/components/map-view";
 import { PinnedPlaces } from "@/components/pinned-places";
+import { useState } from "react";
 
 export default function TripMap() {
   const [, params] = useRoute("/trips/:id/map");
   const tripId = params ? parseInt(params.id) : null;
   const [, setLocation] = useLocation();
+  const [selectedPlace, setSelectedPlace] = useState(null);
 
   const { data: trip, isLoading, error } = useQuery<Trip>({
     queryKey: ["/api/trips", tripId],
@@ -31,6 +33,10 @@ export default function TripMap() {
     },
     enabled: !!tripId,
   });
+
+  const handlePlaceSelect = (place) => {
+    setSelectedPlace(place);
+  };
 
   if (isLoading) {
     return (
@@ -85,22 +91,53 @@ export default function TripMap() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="space-y-8">
-          <section>
-            <MapView 
-              location={trip.location || ""} 
-              tripId={trip.id} 
-              pinnedPlaces={pinnedPlacesData?.places || []}
-            />
-          </section>
+        <div className="grid gap-8 md:grid-cols-[2fr,1fr]">
+          <div className="space-y-8">
+            <section>
+              <MapView 
+                location={trip.location || ""} 
+                tripId={trip.id} 
+                pinnedPlaces={pinnedPlacesData?.places || []}
+                onPlaceNameClick={handlePlaceSelect}
+              />
+            </section>
+          </div>
 
-          <section>
-            <PinnedPlaces
-              tripId={trip.id}
-              defaultLocation={trip.location || ""}
-              showMap={false}
-            />
-          </section>
+          <div className="space-y-8">
+            <section>
+              <PinnedPlaces
+                tripId={trip.id}
+                defaultLocation={trip.location || ""}
+                showMap={false}
+                onPlaceNameClick={handlePlaceSelect}
+              />
+            </section>
+
+            {selectedPlace && (
+              <section>
+                <div className="bg-card rounded-lg p-4 space-y-4">
+                  <h3 className="text-lg font-semibold">{selectedPlace.name}</h3>
+                  {selectedPlace.address && (
+                    <p className="text-sm text-muted-foreground">{selectedPlace.address}</p>
+                  )}
+                  {selectedPlace.notes && (
+                    <div>
+                      <h4 className="text-sm font-medium">Notes</h4>
+                      <p className="text-sm text-muted-foreground">{selectedPlace.notes}</p>
+                    </div>
+                  )}
+                  {selectedPlace.category && (
+                    <div>
+                      <h4 className="text-sm font-medium">Category</h4>
+                      <p className="text-sm text-muted-foreground capitalize">
+                        {selectedPlace.category.replace(/_/g, ' ')}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+          </div>
         </div>
       </main>
     </div>
