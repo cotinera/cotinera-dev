@@ -80,6 +80,44 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   const { coordinates, setCoordinates, geocodeLocation } = useMapCoordinates(location);
   const { placesService, initPlacesService, getPlaceDetails } = usePlacesService();
 
+  // Process pinned places data
+  const allPinnedPlaces = useMemo(() => {
+    console.log("Processing pinnedPlaces:", pinnedPlaces);
+    if (!pinnedPlaces) return [];
+    if (Array.isArray(pinnedPlaces)) return pinnedPlaces;
+    if ('places' in pinnedPlaces) return pinnedPlaces.places;
+    return [];
+  }, [pinnedPlaces]);
+
+  useEffect(() => {
+    console.log("Updated pinned places:", allPinnedPlaces);
+  }, [allPinnedPlaces]);
+
+  // Base functions that other functions depend on
+  const fetchPlaceDetails = useCallback((placeId: string) => {
+    getPlaceDetails(placeId, (place, status) => {
+      if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+        setSelectedPlace(place);
+      }
+    });
+  }, [getPlaceDetails]);
+
+  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
+    const event = e as unknown as { placeId?: string; stop?: () => void };
+    if (event.stop) event.stop();
+    if (!event.placeId) {
+      setSelectedPlace(null);
+      return;
+    }
+    fetchPlaceDetails(event.placeId);
+  }, [fetchPlaceDetails]);
+
+  const onMapLoad = useCallback((map: google.maps.Map) => {
+    mapRef.current = map;
+    initPlacesService(map);
+    map.addListener('click', handleMapClick);
+  }, [initPlacesService, handleMapClick]);
+
   // Initialize Places Autocomplete
   const {
     ready,
@@ -95,19 +133,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     },
     debounce: 300,
   });
-
-  // Process pinned places data
-  const allPinnedPlaces = useMemo(() => {
-    console.log("Processing pinnedPlaces:", pinnedPlaces);
-    if (!pinnedPlaces) return [];
-    if (Array.isArray(pinnedPlaces)) return pinnedPlaces;
-    if ('places' in pinnedPlaces) return pinnedPlaces.places;
-    return [];
-  }, [pinnedPlaces]);
-
-  useEffect(() => {
-    console.log("Updated pinned places:", allPinnedPlaces);
-  }, [allPinnedPlaces]);
 
   const handleSearchSelect = useCallback(async (placeId: string, description: string) => {
     try {
@@ -190,36 +215,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setValue(e.target.value);
   };
-
-  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
-    const event = e as unknown as { placeId?: string; stop?: () => void };
-
-    if (event.stop) {
-      event.stop();
-    }
-
-    if (!event.placeId) {
-      setSelectedPlace(null);
-      return;
-    }
-
-    fetchPlaceDetails(event.placeId);
-  }, [fetchPlaceDetails]);
-
-  const onMapLoad = useCallback((map: google.maps.Map) => {
-    mapRef.current = map;
-    initPlacesService(map);
-    map.addListener('click', handleMapClick);
-  }, [initPlacesService, handleMapClick]);
-
-  const fetchPlaceDetails = useCallback((placeId: string) => {
-    getPlaceDetails(placeId, (place, status) => {
-      if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-        setSelectedPlace(place);
-      }
-    });
-  }, [getPlaceDetails]);
-
 
   if (loadError) {
     return (
