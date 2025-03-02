@@ -656,6 +656,11 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 if (place.placeId) {
                   fetchPlaceDetails(place.placeId);
                 }
+                // Zoom to the clicked place
+                if (mapRef.current) {
+                  mapRef.current.panTo(place.coordinates);
+                  mapRef.current.setZoom(17); // Set zoom level to 17 for a close-up view
+                }
                 onPinClick?.(place);
               }}
             />
