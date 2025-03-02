@@ -188,20 +188,16 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   };
 
   const handlePlaceSelect = useCallback((place: PinnedPlace) => {
+    // Only handle map navigation, don't show details
     if (mapRef.current && place.coordinates) {
       mapRef.current.panTo(place.coordinates);
       mapRef.current.setZoom(17);
     }
-    if (place.placeId) {
-      fetchPlaceDetails(place.placeId);
-    }
-    onPinClick?.(place);
-  }, [fetchPlaceDetails, onPinClick]);
+  }, []);
 
   useEffect(() => {
     if (onPinClick) {
-      //This line is crucial to replace the original onPinClick with our new handler
-      onPinClick = (place: PinnedPlace) => handlePlaceSelect(place);
+      onPinClick = handlePlaceSelect;
     }
   }, [handlePlaceSelect, onPinClick]);
 
@@ -611,7 +607,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
               icon={{
                 path: google.maps.SymbolPath.MARKER,
                 scale: 30,
-                fillColor: "#DC2626", 
+                fillColor: "#DC2626",
                 fillOpacity: 1,
                 strokeWeight: 2,
                 strokeColor: "#FFFFFF",
@@ -623,7 +619,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 }
                 if (mapRef.current) {
                   mapRef.current.panTo(place.coordinates);
-                  mapRef.current.setZoom(17); 
+                  mapRef.current.setZoom(17);
                 }
                 onPinClick?.(place);
               }}
