@@ -298,6 +298,11 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                         <>
                           <CategoryIcon category={category} />
                           <span>{label}</span>
+                          {selectedPlace.price_level && (
+                            <span className="ml-1">
+                              {"$".repeat(selectedPlace.price_level)}
+                            </span>
+                          )}
                         </>
                       );
                     })()}
@@ -493,6 +498,26 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </div>
               )}
 
+              {/* Hotel-specific features */}
+              {selectedPlace.types?.includes('lodging') && (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium text-foreground">Compare prices</h3>
+                    <div className="space-y-2 border rounded-lg divide-y">
+                      {[
+                        { site: 'Official site', price: selectedPlace.price_level ? selectedPlace.price_level * 200 : 300 },
+                        { site: 'Booking.com', price: selectedPlace.price_level ? selectedPlace.price_level * 180 : 280 },
+                        { site: 'Hotels.com', price: selectedPlace.price_level ? selectedPlace.price_level * 190 : 290 }
+                      ].map((option, index) => (
+                        <div key={index} className="p-3 flex items-center justify-between hover:bg-accent cursor-pointer">
+                          <span className="text-sm">{option.site}</span>
+                          <span className="text-sm font-medium">${option.price}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Reviews section */}
               {selectedPlace.reviews && (
