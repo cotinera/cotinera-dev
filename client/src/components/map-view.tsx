@@ -43,16 +43,14 @@ const StarRating = ({ rating }: { rating: number }) => {
   return (
     <div className="flex items-center">
       {[1, 2, 3, 4, 5].map((star) => {
-        const roundedRating = Math.round(rating * 2) / 2; // Round to nearest 0.5
+        const roundedRating = Math.round(rating * 2) / 2; 
         const difference = star - roundedRating;
-        let starClass = "text-yellow-400 fill-current"; // Full star
+        let starClass = "text-yellow-400 fill-current"; 
 
         if (difference > 0) {
           if (difference === 0.5) {
-            // Half star
             starClass = "text-yellow-400 fill-[50%]";
           } else if (difference >= 1) {
-            // Empty star
             starClass = "text-gray-300 fill-current";
           }
         }
@@ -130,37 +128,19 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
 
   const { isLoaded, loadError } = useGoogleMapsScript();
-  const { coordinates, setCoordinates, geocodeLocation } = useMapCoordinates(location);
-  const { placesService, initPlacesService, getPlaceDetails } = usePlacesService();
+  const { coordinates, setCoordinates } = useMapCoordinates(location);
+  const { initPlacesService, getPlaceDetails } = usePlacesService();
 
-  // Process pinned places data with better error handling and logging
   const allPinnedPlaces = useMemo(() => {
-    console.log("Processing pinnedPlaces input:", pinnedPlaces);
-
-    if (!pinnedPlaces) {
-      console.log("No pinned places provided");
-      return [];
-    }
-
-    if (Array.isArray(pinnedPlaces)) {
-      console.log("Pinned places is an array:", pinnedPlaces);
-      return pinnedPlaces;
-    }
-
-    if ('places' in pinnedPlaces) {
-      console.log("Pinned places is an object with places:", pinnedPlaces.places);
-      return pinnedPlaces.places;
-    }
-
-    console.log("Unknown pinned places format, defaulting to empty array");
+    if (!pinnedPlaces) return [];
+    if (Array.isArray(pinnedPlaces)) return pinnedPlaces;
+    if ('places' in pinnedPlaces) return pinnedPlaces.places;
     return [];
   }, [pinnedPlaces]);
 
   useEffect(() => {
-    console.log("Pinned places updated:", allPinnedPlaces);
   }, [allPinnedPlaces]);
 
-  // Base functions that other functions depend on
   const fetchPlaceDetails = useCallback((placeId: string) => {
     getPlaceDetails(placeId, (place, status) => {
       if (status === google.maps.places.PlacesServiceStatus.OK && place) {
@@ -185,7 +165,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     map.addListener('click', handleMapClick);
   }, [initPlacesService, handleMapClick]);
 
-  // Initialize Places Autocomplete
   const {
     ready,
     value,
@@ -232,8 +211,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
           }
         : coordinates;
 
-      console.log("Pinning place with coordinates:", placeCoordinates);
-
       const response = await fetch(`/api/trips/${tripId}/pinned-places`, {
         method: 'POST',
         headers: {
@@ -255,9 +232,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
       }
 
       const newPinnedPlace = await response.json();
-      console.log("Successfully pinned new place:", newPinnedPlace);
 
-      // Invalidate and refetch pinned places
       await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/pinned-places`] });
 
       toast({
@@ -324,10 +299,8 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         </div>
       </div>
 
-      {/* Main place details sidebar */}
       {selectedPlace && (
         <div className="absolute top-0 left-0 bottom-0 w-[400px] bg-background shadow-lg z-40 flex flex-col">
-          {/* Header section */}
           <div className="p-6 border-b">
             <div className="space-y-2">
               <h2 className="text-[22px] font-medium leading-7 text-foreground">{selectedPlace.name}</h2>
@@ -360,7 +333,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
             </div>
           </div>
 
-          {/* Action buttons - 4 columns grid */}
           <div className="grid grid-cols-4 p-2 border-b">
             <a
               href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(selectedPlace.formatted_address)}`}
@@ -437,7 +409,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
 
           <ScrollArea className="flex-1">
             <div className="p-6 space-y-8">
-              {/* Photos grid */}
               {selectedPlace.photos && selectedPlace.photos.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -461,7 +432,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </div>
               )}
 
-              {/* Location section */}
               <div className="space-y-3">
                 <h3 className="text-sm font-medium text-foreground">Location</h3>
                 <div className="flex items-start gap-4">
@@ -470,7 +440,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </div>
               </div>
 
-              {/* Contact section */}
               {(selectedPlace.formatted_phone_number || selectedPlace.website) && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-medium text-foreground">Contact</h3>
@@ -498,7 +467,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </div>
               )}
 
-              {/* Opening hours */}
               {selectedPlace.opening_hours && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-medium text-foreground">Hours</h3>
@@ -513,7 +481,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </div>
               )}
 
-              {/* Reviews section */}
               {selectedPlace.reviews && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -553,6 +520,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                   </div>
                 </div>
               )}
+
               {selectedPlace.types?.includes('restaurant') && (
                 <section>
                   <RestaurantDetails place={selectedPlace} />
@@ -561,7 +529,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
             </div>
           </ScrollArea>
 
-          {/* Close button */}
           <Button
             variant="ghost"
             size="icon"
@@ -573,7 +540,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         </div>
       )}
 
-      {/* Photo Gallery Modal */}
       {selectedPhotoIndex !== null && selectedPlace?.photos && (
         <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
           <Button
@@ -606,7 +572,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         }}
         onLoad={onMapLoad}
       >
-        {/* Main location marker */}
         <MarkerF
           position={coordinates}
           icon={{
@@ -619,9 +584,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
           }}
         />
 
-        {/* Pinned places markers */}
         {allPinnedPlaces.map((place: PinnedPlace) => {
-          console.log("Rendering marker for place:", place);
           if (!place.coordinates || !place.coordinates.lat || !place.coordinates.lng) {
             console.warn("Invalid coordinates for place:", place);
             return null;
@@ -635,7 +598,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
               icon={{
                 path: google.maps.SymbolPath.MARKER,
                 scale: 30,
-                fillColor: "#DC2626", // Red color
+                fillColor: "#DC2626", 
                 fillOpacity: 1,
                 strokeWeight: 2,
                 strokeColor: "#FFFFFF",
