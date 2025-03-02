@@ -239,70 +239,70 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
           {/* Header section */}
           <div className="p-6 border-b">
             <div className="space-y-2">
-              <h2 className="text-2xl font-semibold text-foreground">{selectedPlace.name}</h2>
-              <div className="flex items-center gap-4">
-                {selectedPlace.types && (
-                  <span className="text-muted-foreground">
-                    {getPrimaryCategory(selectedPlace.types).label}
-                  </span>
-                )}
+              <h2 className="text-[22px] font-medium leading-7 text-foreground">{selectedPlace.name}</h2>
+              <div className="flex flex-col gap-1">
                 {selectedPlace.rating && (
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-0.5">
                       <StarRating rating={selectedPlace.rating} />
-                      <span className="ml-1 font-medium">{selectedPlace.rating}</span>
+                      <span className="ml-1 text-sm font-medium">{selectedPlace.rating}</span>
                     </div>
-                    <span className="text-muted-foreground text-sm">
-                      {selectedPlace.user_ratings_total?.toLocaleString()} reviews
+                    <span className="text-[#70757a] text-sm">
+                      ({selectedPlace.user_ratings_total?.toLocaleString()})
                     </span>
                   </div>
+                )}
+                {selectedPlace.types && (
+                  <span className="text-[14px] text-[#70757a]">
+                    {getPrimaryCategory(selectedPlace.types).label}
+                  </span>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Action buttons */}
-          <div className="grid grid-cols-4 gap-2 p-4 border-b">
-            <button className="flex flex-col items-center justify-center p-2 hover:bg-accent rounded-lg gap-1">
-              <MapPin className="h-6 w-6 text-primary" />
-              <span className="text-xs">Directions</span>
+          {/* Action buttons - 4 columns grid */}
+          <div className="grid grid-cols-4 p-2 border-b">
+            <button className="flex flex-col items-center justify-center p-3 hover:bg-accent rounded-lg gap-1.5 transition-colors">
+              <MapPin className="h-5 w-5 text-primary" />
+              <span className="text-xs font-medium">Directions</span>
             </button>
             <button
-              className="flex flex-col items-center justify-center p-2 hover:bg-accent rounded-lg gap-1"
+              className="flex flex-col items-center justify-center p-3 hover:bg-accent rounded-lg gap-1.5 transition-colors"
               onClick={tripId ? handlePinPlace : undefined}
             >
-              <Plus className="h-6 w-6 text-primary" />
-              <span className="text-xs">Pin</span>
+              <Plus className="h-5 w-5 text-primary" />
+              <span className="text-xs font-medium">Pin</span>
             </button>
-            <button className="flex flex-col items-center justify-center p-2 hover:bg-accent rounded-lg gap-1">
-              <Phone className="h-6 w-6 text-primary" />
-              <span className="text-xs">Call</span>
+            <button className="flex flex-col items-center justify-center p-3 hover:bg-accent rounded-lg gap-1.5 transition-colors">
+              <Phone className="h-5 w-5 text-primary" />
+              <span className="text-xs font-medium">Call</span>
             </button>
-            <button className="flex flex-col items-center justify-center p-2 hover:bg-accent rounded-lg gap-1">
-              <Globe className="h-6 w-6 text-primary" />
-              <span className="text-xs">Website</span>
+            <button className="flex flex-col items-center justify-center p-3 hover:bg-accent rounded-lg gap-1.5 transition-colors">
+              <Globe className="h-5 w-5 text-primary" />
+              <span className="text-xs font-medium">Website</span>
             </button>
           </div>
 
           <ScrollArea className="flex-1">
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-8">
               {/* Photos grid */}
               {selectedPlace.photos && selectedPlace.photos.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium text-muted-foreground">Photos</h3>
+                    <h3 className="text-sm font-medium text-foreground">Photos</h3>
                     <Button variant="ghost" size="sm" onClick={() => setSelectedPhotoIndex(0)}>
                       <Image className="h-4 w-4 mr-2" />
                       View all
                     </Button>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-1">
                     {selectedPlace.photos.slice(0, 4).map((photo, index) => (
                       <img
                         key={index}
                         src={photo.getUrl()}
                         alt={`Place photo ${index + 1}`}
-                        className="w-full h-32 object-cover rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                        className="w-full h-32 object-cover hover:opacity-90 transition-opacity cursor-pointer"
                         onClick={() => setSelectedPhotoIndex(index)}
                       />
                     ))}
@@ -310,22 +310,22 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </div>
               )}
 
-              {/* Address section */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-medium text-muted-foreground">Address</h3>
+              {/* Location section */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium text-foreground">Location</h3>
                 <div className="flex items-start gap-4">
-                  <MapPin className="h-5 w-5 mt-0.5 text-primary" />
-                  <p className="text-sm">{selectedPlace.formatted_address}</p>
+                  <MapPin className="h-5 w-5 mt-1 text-primary flex-shrink-0" />
+                  <p className="text-sm leading-relaxed">{selectedPlace.formatted_address}</p>
                 </div>
               </div>
 
               {/* Contact section */}
               {(selectedPlace.formatted_phone_number || selectedPlace.website) && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-medium text-muted-foreground">Contact</h3>
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium text-foreground">Contact</h3>
                   {selectedPlace.formatted_phone_number && (
                     <div className="flex items-center gap-4">
-                      <Phone className="h-5 w-5 text-primary" />
+                      <Phone className="h-5 w-5 text-primary flex-shrink-0" />
                       <a href={`tel:${selectedPlace.formatted_phone_number}`} className="text-sm hover:underline">
                         {selectedPlace.formatted_phone_number}
                       </a>
@@ -333,7 +333,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                   )}
                   {selectedPlace.website && (
                     <div className="flex items-center gap-4">
-                      <Globe className="h-5 w-5 text-primary" />
+                      <Globe className="h-5 w-5 text-primary flex-shrink-0" />
                       <a
                         href={selectedPlace.website}
                         target="_blank"
@@ -349,13 +349,13 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
 
               {/* Opening hours */}
               {selectedPlace.opening_hours && (
-                <div className="space-y-4">
-                  <h3 className="text-sm font-medium text-muted-foreground">Opening hours</h3>
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium text-foreground">Hours</h3>
                   <div className="flex items-start gap-4">
-                    <Clock className="h-5 w-5 text-primary" />
-                    <ul className="space-y-1 text-sm">
+                    <Clock className="h-5 w-5 mt-1 text-primary flex-shrink-0" />
+                    <ul className="space-y-1.5">
                       {selectedPlace.opening_hours.weekday_text.map((hours, index) => (
-                        <li key={index} className="text-sm">{hours}</li>
+                        <li key={index} className="text-sm leading-relaxed">{hours}</li>
                       ))}
                     </ul>
                   </div>
@@ -364,16 +364,18 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
 
               {/* Reviews section */}
               {selectedPlace.reviews && (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-medium text-muted-foreground">Reviews</h3>
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-[16px] font-medium text-foreground">Reviews</h3>
                       {selectedPlace.rating && (
                         <div className="flex items-center gap-1">
                           <StarRating rating={selectedPlace.rating} />
-                          <span className="font-medium">{selectedPlace.rating}</span>
-                          <span className="text-muted-foreground">
-                            ({selectedPlace.user_ratings_total?.toLocaleString()})
+                          <span className="text-sm">
+                            {selectedPlace.rating}
+                            <span className="text-[#70757a] ml-1">
+                              ({selectedPlace.user_ratings_total?.toLocaleString()})
+                            </span>
                           </span>
                         </div>
                       )}
@@ -382,19 +384,19 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                       variant="ghost"
                       size="sm"
                       onClick={() => setExpandedReviews(!expandedReviews)}
-                      className="text-primary"
+                      className="text-primary text-sm font-medium px-2"
                     >
-                      {expandedReviews ? "Show less" : "View all"}
+                      {expandedReviews ? "Show less" : "More"}
                     </Button>
                   </div>
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     {(expandedReviews ? selectedPlace.reviews : selectedPlace.reviews.slice(0, 2)).map((review, index) => (
-                      <div key={index} className="space-y-2">
+                      <div key={index} className="space-y-1.5">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm">{review.author_name}</span>
+                          <span className="font-medium text-[13px]">{review.author_name}</span>
                           <StarRating rating={review.rating || 0} />
                         </div>
-                        <p className="text-sm text-muted-foreground line-clamp-3">{review.text}</p>
+                        <p className="text-[13px] text-[#70757a] leading-5 line-clamp-3">{review.text}</p>
                       </div>
                     ))}
                   </div>
