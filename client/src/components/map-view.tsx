@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus, ChevronDown, ChevronUp, Image } from "lucide-react";
 import { MdRestaurant, MdHotel } from "react-icons/md";
 import { FaLandmark, FaShoppingBag, FaUmbrellaBeach, FaGlassCheers, FaStore, FaTree } from "react-icons/fa";
@@ -72,8 +72,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const mapRef = useRef<google.maps.Map | null>(null);
-  const placeDetailsRef = useRef<HTMLDivElement | null>(null);
-
   const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
   const [expandedReviews, setExpandedReviews] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
@@ -82,7 +80,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   const { coordinates, setCoordinates, geocodeLocation } = useMapCoordinates(location);
   const { placesService, initPlacesService, getPlaceDetails } = usePlacesService();
 
-  // Initialize Places Autocomplete with proper configuration
+  // Initialize Places Autocomplete
   const {
     ready,
     value,
@@ -93,24 +91,23 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     requestOptions: {
       types: ['establishment', 'geocode'],
       location: isLoaded ? new google.maps.LatLng(coordinates.lat, coordinates.lng) : undefined,
-      radius: 50000, // 50km radius
+      radius: 50000,
     },
     debounce: 300,
   });
 
+  // Process pinned places data
   const allPinnedPlaces = useMemo(() => {
+    console.log("Processing pinnedPlaces:", pinnedPlaces);
+    if (!pinnedPlaces) return [];
     if (Array.isArray(pinnedPlaces)) return pinnedPlaces;
     if ('places' in pinnedPlaces) return pinnedPlaces.places;
     return [];
   }, [pinnedPlaces]);
 
-  const fetchPlaceDetails = useCallback((placeId: string) => {
-    getPlaceDetails(placeId, (place, status) => {
-      if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-        setSelectedPlace(place);
-      }
-    });
-  }, [getPlaceDetails]);
+  useEffect(() => {
+    console.log("Updated pinned places:", allPinnedPlaces);
+  }, [allPinnedPlaces]);
 
   const handleSearchSelect = useCallback(async (placeId: string, description: string) => {
     try {
@@ -132,6 +129,64 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     }
   }, [clearSuggestions, setValue, setCoordinates, fetchPlaceDetails]);
 
+  const handlePinPlace = useCallback(async () => {
+    if (!selectedPlace || !tripId) return;
+
+    try {
+      const placeCoordinates = selectedPlace.geometry?.location
+        ? {
+            lat: selectedPlace.geometry.location.lat(),
+            lng: selectedPlace.geometry.location.lng(),
+          }
+        : coordinates;
+
+      // Get the primary category from place types
+      const { category } = selectedPlace.types ?
+        getPrimaryCategory(selectedPlace.types) :
+        { category: 'attraction' as PlaceCategory };
+
+      console.log("Pinning place with category:", category);
+
+      const response = await fetch(`/api/trips/${tripId}/pinned-places`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: selectedPlace.name,
+          placeId: selectedPlace.place_id,
+          address: selectedPlace.formatted_address,
+          coordinates: placeCoordinates,
+          phone: selectedPlace.formatted_phone_number,
+          website: selectedPlace.website,
+          rating: selectedPlace.rating,
+          category: category,
+          openingHours: selectedPlace.opening_hours?.weekday_text,
+          photos: selectedPlace.photos?.map(photo => photo.getUrl())
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to pin place');
+      }
+
+      // Invalidate and refetch pinned places
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/pinned-places`] });
+
+      toast({
+        title: "Success",
+        description: "Place has been pinned to your trip",
+      });
+    } catch (error) {
+      console.error('Error pinning place:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to pin place to your trip",
+      });
+    }
+  }, [selectedPlace, tripId, coordinates, toast, queryClient]);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setValue(e.target.value);
   };
@@ -151,66 +206,20 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     fetchPlaceDetails(event.placeId);
   }, [fetchPlaceDetails]);
 
-  const handlePinPlace = useCallback(async () => {
-    if (!selectedPlace || !tripId) return;
-
-    try {
-      const placeCoordinates = selectedPlace.geometry?.location
-        ? {
-            lat: selectedPlace.geometry.location.lat(),
-            lng: selectedPlace.geometry.location.lng(),
-          }
-        : coordinates;
-
-      // Get the primary category from place types
-      const { category } = selectedPlace.types ?
-        getPrimaryCategory(selectedPlace.types) :
-        { category: 'attraction' as PlaceCategory };
-
-      const response = await fetch(`/api/trips/${tripId}/pinned-places`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: selectedPlace.name,
-          placeId: selectedPlace.place_id,
-          address: selectedPlace.formatted_address,
-          coordinates: placeCoordinates,
-          phone: selectedPlace.formatted_phone_number,
-          website: selectedPlace.website,
-          rating: selectedPlace.rating,
-          category: category, // Add the category
-          openingHours: selectedPlace.opening_hours?.weekday_text,
-          photos: selectedPlace.photos?.map(photo => photo.getUrl())
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to pin place');
-      }
-
-      toast({
-        title: "Success",
-        description: "Place has been pinned to your trip",
-      });
-
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/pinned-places`] });
-    } catch (error) {
-      console.error('Error pinning place:', error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to pin place to your trip",
-      });
-    }
-  }, [selectedPlace, tripId, coordinates, toast, queryClient]);
-
   const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
     initPlacesService(map);
     map.addListener('click', handleMapClick);
   }, [initPlacesService, handleMapClick]);
+
+  const fetchPlaceDetails = useCallback((placeId: string) => {
+    getPlaceDetails(placeId, (place, status) => {
+      if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+        setSelectedPlace(place);
+      }
+    });
+  }, [getPlaceDetails]);
+
 
   if (loadError) {
     return (
@@ -229,7 +238,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   }
 
   return (
-    <Card className={cn("overflow-hidden relative", className)} ref={placeDetailsRef}>
+    <Card className={cn("overflow-hidden relative", className)}>
       <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 w-[400px]">
         <div className="relative">
           <Input
@@ -547,20 +556,23 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
           }}
         />
 
-        {allPinnedPlaces.map((place: PinnedPlace) => (
-          <MarkerF
-            key={place.id}
-            position={place.coordinates}
-            title={place.name}
-            icon={getCategoryIcon(place.category || 'attraction')}
-            onClick={() => {
-              if (place.placeId) {
-                fetchPlaceDetails(place.placeId);
-              }
-              onPinClick?.(place);
-            }}
-          />
-        ))}
+        {allPinnedPlaces.map((place: PinnedPlace) => {
+          console.log("Rendering marker for place:", place);
+          return (
+            <MarkerF
+              key={place.id}
+              position={place.coordinates}
+              title={place.name}
+              icon={getCategoryIcon(place.category || 'attraction')}
+              onClick={() => {
+                if (place.placeId) {
+                  fetchPlaceDetails(place.placeId);
+                }
+                onPinClick?.(place);
+              }}
+            />
+          );
+        })}
       </GoogleMap>
     </Card>
   );
