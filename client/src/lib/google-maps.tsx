@@ -39,19 +39,30 @@ export const CATEGORY_ICONS = {
 export const PLACE_TYPE_TO_CATEGORY: Record<string, keyof typeof CATEGORY_ICONS> = {
   restaurant: 'restaurant',
   cafe: 'restaurant',
+  food: 'restaurant',
+  meal_delivery: 'restaurant',
+  meal_takeaway: 'restaurant',
   bar: 'nightlife',
   night_club: 'nightlife',
+  casino: 'nightlife',
   lodging: 'hotel',
   hotel: 'hotel',
+  resort: 'hotel',
   museum: 'attraction',
   art_gallery: 'attraction',
   tourist_attraction: 'attraction',
   amusement_park: 'attraction',
+  aquarium: 'attraction',
+  zoo: 'attraction',
   shopping_mall: 'shopping',
   store: 'store',
   clothing_store: 'shopping',
+  department_store: 'shopping',
+  electronics_store: 'shopping',
+  jewelry_store: 'shopping',
   park: 'park',
   beach: 'beach',
+  natural_feature: 'park',
 };
 
 // Type definition for place categories
@@ -127,7 +138,11 @@ export const getPrimaryCategory = (types: string[] = []): { category: PlaceCateg
     if (type in PLACE_TYPE_TO_CATEGORY) {
       return {
         category: PLACE_TYPE_TO_CATEGORY[type],
-        label: type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+        label: type
+          .split('_')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ')
+          .replace(/And/g, '&') // Replace "And" with "&" for better presentation
       };
     }
   }
@@ -138,7 +153,11 @@ export const getPrimaryCategory = (types: string[] = []): { category: PlaceCateg
       if (type.includes(key)) {
         return {
           category: value,
-          label: type.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')
+          label: type
+            .split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ')
+            .replace(/And/g, '&')
         };
       }
     }
@@ -147,7 +166,11 @@ export const getPrimaryCategory = (types: string[] = []): { category: PlaceCateg
   // Default to attraction if no match found
   return {
     category: 'attraction',
-    label: types[0]?.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') || 'Point of Interest'
+    label: types[0]
+      ?.split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
+      .replace(/And/g, '&') || 'Point of Interest'
   };
 };
 

@@ -1,5 +1,7 @@
 import { useState, useRef, useCallback, useMemo } from "react";
 import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus, ChevronDown, ChevronUp, Image } from "lucide-react";
+import { MdRestaurant, MdHotel } from "react-icons/md";
+import { FaLandmark, FaShoppingBag, FaUmbrellaBeach, FaGlassCheers, FaStore, FaTree } from "react-icons/fa";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,8 +19,10 @@ import {
   DEFAULT_MAP_OPTIONS,
   getCategoryIcon,
   getPrimaryCategory,
+  CATEGORY_ICONS,
   type PlaceDetails,
   type PinnedPlace,
+  type PlaceCategory,
 } from "@/lib/google-maps";
 import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
 
@@ -29,6 +33,11 @@ interface MapViewProps {
   onPinClick?: (place: PinnedPlace) => void;
   className?: string;
 }
+
+const CategoryIcon = ({ category }: { category: PlaceCategory }) => {
+  const IconComponent = CATEGORY_ICONS[category];
+  return IconComponent ? <IconComponent className="h-4 w-4 text-[#70757a]" /> : null;
+};
 
 const StarRating = ({ rating }: { rating: number }) => {
   return (
@@ -263,9 +272,17 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                   </div>
                 )}
                 {selectedPlace.types && (
-                  <span className="text-[14px] text-[#70757a]">
-                    {getPrimaryCategory(selectedPlace.types).label}
-                  </span>
+                  <div className="flex items-center gap-2 text-[14px] text-[#70757a]">
+                    {(() => {
+                      const { category, label } = getPrimaryCategory(selectedPlace.types);
+                      return (
+                        <>
+                          <CategoryIcon category={category} />
+                          <span>{label}</span>
+                        </>
+                      );
+                    })()}
+                  </div>
                 )}
               </div>
             </div>
