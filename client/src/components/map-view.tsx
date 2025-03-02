@@ -575,12 +575,13 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
               position={place.coordinates}
               title={place.name}
               icon={{
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 10,
+                path: google.maps.SymbolPath.MARKER,
+                scale: 30,
                 fillColor: "#DC2626", // Red color
                 fillOpacity: 1,
                 strokeWeight: 2,
                 strokeColor: "#FFFFFF",
+                labelOrigin: new google.maps.Point(0, -15)
               }}
               onClick={() => {
                 if (place.placeId) {
