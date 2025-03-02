@@ -575,9 +575,9 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
               position={place.coordinates}
               title={place.name}
               icon={{
-                path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-                scale: 6,
-                fillColor: "#1E88E5",
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 10,
+                fillColor: "#DC2626", // Red color
                 fillOpacity: 1,
                 strokeWeight: 2,
                 strokeColor: "#FFFFFF",
