@@ -58,7 +58,7 @@ const StarRating = ({ rating }: { rating: number }) => {
   );
 };
 
-interface MapViewProps {
+export interface MapViewProps {
   location: string;
   tripId?: number;
   pinnedPlaces?: PinnedPlace[] | { places: PinnedPlace[] };
@@ -66,6 +66,20 @@ interface MapViewProps {
   onPlaceNameClick?: (place: PinnedPlace) => void;
   className?: string;
 }
+
+export const handlePlaceNameClick = (
+  place: PinnedPlace,
+  mapRef: React.RefObject<google.maps.Map | null>,
+  fetchPlaceDetails: (placeId: string) => void
+): void => {
+  if (mapRef.current && place.coordinates) {
+    mapRef.current.panTo(place.coordinates);
+    mapRef.current.setZoom(17);
+  }
+  if (place.placeId) {
+    fetchPlaceDetails(place.placeId);
+  }
+};
 
 export function MapView({
   location,
@@ -86,7 +100,6 @@ export function MapView({
   const { coordinates, setCoordinates } = useMapCoordinates(location);
   const { placesService, initPlacesService, getPlaceDetails } = usePlacesService();
 
-  // Initialize Places Autocomplete hook
   const {
     ready,
     value,
@@ -109,31 +122,23 @@ export function MapView({
     return [];
   }, [pinnedPlaces]);
 
-  const handlePlaceNameClick = useCallback((place: PinnedPlace) => {
-    if (mapRef.current && place.coordinates) {
-      mapRef.current.panTo(place.coordinates);
-      mapRef.current.setZoom(17);
-    }
-  }, []);
-
-  const handleMarkerClick = useCallback((place: PinnedPlace) => {
-    if (place.placeId) {
-      fetchPlaceDetails(place.placeId);
-    }
-    if (mapRef.current) {
-      mapRef.current.panTo(place.coordinates);
-      mapRef.current.setZoom(17);
-    }
-    onPinClick?.(place);
-  }, [onPinClick]);
-
-  const fetchPlaceDetails = useCallback((placeId: string) => {
+  const fetchDetails = useCallback((placeId: string) => {
     getPlaceDetails(placeId, (place, status) => {
       if (status === google.maps.places.PlacesServiceStatus.OK && place) {
         setSelectedPlace(place);
       }
     });
   }, [getPlaceDetails]);
+
+  const handleMarkerClick = useCallback((place: PinnedPlace) => {
+    handlePlaceNameClick(place, mapRef, fetchDetails);
+    onPinClick?.(place);
+  }, [onPinClick, fetchDetails, handlePlaceNameClick]);
+
+  const handleLocalPlaceNameClick = useCallback((place: PinnedPlace) => {
+    handlePlaceNameClick(place, mapRef, fetchDetails);
+    onPlaceNameClick?.(place);
+  }, [onPlaceNameClick, fetchDetails, handlePlaceNameClick]);
 
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
     const event = e as unknown as { placeId?: string; stop?: () => void };
@@ -142,8 +147,8 @@ export function MapView({
       setSelectedPlace(null);
       return;
     }
-    fetchPlaceDetails(event.placeId);
-  }, [fetchPlaceDetails]);
+    fetchDetails(event.placeId);
+  }, [fetchDetails]);
 
   const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
@@ -165,11 +170,11 @@ export function MapView({
         mapRef.current.setZoom(15);
       }
 
-      fetchPlaceDetails(placeId);
+      fetchDetails(placeId);
     } catch (error) {
       console.error("Error selecting place:", error);
     }
-  }, [clearSuggestions, setValue, setCoordinates, fetchPlaceDetails]);
+  }, [clearSuggestions, setValue, setCoordinates, fetchDetails]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setValue(e.target.value);
