@@ -30,6 +30,24 @@ interface MapViewProps {
   className?: string;
 }
 
+const StarRating = ({ rating }: { rating: number }) => {
+  return (
+    <div className="flex items-center">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <Star
+          key={star}
+          className={`h-3.5 w-3.5 -ml-0.5 first:ml-0 ${
+            star <= Math.floor(rating)
+              ? "text-yellow-400 fill-current"
+              : star - rating <= 0.5
+              ? "text-yellow-400 fill-[50%]"
+              : "text-gray-300 fill-current"
+          }`}
+        />
+      ))}
+    </div>
+  );
+};
 
 export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, className }: MapViewProps) {
   const { toast } = useToast();
@@ -230,8 +248,8 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 )}
                 {selectedPlace.rating && (
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center">
-                      <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                    <div className="flex items-center gap-1">
+                      <StarRating rating={selectedPlace.rating} />
                       <span className="ml-1 font-medium">{selectedPlace.rating}</span>
                     </div>
                     <span className="text-muted-foreground text-sm">
@@ -348,7 +366,18 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
               {selectedPlace.reviews && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium text-muted-foreground">Reviews</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-medium text-muted-foreground">Reviews</h3>
+                      {selectedPlace.rating && (
+                        <div className="flex items-center gap-1">
+                          <StarRating rating={selectedPlace.rating} />
+                          <span className="font-medium">{selectedPlace.rating}</span>
+                          <span className="text-muted-foreground">
+                            ({selectedPlace.user_ratings_total?.toLocaleString()})
+                          </span>
+                        </div>
+                      )}
+                    </div>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -363,10 +392,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                       <div key={index} className="space-y-2">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm">{review.author_name}</span>
-                          <div className="flex items-center">
-                            <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                            <span className="ml-1 text-sm">{review.rating}</span>
-                          </div>
+                          <StarRating rating={review.rating || 0} />
                         </div>
                         <p className="text-sm text-muted-foreground line-clamp-3">{review.text}</p>
                       </div>
