@@ -271,7 +271,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         </div>
       </div>
 
-      {/* Main place details sidebar */}
+      {/* Place details sidebar */}
       {selectedPlace && (
         <div className="absolute top-0 left-0 bottom-0 w-[400px] bg-background shadow-lg z-40 flex flex-col">
           {/* Header section */}
@@ -312,7 +312,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
             </div>
           </div>
 
-          {/* Enhanced Action buttons - 4 columns grid */}
+          {/* Action buttons - 4 columns grid */}
           <div className="grid grid-cols-4 p-2 border-b">
             <a
               href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(selectedPlace.formatted_address)}`}
@@ -362,7 +362,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
           {(selectedPlace.reservable || selectedPlace.booking_url) && (
             <div className="p-4 border-b">
               <Button
-                className="w-full"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium"
                 size="lg"
                 onClick={() => window.open(selectedPlace.booking_url || selectedPlace.url, '_blank')}
               >
@@ -543,7 +543,17 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                       onClick={() => setExpandedReviews(!expandedReviews)}
                       className="text-primary text-sm font-medium px-2"
                     >
-                      {expandedReviews ? "Show less" : "More"}
+                      {expandedReviews ? (
+                        <>
+                          Show less
+                          <ChevronUp className="h-4 w-4 ml-1" />
+                        </>
+                      ) : (
+                        <>
+                          More
+                          <ChevronDown className="h-4 w-4 ml-1" />
+                        </>
+                      )}
                     </Button>
                   </div>
                   <div className="space-y-6">
