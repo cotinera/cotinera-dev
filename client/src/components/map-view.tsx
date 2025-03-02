@@ -235,7 +235,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                       <span className="ml-1 font-medium">{selectedPlace.rating}</span>
                     </div>
                     <span className="text-muted-foreground text-sm">
-                      {selectedPlace.reviews?.length} reviews
+                      {selectedPlace.user_ratings_total?.toLocaleString()} reviews
                     </span>
                   </div>
                 )}

@@ -82,6 +82,7 @@ export interface PlaceDetails {
   formatted_address: string;
   formatted_phone_number?: string;
   rating?: number;
+  user_ratings_total?: number;  // Added field for total review count
   opening_hours?: {
     weekday_text: string[];
     isOpen: () => boolean;
@@ -180,6 +181,7 @@ export const usePlacesService = () => {
         'formatted_address',
         'formatted_phone_number',
         'rating',
+        'user_ratings_total',  // Added field to fetch total reviews
         'opening_hours',
         'website',
         'photos',
