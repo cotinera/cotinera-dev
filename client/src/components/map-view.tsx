@@ -222,22 +222,30 @@ export function MapView({
   }, [selectedPlaceDetails, tripId, coordinates, toast, queryClient]);
 
   useEffect(() => {
-    if (selectedPlace && selectedPlace.placeId) {
-      getPlaceDetails(selectedPlace.placeId, (place, status) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-          setSelectedPlaceDetails(place);
-          if (mapRef.current && selectedPlace.coordinates) {
-            mapRef.current.panTo(selectedPlace.coordinates);
-            mapRef.current.setZoom(17);
-          }
-        }
-      });
-    } else if (selectedPlace && selectedPlace.coordinates) {
-      if (mapRef.current) {
+    if (selectedPlace) {
+      if (mapRef.current && selectedPlace.coordinates) {
         mapRef.current.panTo(selectedPlace.coordinates);
         mapRef.current.setZoom(17);
       }
-      setSelectedPlaceDetails(null);
+      if (selectedPlace.placeId) {
+        getPlaceDetails(selectedPlace.placeId, (place, status) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+            setSelectedPlaceDetails(place);
+          }
+        });
+      } else {
+        // If there's no placeId, create a simplified place details object
+        setSelectedPlaceDetails({
+          name: selectedPlace.name,
+          formatted_address: selectedPlace.address,
+          geometry: {
+            location: new google.maps.LatLng(
+              selectedPlace.coordinates.lat,
+              selectedPlace.coordinates.lng
+            )
+          }
+        } as PlaceDetails);
+      }
     } else {
       setSelectedPlaceDetails(null);
     }
