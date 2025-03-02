@@ -48,6 +48,22 @@ export function MapView({
   const { coordinates, setCoordinates } = useMapCoordinates(location);
   const { placesService, initPlacesService, getPlaceDetails } = usePlacesService();
 
+  // Initialize Places Autocomplete hook early
+  const {
+    ready,
+    value,
+    suggestions: { status, data },
+    setValue,
+    clearSuggestions,
+  } = usePlacesAutocomplete({
+    requestOptions: {
+      types: ['establishment', 'geocode'],
+      location: isLoaded ? new google.maps.LatLng(coordinates.lat, coordinates.lng) : undefined,
+      radius: 50000,
+    },
+    debounce: 300,
+  });
+
   const allPinnedPlaces = useMemo(() => {
     if (!pinnedPlaces) return [];
     if (Array.isArray(pinnedPlaces)) return pinnedPlaces;
@@ -99,6 +115,10 @@ export function MapView({
     }
   }, [clearSuggestions, setValue, setCoordinates, fetchPlaceDetails]);
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setValue(e.target.value);
+  };
+
   const handlePinPlace = useCallback(async () => {
     if (!selectedPlace || !tripId) return;
 
@@ -142,28 +162,10 @@ export function MapView({
     }
   }, [selectedPlace, tripId, coordinates, toast, queryClient]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setValue(e.target.value);
-  };
-
-  const {
-    ready,
-    value,
-    suggestions: { status, data },
-    setValue,
-    clearSuggestions,
-  } = usePlacesAutocomplete({
-    requestOptions: {
-      types: ['establishment', 'geocode'],
-      location: isLoaded ? new google.maps.LatLng(coordinates.lat, coordinates.lng) : undefined,
-      radius: 50000,
-    },
-    debounce: 300,
-  });
 
   if (loadError) {
     return (
-      <Card className="p-4 text-center text-destructive">
+      <Card className={cn("p-4 text-center text-destructive", className)}>
         Error loading map
       </Card>
     );
@@ -171,7 +173,7 @@ export function MapView({
 
   if (!isLoaded) {
     return (
-      <Card className="p-4 flex items-center justify-center h-[400px]">
+      <Card className={cn("p-4 flex items-center justify-center h-[400px]", className)}>
         <Loader2 className="h-8 w-8 animate-spin" />
       </Card>
     );
