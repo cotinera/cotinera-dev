@@ -1,14 +1,11 @@
-import { useState, useRef, useCallback, useMemo, useEffect } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus, ChevronDown, ChevronUp, Image } from "lucide-react";
-import { MdRestaurant, MdHotel } from "react-icons/md";
-import { FaLandmark, FaShoppingBag, FaUmbrellaBeach, FaGlassCheers, FaStore, FaTree } from "react-icons/fa";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
 import {
   useGoogleMapsScript,
   useMapCoordinates,
@@ -17,12 +14,8 @@ import {
   MarkerF,
   MAP_CONTAINER_STYLE,
   DEFAULT_MAP_OPTIONS,
-  getCategoryIcon,
-  getPrimaryCategory,
-  CATEGORY_ICONS,
   type PlaceDetails,
   type PinnedPlace,
-  type PlaceCategory,
 } from "@/lib/google-maps";
 import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
 
@@ -31,46 +24,35 @@ interface MapViewProps {
   tripId?: number;
   pinnedPlaces?: PinnedPlace[] | { places: PinnedPlace[] };
   onPinClick?: (place: PinnedPlace) => void;
+  onPlaceNameClick?: (place: PinnedPlace) => void;
   className?: string;
 }
 
-export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, className }: MapViewProps) {
+export function MapView({ 
+  location, 
+  tripId, 
+  pinnedPlaces = [], 
+  onPinClick,
+  onPlaceNameClick,
+  className 
+}: MapViewProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const mapRef = useRef<google.maps.Map | null>(null);
   const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
-  const [expandedReviews, setExpandedReviews] = useState(false);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
+  const [expandedReviews, setExpandedReviews] = useState(false);
 
   const { isLoaded, loadError } = useGoogleMapsScript();
-  const { coordinates, setCoordinates, geocodeLocation } = useMapCoordinates(location);
+  const { coordinates, setCoordinates } = useMapCoordinates(location);
   const { placesService, initPlacesService, getPlaceDetails } = usePlacesService();
 
   const allPinnedPlaces = useMemo(() => {
-    console.log("Processing pinnedPlaces input:", pinnedPlaces);
-
-    if (!pinnedPlaces) {
-      console.log("No pinned places provided");
-      return [];
-    }
-
-    if (Array.isArray(pinnedPlaces)) {
-      console.log("Pinned places is an array:", pinnedPlaces);
-      return pinnedPlaces;
-    }
-
-    if ('places' in pinnedPlaces) {
-      console.log("Pinned places is an object with places:", pinnedPlaces.places);
-      return pinnedPlaces.places;
-    }
-
-    console.log("Unknown pinned places format, defaulting to empty array");
+    if (!pinnedPlaces) return [];
+    if (Array.isArray(pinnedPlaces)) return pinnedPlaces;
+    if ('places' in pinnedPlaces) return pinnedPlaces.places;
     return [];
   }, [pinnedPlaces]);
-
-  useEffect(() => {
-    console.log("Pinned places updated:", allPinnedPlaces);
-  }, [allPinnedPlaces]);
 
   const fetchPlaceDetails = useCallback((placeId: string) => {
     getPlaceDetails(placeId, (place, status) => {
@@ -95,21 +77,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     initPlacesService(map);
     map.addListener('click', handleMapClick);
   }, [initPlacesService, handleMapClick]);
-
-  const {
-    ready,
-    value,
-    suggestions: { status, data },
-    setValue,
-    clearSuggestions,
-  } = usePlacesAutocomplete({
-    requestOptions: {
-      types: ['establishment', 'geocode'],
-      location: isLoaded ? new google.maps.LatLng(coordinates.lat, coordinates.lng) : undefined,
-      radius: 50000,
-    },
-    debounce: 300,
-  });
 
   const handleSearchSelect = useCallback(async (placeId: string, description: string) => {
     try {
@@ -187,20 +154,43 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     setValue(e.target.value);
   };
 
-  const handlePlaceSelect = useCallback((place: PinnedPlace) => {
-    // Only handle map navigation, don't show details
+  const handlePlaceNameClick = useCallback((place: PinnedPlace) => {
+    // Only handle map navigation when clicking the place name
     if (mapRef.current && place.coordinates) {
       mapRef.current.panTo(place.coordinates);
       mapRef.current.setZoom(17);
     }
-  }, []);
+    // Call the provided onPlaceNameClick prop if it exists
+    onPlaceNameClick?.(place);
+  }, [onPlaceNameClick]);
 
-  useEffect(() => {
-    if (onPinClick) {
-      onPinClick = handlePlaceSelect;
+  const handleMarkerClick = useCallback((place: PinnedPlace) => {
+    // Handle both navigation and details display for marker clicks
+    if (place.placeId) {
+      fetchPlaceDetails(place.placeId);
     }
-  }, [handlePlaceSelect, onPinClick]);
+    if (mapRef.current) {
+      mapRef.current.panTo(place.coordinates);
+      mapRef.current.setZoom(17);
+    }
+    onPinClick?.(place);
+  }, [fetchPlaceDetails, onPinClick]);
 
+
+  const {
+    ready,
+    value,
+    suggestions: { status, data },
+    setValue,
+    clearSuggestions,
+  } = usePlacesAutocomplete({
+    requestOptions: {
+      types: ['establishment', 'geocode'],
+      location: isLoaded ? new google.maps.LatLng(coordinates.lat, coordinates.lng) : undefined,
+      radius: 50000,
+    },
+    debounce: 300,
+  });
 
   if (loadError) {
     return (
@@ -592,40 +582,23 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
           }}
         />
 
-        {allPinnedPlaces.map((place: PinnedPlace) => {
-          console.log("Rendering marker for place:", place);
-          if (!place.coordinates || !place.coordinates.lat || !place.coordinates.lng) {
-            console.warn("Invalid coordinates for place:", place);
-            return null;
-          }
-
-          return (
-            <MarkerF
-              key={place.id}
-              position={place.coordinates}
-              title={place.name}
-              icon={{
-                path: google.maps.SymbolPath.MARKER,
-                scale: 30,
-                fillColor: "#DC2626",
-                fillOpacity: 1,
-                strokeWeight: 2,
-                strokeColor: "#FFFFFF",
-                labelOrigin: new google.maps.Point(0, -15)
-              }}
-              onClick={() => {
-                if (place.placeId) {
-                  fetchPlaceDetails(place.placeId);
-                }
-                if (mapRef.current) {
-                  mapRef.current.panTo(place.coordinates);
-                  mapRef.current.setZoom(17);
-                }
-                onPinClick?.(place);
-              }}
-            />
-          );
-        })}
+        {allPinnedPlaces.map((place: PinnedPlace) => (
+          <MarkerF
+            key={place.id}
+            position={place.coordinates}
+            title={place.name}
+            icon={{
+              path: google.maps.SymbolPath.MARKER,
+              scale: 30,
+              fillColor: "#DC2626",
+              fillOpacity: 1,
+              strokeWeight: 2,
+              strokeColor: "#FFFFFF",
+              labelOrigin: new google.maps.Point(0, -15)
+            }}
+            onClick={() => handleMarkerClick(place)}
+          />
+        ))}
       </GoogleMap>
     </Card>
   );
