@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo, useEffect } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus, ChevronDown, ChevronUp, Image } from "lucide-react";
 import { MdRestaurant, MdHotel } from "react-icons/md";
 import { FaLandmark, FaShoppingBag, FaUmbrellaBeach, FaGlassCheers, FaStore, FaTree } from "react-icons/fa";
@@ -43,9 +43,9 @@ const StarRating = ({ rating }: { rating: number }) => {
   return (
     <div className="flex items-center">
       {[1, 2, 3, 4, 5].map((star) => {
-        const roundedRating = Math.round(rating * 2) / 2; 
+        const roundedRating = Math.round(rating * 2) / 2;
         const difference = star - roundedRating;
-        let starClass = "text-yellow-400 fill-current"; 
+        let starClass = "text-yellow-400 fill-current";
 
         if (difference > 0) {
           if (difference === 0.5) {
@@ -138,9 +138,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     return [];
   }, [pinnedPlaces]);
 
-  useEffect(() => {
-  }, [allPinnedPlaces]);
-
   const fetchPlaceDetails = useCallback((placeId: string) => {
     getPlaceDetails(placeId, (place, status) => {
       if (status === google.maps.places.PlacesServiceStatus.OK && place) {
@@ -230,8 +227,6 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
       if (!response.ok) {
         throw new Error('Failed to pin place');
       }
-
-      const newPinnedPlace = await response.json();
 
       await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/pinned-places`] });
 
@@ -484,20 +479,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
               {selectedPlace.reviews && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-[16px] font-medium text-foreground">Reviews</h3>
-                      {selectedPlace.rating && (
-                        <div className="flex items-center gap-1">
-                          <StarRating rating={selectedPlace.rating} />
-                          <span className="text-sm">
-                            {selectedPlace.rating}
-                            <span className="text-[#70757a] ml-1">
-                              ({selectedPlace.user_ratings_total?.toLocaleString()})
-                            </span>
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    <h3 className="text-[16px] font-medium text-foreground">Reviews</h3>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -598,7 +580,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
               icon={{
                 path: google.maps.SymbolPath.MARKER,
                 scale: 30,
-                fillColor: "#DC2626", 
+                fillColor: "#DC2626",
                 fillOpacity: 1,
                 strokeWeight: 2,
                 strokeColor: "#FFFFFF",
