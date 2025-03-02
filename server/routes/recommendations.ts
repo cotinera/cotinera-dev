@@ -37,6 +37,17 @@ router.post("/api/recommendations/generate", async (req, res) => {
 
     const { tripId, location, startDate, endDate } = req.body;
 
+    // Check if user has set their preferences
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, req.session.userId),
+    });
+
+    if (!user?.preferences?.travelPreferences) {
+      return res.status(400).json({ 
+        error: "Please set your travel preferences before generating recommendations" 
+      });
+    }
+
     const recommendations = await generateTravelRecommendations({
       userId: req.session.userId,
       context: {
@@ -50,7 +61,7 @@ router.post("/api/recommendations/generate", async (req, res) => {
     res.json(recommendations);
   } catch (error) {
     console.error("Error generating recommendations:", error);
-    res.status(500).json({ error: "Failed to generate recommendations" });
+    res.status(500).json({ error: "Failed to generate recommendations", details: error.message });
   }
 });
 

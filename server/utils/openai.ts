@@ -41,7 +41,7 @@ export async function generateTravelRecommendations(request: RecommendationReque
     - Trip Duration: ${travelPreferences.tripDuration.min}-${travelPreferences.tripDuration.max} days
     ${request.context?.location ? `- Considering location: ${request.context.location}` : ''}
     ${request.context?.startDate ? `- For dates: ${request.context.startDate} to ${request.context.endDate}` : ''}
-    
+
     Provide recommendations in JSON format with the following structure:
     {
       "destinations": [{
@@ -58,11 +58,19 @@ export async function generateTravelRecommendations(request: RecommendationReque
   };
 
   try {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OpenAI API key not configured");
+    }
+
     const completion = await openai.chat.completions.create({
       model: "gpt-4o",
       messages: [{ role: "system", content: prompt.content }],
       response_format: { type: "json_object" }
     });
+
+    if (!completion.choices[0].message.content) {
+      throw new Error("No response from OpenAI");
+    }
 
     const recommendations = JSON.parse(completion.choices[0].message.content);
 
@@ -87,6 +95,6 @@ export async function generateTravelRecommendations(request: RecommendationReque
     return savedRecommendations;
   } catch (error) {
     console.error('Error generating recommendations:', error);
-    throw new Error('Failed to generate travel recommendations');
+    throw error;
   }
 }
