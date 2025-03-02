@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus, ChevronDown, ChevronUp, Image } from "lucide-react";
 import { MdRestaurant, MdHotel } from "react-icons/md";
 import { FaLandmark, FaShoppingBag, FaUmbrellaBeach, FaGlassCheers, FaStore, FaTree } from "react-icons/fa";
@@ -65,21 +65,8 @@ export interface MapViewProps {
   onPinClick?: (place: PinnedPlace) => void;
   onPlaceNameClick?: (place: PinnedPlace) => void;
   className?: string;
+  selectedPlace?: PinnedPlace | null;
 }
-
-export const handlePlaceNameClick = (
-  place: PinnedPlace,
-  mapRef: React.RefObject<google.maps.Map | null>,
-  fetchPlaceDetails: (placeId: string) => void
-): void => {
-  if (mapRef.current && place.coordinates) {
-    mapRef.current.panTo(place.coordinates);
-    mapRef.current.setZoom(17);
-  }
-  if (place.placeId) {
-    fetchPlaceDetails(place.placeId);
-  }
-};
 
 export function MapView({
   location,
@@ -87,12 +74,13 @@ export function MapView({
   pinnedPlaces = [],
   onPinClick,
   onPlaceNameClick,
-  className
+  className,
+  selectedPlace
 }: MapViewProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const mapRef = useRef<google.maps.Map | null>(null);
-  const [selectedPlace, setSelectedPlace] = useState<PlaceDetails | null>(null);
+  const [selectedPlaceDetails, setSelectedPlaceDetails] = useState<PlaceDetails | null>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [expandedReviews, setExpandedReviews] = useState(false);
 
@@ -125,7 +113,7 @@ export function MapView({
   const fetchDetails = useCallback((placeId: string) => {
     getPlaceDetails(placeId, (place, status) => {
       if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-        setSelectedPlace(place);
+        setSelectedPlaceDetails(place);
       }
     });
   }, [getPlaceDetails]);
@@ -144,7 +132,7 @@ export function MapView({
     const event = e as unknown as { placeId?: string; stop?: () => void };
     if (event.stop) event.stop();
     if (!event.placeId) {
-      setSelectedPlace(null);
+      setSelectedPlaceDetails(null);
       return;
     }
     fetchDetails(event.placeId);
@@ -181,13 +169,13 @@ export function MapView({
   };
 
   const handlePinPlace = useCallback(async () => {
-    if (!selectedPlace || !tripId) return;
+    if (!selectedPlaceDetails || !tripId) return;
 
     try {
-      const placeCoordinates = selectedPlace.geometry?.location
+      const placeCoordinates = selectedPlaceDetails.geometry?.location
         ? {
-            lat: selectedPlace.geometry.location.lat(),
-            lng: selectedPlace.geometry.location.lng(),
+            lat: selectedPlaceDetails.geometry.location.lat(),
+            lng: selectedPlaceDetails.geometry.location.lng(),
           }
         : coordinates;
 
@@ -197,8 +185,8 @@ export function MapView({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: selectedPlace.name,
-          placeId: selectedPlace.place_id,
+          name: selectedPlaceDetails.name,
+          placeId: selectedPlaceDetails.place_id,
           coordinates: placeCoordinates,
         }),
       });
@@ -221,7 +209,29 @@ export function MapView({
         description: "Failed to pin place to your trip",
       });
     }
-  }, [selectedPlace, tripId, coordinates, toast, queryClient]);
+  }, [selectedPlaceDetails, tripId, coordinates, toast, queryClient]);
+
+  useEffect(() => {
+    if (selectedPlace && selectedPlace.placeId) {
+      getPlaceDetails(selectedPlace.placeId, (place, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+          setSelectedPlaceDetails(place);
+          if (mapRef.current && selectedPlace.coordinates) {
+            mapRef.current.panTo(selectedPlace.coordinates);
+            mapRef.current.setZoom(17);
+          }
+        }
+      });
+    } else if (selectedPlace && selectedPlace.coordinates) {
+      if (mapRef.current) {
+        mapRef.current.panTo(selectedPlace.coordinates);
+        mapRef.current.setZoom(17);
+      }
+      setSelectedPlaceDetails(null);
+    } else {
+      setSelectedPlaceDetails(null);
+    }
+  }, [selectedPlace, getPlaceDetails]);
 
   if (loadError) {
     return (
@@ -269,35 +279,34 @@ export function MapView({
         </div>
       </div>
 
-      {/* Place details sidebar */}
-      {selectedPlace && (
+      {selectedPlaceDetails && (
         <div className="absolute top-0 left-0 bottom-0 w-[400px] bg-background shadow-lg z-40 flex flex-col">
           <div className="p-6 border-b">
             <div className="space-y-2">
-              <h2 className="text-[22px] font-medium leading-7 text-foreground">{selectedPlace.name}</h2>
+              <h2 className="text-[22px] font-medium leading-7 text-foreground">{selectedPlaceDetails.name}</h2>
               <div className="flex flex-col gap-1">
-                {selectedPlace.rating && (
+                {selectedPlaceDetails.rating && (
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-0.5">
-                      <StarRating rating={selectedPlace.rating} />
-                      <span className="ml-1 text-sm font-medium">{selectedPlace.rating}</span>
+                      <StarRating rating={selectedPlaceDetails.rating} />
+                      <span className="ml-1 text-sm font-medium">{selectedPlaceDetails.rating}</span>
                     </div>
                     <span className="text-[#70757a] text-sm">
-                      ({selectedPlace.user_ratings_total?.toLocaleString()})
+                      ({selectedPlaceDetails.user_ratings_total?.toLocaleString()})
                     </span>
                   </div>
                 )}
-                {selectedPlace.types && (
+                {selectedPlaceDetails.types && (
                   <div className="flex items-center gap-2 text-[14px] text-[#70757a]">
                     {(() => {
-                      const { category, label } = getPrimaryCategory(selectedPlace.types);
+                      const { category, label } = getPrimaryCategory(selectedPlaceDetails.types);
                       return (
                         <>
                           <CategoryIcon category={category} />
                           <span>{label}</span>
-                          {selectedPlace.price_level && (
+                          {selectedPlaceDetails.price_level && (
                             <span className="ml-1">
-                              {"$".repeat(selectedPlace.price_level)}
+                              {"$".repeat(selectedPlaceDetails.price_level)}
                             </span>
                           )}
                         </>
@@ -311,7 +320,7 @@ export function MapView({
 
           <div className="grid grid-cols-4 p-2 border-b">
             <a
-              href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(selectedPlace.formatted_address)}`}
+              href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(selectedPlaceDetails.formatted_address)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex flex-col items-center justify-center p-3 hover:bg-accent rounded-lg gap-1.5 transition-colors"
@@ -330,9 +339,9 @@ export function MapView({
               </button>
             )}
 
-            {selectedPlace.formatted_phone_number && (
+            {selectedPlaceDetails.formatted_phone_number && (
               <a
-                href={`tel:${selectedPlace.formatted_phone_number}`}
+                href={`tel:${selectedPlaceDetails.formatted_phone_number}`}
                 className="flex flex-col items-center justify-center p-3 hover:bg-accent rounded-lg gap-1.5 transition-colors"
               >
                 <Phone className="h-5 w-5 text-primary" />
@@ -340,9 +349,9 @@ export function MapView({
               </a>
             )}
 
-            {selectedPlace.website && (
+            {selectedPlaceDetails.website && (
               <a
-                href={selectedPlace.website}
+                href={selectedPlaceDetails.website}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex flex-col items-center justify-center p-3 hover:bg-accent rounded-lg gap-1.5 transition-colors"
@@ -353,22 +362,21 @@ export function MapView({
             )}
           </div>
 
-          {/* Booking/Reservation Button */}
-          {(selectedPlace.reservable || selectedPlace.booking_url) && (
+          {(selectedPlaceDetails.reservable || selectedPlaceDetails.booking_url) && (
             <div className="p-4 border-b">
               <Button
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium"
                 size="lg"
-                onClick={() => window.open(selectedPlace.booking_url || selectedPlace.url, '_blank')}
+                onClick={() => window.open(selectedPlaceDetails.booking_url || selectedPlaceDetails.url, '_blank')}
               >
-                {selectedPlace.types?.includes('restaurant') ? 'Reserve a table' : 'Book Now'}
+                {selectedPlaceDetails.types?.includes('restaurant') ? 'Reserve a table' : 'Book Now'}
               </Button>
             </div>
           )}
 
           <ScrollArea className="flex-1">
             <div className="p-6 space-y-8">
-              {selectedPlace.photos && selectedPlace.photos.length > 0 && (
+              {selectedPlaceDetails.photos && selectedPlaceDetails.photos.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-medium text-foreground">Photos</h3>
@@ -378,7 +386,7 @@ export function MapView({
                     </Button>
                   </div>
                   <div className="grid grid-cols-2 gap-1">
-                    {selectedPlace.photos.slice(0, 4).map((photo, index) => (
+                    {selectedPlaceDetails.photos.slice(0, 4).map((photo, index) => (
                       <img
                         key={index}
                         src={photo.getUrl()}
@@ -395,51 +403,51 @@ export function MapView({
                 <h3 className="text-sm font-medium text-foreground">Location</h3>
                 <div className="flex items-start gap-4">
                   <MapPin className="h-5 w-5 mt-1 text-primary flex-shrink-0" />
-                  <p className="text-sm leading-relaxed">{selectedPlace.formatted_address}</p>
+                  <p className="text-sm leading-relaxed">{selectedPlaceDetails.formatted_address}</p>
                 </div>
               </div>
 
-              {(selectedPlace.formatted_phone_number || selectedPlace.website) && (
+              {(selectedPlaceDetails.formatted_phone_number || selectedPlaceDetails.website) && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-medium text-foreground">Contact</h3>
-                  {selectedPlace.formatted_phone_number && (
+                  {selectedPlaceDetails.formatted_phone_number && (
                     <div className="flex items-center gap-4">
                       <Phone className="h-5 w-5 text-primary flex-shrink-0" />
-                      <a href={`tel:${selectedPlace.formatted_phone_number}`} className="text-sm hover:underline">
-                        {selectedPlace.formatted_phone_number}
+                      <a href={`tel:${selectedPlaceDetails.formatted_phone_number}`} className="text-sm hover:underline">
+                        {selectedPlaceDetails.formatted_phone_number}
                       </a>
                     </div>
                   )}
-                  {selectedPlace.website && (
+                  {selectedPlaceDetails.website && (
                     <div className="flex items-center gap-4">
                       <Globe className="h-5 w-5 text-primary flex-shrink-0" />
                       <a
-                        href={selectedPlace.website}
+                        href={selectedPlaceDetails.website}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-sm hover:underline truncate"
                       >
-                        {selectedPlace.website}
+                        {selectedPlaceDetails.website}
                       </a>
                     </div>
                   )}
                 </div>
               )}
 
-              {selectedPlace.opening_hours && (
+              {selectedPlaceDetails.opening_hours && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-medium text-foreground">Hours</h3>
                     <span className={`text-sm font-medium ${
-                      selectedPlace.opening_hours.isOpen() ? 'text-green-600' : 'text-red-600'
+                      selectedPlaceDetails.opening_hours.isOpen() ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      {selectedPlace.opening_hours.isOpen() ? 'Open' : 'Closed'}
+                      {selectedPlaceDetails.opening_hours.isOpen() ? 'Open' : 'Closed'}
                     </span>
                   </div>
                   <div className="flex items-start gap-4">
                     <Clock className="h-5 w-5 mt-1 text-primary flex-shrink-0" />
                     <ul className="space-y-1.5">
-                      {selectedPlace.opening_hours.weekday_text.map((hours, index) => (
+                      {selectedPlaceDetails.opening_hours.weekday_text.map((hours, index) => (
                         <li key={index} className="text-sm leading-relaxed">{hours}</li>
                       ))}
                     </ul>
@@ -447,21 +455,21 @@ export function MapView({
                 </div>
               )}
 
-              {selectedPlace.types?.includes('restaurant') && (
+              {selectedPlaceDetails.types?.includes('restaurant') && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-medium text-foreground">Service options</h3>
                   <div className="space-y-2">
-                    {selectedPlace.dine_in && (
+                    {selectedPlaceDetails.dine_in && (
                       <div className="flex items-center gap-2">
                         <span className="text-sm">✓ Dine-in</span>
                       </div>
                     )}
-                    {selectedPlace.takeout && (
+                    {selectedPlaceDetails.takeout && (
                       <div className="flex items-center gap-2">
                         <span className="text-sm">✓ Takeout</span>
                       </div>
                     )}
-                    {selectedPlace.delivery && (
+                    {selectedPlaceDetails.delivery && (
                       <div className="flex items-center gap-2">
                         <span className="text-sm">✓ Delivery</span>
                       </div>
@@ -470,15 +478,15 @@ export function MapView({
                 </div>
               )}
 
-              {selectedPlace.types?.includes('lodging') && (
+              {selectedPlaceDetails.types?.includes('lodging') && (
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <h3 className="text-sm font-medium text-foreground">Compare prices</h3>
                     <div className="space-y-2 border rounded-lg divide-y">
                       {[
-                        { site: 'Official site', price: selectedPlace.price_level ? selectedPlace.price_level * 200 : 300 },
-                        { site: 'Booking.com', price: selectedPlace.price_level ? selectedPlace.price_level * 180 : 280 },
-                        { site: 'Hotels.com', price: selectedPlace.price_level ? selectedPlace.price_level * 190 : 290 }
+                        { site: 'Official site', price: selectedPlaceDetails.price_level ? selectedPlaceDetails.price_level * 200 : 300 },
+                        { site: 'Booking.com', price: selectedPlaceDetails.price_level ? selectedPlaceDetails.price_level * 180 : 280 },
+                        { site: 'Hotels.com', price: selectedPlaceDetails.price_level ? selectedPlaceDetails.price_level * 190 : 290 }
                       ].map((option, index) => (
                         <div key={index} className="p-3 flex items-center justify-between hover:bg-accent cursor-pointer">
                           <span className="text-sm">{option.site}</span>
@@ -490,18 +498,18 @@ export function MapView({
                 </div>
               )}
 
-              {selectedPlace.reviews && (
+              {selectedPlaceDetails.reviews && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <h3 className="text-[16px] font-medium text-foreground">Reviews</h3>
-                      {selectedPlace.rating && (
+                      {selectedPlaceDetails.rating && (
                         <div className="flex items-center gap-1">
-                          <StarRating rating={selectedPlace.rating} />
+                          <StarRating rating={selectedPlaceDetails.rating} />
                           <span className="text-sm">
-                            {selectedPlace.rating}
+                            {selectedPlaceDetails.rating}
                             <span className="text-[#70757a] ml-1">
-                              ({selectedPlace.user_ratings_total?.toLocaleString()})
+                              ({selectedPlaceDetails.user_ratings_total?.toLocaleString()})
                             </span>
                           </span>
                         </div>
@@ -527,7 +535,7 @@ export function MapView({
                     </Button>
                   </div>
                   <div className="space-y-6">
-                    {(expandedReviews ? selectedPlace.reviews : selectedPlace.reviews.slice(0, 2)).map((review, index) => (
+                    {(expandedReviews ? selectedPlaceDetails.reviews : selectedPlaceDetails.reviews.slice(0, 2)).map((review, index) => (
                       <div key={index} className="space-y-1.5">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-[13px]">{review.author_name}</span>
@@ -545,7 +553,7 @@ export function MapView({
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setSelectedPlace(null)}
+            onClick={() => setSelectedPlaceDetails(null)}
             className="absolute top-4 right-4"
           >
             <X className="h-4 w-4" />
@@ -553,8 +561,7 @@ export function MapView({
         </div>
       )}
 
-      {/* Photo Gallery Modal */}
-      {selectedPhotoIndex !== null && selectedPlace?.photos && (
+      {selectedPhotoIndex !== null && selectedPlaceDetails?.photos && (
         <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
           <Button
             variant="ghost"
@@ -565,12 +572,12 @@ export function MapView({
             <X className="h-6 w-6" />
           </Button>
           <img
-            src={selectedPlace.photos[selectedPhotoIndex].getUrl({ maxWidth: 1200, maxHeight: 800 })}
+            src={selectedPlaceDetails.photos[selectedPhotoIndex].getUrl({ maxWidth: 1200, maxHeight: 800 })}
             alt={`Photo ${selectedPhotoIndex + 1}`}
             className="max-w-[90vw] max-h-[90vh] object-contain"
           />
           <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white text-sm">
-            {selectedPhotoIndex + 1} / {selectedPlace.photos.length}
+            {selectedPhotoIndex + 1} / {selectedPlaceDetails.photos.length}
           </div>
         </div>
       )}

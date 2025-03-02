@@ -7,12 +7,14 @@ import { TripHeaderEdit } from "@/components/trip-header-edit";
 import { MapView } from "@/components/map-view";
 import { PinnedPlaces } from "@/components/pinned-places";
 import { useState } from "react";
+import type { PinnedPlace } from "@/types/PinnedPlace"; // Assuming PinnedPlace type is defined here
+
 
 export default function TripMap() {
   const [, params] = useRoute("/trips/:id/map");
   const tripId = params ? parseInt(params.id) : null;
   const [, setLocation] = useLocation();
-  const [selectedPlace, setSelectedPlace] = useState(null);
+  const [selectedPlace, setSelectedPlace] = useState<PinnedPlace | null>(null);
 
   const { data: trip, isLoading, error } = useQuery<Trip>({
     queryKey: ["/api/trips", tripId],
@@ -34,7 +36,7 @@ export default function TripMap() {
     enabled: !!tripId,
   });
 
-  const handlePinClick = (place) => {
+  const handlePinClick = (place: PinnedPlace) => {
     setSelectedPlace(place);
   };
 
@@ -98,6 +100,7 @@ export default function TripMap() {
               tripId={trip.id} 
               pinnedPlaces={pinnedPlacesData?.places || []}
               selectedPlace={selectedPlace}
+              onPinClick={handlePinClick}
             />
           </section>
 
