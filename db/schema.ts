@@ -9,7 +9,8 @@ import {
   integer,
   uuid,
   time,
-  numeric
+  numeric,
+  jsonb
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { relations } from "drizzle-orm";
@@ -22,12 +23,30 @@ export const users = pgTable("users", {
   name: text("name"),
   username: text("username"),
   avatar: text("avatar"),
-  provider: text("provider").default("email"), // 'email', 'google', or 'apple'
-  providerId: text("provider_id"), // ID from the provider
-  preferences: json("preferences").$type<{
+  provider: text("provider").default("email"),
+  providerId: text("provider_id"),
+  preferences: jsonb("preferences").$type<{
     notifications: boolean;
     frequentDestinations: string[];
     airlines: string[];
+    travelPreferences: {
+      preferredActivities: string[];
+      interests: string[];
+      budgetRange: {
+        min: number;
+        max: number;
+        currency: string;
+      };
+      preferredAccommodations: string[];
+      dietaryRestrictions: string[];
+      accessibility: string[];
+      travelStyle: string[];
+      preferredClimate: string[];
+      tripDuration: {
+        min: number;
+        max: number;
+      };
+    };
   }>(),
 });
 
@@ -35,7 +54,7 @@ export const trips = pgTable("trips", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   description: text("description"),
-  location: text("location"), // Made optional
+  location: text("location"),
   coordinates: json("coordinates").$type<{
     lat: number;
     lng: number;
@@ -59,7 +78,7 @@ export const destinations = pgTable("destinations", {
     lat: number;
     lng: number;
   }>(),
-  order: integer("order").notNull(), // For maintaining the sequence of destinations
+  order: integer("order").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -83,7 +102,7 @@ export const activitySuggestions = pgTable("activity_suggestions", {
   currency: text("currency").default("USD"),
   startTime: timestamp("start_time"),
   endTime: timestamp("end_time"),
-  status: text("status").notNull().default('pending'), 
+  status: text("status").notNull().default('pending'),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -91,7 +110,7 @@ export const activityVotes = pgTable("activity_votes", {
   id: serial("id").primaryKey(),
   suggestionId: integer("suggestion_id").notNull().references(() => activitySuggestions.id),
   userId: integer("user_id").notNull().references(() => users.id),
-  vote: text("vote").notNull(), 
+  vote: text("vote").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -102,7 +121,7 @@ export const expenses = pgTable("expenses", {
   title: text("title").notNull(),
   amount: numeric("amount").notNull(),
   currency: text("currency").default("USD"),
-  category: text("category").notNull(), 
+  category: text("category").notNull(),
   date: date("date").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -112,7 +131,7 @@ export const expenseSplits = pgTable("expense_splits", {
   expenseId: integer("expense_id").notNull().references(() => expenses.id),
   userId: integer("user_id").notNull().references(() => users.id),
   amount: numeric("amount").notNull(),
-  status: text("status").notNull().default('pending'), 
+  status: text("status").notNull().default('pending'),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -123,7 +142,7 @@ export const taskAssignments = pgTable("task_assignments", {
   title: text("title").notNull(),
   description: text("description"),
   dueDate: date("due_date"),
-  status: text("status").notNull().default('pending'), 
+  status: text("status").notNull().default('pending'),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -139,8 +158,8 @@ export const flights = pgTable("flights", {
   arrivalDate: date("arrival_date").notNull(),
   arrivalTime: time("arrival_time").notNull(),
   bookingReference: text("booking_reference").notNull(),
-  bookingStatus: text("booking_status").notNull(), 
-  price: integer("price"), 
+  bookingStatus: text("booking_status").notNull(),
+  price: integer("price"),
   currency: text("currency").default("USD"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -149,18 +168,18 @@ export const flights = pgTable("flights", {
 export const accommodations = pgTable("accommodations", {
   id: serial("id").primaryKey(),
   tripId: integer("trip_id").notNull().references(() => trips.id),
-  name: text("name").notNull(), 
-  type: text("type").notNull(), 
+  name: text("name").notNull(),
+  type: text("type").notNull(),
   address: text("address").notNull(),
   checkInDate: date("check_in_date").notNull(),
   checkOutDate: date("check_out_date").notNull(),
   checkInTime: time("check_in_time"),
   checkOutTime: time("check_out_time"),
   bookingReference: text("booking_reference").notNull(),
-  bookingStatus: text("booking_status").notNull(), 
-  price: integer("price"), 
+  bookingStatus: text("booking_status").notNull(),
+  price: integer("price"),
   currency: text("currency").default("USD"),
-  roomType: text("room_type"), 
+  roomType: text("room_type"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -185,7 +204,7 @@ export const participants = pgTable("participants", {
   departureDate: date("departure_date"),
   flightStatus: text("flight_status").notNull().default('pending'),
   hotelStatus: text("hotel_status").notNull().default('pending'),
-  accommodationId: integer("accommodation_id").references(() => accommodations.id), 
+  accommodationId: integer("accommodation_id").references(() => accommodations.id),
 });
 
 export const activities = pgTable("activities", {
@@ -228,11 +247,10 @@ export const pinnedPlaces = pgTable("pinned_places", {
   }>(),
   destinationId: integer("destination_id").references(() => destinations.id),
   addedToChecklist: boolean("added_to_checklist").notNull().default(false),
-  category: text("category").notNull().default('other'), 
+  category: text("category").notNull().default('other'),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Add these new tables after the existing tables
 export const polls = pgTable("polls", {
   id: serial("id").primaryKey(),
   tripId: integer("trip_id").notNull().references(() => trips.id),
@@ -252,6 +270,22 @@ export const pollVotes = pgTable("poll_votes", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const travelRecommendations = pgTable("travel_recommendations", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  tripId: integer("trip_id").references(() => trips.id),
+  destinationName: text("destination_name").notNull(),
+  description: text("description").notNull(),
+  activities: json("activities").$type<string[]>().notNull(),
+  interests: json("interests").$type<string[]>().notNull(),
+  estimatedBudget: numeric("estimated_budget"),
+  currency: text("currency").default("USD"),
+  recommendedDuration: integer("recommended_duration"),
+  score: numeric("score"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const tripsRelations = relations(trips, ({ one, many }) => ({
   owner: one(users, {
     fields: [trips.ownerId],
@@ -267,6 +301,8 @@ export const tripsRelations = relations(trips, ({ one, many }) => ({
   accommodations: many(accommodations),
   chatMessages: many(chatMessages),
   pinnedPlaces: many(pinnedPlaces),
+  polls: many(polls),
+
 }));
 
 export const destinationsRelations = relations(destinations, ({ one }) => ({
@@ -321,7 +357,6 @@ export const participantsRelations = relations(participants, ({ one }) => ({
     fields: [participants.userId],
     references: [users.id],
   }),
-  // Make accommodation relation nullable and properly referenced
   accommodation: one(accommodations, {
     fields: [participants.accommodationId],
     references: [accommodations.id],
@@ -386,7 +421,6 @@ export const pinnedPlacesRelations = relations(pinnedPlaces, ({ one }) => ({
   }),
 }));
 
-// Add relations
 export const pollsRelations = relations(polls, ({ one, many }) => ({
   trip: one(trips, {
     fields: [polls.tripId],
@@ -409,6 +443,18 @@ export const pollVotesRelations = relations(pollVotes, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+export const travelRecommendationsRelations = relations(travelRecommendations, ({ one }) => ({
+  user: one(users, {
+    fields: [travelRecommendations.userId],
+    references: [users.id],
+  }),
+  trip: one(trips, {
+    fields: [travelRecommendations.tripId],
+    references: [trips.id],
+  }),
+}));
+
 
 export const insertUserSchema = createInsertSchema(users, {
   email: z.string().email("Invalid email address"),
@@ -437,11 +483,12 @@ export const insertTaskAssignmentSchema = createInsertSchema(taskAssignments);
 export const selectTaskAssignmentSchema = createSelectSchema(taskAssignments);
 export const insertDestinationSchema = createInsertSchema(destinations);
 export const selectDestinationSchema = createSelectSchema(destinations);
-// Add Zod schemas
 export const insertPollSchema = createInsertSchema(polls);
 export const selectPollSchema = createSelectSchema(polls);
 export const insertPollVoteSchema = createInsertSchema(pollVotes);
 export const selectPollVoteSchema = createSelectSchema(pollVotes);
+export const insertTravelRecommendationSchema = createInsertSchema(travelRecommendations);
+export const selectTravelRecommendationSchema = createSelectSchema(travelRecommendations);
 
 export type User = typeof users.$inferSelect;
 export type Trip = typeof trips.$inferSelect;
@@ -460,6 +507,6 @@ export type ExpenseSplit = typeof expenseSplits.$inferSelect;
 export type TaskAssignment = typeof taskAssignments.$inferSelect;
 export type Destination = typeof destinations.$inferSelect;
 export type PinnedPlace = typeof pinnedPlaces.$inferSelect;
-// Add types for the new tables
 export type Poll = typeof polls.$inferSelect;
 export type PollVote = typeof pollVotes.$inferSelect;
+export type TravelRecommendation = typeof travelRecommendations.$inferSelect;
