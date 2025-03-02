@@ -107,7 +107,6 @@ export interface PlaceDetails {
   reviews?: google.maps.places.PlaceReview[];
   geometry?: google.maps.places.PlaceGeometry;
   types?: string[];
-  // New fields
   price_level?: number;
   business_status?: string;
   url?: string; // Google Maps URL
@@ -118,7 +117,6 @@ export interface PlaceDetails {
   dine_in?: boolean;
   located_in?: string;
   menu_url?: string;
-  // Fields for hotels
   booking_url?: string;
   check_in_time?: string;
   check_out_time?: string;
@@ -212,7 +210,7 @@ export const usePlacesService = () => {
   ) => {
     if (!placesService.current) {
       console.error('Places service not initialized');
-      callback(null, google.maps.places.PlacesServiceStatus.ERROR);
+      callback(null, google.maps.places.PlacesServiceStatus.UNKNOWN_ERROR);
       return;
     }
 
@@ -233,29 +231,26 @@ export const usePlacesService = () => {
         'types',
         'price_level',
         'business_status',
-        'url',
-        'serves_food',
-        'takeout',
-        'delivery',
-        'dine_in',
-        'menu_url',
-        'reservations',
-        'located_in'
+        'url'
       ],
     };
 
     placesService.current.getDetails(request, (place, status) => {
       if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-        // Process additional fields
+        // Process additional fields based on available data
         const processedPlace: PlaceDetails = {
           ...place,
-          reservable: place.reservations || false,
-          dine_in: place.dine_in || place.serves_food || false,
-          takeout: place.takeout || false,
-          delivery: place.delivery || false,
-          located_in: place.located_in || null,
-          menu_url: place.menu || null,
-          booking_url: place.url // Use Google Maps URL as fallback for booking
+          // Derive reservable status from types and business_status
+          reservable: place.types?.includes('restaurant') || place.types?.includes('lodging'),
+          // Derive dining options from types
+          dine_in: place.types?.includes('restaurant'),
+          takeout: place.types?.includes('meal_takeaway'),
+          delivery: place.types?.includes('meal_delivery'),
+          // Use Google Maps URL for booking
+          booking_url: place.url,
+          // Other fields
+          menu_url: null,
+          located_in: null
         };
         callback(processedPlace, status);
       } else {
