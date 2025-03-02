@@ -80,17 +80,31 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   const { coordinates, setCoordinates, geocodeLocation } = useMapCoordinates(location);
   const { placesService, initPlacesService, getPlaceDetails } = usePlacesService();
 
-  // Process pinned places data
+  // Process pinned places data with better error handling and logging
   const allPinnedPlaces = useMemo(() => {
-    console.log("Processing pinnedPlaces:", pinnedPlaces);
-    if (!pinnedPlaces) return [];
-    if (Array.isArray(pinnedPlaces)) return pinnedPlaces;
-    if ('places' in pinnedPlaces) return pinnedPlaces.places;
+    console.log("Processing pinnedPlaces input:", pinnedPlaces);
+
+    if (!pinnedPlaces) {
+      console.log("No pinned places provided");
+      return [];
+    }
+
+    if (Array.isArray(pinnedPlaces)) {
+      console.log("Pinned places is an array:", pinnedPlaces);
+      return pinnedPlaces;
+    }
+
+    if ('places' in pinnedPlaces) {
+      console.log("Pinned places is an object with places:", pinnedPlaces.places);
+      return pinnedPlaces.places;
+    }
+
+    console.log("Unknown pinned places format, defaulting to empty array");
     return [];
   }, [pinnedPlaces]);
 
   useEffect(() => {
-    console.log("Updated pinned places:", allPinnedPlaces);
+    console.log("Pinned places updated:", allPinnedPlaces);
   }, [allPinnedPlaces]);
 
   // Base functions that other functions depend on
@@ -165,12 +179,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
           }
         : coordinates;
 
-      // Get the primary category from place types
-      const { category } = selectedPlace.types ?
-        getPrimaryCategory(selectedPlace.types) :
-        { category: 'attraction' as PlaceCategory };
-
-      console.log("Pinning place with category:", category);
+      console.log("Pinning place with coordinates:", placeCoordinates);
 
       const response = await fetch(`/api/trips/${tripId}/pinned-places`, {
         method: 'POST',
@@ -184,10 +193,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
           coordinates: placeCoordinates,
           phone: selectedPlace.formatted_phone_number,
           website: selectedPlace.website,
-          rating: selectedPlace.rating,
-          category: category,
-          openingHours: selectedPlace.opening_hours?.weekday_text,
-          photos: selectedPlace.photos?.map(photo => photo.getUrl())
+          rating: selectedPlace.rating
         }),
       });
 
@@ -195,8 +201,11 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         throw new Error('Failed to pin place');
       }
 
+      const newPinnedPlace = await response.json();
+      console.log("Successfully pinned new place:", newPinnedPlace);
+
       // Invalidate and refetch pinned places
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/pinned-places`] });
+      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/pinned-places`] });
 
       toast({
         title: "Success",
@@ -539,6 +548,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         }}
         onLoad={onMapLoad}
       >
+        {/* Main location marker */}
         <MarkerF
           position={coordinates}
           icon={{
@@ -551,14 +561,27 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
           }}
         />
 
+        {/* Pinned places markers */}
         {allPinnedPlaces.map((place: PinnedPlace) => {
           console.log("Rendering marker for place:", place);
+          if (!place.coordinates || !place.coordinates.lat || !place.coordinates.lng) {
+            console.warn("Invalid coordinates for place:", place);
+            return null;
+          }
+
           return (
             <MarkerF
               key={place.id}
               position={place.coordinates}
               title={place.name}
-              icon={getCategoryIcon(place.category || 'attraction')}
+              icon={{
+                path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+                scale: 6,
+                fillColor: "#1E88E5",
+                fillOpacity: 1,
+                strokeWeight: 2,
+                strokeColor: "#FFFFFF",
+              }}
               onClick={() => {
                 if (place.placeId) {
                   fetchPlaceDetails(place.placeId);
