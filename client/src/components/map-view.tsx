@@ -307,7 +307,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
             </div>
           </div>
 
-          {/* Action buttons - 4 columns grid */}
+          {/* Enhanced Action buttons - 4 columns grid */}
           <div className="grid grid-cols-4 p-2 border-b">
             <a
               href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(selectedPlace.formatted_address)}`}
@@ -328,59 +328,43 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 <Plus className="h-5 w-5 text-primary" />
                 <span className="text-xs font-medium">Pin</span>
               </button>
-            ) : (
-              <button
-                className="flex flex-col items-center justify-center p-3 gap-1.5 transition-colors opacity-50 cursor-not-allowed"
-                disabled
-                title="Not available outside of a trip"
-              >
-                <Plus className="h-5 w-5 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground">Pin</span>
-              </button>
-            )}
+            ) : null}
 
-            {selectedPlace.formatted_phone_number ? (
+            {selectedPlace.formatted_phone_number && (
               <a
                 href={`tel:${selectedPlace.formatted_phone_number}`}
                 className="flex flex-col items-center justify-center p-3 hover:bg-accent rounded-lg gap-1.5 transition-colors"
-                title={`Call ${selectedPlace.formatted_phone_number}`}
               >
                 <Phone className="h-5 w-5 text-primary" />
                 <span className="text-xs font-medium">Call</span>
               </a>
-            ) : (
-              <button
-                className="flex flex-col items-center justify-center p-3 gap-1.5 transition-colors opacity-50 cursor-not-allowed"
-                disabled
-                title="No phone number available"
-              >
-                <Phone className="h-5 w-5 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground">Call</span>
-              </button>
             )}
 
-            {selectedPlace.website ? (
+            {selectedPlace.website && (
               <a
                 href={selectedPlace.website}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex flex-col items-center justify-center p-3 hover:bg-accent rounded-lg gap-1.5 transition-colors"
-                title={selectedPlace.website}
               >
                 <Globe className="h-5 w-5 text-primary" />
                 <span className="text-xs font-medium">Website</span>
               </a>
-            ) : (
-              <button
-                className="flex flex-col items-center justify-center p-3 gap-1.5 transition-colors opacity-50 cursor-not-allowed"
-                disabled
-                title="No website available"
-              >
-                <Globe className="h-5 w-5 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground">Website</span>
-              </button>
             )}
           </div>
+
+          {/* Booking/Reservation Button */}
+          {(selectedPlace.reservable || selectedPlace.booking_url) && (
+            <div className="p-4 border-b">
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={() => window.open(selectedPlace.booking_url || selectedPlace.url, '_blank')}
+              >
+                {selectedPlace.types?.includes('restaurant') ? 'Reserve a table' : 'Book Now'}
+              </Button>
+            </div>
+          )}
 
           <ScrollArea className="flex-1">
             <div className="p-6 space-y-8">
@@ -445,10 +429,17 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </div>
               )}
 
-              {/* Opening hours */}
+              {/* Status and Hours */}
               {selectedPlace.opening_hours && (
                 <div className="space-y-3">
-                  <h3 className="text-sm font-medium text-foreground">Hours</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-foreground">Hours</h3>
+                    <span className={`text-sm font-medium ${
+                      selectedPlace.opening_hours.isOpen() ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {selectedPlace.opening_hours.isOpen() ? 'Open' : 'Closed'}
+                    </span>
+                  </div>
                   <div className="flex items-start gap-4">
                     <Clock className="h-5 w-5 mt-1 text-primary flex-shrink-0" />
                     <ul className="space-y-1.5">
@@ -459,6 +450,49 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                   </div>
                 </div>
               )}
+
+              {/* Location Context */}
+              {selectedPlace.located_in && (
+                <div className="space-y-2">
+                  <p className="text-sm text-[#70757a]">
+                    Located in: {selectedPlace.located_in}
+                  </p>
+                </div>
+              )}
+
+              {/* Restaurant-specific features */}
+              {selectedPlace.types?.includes('restaurant') && (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-medium text-foreground">Service options</h3>
+                  <div className="space-y-2">
+                    {selectedPlace.dine_in && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">✓ Dine-in</span>
+                      </div>
+                    )}
+                    {selectedPlace.takeout && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">✓ Takeout</span>
+                      </div>
+                    )}
+                    {selectedPlace.delivery && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm">✓ Delivery</span>
+                      </div>
+                    )}
+                  </div>
+                  {selectedPlace.menu_url && (
+                    <Button
+                      variant="outline"
+                      className="w-full mt-2"
+                      onClick={() => window.open(selectedPlace.menu_url, '_blank')}
+                    >
+                      View Menu
+                    </Button>
+                  )}
+                </div>
+              )}
+
 
               {/* Reviews section */}
               {selectedPlace.reviews && (

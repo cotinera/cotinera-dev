@@ -93,16 +93,35 @@ export interface PlaceDetails {
   formatted_address: string;
   formatted_phone_number?: string;
   rating?: number;
-  user_ratings_total?: number;  // Added field for total review count
+  user_ratings_total?: number;
   opening_hours?: {
     weekday_text: string[];
     isOpen: () => boolean;
+    periods?: {
+      open: { day: number; time: string; };
+      close: { day: number; time: string; };
+    }[];
   };
   website?: string;
   photos?: google.maps.places.PlacePhoto[];
   reviews?: google.maps.places.PlaceReview[];
   geometry?: google.maps.places.PlaceGeometry;
   types?: string[];
+  // New fields
+  price_level?: number;
+  business_status?: string;
+  url?: string; // Google Maps URL
+  reservable?: boolean;
+  serves_food?: boolean;
+  takeout?: boolean;
+  delivery?: boolean;
+  dine_in?: boolean;
+  located_in?: string;
+  menu_url?: string;
+  // Fields for hotels
+  booking_url?: string;
+  check_in_time?: string;
+  check_out_time?: string;
 }
 
 /**
@@ -204,20 +223,41 @@ export const usePlacesService = () => {
         'formatted_address',
         'formatted_phone_number',
         'rating',
-        'user_ratings_total',  // Added field to fetch total reviews
+        'user_ratings_total',
         'opening_hours',
         'website',
         'photos',
         'reviews',
         'place_id',
         'geometry',
-        'types'
+        'types',
+        'price_level',
+        'business_status',
+        'url',
+        'serves_food',
+        'takeout',
+        'delivery',
+        'dine_in',
+        'menu_url',
+        'reservations',
+        'located_in'
       ],
     };
 
     placesService.current.getDetails(request, (place, status) => {
       if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-        callback(place as PlaceDetails, status);
+        // Process additional fields
+        const processedPlace: PlaceDetails = {
+          ...place,
+          reservable: place.reservations || false,
+          dine_in: place.dine_in || place.serves_food || false,
+          takeout: place.takeout || false,
+          delivery: place.delivery || false,
+          located_in: place.located_in || null,
+          menu_url: place.menu || null,
+          booking_url: place.url // Use Google Maps URL as fallback for booking
+        };
+        callback(processedPlace, status);
       } else {
         console.error('Failed to get place details:', status);
         callback(null, status);
