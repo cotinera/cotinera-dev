@@ -34,11 +34,15 @@ const StarRating = ({ rating }: { rating: number }) => {
   return (
     <div className="flex items-center">
       {[1, 2, 3, 4, 5].map((star) => {
-        const difference = star - rating;
+        const roundedRating = Math.round(rating * 2) / 2; // Round to nearest 0.5
+        const difference = star - roundedRating;
         let starClass = "text-yellow-400 fill-current"; // Full star
 
         if (difference > 0) {
-          if (difference < 1 && difference > 0.2) {
+          if (difference === 0.5) {
+            // Half star
+            starClass = "text-yellow-400 fill-[50%]";
+          } else if (difference >= 1) {
             // Empty star
             starClass = "text-gray-300 fill-current";
           }
