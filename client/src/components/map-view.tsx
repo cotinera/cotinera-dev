@@ -162,6 +162,11 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
           }
         : coordinates;
 
+      // Get the primary category from place types
+      const { category } = selectedPlace.types ?
+        getPrimaryCategory(selectedPlace.types) :
+        { category: 'attraction' as PlaceCategory };
+
       const response = await fetch(`/api/trips/${tripId}/pinned-places`, {
         method: 'POST',
         headers: {
@@ -175,6 +180,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
           phone: selectedPlace.formatted_phone_number,
           website: selectedPlace.website,
           rating: selectedPlace.rating,
+          category: category, // Add the category
           openingHours: selectedPlace.opening_hours?.weekday_text,
           photos: selectedPlace.photos?.map(photo => photo.getUrl())
         }),
