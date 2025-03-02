@@ -552,7 +552,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
             key={place.id}
             position={place.coordinates}
             title={place.name}
-            icon={getCategoryIcon(place.category)}
+            icon={getCategoryIcon(place.category || 'attraction')}
             onClick={() => {
               if (place.placeId) {
                 fetchPlaceDetails(place.placeId);
