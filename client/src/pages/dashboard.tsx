@@ -2,7 +2,7 @@ import { useTrips } from "@/hooks/use-trips";
 import { useUser } from "@/hooks/use-user";
 import { Button } from "@/components/ui/button";
 import { TripCard } from "@/components/trip-card";
-import { Plus, LogOut, Trash2 } from "lucide-react";
+import { Plus, LogOut, Trash2, Settings } from "lucide-react";
 import { useState, useMemo } from "react";
 import { z } from "zod";
 import {
@@ -36,6 +36,7 @@ import { MapPicker } from "@/components/map-picker";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { TravelPreferencesForm } from "@/components/travel-preferences-form";
 
 const tripFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -51,6 +52,7 @@ export default function Dashboard() {
   const { logout } = useUser();
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
   const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [selectedTrips, setSelectedTrips] = useState<number[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -215,9 +217,24 @@ export default function Dashboard() {
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">Personal Group Coordinator</h1>
-          <Button variant="ghost" size="icon" onClick={() => logout()}>
-            <LogOut className="h-5 w-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Dialog open={isPreferencesOpen} onOpenChange={setIsPreferencesOpen}>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="icon" title="Travel Preferences">
+                  <Settings className="h-5 w-5" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Travel Preferences</DialogTitle>
+                </DialogHeader>
+                <TravelPreferencesForm onClose={() => setIsPreferencesOpen(false)} />
+              </DialogContent>
+            </Dialog>
+            <Button variant="ghost" size="icon" onClick={() => logout()}>
+              <LogOut className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
       </header>
 

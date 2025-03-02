@@ -13,35 +13,6 @@ import DestinationDetail from "@/pages/destination-detail";
 import AuthPage from "@/pages/auth-page";
 import { TravelPreferencesPage } from "@/pages/travel-preferences";
 import { ProtectedRoute } from "./lib/protected-route";
-import { SidebarProvider, Sidebar, SidebarContent, SidebarTrigger, SidebarMenu, SidebarMenuItem, SidebarMenuButton } from "@/components/ui/sidebar";
-import { Compass, Map, Calendar, Users, Settings } from "lucide-react";
-
-function Navigation() {
-  return (
-    <Sidebar>
-      <SidebarContent>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Dashboard">
-              <a href="/">
-                <Compass className="h-4 w-4" />
-                <span>Dashboard</span>
-              </a>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip="Travel Preferences">
-              <a href="/preferences">
-                <Settings className="h-4 w-4" />
-                <span>Travel Preferences</span>
-              </a>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
-      </SidebarContent>
-    </Sidebar>
-  );
-}
 
 function Router() {
   return (
@@ -63,11 +34,8 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <SidebarProvider>
-          <Navigation />
-          <Router />
-          <Toaster />
-        </SidebarProvider>
+        <Router />
+        <Toaster />
       </AuthProvider>
     </QueryClientProvider>
   );
