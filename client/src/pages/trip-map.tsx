@@ -6,11 +6,13 @@ import type { Trip } from "@db/schema";
 import { TripHeaderEdit } from "@/components/trip-header-edit";
 import { MapView } from "@/components/map-view";
 import { PinnedPlaces } from "@/components/pinned-places";
+import { useState } from "react";
 
 export default function TripMap() {
   const [, params] = useRoute("/trips/:id/map");
   const tripId = params ? parseInt(params.id) : null;
   const [, setLocation] = useLocation();
+  const [selectedPlace, setSelectedPlace] = useState(null);
 
   const { data: trip, isLoading, error } = useQuery<Trip>({
     queryKey: ["/api/trips", tripId],
@@ -31,6 +33,10 @@ export default function TripMap() {
     },
     enabled: !!tripId,
   });
+
+  const handlePinClick = (place) => {
+    setSelectedPlace(place);
+  };
 
   if (isLoading) {
     return (
@@ -91,6 +97,7 @@ export default function TripMap() {
               location={trip.location || ""} 
               tripId={trip.id} 
               pinnedPlaces={pinnedPlacesData?.places || []}
+              selectedPlace={selectedPlace}
             />
           </section>
 
@@ -99,6 +106,7 @@ export default function TripMap() {
               tripId={trip.id}
               defaultLocation={trip.location || ""}
               showMap={false}
+              onPinClick={handlePinClick}
             />
           </section>
         </div>

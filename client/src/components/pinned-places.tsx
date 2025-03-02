@@ -151,6 +151,7 @@ interface PinnedPlacesProps {
   onPinPlace?: (place: PinnedPlace) => void;
   showMap?: boolean;
   tripCoordinates?: { lat: number; lng: number };
+  onPinClick?: (place: PinnedPlace) => void;
 }
 
 const formatCategoryName = (category: string): string => {
@@ -184,7 +185,8 @@ export function PinnedPlaces({
   defaultLocation,
   onPinPlace,
   showMap = false,
-  tripCoordinates
+  tripCoordinates,
+  onPinClick
 }: PinnedPlacesProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -473,21 +475,18 @@ export function PinnedPlaces({
     return CATEGORY_ICONS[category] || MapPin;
   };
 
-  const [selectedPlace, setSelectedPlace] = useState<PinnedPlace | null>(null);
-  const [isPlaceDetailsOpen, setIsPlaceDetailsOpen] = useState(false);
 
   const handlePlaceClick = (place: PinnedPlace) => {
-    setSelectedPlace(place);
-    setIsPlaceDetailsOpen(true);
+    onPinClick?.(place);
   };
 
   const handleEditClick = (e: React.MouseEvent, place: PinnedPlace) => {
-    e.stopPropagation(); 
+    e.stopPropagation();
     setPlaceToEdit(place);
   };
 
   const handleDeleteClick = (e: React.MouseEvent, place: PinnedPlace) => {
-    e.stopPropagation(); 
+    e.stopPropagation();
     setPlaceToDelete(place);
   };
 
@@ -540,7 +539,7 @@ export function PinnedPlaces({
                             initialCenter={effectiveLocation}
                             searchBias={effectiveLocation ? {
                               ...effectiveLocation,
-                              radius: 50000 
+                              radius: 50000
                             } : undefined}
                             onSearchInputRef={setSearchInputRef}
                           />
@@ -657,113 +656,6 @@ export function PinnedPlaces({
           <ScrollBar orientation="vertical" />
         </ScrollArea>
       </CardContent>
-
-      <Dialog open={isPlaceDetailsOpen} onOpenChange={setIsPlaceDetailsOpen}>
-        <DialogContent className="sm:max-w-[800px]">
-          <DialogHeader>
-            <DialogTitle>{selectedPlace?.name}</DialogTitle>
-            <DialogDescription>
-              Place details and information
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-6">
-            {selectedPlace?.photos && selectedPlace.photos.length > 0 && (
-              <div className="relative h-64 overflow-hidden rounded-lg">
-                <div className="flex space-x-4 overflow-x-auto pb-4">
-                  {selectedPlace.photos.map((photo, index) => (
-                    <img
-                      key={index}
-                      src={photo}
-                      alt={`${selectedPlace.name} photo ${index + 1}`}
-                      className="h-60 w-auto object-cover rounded-lg"
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-4">
-              <div>
-                <h4 className="text-sm font-medium">Address</h4>
-                <p className="text-sm text-muted-foreground">{selectedPlace?.address}</p>
-              </div>
-
-              {selectedPlace?.phone && (
-                <div>
-                  <h4 className="text-sm font-medium">Phone</h4>
-                  <p className="text-sm text-muted-foreground">{selectedPlace.phone}</p>
-                </div>
-              )}
-
-              {selectedPlace?.website && (
-                <div>
-                  <h4 className="text-sm font-medium">Website</h4>
-                  <a 
-                    href={selectedPlace.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-primary hover:underline"
-                  >
-                    Visit Website
-                  </a>
-                </div>
-              )}
-
-              {selectedPlace?.rating && (
-                <div>
-                  <h4 className="text-sm font-medium">Rating</h4>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">
-                      {selectedPlace.rating} / 5
-                    </span>
-                    <div className="flex text-yellow-400">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <svg
-                          key={i}
-                          className={cn(
-                            "h-4 w-4",
-                            i < Math.floor(selectedPlace.rating)
-                              ? "fill-current"
-                              : "fill-muted stroke-muted"
-                          )}
-                          viewBox="0 0 24 24"
-                        >
-                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                        </svg>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {selectedPlace?.openingHours && selectedPlace.openingHours.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-medium">Opening Hours</h4>
-                  <div className="text-sm text-muted-foreground space-y-1">
-                    {selectedPlace.openingHours.map((hours, index) => (
-                      <p key={index}>{hours}</p>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedPlace?.notes && (
-                <div>
-                  <h4 className="text-sm font-medium">Notes</h4>
-                  <p className="text-sm text-muted-foreground">{selectedPlace.notes}</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsPlaceDetailsOpen(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={!!placeToEdit} onOpenChange={(open) => !open && setPlaceToEdit(null)}>
         <DialogContent className="sm:max-w-[800px]">
