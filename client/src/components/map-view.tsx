@@ -263,25 +263,77 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
 
           {/* Action buttons - 4 columns grid */}
           <div className="grid grid-cols-4 p-2 border-b">
-            <button className="flex flex-col items-center justify-center p-3 hover:bg-accent rounded-lg gap-1.5 transition-colors">
+            <a
+              href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(selectedPlace.formatted_address)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex flex-col items-center justify-center p-3 hover:bg-accent rounded-lg gap-1.5 transition-colors"
+            >
               <MapPin className="h-5 w-5 text-primary" />
               <span className="text-xs font-medium">Directions</span>
-            </button>
-            <button
-              className="flex flex-col items-center justify-center p-3 hover:bg-accent rounded-lg gap-1.5 transition-colors"
-              onClick={tripId ? handlePinPlace : undefined}
-            >
-              <Plus className="h-5 w-5 text-primary" />
-              <span className="text-xs font-medium">Pin</span>
-            </button>
-            <button className="flex flex-col items-center justify-center p-3 hover:bg-accent rounded-lg gap-1.5 transition-colors">
-              <Phone className="h-5 w-5 text-primary" />
-              <span className="text-xs font-medium">Call</span>
-            </button>
-            <button className="flex flex-col items-center justify-center p-3 hover:bg-accent rounded-lg gap-1.5 transition-colors">
-              <Globe className="h-5 w-5 text-primary" />
-              <span className="text-xs font-medium">Website</span>
-            </button>
+            </a>
+
+            {tripId ? (
+              <button
+                className="flex flex-col items-center justify-center p-3 hover:bg-accent rounded-lg gap-1.5 transition-colors"
+                onClick={handlePinPlace}
+                title={selectedPlace.place_id ? "Pin this place to your trip" : "Place cannot be pinned"}
+              >
+                <Plus className="h-5 w-5 text-primary" />
+                <span className="text-xs font-medium">Pin</span>
+              </button>
+            ) : (
+              <button
+                className="flex flex-col items-center justify-center p-3 gap-1.5 transition-colors opacity-50 cursor-not-allowed"
+                disabled
+                title="Not available outside of a trip"
+              >
+                <Plus className="h-5 w-5 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground">Pin</span>
+              </button>
+            )}
+
+            {selectedPlace.formatted_phone_number ? (
+              <a
+                href={`tel:${selectedPlace.formatted_phone_number}`}
+                className="flex flex-col items-center justify-center p-3 hover:bg-accent rounded-lg gap-1.5 transition-colors"
+                title={`Call ${selectedPlace.formatted_phone_number}`}
+              >
+                <Phone className="h-5 w-5 text-primary" />
+                <span className="text-xs font-medium">Call</span>
+              </a>
+            ) : (
+              <button
+                className="flex flex-col items-center justify-center p-3 gap-1.5 transition-colors opacity-50 cursor-not-allowed"
+                disabled
+                title="No phone number available"
+              >
+                <Phone className="h-5 w-5 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground">Call</span>
+              </button>
+            )}
+
+            {selectedPlace.website ? (
+              <a
+                href={selectedPlace.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col items-center justify-center p-3 hover:bg-accent rounded-lg gap-1.5 transition-colors"
+                title={selectedPlace.website}
+              >
+                <Globe className="h-5 w-5 text-primary" />
+                <span className="text-xs font-medium">Website</span>
+              </a>
+            ) : (
+              <button
+                className="flex flex-col items-center justify-center p-3 gap-1.5 transition-colors opacity-50 cursor-not-allowed"
+                disabled
+                title="No website available"
+              >
+                <Globe className="h-5 w-5 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground">Website</span>
+              </button>
+            )}
           </div>
 
           <ScrollArea className="flex-1">
