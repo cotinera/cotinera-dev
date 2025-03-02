@@ -93,7 +93,7 @@ export interface PlaceDetails {
   formatted_address: string;
   formatted_phone_number?: string;
   rating?: number;
-  user_ratings_total?: number;  // Added field for total review count
+  user_ratings_total?: number;
   opening_hours?: {
     weekday_text: string[];
     isOpen: () => boolean;
@@ -103,6 +103,22 @@ export interface PlaceDetails {
   reviews?: google.maps.places.PlaceReview[];
   geometry?: google.maps.places.PlaceGeometry;
   types?: string[];
+  // New fields
+  price_level?: number;
+  url?: string; // Google Maps URL
+  business_status?: string;
+  serves_beer?: boolean;
+  serves_wine?: boolean;
+  serves_vegetarian_food?: boolean;
+  takeout?: boolean;
+  delivery?: boolean;
+  dine_in?: boolean;
+  reservable?: boolean;
+  serves_breakfast?: boolean;
+  serves_lunch?: boolean;
+  serves_dinner?: boolean;
+  outdoor_seating?: boolean;
+  wheelchair_accessible_entrance?: boolean;
 }
 
 /**
@@ -204,14 +220,30 @@ export const usePlacesService = () => {
         'formatted_address',
         'formatted_phone_number',
         'rating',
-        'user_ratings_total',  // Added field to fetch total reviews
+        'user_ratings_total',
         'opening_hours',
         'website',
         'photos',
         'reviews',
         'place_id',
         'geometry',
-        'types'
+        'types',
+        // Additional fields
+        'price_level',
+        'url',
+        'business_status',
+        'serves_beer',
+        'serves_wine',
+        'serves_vegetarian_food',
+        'takeout',
+        'delivery',
+        'dine_in',
+        'reservable',
+        'serves_breakfast',
+        'serves_lunch',
+        'serves_dinner',
+        'outdoor_seating',
+        'wheelchair_accessible_entrance'
       ],
     };
 

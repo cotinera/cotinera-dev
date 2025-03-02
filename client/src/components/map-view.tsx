@@ -68,6 +68,59 @@ const StarRating = ({ rating }: { rating: number }) => {
   );
 };
 
+const RestaurantDetails = ({ place }: { place: PlaceDetails }) => {
+  const features = [
+    place.takeout && { icon: <FaStore className="h-4 w-4" />, label: "Takeout available" },
+    place.delivery && { icon: <FaStore className="h-4 w-4" />, label: "Delivery available" },
+    place.dine_in && { icon: <FaStore className="h-4 w-4" />, label: "Dine-in available" },
+    place.outdoor_seating && { icon: <FaStore className="h-4 w-4" />, label: "Outdoor seating" },
+    place.serves_breakfast && { icon: <MdRestaurant className="h-4 w-4" />, label: "Serves breakfast" },
+    place.serves_lunch && { icon: <MdRestaurant className="h-4 w-4" />, label: "Serves lunch" },
+    place.serves_dinner && { icon: <MdRestaurant className="h-4 w-4" />, label: "Serves dinner" },
+    place.serves_vegetarian_food && { icon: <MdRestaurant className="h-4 w-4" />, label: "Vegetarian options" },
+    place.wheelchair_accessible_entrance && { icon: <FaStore className="h-4 w-4" />, label: "Wheelchair accessible" },
+  ].filter(Boolean);
+
+  const priceLevel = place.price_level ? ''.padStart(place.price_level, '$') : null;
+
+  return (
+    <div className="space-y-6">
+      {priceLevel && (
+        <div className="text-sm text-muted-foreground">
+          Price level: {priceLevel}
+        </div>
+      )}
+
+      {features.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="text-sm font-medium">Amenities & Services</h4>
+          <div className="grid grid-cols-2 gap-2">
+            {features.map((feature, index) => feature && (
+              <div key={index} className="flex items-center gap-2 text-sm text-muted-foreground">
+                {feature.icon}
+                <span>{feature.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {place.url && (
+        <div className="pt-4">
+          <a
+            href={place.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+          >
+            View on Google Maps
+          </a>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, className }: MapViewProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -499,6 +552,11 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                     ))}
                   </div>
                 </div>
+              )}
+              {selectedPlace.types?.includes('restaurant') && (
+                <section>
+                  <RestaurantDetails place={selectedPlace} />
+                </section>
               )}
             </div>
           </ScrollArea>
