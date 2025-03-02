@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus, ChevronDown, ChevronUp, Image } from "lucide-react";
 import { MdRestaurant, MdHotel } from "react-icons/md";
 import { FaLandmark, FaShoppingBag, FaUmbrellaBeach, FaGlassCheers, FaStore, FaTree } from "react-icons/fa";
@@ -17,8 +17,12 @@ import {
   MarkerF,
   MAP_CONTAINER_STYLE,
   DEFAULT_MAP_OPTIONS,
+  getCategoryIcon,
+  getPrimaryCategory,
+  CATEGORY_ICONS,
   type PlaceDetails,
   type PinnedPlace,
+  type PlaceCategory,
 } from "@/lib/google-maps";
 import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
 
@@ -30,18 +34,25 @@ interface MapViewProps {
   className?: string;
 }
 
+const CategoryIcon = ({ category }: { category: PlaceCategory }) => {
+  const IconComponent = CATEGORY_ICONS[category];
+  return IconComponent ? <IconComponent className="h-4 w-4 text-[#70757a]" /> : null;
+};
+
 const StarRating = ({ rating }: { rating: number }) => {
   return (
     <div className="flex items-center">
       {[1, 2, 3, 4, 5].map((star) => {
-        const roundedRating = Math.round(rating * 2) / 2;
+        const roundedRating = Math.round(rating * 2) / 2; // Round to nearest 0.5
         const difference = star - roundedRating;
-        let starClass = "text-yellow-400 fill-current";
+        let starClass = "text-yellow-400 fill-current"; // Full star
 
         if (difference > 0) {
           if (difference === 0.5) {
+            // Half star
             starClass = "text-yellow-400 fill-[50%]";
           } else if (difference >= 1) {
+            // Empty star
             starClass = "text-gray-300 fill-current";
           }
         }
@@ -57,59 +68,6 @@ const StarRating = ({ rating }: { rating: number }) => {
   );
 };
 
-const RestaurantDetails = ({ place }: { place: PlaceDetails }) => {
-  const features = [
-    place.takeout && { icon: <FaStore className="h-4 w-4" />, label: "Takeout available" },
-    place.delivery && { icon: <FaStore className="h-4 w-4" />, label: "Delivery available" },
-    place.dine_in && { icon: <FaStore className="h-4 w-4" />, label: "Dine-in available" },
-    place.outdoor_seating && { icon: <FaStore className="h-4 w-4" />, label: "Outdoor seating" },
-    place.serves_breakfast && { icon: <MdRestaurant className="h-4 w-4" />, label: "Serves breakfast" },
-    place.serves_lunch && { icon: <MdRestaurant className="h-4 w-4" />, label: "Serves lunch" },
-    place.serves_dinner && { icon: <MdRestaurant className="h-4 w-4" />, label: "Serves dinner" },
-    place.serves_vegetarian_food && { icon: <MdRestaurant className="h-4 w-4" />, label: "Vegetarian options" },
-    place.wheelchair_accessible_entrance && { icon: <FaStore className="h-4 w-4" />, label: "Wheelchair accessible" },
-  ].filter(Boolean);
-
-  const priceLevel = place.price_level ? ''.padStart(place.price_level, '$') : null;
-
-  return (
-    <div className="space-y-6">
-      {priceLevel && (
-        <div className="text-sm text-muted-foreground">
-          Price level: {priceLevel}
-        </div>
-      )}
-
-      {features.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-sm font-medium">Amenities & Services</h4>
-          <div className="grid grid-cols-2 gap-2">
-            {features.map((feature, index) => feature && (
-              <div key={index} className="flex items-center gap-2 text-sm text-muted-foreground">
-                {feature.icon}
-                <span>{feature.label}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {place.url && (
-        <div className="pt-4">
-          <a
-            href={place.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
-          >
-            View on Google Maps
-          </a>
-        </div>
-      )}
-    </div>
-  );
-};
-
 export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, className }: MapViewProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -119,16 +77,37 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
 
   const { isLoaded, loadError } = useGoogleMapsScript();
-  const { coordinates, setCoordinates } = useMapCoordinates(location);
-  const { initPlacesService, getPlaceDetails } = usePlacesService();
+  const { coordinates, setCoordinates, geocodeLocation } = useMapCoordinates(location);
+  const { placesService, initPlacesService, getPlaceDetails } = usePlacesService();
 
+  // Process pinned places data with better error handling and logging
   const allPinnedPlaces = useMemo(() => {
-    if (!pinnedPlaces) return [];
-    if (Array.isArray(pinnedPlaces)) return pinnedPlaces;
-    if ('places' in pinnedPlaces) return pinnedPlaces.places;
+    console.log("Processing pinnedPlaces input:", pinnedPlaces);
+
+    if (!pinnedPlaces) {
+      console.log("No pinned places provided");
+      return [];
+    }
+
+    if (Array.isArray(pinnedPlaces)) {
+      console.log("Pinned places is an array:", pinnedPlaces);
+      return pinnedPlaces;
+    }
+
+    if ('places' in pinnedPlaces) {
+      console.log("Pinned places is an object with places:", pinnedPlaces.places);
+      return pinnedPlaces.places;
+    }
+
+    console.log("Unknown pinned places format, defaulting to empty array");
     return [];
   }, [pinnedPlaces]);
 
+  useEffect(() => {
+    console.log("Pinned places updated:", allPinnedPlaces);
+  }, [allPinnedPlaces]);
+
+  // Base functions that other functions depend on
   const fetchPlaceDetails = useCallback((placeId: string) => {
     getPlaceDetails(placeId, (place, status) => {
       if (status === google.maps.places.PlacesServiceStatus.OK && place) {
@@ -153,6 +132,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
     map.addListener('click', handleMapClick);
   }, [initPlacesService, handleMapClick]);
 
+  // Initialize Places Autocomplete
   const {
     ready,
     value,
@@ -199,6 +179,8 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
           }
         : coordinates;
 
+      console.log("Pinning place with coordinates:", placeCoordinates);
+
       const response = await fetch(`/api/trips/${tripId}/pinned-places`, {
         method: 'POST',
         headers: {
@@ -219,6 +201,10 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         throw new Error('Failed to pin place');
       }
 
+      const newPinnedPlace = await response.json();
+      console.log("Successfully pinned new place:", newPinnedPlace);
+
+      // Invalidate and refetch pinned places
       await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/pinned-places`] });
 
       toast({
@@ -285,24 +271,43 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         </div>
       </div>
 
+      {/* Main place details sidebar */}
       {selectedPlace && (
         <div className="absolute top-0 left-0 bottom-0 w-[400px] bg-background shadow-lg z-40 flex flex-col">
+          {/* Header section */}
           <div className="p-6 border-b">
             <div className="space-y-2">
               <h2 className="text-[22px] font-medium leading-7 text-foreground">{selectedPlace.name}</h2>
               <div className="flex flex-col gap-1">
                 {selectedPlace.rating && (
                   <div className="flex items-center gap-2">
-                    <StarRating rating={selectedPlace.rating} />
-                    <span className="text-sm text-muted-foreground">
-                      ({selectedPlace.user_ratings_total?.toLocaleString()} reviews)
+                    <div className="flex items-center gap-0.5">
+                      <StarRating rating={selectedPlace.rating} />
+                      <span className="ml-1 text-sm font-medium">{selectedPlace.rating}</span>
+                    </div>
+                    <span className="text-[#70757a] text-sm">
+                      ({selectedPlace.user_ratings_total?.toLocaleString()})
                     </span>
+                  </div>
+                )}
+                {selectedPlace.types && (
+                  <div className="flex items-center gap-2 text-[14px] text-[#70757a]">
+                    {(() => {
+                      const { category, label } = getPrimaryCategory(selectedPlace.types);
+                      return (
+                        <>
+                          <CategoryIcon category={category} />
+                          <span>{label}</span>
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
             </div>
           </div>
 
+          {/* Action buttons - 4 columns grid */}
           <div className="grid grid-cols-4 p-2 border-b">
             <a
               href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(selectedPlace.formatted_address)}`}
@@ -379,10 +384,17 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
 
           <ScrollArea className="flex-1">
             <div className="p-6 space-y-8">
+              {/* Photos grid */}
               {selectedPlace.photos && selectedPlace.photos.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="text-sm font-medium text-foreground">Photos</h3>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-foreground">Photos</h3>
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedPhotoIndex(0)}>
+                      <Image className="h-4 w-4 mr-2" />
+                      View all
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1">
                     {selectedPlace.photos.slice(0, 4).map((photo, index) => (
                       <img
                         key={index}
@@ -396,6 +408,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </div>
               )}
 
+              {/* Location section */}
               <div className="space-y-3">
                 <h3 className="text-sm font-medium text-foreground">Location</h3>
                 <div className="flex items-start gap-4">
@@ -404,6 +417,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </div>
               </div>
 
+              {/* Contact section */}
               {(selectedPlace.formatted_phone_number || selectedPlace.website) && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-medium text-foreground">Contact</h3>
@@ -431,6 +445,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </div>
               )}
 
+              {/* Opening hours */}
               {selectedPlace.opening_hours && (
                 <div className="space-y-3">
                   <h3 className="text-sm font-medium text-foreground">Hours</h3>
@@ -445,41 +460,41 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
                 </div>
               )}
 
-              {selectedPlace.types?.includes('restaurant') && (
-                <RestaurantDetails place={selectedPlace} />
-              )}
-
+              {/* Reviews section */}
               {selectedPlace.reviews && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-[16px] font-medium text-foreground">Reviews</h3>
+                    <div className="flex items-center gap-3">
+                      <h3 className="text-[16px] font-medium text-foreground">Reviews</h3>
+                      {selectedPlace.rating && (
+                        <div className="flex items-center gap-1">
+                          <StarRating rating={selectedPlace.rating} />
+                          <span className="text-sm">
+                            {selectedPlace.rating}
+                            <span className="text-[#70757a] ml-1">
+                              ({selectedPlace.user_ratings_total?.toLocaleString()})
+                            </span>
+                          </span>
+                        </div>
+                      )}
+                    </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => setExpandedReviews(!expandedReviews)}
                       className="text-primary text-sm font-medium px-2"
                     >
-                      {expandedReviews ? (
-                        <>
-                          Show less
-                          <ChevronUp className="ml-1 h-4 w-4" />
-                        </>
-                      ) : (
-                        <>
-                          More
-                          <ChevronDown className="ml-1 h-4 w-4" />
-                        </>
-                      )}
+                      {expandedReviews ? "Show less" : "More"}
                     </Button>
                   </div>
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     {(expandedReviews ? selectedPlace.reviews : selectedPlace.reviews.slice(0, 2)).map((review, index) => (
-                      <div key={index} className="space-y-2">
+                      <div key={index} className="space-y-1.5">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-[13px]">{review.author_name}</span>
                           <StarRating rating={review.rating || 0} />
                         </div>
-                        <p className="text-[13px] text-muted-foreground leading-5">{review.text}</p>
+                        <p className="text-[13px] text-[#70757a] leading-5 line-clamp-3">{review.text}</p>
                       </div>
                     ))}
                   </div>
@@ -488,6 +503,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
             </div>
           </ScrollArea>
 
+          {/* Close button */}
           <Button
             variant="ghost"
             size="icon"
@@ -499,6 +515,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         </div>
       )}
 
+      {/* Photo Gallery Modal */}
       {selectedPhotoIndex !== null && selectedPlace?.photos && (
         <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center">
           <Button
@@ -531,6 +548,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
         }}
         onLoad={onMapLoad}
       >
+        {/* Main location marker */}
         <MarkerF
           position={coordinates}
           icon={{
@@ -543,7 +561,9 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
           }}
         />
 
+        {/* Pinned places markers */}
         {allPinnedPlaces.map((place: PinnedPlace) => {
+          console.log("Rendering marker for place:", place);
           if (!place.coordinates || !place.coordinates.lat || !place.coordinates.lng) {
             console.warn("Invalid coordinates for place:", place);
             return null;
@@ -557,7 +577,7 @@ export function MapView({ location, tripId, pinnedPlaces = [], onPinClick, class
               icon={{
                 path: google.maps.SymbolPath.MARKER,
                 scale: 30,
-                fillColor: "#DC2626",
+                fillColor: "#DC2626", // Red color
                 fillOpacity: 1,
                 strokeWeight: 2,
                 strokeColor: "#FFFFFF",
