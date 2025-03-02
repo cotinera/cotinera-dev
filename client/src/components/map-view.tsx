@@ -118,15 +118,25 @@ export function MapView({
     });
   }, [getPlaceDetails]);
 
+  const handlePlaceNameClick = useCallback((place: PinnedPlace) => {
+    if (mapRef.current && place.coordinates) {
+      mapRef.current.panTo(place.coordinates);
+      mapRef.current.setZoom(17);
+    }
+    if (place.placeId) {
+      fetchDetails(place.placeId);
+    }
+  }, [fetchDetails]);
+
   const handleMarkerClick = useCallback((place: PinnedPlace) => {
-    handlePlaceNameClick(place, mapRef, fetchDetails);
+    handlePlaceNameClick(place);
     onPinClick?.(place);
-  }, [onPinClick, fetchDetails, handlePlaceNameClick]);
+  }, [onPinClick, handlePlaceNameClick]);
 
   const handleLocalPlaceNameClick = useCallback((place: PinnedPlace) => {
-    handlePlaceNameClick(place, mapRef, fetchDetails);
+    handlePlaceNameClick(place);
     onPlaceNameClick?.(place);
-  }, [onPlaceNameClick, fetchDetails, handlePlaceNameClick]);
+  }, [onPlaceNameClick, handlePlaceNameClick]);
 
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
     const event = e as unknown as { placeId?: string; stop?: () => void };
