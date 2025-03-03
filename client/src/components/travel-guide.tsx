@@ -25,7 +25,7 @@ interface TutorialStep {
   description: string;
   icon: typeof Plane;
   expression: keyof typeof GuideExpressions;
-  highlight?: string; // CSS selector to highlight
+  highlight?: string;
   position?: "top" | "bottom" | "left" | "right";
 }
 

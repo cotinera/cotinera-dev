@@ -34,8 +34,8 @@ export function Checklist({ tripId }: ChecklistProps) {
         credentials: "include",
       });
       if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || "Failed to fetch checklist items");
+        const error = await res.json().catch(() => ({ message: 'Failed to fetch checklist items' }));
+        throw new Error(error.message);
       }
       return res.json();
     },
@@ -52,17 +52,9 @@ export function Checklist({ tripId }: ChecklistProps) {
         },
       });
 
-      // Check if the response is JSON
-      const contentType = res.headers.get("content-type");
-      if (!contentType || !contentType.includes("application/json")) {
-        // If not JSON, try to get the error message from the text
-        const errorText = await res.text();
-        throw new Error(errorText || "Failed to delete checklist item");
-      }
-
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({ message: "Failed to delete checklist item" }));
-        throw new Error(errorData.message || "Failed to delete checklist item");
+        const error = await res.json().catch(() => ({ message: 'Failed to delete checklist item' }));
+        throw new Error(error.message);
       }
 
       return res.json().catch(() => ({}));
@@ -94,8 +86,8 @@ export function Checklist({ tripId }: ChecklistProps) {
       });
 
       if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || "Failed to create checklist item");
+        const error = await res.json().catch(() => ({ message: 'Failed to create checklist item' }));
+        throw new Error(error.message);
       }
 
       return res.json();
@@ -128,8 +120,8 @@ export function Checklist({ tripId }: ChecklistProps) {
       });
 
       if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || "Failed to update checklist item");
+        const error = await res.json().catch(() => ({ message: 'Failed to update checklist item' }));
+        throw new Error(error.message);
       }
 
       return res.json();
