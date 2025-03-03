@@ -12,7 +12,6 @@ import { cn } from "@/lib/utils";
 import {
   useGoogleMapsScript,
   useMapCoordinates,
-  usePlacesService,
   GoogleMap,
   MarkerF,
   MAP_CONTAINER_STYLE,
@@ -86,7 +85,44 @@ export function MapView({
 
   const { isLoaded, loadError } = useGoogleMapsScript();
   const { coordinates, setCoordinates } = useMapCoordinates(location);
-  const { placesService, initPlacesService, getPlaceDetails } = usePlacesService();
+  const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
+
+  const initPlacesService = useCallback((map: google.maps.Map) => {
+    placesServiceRef.current = new google.maps.places.PlacesService(map);
+  }, []);
+
+  const getPlaceDetails = useCallback((placeId: string, callback: (place: PlaceDetails | null, status: google.maps.places.PlacesServiceStatus) => void) => {
+    if (!placesServiceRef.current) return;
+
+    placesServiceRef.current.getDetails(
+      { placeId, fields: ['name', 'formatted_address', 'geometry', 'photos', 'rating', 'user_ratings_total', 'types', 'price_level', 'website', 'formatted_phone_number', 'opening_hours', 'reviews'] },
+      (place, status) => callback(place as PlaceDetails, status)
+    );
+  }, []);
+
+  const findPlaceByQuery = useCallback((name: string, location: google.maps.LatLng, callback: (placeId: string | null) => void) => {
+    if (!placesServiceRef.current) return;
+
+    const request = {
+      query: name,
+      locationBias: {
+        center: location,
+        radius: 100
+      },
+      fields: ['place_id']
+    };
+
+    placesServiceRef.current.findPlaceFromQuery(
+      request,
+      (results, status) => {
+        if (status === google.maps.places.PlacesServiceStatus.OK && results && results[0]) {
+          callback(results[0].place_id);
+        } else {
+          callback(null);
+        }
+      }
+    );
+  }, []);
 
   const {
     ready,
@@ -236,42 +272,44 @@ export function MapView({
 
       // First try to use the stored placeId
       if (selectedPlace.placeId) {
-        fetchDetails(selectedPlace.placeId);
+        getPlaceDetails(selectedPlace.placeId, (place, status) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+            setSelectedPlaceDetails(place);
+          }
+        });
       } else {
-        // If no placeId, try to find the place using the coordinates
-        const request = {
-          location: new google.maps.LatLng(
-            selectedPlace.coordinates.lat,
-            selectedPlace.coordinates.lng
-          ),
-          radius: 1,
-          name: selectedPlace.name
-        };
+        // If no placeId, try to find the place using name search
+        const location = new google.maps.LatLng(
+          selectedPlace.coordinates.lat,
+          selectedPlace.coordinates.lng
+        );
 
-        if (placesService) {
-          placesService.nearbySearch(request, (results, status) => {
-            if (status === google.maps.places.PlacesServiceStatus.OK && results && results[0]) {
-              fetchDetails(results[0].place_id);
-            } else {
-              // Fallback to simplified place details if no match found
-              setSelectedPlaceDetails({
-                name: selectedPlace.name,
-                formatted_address: selectedPlace.address,
-                geometry: {
-                  location: new google.maps.LatLng(
-                    selectedPlace.coordinates.lat,
-                    selectedPlace.coordinates.lng
-                  )
-                }
-              } as PlaceDetails);
-            }
-          });
-        }
+        findPlaceByQuery(selectedPlace.name, location, (placeId) => {
+          if (placeId) {
+            getPlaceDetails(placeId, (place, status) => {
+              if (status === google.maps.places.PlacesServiceStatus.OK && place) {
+                setSelectedPlaceDetails(place);
+              }
+            });
+          } else {
+            // Fallback to simplified place details if no match found
+            setSelectedPlaceDetails({
+              name: selectedPlace.name,
+              formatted_address: selectedPlace.address,
+              geometry: {
+                location: new google.maps.LatLng(
+                  selectedPlace.coordinates.lat,
+                  selectedPlace.coordinates.lng
+                )
+              }
+            } as PlaceDetails);
+          }
+        });
       }
     } else {
       setSelectedPlaceDetails(null);
     }
-  }, [selectedPlace, fetchDetails, placesService]);
+  }, [selectedPlace, getPlaceDetails, findPlaceByQuery]);
 
   if (loadError) {
     return (
