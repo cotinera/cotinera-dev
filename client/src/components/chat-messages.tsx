@@ -130,7 +130,7 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
       return res.json();
     },
     onSuccess: (data) => {
-      // Invalidate both polls and chat queries to refresh the data
+      // Invalidate queries to refresh the data
       queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "chat"] });
       queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "polls"] });
 
@@ -140,6 +140,12 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
         question: "",
         options: ["", ""],
         endTime: undefined,
+      });
+
+      // Show success message
+      toast({
+        title: "Success",
+        description: "Poll created successfully",
       });
     },
     onError: (error: Error) => {

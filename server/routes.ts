@@ -929,10 +929,8 @@ export function registerRoutes(app: Express): Server {
         }
 
         // Update participant
-        const [participant] = await tx
-          .update(participants)
+        const [participant] = await tx          .update(participants)
           .set({
-            ...(name`
             ...(name && { name }),
             ...(arrivalDate && { arrivalDate: new Date(arrivalDate) }),
             ...(departureDate && { departureDate: new Date(departureDate) }),
@@ -1379,6 +1377,7 @@ export function registerRoutes(app: Express): Server {
 
       console.log('Created chat message:', newMessage);
 
+      // Get full message with user details
       const messageWithUser = await db.query.chatMessages.findFirst({
         where: eq(chatMessages.id, newMessage.id),
         with: {
