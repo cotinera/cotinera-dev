@@ -689,13 +689,13 @@ export function MapView({
             position={place.coordinates}
             title={place.name}
             icon={{
-              path: google.maps.SymbolPath.MARKER,
-              scale: 30,
+              path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+              scale: 6,
               fillColor: "#DC2626",
               fillOpacity: 1,
               strokeWeight: 2,
               strokeColor: "#FFFFFF",
-              labelOrigin: new google.maps.Point(0, -15)
+              labelOrigin: new google.maps.Point(0, -3)
             }}
             onClick={() => handleMarkerClick(place)}
           />
