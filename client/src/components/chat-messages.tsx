@@ -110,45 +110,24 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
 
   const { mutate: createPoll, isPending: isCreatingPoll } = useMutation({
     mutationFn: async (data: PollFormData) => {
-      // First create the poll
+      console.log('Creating poll with data:', data);
       const res = await fetch(`/api/trips/${tripId}/polls`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           question: data.question,
           options: data.options.filter(opt => opt.trim()),
-          endTime: data.endTime,
+          endTime: data.endTime
         }),
         credentials: 'include'
       });
 
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.message || 'Failed to create poll');
+        throw new Error(error.message || error.error || 'Failed to create poll');
       }
 
-      const pollData = await res.json();
-
-      // Then create a chat message with the poll
-      const messageRes = await fetch(`/api/trips/${tripId}/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: JSON.stringify({
-            type: 'poll',
-            pollId: pollData.id,
-            question: pollData.question,
-            options: pollData.options
-          })
-        }),
-        credentials: 'include'
-      });
-
-      if (!messageRes.ok) {
-        throw new Error('Failed to create poll message');
-      }
-
-      return messageRes.json();
+      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "chat"] });

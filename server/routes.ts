@@ -1333,16 +1333,34 @@ export function registerRoutes(app: Express): Server {
         });
       }
 
+      // Create the poll
       const [poll] = await db.insert(polls).values({
-        tripId,
-        question,
-        options,
+        tripId: tripId,
+        userId: req.user?.id || 1,
+        question: question,
+        options: options,
         endTime: endTime ? new Date(endTime) : null,
-        createdBy: req.user?.id || 1,
-        isClosed: false
+        isClosed: false,
+        createdAt: new Date(),
       }).returning();
 
-      console.log('Created poll:', poll);
+      console.log('Successfully created poll:', poll);
+
+      // Create the chat message for the poll
+      const chatMessage = await db.insert(chatMessages).values({
+        tripId: tripId,
+        userId: req.user?.id || 1,
+        message: JSON.stringify({
+          type: 'poll',
+          pollId: poll.id,
+          question: question,
+          options: options
+        }),
+        createdAt: new Date()
+      }).returning();
+
+      console.log('Created chat message for poll:', chatMessage);
+
       res.json(poll);
     } catch (error) {
       console.error('Error creating poll:', error);
@@ -1420,54 +1438,7 @@ export function registerRoutes(app: Express): Server {
   });
 
   // Create a new poll
-  app.post("/api/trips/:tripId/polls", async (req, res) => {
-    try {
-      const userId = req.user?.id || 1;
-      const tripId = parseInt(req.params.tripId);
-      const { question, options, endTime } = req.body;
-
-      // Create the poll
-      const [poll] = await db.insert(polls).values({
-        tripId,
-        userId,
-        question,
-        options,
-        endTime: endTime ? new Date(endTime) : null,
-      }).returning();
-
-      // Create a chat message for the poll
-      const pollMessage = {
-        type: 'poll',
-        pollId: poll.id,
-        question: poll.question,
-        options: poll.options,
-      };
-
-      const [message] = await db.insert(chatMessages).values({
-        tripId,
-        userId,
-        message: JSON.stringify(pollMessage),
-      }).returning();
-
-      const fullMessage = await db.query.chatMessages.findFirst({
-        where: eq(chatMessages.id, message.id),
-        with: {
-          user: {
-            columns: {
-              id: true,
-              name: true,
-              email: true
-            }
-          }
-        },
-      });
-
-      res.json({ poll, message: fullMessage });
-    } catch (error) {
-      console.error('Error creating poll:', error);
-      res.status(500).json({ error: 'Failed to create poll' });
-    }
-  });
+  //This route is already removed in the edited section, so we skip it.
 
   // Get poll details with votes
   app.get("/api/trips/:tripId/polls/:pollId", async (req, res) => {
