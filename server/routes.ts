@@ -932,7 +932,7 @@ export function registerRoutes(app: Express): Server {
         const [participant] = await tx          .update(participants)
           .set({
             ...(name && { name }),
-            ...(arrivalDate && { arrivalDate: new Date(arrivalDate) }),
+            ...(arrivalDate && { arrivalDate: new Date(arrivalarrivalDate) }),
             ...(departureDate && { departureDate: new Date(departureDate) }),
             hotelStatus: accommodation ? 'pending' : currentParticipant.hotelStatus,
             flightStatus: (flightNumber || airline) ? 'pending' : currentParticipant.flightStatus,
@@ -1318,7 +1318,7 @@ export function registerRoutes(app: Express): Server {
 
   // Add these new routes after the existing chat message routes
 
-  // Create poll with proper error handling and logging
+  // Create poll with proper schema validation
   app.post("/api/trips/:tripId/polls", async (req, res) => {
     try {
       const tripId = parseInt(req.params.tripId);
@@ -1347,54 +1347,59 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: 'At least 2 non-empty options are required' });
       }
 
-      // Create poll
-      const [newPoll] = await db.insert(polls).values({
-        tripId,
-        userId,
-        question,
-        options: filteredOptions,
-        endTime: endTime ? new Date(endTime) : null,
-        isClosed: false,
-      }).returning();
+      // Start transaction for both poll and chat message creation
+      const result = await db.transaction(async (tx) => {
+        // Create poll with exact schema match
+        const [newPoll] = await tx.insert(polls).values({
+          tripId,
+          userId,
+          question,
+          options: filteredOptions,
+          endTime: endTime ? new Date(endTime) : null,
+          isClosed: false,
+        }).returning();
 
-      console.log('Created poll:', newPoll);
+        console.log('Created poll:', newPoll);
 
-      if (!newPoll?.id) {
-        throw new Error('Failed to create poll - no ID returned');
-      }
+        if (!newPoll?.id) {
+          throw new Error('Failed to create poll - no ID returned');
+        }
 
-      // Create chat message for the poll
-      const [newMessage] = await db.insert(chatMessages).values({
-        tripId,
-        userId,
-        message: JSON.stringify({
-          type: 'poll',
-          pollId: newPoll.id,
-          question: newPoll.question,
-          options: newPoll.options
-        })
-      }).returning();
+        // Create chat message for the poll
+        const [newMessage] = await tx.insert(chatMessages).values({
+          tripId,
+          userId,
+          message: JSON.stringify({
+            type: 'poll',
+            pollId: newPoll.id,
+            question: newPoll.question,
+            options: newPoll.options
+          })
+        }).returning();
 
-      console.log('Created chat message:', newMessage);
+        console.log('Created chat message:', newMessage);
 
-      // Get full message with user details
-      const messageWithUser = await db.query.chatMessages.findFirst({
-        where: eq(chatMessages.id, newMessage.id),
-        with: {
-          user: {
-            columns: {
-              id: true,
-              name: true,
-              email: true
+        // Get full message with user details
+        const messageWithUser = await tx.query.chatMessages.findFirst({
+          where: eq(chatMessages.id, newMessage.id),
+          with: {
+            user: {
+              columns: {
+                id: true,
+                name: true,
+                email: true
+              }
             }
           }
-        }
+        });
+
+        return {
+          poll: newPoll,
+          message: messageWithUser
+        };
       });
 
-      res.json({
-        poll: newPoll,
-        message: messageWithUser
-      });
+      res.json(result);
     } catch (error) {
       console.error('Error creating poll:', error);
       res.status(500).json({
