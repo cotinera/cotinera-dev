@@ -673,14 +673,6 @@ export function MapView({
       >
         <MarkerF
           position={coordinates}
-          icon={{
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 10,
-            fillColor: "#1E88E5",
-            fillOpacity: 1,
-            strokeWeight: 2,
-            strokeColor: "#FFFFFF",
-          }}
         />
 
         {allPinnedPlaces.map((place: PinnedPlace) => (
@@ -688,15 +680,6 @@ export function MapView({
             key={place.id}
             position={place.coordinates}
             title={place.name}
-            icon={{
-              path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-              scale: 6,
-              fillColor: "#DC2626",
-              fillOpacity: 1,
-              strokeWeight: 2,
-              strokeColor: "#FFFFFF",
-              labelOrigin: new google.maps.Point(0, -3)
-            }}
             onClick={() => handleMarkerClick(place)}
           />
         ))}
