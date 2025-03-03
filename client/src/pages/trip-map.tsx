@@ -83,7 +83,7 @@ export default function TripMap() {
               className="absolute left-4 top-0"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
+              Back
             </Button>
 
             <TripHeaderEdit trip={trip} onBack={() => setLocation("/")} />
