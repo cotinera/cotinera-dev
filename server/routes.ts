@@ -932,7 +932,7 @@ export function registerRoutes(app: Express): Server {
         const [participant] = await tx
           .update(participants)
           .set({
-            ...(name &&{ name }),
+            ...(name && { name }),
             ...(arrivalDate && { arrivalDate: new Date(arrivalDate) }),
             ...(departureDate && { departureDate: new Date(departureDate) }),
             hotelStatus: accommodation ? 'pending' : currentParticipant.hotelStatus,
