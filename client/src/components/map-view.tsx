@@ -1,7 +1,5 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus, ChevronDown, ChevronUp, Image } from "lucide-react";
-import { MdRestaurant, MdHotel } from "react-icons/md";
-import { FaLandmark, FaShoppingBag, FaUmbrellaBeach, FaGlassCheers, FaStore, FaTree } from "react-icons/fa";
+import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -16,19 +14,10 @@ import {
   MarkerF,
   MAP_CONTAINER_STYLE,
   DEFAULT_MAP_OPTIONS,
-  getCategoryIcon,
-  getPrimaryCategory,
-  CATEGORY_ICONS,
   type PlaceDetails,
   type PinnedPlace,
-  type PlaceCategory,
 } from "@/lib/google-maps";
 import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
-
-const CategoryIcon = ({ category }: { category: PlaceCategory }) => {
-  const IconComponent = CATEGORY_ICONS[category];
-  return IconComponent ? <IconComponent className="h-4 w-4 text-[#70757a]" /> : null;
-};
 
 const StarRating = ({ rating }: { rating: number }) => {
   return (
@@ -235,7 +224,6 @@ export function MapView({
           placeId: selectedPlaceDetails.place_id,
           coordinates: placeCoordinates,
           address: selectedPlaceDetails.formatted_address,
-          category: getPrimaryCategory(selectedPlaceDetails.types || []).category,
           phone: selectedPlaceDetails.formatted_phone_number,
           website: selectedPlaceDetails.website,
           rating: selectedPlaceDetails.rating,
@@ -270,7 +258,6 @@ export function MapView({
         mapRef.current.setZoom(17);
       }
 
-      // First try to use the stored placeId
       if (selectedPlace.placeId) {
         getPlaceDetails(selectedPlace.placeId, (place, status) => {
           if (status === google.maps.places.PlacesServiceStatus.OK && place) {
@@ -278,7 +265,6 @@ export function MapView({
           }
         });
       } else {
-        // If no placeId, try to find the place using name search
         const location = new google.maps.LatLng(
           selectedPlace.coordinates.lat,
           selectedPlace.coordinates.lng
@@ -292,7 +278,6 @@ export function MapView({
               }
             });
           } else {
-            // Fallback to simplified place details if no match found
             setSelectedPlaceDetails({
               name: selectedPlace.name,
               formatted_address: selectedPlace.address,
@@ -372,24 +357,6 @@ export function MapView({
                     <span className="text-[#70757a] text-sm">
                       ({selectedPlaceDetails.user_ratings_total?.toLocaleString()})
                     </span>
-                  </div>
-                )}
-                {selectedPlaceDetails.types && (
-                  <div className="flex items-center gap-2 text-[14px] text-[#70757a]">
-                    {(() => {
-                      const { category, label } = getPrimaryCategory(selectedPlaceDetails.types);
-                      return (
-                        <>
-                          <CategoryIcon category={category} />
-                          <span>{label}</span>
-                          {selectedPlaceDetails.price_level && (
-                            <span className="ml-1">
-                              {"$".repeat(selectedPlaceDetails.price_level)}
-                            </span>
-                          )}
-                        </>
-                      );
-                    })()}
                   </div>
                 )}
               </div>
@@ -529,49 +496,6 @@ export function MapView({
                         <li key={index} className="text-sm leading-relaxed">{hours}</li>
                       ))}
                     </ul>
-                  </div>
-                </div>
-              )}
-
-              {selectedPlaceDetails.types?.includes('restaurant') && (
-                <div className="space-y-3">
-                  <h3 className="text-sm font-medium text-foreground">Service options</h3>
-                  <div className="space-y-2">
-                    {selectedPlaceDetails.dine_in && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">✓ Dine-in</span>
-                      </div>
-                    )}
-                    {selectedPlaceDetails.takeout && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">✓ Takeout</span>
-                      </div>
-                    )}
-                    {selectedPlaceDetails.delivery && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">✓ Delivery</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {selectedPlaceDetails.types?.includes('lodging') && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-medium text-foreground">Compare prices</h3>
-                    <div className="space-y-2 border rounded-lg divide-y">
-                      {[
-                        { site: 'Official site', price: selectedPlaceDetails.price_level ? selectedPlaceDetails.price_level * 200 : 300 },
-                        { site: 'Booking.com', price: selectedPlaceDetails.price_level ? selectedPlaceDetails.price_level * 180 : 280 },
-                        { site: 'Hotels.com', price: selectedPlaceDetails.price_level ? selectedPlaceDetails.price_level * 190 : 290 }
-                      ].map((option, index) => (
-                        <div key={index} className="p-3 flex items-center justify-between hover:bg-accent cursor-pointer">
-                          <span className="text-sm">{option.site}</span>
-                          <span className="text-sm font-medium">${option.price}</span>
-                        </div>
-                      ))}
-                    </div>
                   </div>
                 </div>
               )}
