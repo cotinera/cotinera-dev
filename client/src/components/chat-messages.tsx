@@ -32,6 +32,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 interface ChatMessagesProps {
   tripId: number;
@@ -189,7 +190,7 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
   });
 
   const { mutate: sendMessage, isPending: isSendingMessage } = useMutation({
-    mutationFn: async (data: ChatFormData) => {
+    mutationFn: async (data: ChatFormData | {message: string}) => {
       const res = await fetch(`/api/trips/${tripId}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -225,8 +226,21 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
 
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "chat"] });
+    onSuccess: async (pollData) => {
+      // Create a poll message
+      const pollMessage = {
+        message: JSON.stringify({
+          type: 'poll',
+          pollId: pollData.id,
+          question: pollData.question,
+          options: pollData.options
+        })
+      };
+
+      // Send the poll message
+      await sendMessage(pollMessage);
+
+      // Close dialog and reset form
       setIsPollDialogOpen(false);
       pollForm.reset({
         question: "",
@@ -236,12 +250,17 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
     },
     onError: (error) => {
       console.error('Error creating poll:', error);
+      useToast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create poll",
+        variant: "destructive",
+      });
     },
   });
 
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = 0;
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
 
@@ -259,11 +278,7 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
         });
         return;
       }
-      await createPoll({
-        question: data.question,
-        options: filteredOptions,
-        endTime: data.endTime,
-      });
+      await createPoll(data);
     } catch (error) {
       console.error('Error creating poll:', error);
     }
