@@ -11,3 +11,31 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+/* Tutorial highlight styles */
+.tutorial-highlight {
+  position: relative;
+  z-index: 60;
+  animation: tutorial-pulse 2s infinite;
+}
+
+@keyframes tutorial-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--primary) / 0.3);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(var(--primary) / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--primary) / 0);
+  }
+}
+
+.tutorial-highlight::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border: 2px solid hsl(var(--primary));
+  border-radius: 8px;
+  pointer-events: none;
+}

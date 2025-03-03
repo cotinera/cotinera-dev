@@ -1,7 +1,9 @@
 import { useTrips } from "@/hooks/use-trips";
 import { useUser } from "@/hooks/use-user";
+import { useTutorial } from "@/hooks/use-tutorial";
 import { Button } from "@/components/ui/button";
 import { TripCard } from "@/components/trip-card";
+import { TravelGuide } from "@/components/travel-guide";
 import { Plus, LogOut, Trash2, Settings } from "lucide-react";
 import { useState, useMemo } from "react";
 import { z } from "zod";
@@ -50,6 +52,7 @@ interface TripFormData extends z.infer<typeof tripFormSchema> {}
 export default function Dashboard() {
   const { trips, createTrip } = useTrips();
   const { logout } = useUser();
+  const { isFirstTime, completeTutorial } = useTutorial();
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
@@ -214,6 +217,10 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
+      <TravelGuide 
+        onComplete={completeTutorial}
+        isFirstTime={isFirstTime}
+      />
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">Personal Group Coordinator</h1>
