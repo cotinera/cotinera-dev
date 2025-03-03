@@ -124,13 +124,17 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
 
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.message || error.error || 'Failed to create poll');
+        throw new Error(error.error || error.details || 'Failed to create poll');
       }
 
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Invalidate both polls and chat queries to refresh the data
       queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "chat"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "polls"] });
+
+      // Close dialog and reset form
       setIsPollDialogOpen(false);
       pollForm.reset({
         question: "",
