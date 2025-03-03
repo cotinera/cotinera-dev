@@ -7,8 +7,7 @@ import { TripHeaderEdit } from "@/components/trip-header-edit";
 import { MapView } from "@/components/map-view";
 import { PinnedPlaces } from "@/components/pinned-places";
 import { useState } from "react";
-import type { PinnedPlace } from "@/types/PinnedPlace"; // Assuming PinnedPlace type is defined here
-
+import type { PinnedPlace } from "@/types/PinnedPlace";
 
 export default function TripMap() {
   const [, params] = useRoute("/trips/:id/map");
@@ -80,11 +79,11 @@ export default function TripMap() {
           <div className="container mx-auto px-4 relative z-10">
             <Button
               variant="ghost"
-              onClick={() => setLocation(`/trips/${tripId}`)}
+              onClick={() => setLocation("/")}
               className="absolute left-4 top-0"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Trip
+              Back to Dashboard
             </Button>
 
             <TripHeaderEdit trip={trip} onBack={() => setLocation("/")} />
