@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -54,110 +55,11 @@ const pollFormSchema = z.object({
   endTime: z.string().optional(),
 });
 
-function PollMessage({ message, tripId }: { message: ChatMessage; tripId: number }) {
-  const queryClient = useQueryClient();
-  const [selectedOption, setSelectedOption] = useState<number | null>(null);
-
-  // Parse poll data from message
-  const pollData = useMemo(() => {
-    try {
-      const data = JSON.parse(message.message);
-      return data.type === 'poll' ? data : null;
-    } catch (e) {
-      console.error('Error parsing poll data:', e);
-      return null;
-    }
-  }, [message.message]);
-
-  const { data: pollDetails } = useQuery({
-    queryKey: ["/api/trips", tripId, "polls", pollData?.pollId],
-    queryFn: async () => {
-      if (!pollData?.pollId) return null;
-      const res = await fetch(`/api/trips/${tripId}/polls/${pollData.pollId}`);
-      if (!res.ok) throw new Error("Failed to fetch poll details");
-      return res.json();
-    },
-    enabled: !!pollData?.pollId,
-  });
-
-  const { mutate: submitVote } = useMutation({
-    mutationFn: async (optionIndex: number) => {
-      if (!pollData?.pollId) return;
-      const res = await fetch(`/api/trips/${tripId}/polls/${pollData.pollId}/vote`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ optionIndex }),
-        credentials: 'include'
-      });
-      if (!res.ok) throw new Error("Failed to submit vote");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["/api/trips", tripId, "polls", pollData?.pollId],
-      });
-    },
-  });
-
-  if (!pollData || !pollDetails) return null;
-
-  const { votes = [] } = pollDetails;
-  const optionVotes = pollData.options.map((_: string, index: number) =>
-    votes.filter((vote: any) => vote.optionIndex === index).length
-  );
-  const totalVotes = votes.length;
-
-  return (
-    <div className="bg-accent/20 rounded-lg p-4 mt-2">
-      <h4 className="font-medium mb-2">{pollData.question}</h4>
-      <div className="space-y-2">
-        {pollData.options.map((option: string, index: number) => {
-          const voteCount = optionVotes[index];
-          const percentage = totalVotes > 0 ? (voteCount / totalVotes) * 100 : 0;
-
-          return (
-            <button
-              key={index}
-              className={cn(
-                "w-full text-left p-2 rounded hover:bg-accent/30 relative",
-                selectedOption === index && "bg-accent/40"
-              )}
-              onClick={() => {
-                setSelectedOption(index);
-                submitVote(index);
-              }}
-              disabled={pollDetails?.isClosed}
-            >
-              <div className="flex justify-between items-center">
-                <span>{option}</span>
-                <span className="text-sm text-muted-foreground">
-                  {voteCount} ({percentage.toFixed(1)}%)
-                </span>
-              </div>
-              <div
-                className="absolute inset-0 bg-accent/20 rounded"
-                style={{
-                  width: `${percentage}%`,
-                  zIndex: -1,
-                }}
-              />
-            </button>
-          );
-        })}
-      </div>
-      {pollDetails?.endTime && (
-        <p className="text-sm text-muted-foreground mt-2">
-          Ends {formatDistance(new Date(pollDetails.endTime), new Date(), { addSuffix: true })}
-        </p>
-      )}
-    </div>
-  );
-}
-
 export function ChatMessages({ tripId }: ChatMessagesProps) {
   const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPollDialogOpen, setIsPollDialogOpen] = useState(false);
+  const { toast } = useToast();
 
   const chatForm = useForm<ChatFormData>({
     defaultValues: {
@@ -189,8 +91,8 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
     refetchInterval: 2000,
   });
 
-  const { mutate: sendMessage, isPending: isSendingMessage } = useMutation({
-    mutationFn: async (data: ChatFormData | {message: string}) => {
+  const { mutate: sendMessage } = useMutation({
+    mutationFn: async (data: ChatFormData | { message: string }) => {
       const res = await fetch(`/api/trips/${tripId}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -208,6 +110,7 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
 
   const { mutate: createPoll, isPending: isCreatingPoll } = useMutation({
     mutationFn: async (data: PollFormData) => {
+      // First create the poll
       const res = await fetch(`/api/trips/${tripId}/polls`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -224,23 +127,31 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
         throw new Error(error.message || 'Failed to create poll');
       }
 
-      return res.json();
+      const pollData = await res.json();
+
+      // Then create a chat message with the poll
+      const messageRes = await fetch(`/api/trips/${tripId}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: JSON.stringify({
+            type: 'poll',
+            pollId: pollData.id,
+            question: pollData.question,
+            options: pollData.options
+          })
+        }),
+        credentials: 'include'
+      });
+
+      if (!messageRes.ok) {
+        throw new Error('Failed to create poll message');
+      }
+
+      return messageRes.json();
     },
-    onSuccess: async (pollData) => {
-      // Create a poll message
-      const pollMessage = {
-        message: JSON.stringify({
-          type: 'poll',
-          pollId: pollData.id,
-          question: pollData.question,
-          options: pollData.options
-        })
-      };
-
-      // Send the poll message
-      await sendMessage(pollMessage);
-
-      // Close dialog and reset form
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "chat"] });
       setIsPollDialogOpen(false);
       pollForm.reset({
         question: "",
@@ -248,11 +159,11 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
         endTime: undefined,
       });
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       console.error('Error creating poll:', error);
-      useToast({
+      toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to create poll",
+        description: error.message || "Failed to create poll",
         variant: "destructive",
       });
     },
@@ -278,7 +189,12 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
         });
         return;
       }
-      await createPoll(data);
+
+      createPoll({
+        question: data.question,
+        options: filteredOptions,
+        endTime: data.endTime,
+      });
     } catch (error) {
       console.error('Error creating poll:', error);
     }
@@ -429,18 +345,11 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
                       )}
                     />
 
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => setIsPollDialogOpen(false)}
-                      >
-                        Cancel
-                      </Button>
+                    <DialogFooter>
                       <Button type="submit" disabled={isCreatingPoll}>
                         Create Poll
                       </Button>
-                    </div>
+                    </DialogFooter>
                   </form>
                 </Form>
               </DialogContent>
@@ -449,7 +358,7 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
           <Button
             type="submit"
             size="icon"
-            disabled={isSendingMessage}
+            disabled={chatForm.watch("message").length === 0}
           >
             <Send className="h-4 w-4" />
           </Button>
@@ -459,7 +368,106 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
   );
 }
 
-// Helper function to convert URLs in text to clickable links
+function PollMessage({ message, tripId }: { message: ChatMessage; tripId: number }) {
+  const queryClient = useQueryClient();
+  const [selectedOption, setSelectedOption] = useState<number | null>(null);
+
+  // Parse poll data from message
+  const pollData = useMemo(() => {
+    try {
+      const data = JSON.parse(message.message);
+      return data.type === 'poll' ? data : null;
+    } catch (e) {
+      console.error('Error parsing poll data:', e);
+      return null;
+    }
+  }, [message.message]);
+
+  const { data: pollDetails } = useQuery({
+    queryKey: ["/api/trips", tripId, "polls", pollData?.pollId],
+    queryFn: async () => {
+      if (!pollData?.pollId) return null;
+      const res = await fetch(`/api/trips/${tripId}/polls/${pollData.pollId}`);
+      if (!res.ok) throw new Error("Failed to fetch poll details");
+      return res.json();
+    },
+    enabled: !!pollData?.pollId,
+  });
+
+  const { mutate: submitVote } = useMutation({
+    mutationFn: async (optionIndex: number) => {
+      if (!pollData?.pollId) return;
+      const res = await fetch(`/api/trips/${tripId}/polls/${pollData.pollId}/vote`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ optionIndex }),
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error("Failed to submit vote");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/trips", tripId, "polls", pollData?.pollId],
+      });
+    },
+  });
+
+  if (!pollData || !pollDetails) return null;
+
+  const { votes = [] } = pollDetails;
+  const optionVotes = pollData.options.map((_: string, index: number) =>
+    votes.filter((vote: any) => vote.optionIndex === index).length
+  );
+  const totalVotes = votes.length;
+
+  return (
+    <div className="bg-accent/20 rounded-lg p-4 mt-2">
+      <h4 className="font-medium mb-2">{pollData.question}</h4>
+      <div className="space-y-2">
+        {pollData.options.map((option: string, index: number) => {
+          const voteCount = optionVotes[index];
+          const percentage = totalVotes > 0 ? (voteCount / totalVotes) * 100 : 0;
+
+          return (
+            <button
+              key={index}
+              className={cn(
+                "w-full text-left p-2 rounded hover:bg-accent/30 relative",
+                selectedOption === index && "bg-accent/40"
+              )}
+              onClick={() => {
+                setSelectedOption(index);
+                submitVote(index);
+              }}
+              disabled={pollDetails?.isClosed}
+            >
+              <div className="flex justify-between items-center">
+                <span>{option}</span>
+                <span className="text-sm text-muted-foreground">
+                  {voteCount} ({percentage.toFixed(1)}%)
+                </span>
+              </div>
+              <div
+                className="absolute inset-0 bg-accent/20 rounded"
+                style={{
+                  width: `${percentage}%`,
+                  zIndex: -1,
+                }}
+              />
+            </button>
+          );
+        })}
+      </div>
+      {pollDetails?.endTime && (
+        <p className="text-sm text-muted-foreground mt-2">
+          Ends {formatDistance(new Date(pollDetails.endTime), new Date(), { addSuffix: true })}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function linkifyText(text: string) {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   const parts = text.split(urlRegex);
