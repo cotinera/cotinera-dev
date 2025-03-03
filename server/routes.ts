@@ -1319,6 +1319,106 @@ export function registerRoutes(app: Express): Server {
 
   // Add these new routes after the existing chat message routes
 
+  // Add poll endpoints with proper error handling
+  app.post("/api/trips/:tripId/polls", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const { question, options, endTime } = req.body;
+
+      console.log('Creating poll with data:', { tripId, question, options, endTime });
+
+      if (!question || !options || !Array.isArray(options) || options.length < 2) {
+        return res.status(400).json({ 
+          error: 'Invalid poll data. Question and at least 2 options are required.' 
+        });
+      }
+
+      const [poll] = await db.insert(polls).values({
+        tripId,
+        question,
+        options,
+        endTime: endTime ? new Date(endTime) : null,
+        createdBy: req.user?.id || 1,
+        isClosed: false
+      }).returning();
+
+      console.log('Created poll:', poll);
+      res.json(poll);
+    } catch (error) {
+      console.error('Error creating poll:', error);
+      res.status(500).json({ 
+        error: 'Failed to create poll',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.get("/api/trips/:tripId/polls/:pollId", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const pollId = parseInt(req.params.pollId);
+
+      const [poll] = await db.select().from(polls)
+        .where(and(
+          eq(polls.id, pollId),
+          eq(polls.tripId, tripId)
+        ));
+
+      if (!poll) {
+        return res.status(404).json({ error: 'Poll not found' });
+      }
+
+      const votes = await db.select().from(pollVotes)
+        .where(eq(pollVotes.pollId, pollId));
+
+      res.json({ ...poll, votes });
+    } catch (error) {
+      console.error('Error fetching poll:', error);
+      res.status(500).json({ error: 'Failed to fetch poll' });
+    }
+  });
+
+  app.post("/api/trips/:tripId/polls/:pollId/vote", async (req, res) => {
+    try {
+      const pollId = parseInt(req.params.pollId);
+      const { optionIndex } = req.body;
+      const userId = req.user?.id || 1;
+
+      if (typeof optionIndex !== 'number') {
+        return res.status(400).json({ error: 'Invalid option index' });
+      }
+
+      // Check if user has already voted
+      const existingVote = await db.select().from(pollVotes)
+        .where(and(
+          eq(pollVotes.pollId, pollId),
+          eq(pollVotes.userId, userId)
+        ))
+        .limit(1);
+
+      if (existingVote.length > 0) {
+        // Update existing vote
+        const [vote] = await db.update(pollVotes)
+          .set({ optionIndex })
+          .where(eq(pollVotes.id, existingVote[0].id))
+          .returning();
+        return res.json(vote);
+      }
+
+      // Create new vote
+      const [vote] = await db.insert(pollVotes).values({
+        pollId,
+        userId,
+        optionIndex
+      }).returning();
+
+      res.json(vote);
+    } catch (error) {
+      console.error('Error submitting vote:', error);
+      res.status(500).json({ error: 'Failed to submit vote' });
+    }
+  });
+
   // Create a new poll
   app.post("/api/trips/:tripId/polls", async (req, res) => {
     try {
