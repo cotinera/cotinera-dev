@@ -41,7 +41,7 @@ const tutorialSteps: TutorialStep[] = [
     description: "Start by clicking the 'New Trip' button to plan your adventure!",
     icon: Map,
     expression: "pointing",
-    highlight: "button:contains('New Trip')",
+    highlight: "[data-tutorial='new-trip']",
     position: "bottom",
   },
   {
@@ -49,7 +49,7 @@ const tutorialSteps: TutorialStep[] = [
     description: "Planning is better together! Add your travel buddies to coordinate.",
     icon: Users,
     expression: "happy",
-    highlight: ".participant-section",
+    highlight: "[data-tutorial='participants']",
     position: "right",
   },
   {
@@ -57,7 +57,7 @@ const tutorialSteps: TutorialStep[] = [
     description: "Use the calendar to organize your daily activities and keep everyone in sync!",
     icon: Calendar,
     expression: "explaining",
-    highlight: ".calendar-section",
+    highlight: "[data-tutorial='calendar']",
     position: "left",
   },
   {
@@ -65,7 +65,7 @@ const tutorialSteps: TutorialStep[] = [
     description: "Keep track of bookings, todos, and shared notes in one place!",
     icon: CheckSquare,
     expression: "thinking",
-    highlight: ".checklist-section",
+    highlight: "[data-tutorial='checklist']",
     position: "right",
   },
 ];

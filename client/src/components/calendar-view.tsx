@@ -20,7 +20,7 @@ export function CalendarView({ trips }: CalendarViewProps) {
   const [date, setDate] = useState<Date | undefined>(new Date());
 
   // Get destinations for all trips
-  const tripDestinationsQueries = trips.map(trip => 
+  const tripDestinationsQueries = trips.map(trip =>
     useQuery({
       queryKey: [`/api/trips/${trip.id}/destinations`],
       queryFn: async () => {
@@ -90,7 +90,7 @@ export function CalendarView({ trips }: CalendarViewProps) {
   }, []);
 
   return (
-    <Card>
+    <Card data-tutorial="calendar">
       <CardHeader>
         <CardTitle>Calendar</CardTitle>
         <CardDescription>View your upcoming trips</CardDescription>

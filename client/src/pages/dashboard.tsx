@@ -262,7 +262,7 @@ export default function Dashboard() {
           </div>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
-              <Button>
+              <Button data-tutorial="new-trip">
                 <Plus className="h-4 w-4 mr-2" />
                 New Trip
               </Button>

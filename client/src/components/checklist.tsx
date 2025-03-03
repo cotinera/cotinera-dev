@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/card";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 
 interface ChecklistProps {
   tripId?: number;
@@ -24,6 +25,7 @@ export function Checklist({ tripId }: ChecklistProps) {
   const [newItemTitle, setNewItemTitle] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
+  const [isAddChecklist, setIsAddChecklist] = useState(false);
 
   const { data: items = [], isError } = useQuery<ChecklistItem[]>({
     queryKey: [`/api/trips/${tripId}/checklist`],
@@ -103,6 +105,7 @@ export function Checklist({ tripId }: ChecklistProps) {
         queryKey: [`/api/trips/${tripId}/checklist`],
       });
       setNewItemTitle("");
+      setIsAddChecklist(false);
     },
     onError: (error: Error) => {
       toast({
@@ -212,22 +215,32 @@ export function Checklist({ tripId }: ChecklistProps) {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Trip Checklist</CardTitle>
-        <CardDescription>Track your trip preparation tasks</CardDescription>
+      <CardHeader className="pb-3">
+        <div className="flex justify-between items-center">
+          <CardTitle>Trip Checklist</CardTitle>
+          <div className="flex gap-2" data-tutorial="checklist">
+            <Dialog open={isAddChecklist} onOpenChange={setIsAddChecklist}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Item
+                </Button>
+              </DialogTrigger>
+              <form onSubmit={handleSubmit} className="flex gap-2 mt-2">
+                <Input
+                  placeholder="Add new item..."
+                  value={newItemTitle}
+                  onChange={(e) => setNewItemTitle(e.target.value)}
+                />
+                <Button type="submit" size="icon" disabled={createItem.isPending}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </form>
+            </Dialog>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="flex gap-2 mb-4">
-          <Input
-            placeholder="Add new item..."
-            value={newItemTitle}
-            onChange={(e) => setNewItemTitle(e.target.value)}
-          />
-          <Button type="submit" size="icon" disabled={createItem.isPending}>
-            <Plus className="h-4 w-4" />
-          </Button>
-        </form>
-
         <div className="space-y-2">
           {items.map((item) => (
             <div
