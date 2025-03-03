@@ -1,5 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ChecklistItem } from "@db/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,13 @@ import {
 } from "@/components/ui/card";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface ChecklistProps {
   tripId?: number;
@@ -218,16 +224,21 @@ export function Checklist({ tripId }: ChecklistProps) {
                   Add Item
                 </Button>
               </DialogTrigger>
-              <form onSubmit={handleSubmit} className="flex gap-2 mt-2">
-                <Input
-                  placeholder="Add new item..."
-                  value={newItemTitle}
-                  onChange={(e) => setNewItemTitle(e.target.value)}
-                />
-                <Button type="submit" size="icon" disabled={createItem.isPending}>
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </form>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Item</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+                  <Input
+                    placeholder="Enter item title..."
+                    value={newItemTitle}
+                    onChange={(e) => setNewItemTitle(e.target.value)}
+                  />
+                  <Button type="submit" className="w-full" disabled={createItem.isPending}>
+                    Add Item
+                  </Button>
+                </form>
+              </DialogContent>
             </Dialog>
           </div>
         </div>
@@ -237,7 +248,7 @@ export function Checklist({ tripId }: ChecklistProps) {
           {items.map((item) => (
             <div
               key={item.id}
-              className="flex items-center gap-2 p-2 rounded-lg hover:bg-accent group"
+              className="flex items-center gap-2 p-2 rounded-md bg-muted/50 hover:bg-muted/70 transition-colors group"
             >
               <Checkbox
                 id={`item-${item.id}`}
