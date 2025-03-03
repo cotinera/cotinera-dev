@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Plus, Trash2, Coffee, UtensilsCrossed, Wine, Beer, Building2, ShoppingBag, Theater, Palmtree, History, Building, Pencil } from "lucide-react";
+import { MapPin, Plus, Trash2, Pencil } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -31,93 +31,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-
-export enum PlaceCategory {
-  FOOD = "food",
-  BAR = "bar",
-  CAFE = "cafe",
-  WINE = "wine",
-  SHOPPING = "shopping",
-  GROCERY = "grocery",
-  ARTS = "arts",
-  LIGHTHOUSE = "lighthouse",
-  THEATRE = "theatre",
-  TOURIST = "tourist",
-  CASINO = "casino",
-  AQUARIUM = "aquarium",
-  EVENT_VENUE = "event_venue",
-  AMUSEMENT_PARK = "amusement_park",
-  HISTORIC = "historic",
-  MUSEUM = "museum",
-  MOVIE_THEATRE = "movie_theatre",
-  MONUMENT = "monument",
-  MUSIC = "music",
-  RELIC = "relic"
-}
-
-export const CATEGORY_ICONS: Record<PlaceCategory, typeof MapPin> = {
-  [PlaceCategory.FOOD]: UtensilsCrossed,
-  [PlaceCategory.BAR]: Beer,
-  [PlaceCategory.CAFE]: Coffee,
-  [PlaceCategory.WINE]: Wine,
-  [PlaceCategory.SHOPPING]: ShoppingBag,
-  [PlaceCategory.GROCERY]: ShoppingBag,
-  [PlaceCategory.ARTS]: Theater,
-  [PlaceCategory.LIGHTHOUSE]: Building2,
-  [PlaceCategory.THEATRE]: Theater,
-  [PlaceCategory.TOURIST]: Palmtree,
-  [PlaceCategory.CASINO]: Building2,
-  [PlaceCategory.AQUARIUM]: Building2,
-  [PlaceCategory.EVENT_VENUE]: Building2,
-  [PlaceCategory.AMUSEMENT_PARK]: Palmtree,
-  [PlaceCategory.HISTORIC]: History,
-  [PlaceCategory.MUSEUM]: Building,
-  [PlaceCategory.MOVIE_THEATRE]: Theater,
-  [PlaceCategory.MONUMENT]: Building2,
-  [PlaceCategory.MUSIC]: Theater,
-  [PlaceCategory.RELIC]: History,
-};
-
-const CATEGORY_GROUPS = {
-  "Food & Drink": [PlaceCategory.FOOD, PlaceCategory.BAR, PlaceCategory.CAFE, PlaceCategory.WINE],
-  "Shopping": [PlaceCategory.SHOPPING, PlaceCategory.GROCERY],
-  "Entertainment / Leisure": [
-    PlaceCategory.ARTS,
-    PlaceCategory.LIGHTHOUSE,
-    PlaceCategory.THEATRE,
-    PlaceCategory.TOURIST,
-    PlaceCategory.CASINO,
-    PlaceCategory.AQUARIUM,
-    PlaceCategory.EVENT_VENUE,
-    PlaceCategory.AMUSEMENT_PARK,
-    PlaceCategory.HISTORIC,
-    PlaceCategory.MUSEUM,
-    PlaceCategory.MOVIE_THEATRE,
-    PlaceCategory.MONUMENT,
-    PlaceCategory.MUSIC,
-    PlaceCategory.RELIC
-  ]
-};
 
 interface PinnedPlace {
   id: number;
   name: string;
   address: string;
   notes?: string;
-  category: PlaceCategory;
   coordinates: {
     lat: number;
     lng: number;
@@ -129,19 +52,16 @@ interface PinnedPlace {
   website?: string;
   rating?: number;
   openingHours?: string[];
-  photos?: string[];
 }
 
 interface AddPinnedPlaceForm {
   address: string;
   notes?: string;
-  category: PlaceCategory;
 }
 
 interface EditPinnedPlaceForm {
   address?: string;
   notes?: string;
-  category: PlaceCategory;
 }
 
 interface PinnedPlacesProps {
@@ -153,31 +73,6 @@ interface PinnedPlacesProps {
   tripCoordinates?: { lat: number; lng: number };
   onPinClick?: (place: PinnedPlace) => void;
 }
-
-const formatCategoryName = (category: string): string => {
-  return category
-    .split('_')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ');
-};
-
-interface PlaceDetailsWithPhotos extends PinnedPlace {
-  photos?: {
-    getUrl: () => string;
-    height: number;
-    width: number;
-    html_attributions: string[];
-  }[];
-  price_level?: number;
-  reviews?: {
-    author_name: string;
-    rating: number;
-    text: string;
-    time: number;
-  }[];
-  url?: string;
-}
-
 
 export function PinnedPlaces({
   tripId,
@@ -246,7 +141,6 @@ export function PinnedPlaces({
     defaultValues: {
       address: "",
       notes: "",
-      category: PlaceCategory.TOURIST,
     },
   });
 
@@ -254,7 +148,6 @@ export function PinnedPlaces({
     defaultValues: {
       address: "",
       notes: "",
-      category: PlaceCategory.TOURIST,
     },
   });
 
@@ -263,7 +156,6 @@ export function PinnedPlaces({
       editForm.reset({
         address: placeToEdit.name,
         notes: placeToEdit.notes || "",
-        category: placeToEdit.category,
       });
       setEditedPlaceCoordinates(placeToEdit.coordinates);
       setEditedPlaceName(placeToEdit.name);
@@ -275,7 +167,6 @@ export function PinnedPlaces({
       form.reset({
         address: "",
         notes: "",
-        category: PlaceCategory.TOURIST,
       });
       setSelectedCoordinates(null);
     }
@@ -296,7 +187,6 @@ export function PinnedPlaces({
           address: data.address,
           notes: data.notes,
           coordinates: selectedCoordinates,
-          category: data.category,
           destinationId,
         }),
       });
@@ -471,11 +361,6 @@ export function PinnedPlaces({
     });
   };
 
-  const getIconComponent = (category: PlaceCategory) => {
-    return CATEGORY_ICONS[category] || MapPin;
-  };
-
-
   const handlePlaceClick = (place: PinnedPlace) => {
     onPinClick?.(place);
   };
@@ -550,41 +435,6 @@ export function PinnedPlaces({
                 />
                 <FormField
                   control={form.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <SelectTrigger tabIndex="-1">
-                          <SelectValue placeholder="Select a category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Object.entries(CATEGORY_GROUPS).map(([groupName, categories]) => (
-                            <SelectGroup key={groupName}>
-                              <SelectLabel>{groupName}</SelectLabel>
-                              {[...categories].sort((a, b) => formatCategoryName(a).localeCompare(formatCategoryName(b))).map((category) => {
-                                const Icon = getIconComponent(category);
-                                return (
-                                  <SelectItem key={category} value={category}>
-                                    <div className="flex items-center gap-2">
-                                      <Icon className="h-4 w-4" />
-                                      <span>{formatCategoryName(category)}</span>
-                                    </div>
-                                  </SelectItem>
-                                );
-                              })}
-                            </SelectGroup>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
                   name="notes"
                   render={({ field }) => (
                     <FormItem>
@@ -612,41 +462,38 @@ export function PinnedPlaces({
       <CardContent>
         <ScrollArea className="h-[200px] w-full rounded-md">
           <div className="space-y-2">
-            {existingPins.map((place) => {
-              const Icon = getIconComponent(place.category);
-              return (
-                <div
-                  key={place.id}
-                  className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer"
-                  onClick={() => handlePlaceClick(place)}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <Icon className="h-4 w-4" />
-                      <p className="text-sm font-medium truncate">{place.name}</p>
-                    </div>
-                  </div>
+            {existingPins.map((place) => (
+              <div
+                key={place.id}
+                className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted/70 transition-colors cursor-pointer"
+                onClick={() => handlePlaceClick(place)}
+              >
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => handleEditClick(e, place)}
-                      className="p-0 h-8 w-8 text-muted-foreground hover:text-primary"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => handleDeleteClick(e, place)}
-                      className="p-0 h-8 w-8 text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <MapPin className="h-4 w-4" />
+                    <p className="text-sm font-medium truncate">{place.name}</p>
                   </div>
                 </div>
-              );
-            })}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => handleEditClick(e, place)}
+                    className="p-0 h-8 w-8 text-muted-foreground hover:text-primary"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => handleDeleteClick(e, place)}
+                    className="p-0 h-8 w-8 text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
             {existingPins.length === 0 && (
               <p className="text-center text-muted-foreground py-4">
                 No places pinned yet
@@ -693,41 +540,6 @@ export function PinnedPlaces({
                         />
                       </div>
                     </FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={editForm.control}
-                name="category"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <SelectTrigger tabIndex="-1">
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(CATEGORY_GROUPS).map(([groupName, categories]) => (
-                          <SelectGroup key={groupName}>
-                            <SelectLabel>{groupName}</SelectLabel>
-                            {[...categories].sort((a, b) => formatCategoryName(a).localeCompare(formatCategoryName(b))).map((category) => {
-                              const Icon = getIconComponent(category);
-                              return (
-                                <SelectItem key={category} value={category}>
-                                  <div className="flex items-center gap-2">
-                                    <Icon className="h-4 w-4" />
-                                    <span>{formatCategoryName(category)}</span>
-                                  </div>
-                                </SelectItem>
-                              );
-                            })}
-                          </SelectGroup>
-                        ))}
-                      </SelectContent>
-                    </Select>
                   </FormItem>
                 )}
               />
