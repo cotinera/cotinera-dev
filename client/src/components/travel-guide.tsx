@@ -11,13 +11,13 @@ import {
 } from "@/components/ui/card";
 import { Plane, Map, Users, Calendar, CheckSquare } from "lucide-react";
 
-// Character expressions for different moods
+// Character expressions using actual emojis
 const GuideExpressions = {
-  happy: "^‿^",
-  explaining: "¬‿¬",
-  excited: "＼(＾▽＾)／",
-  thinking: "(￣～￣;)",
-  pointing: "( ´▽`)ﾉ",
+  happy: "😊",
+  explaining: "🤓",
+  excited: "🤗",
+  thinking: "🤔",
+  pointing: "👉",
 } as const;
 
 interface TutorialStep {
@@ -130,7 +130,7 @@ export function TravelGuide({ onComplete, isFirstTime = true }: TravelGuideProps
               <CardTitle className="text-lg">{step.title}</CardTitle>
             </div>
             <CardDescription>
-              <span className="font-mono text-xl mr-2">
+              <span className="text-xl mr-2">
                 {GuideExpressions[step.expression]}
               </span>
               {step.description}
