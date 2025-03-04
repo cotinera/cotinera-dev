@@ -49,25 +49,6 @@ const StarRating = ({ rating }: { rating: number }) => {
   );
 };
 
-export interface MapViewProps {
-  location: string;
-  tripId?: number;
-  pinnedPlaces?: PinnedPlace[] | { places: PinnedPlace[] };
-  onPinClick?: (place: PinnedPlace) => void;
-  onPlaceNameClick?: (place: PinnedPlace) => void;
-  className?: string;
-  selectedPlace?: PinnedPlace | null;
-}
-
-interface Accommodation {
-  id: number;
-  name: string;
-  address?: string;
-  coordinates: { lat: number; lng: number; };
-  checkInTime?: string;
-  checkOutTime?: string;
-}
-
 interface CategoryButton {
   id: string;
   label: string;
@@ -239,15 +220,16 @@ export function MapView({
   const refreshPlaces = useCallback(() => {
     if (!selectedCategory || !placesServiceRef.current || !mapRef.current) return;
 
+    const bounds = mapRef.current.getBounds();
+    if (!bounds) return;
+
     setIsLoadingPlaces(true);
     const category = categoryButtons.find(c => c.id === selectedCategory);
-
     if (!category) return;
 
-    const request: google.maps.places.PlaceSearchRequest = {
-      location: mapRef.current.getCenter(),
-      radius: 1500, // 1.5km radius
-      type: category.type[0],
+    const request = {
+      bounds,
+      type: category.type[0] as google.maps.places.PlaceType,
     };
 
     placesServiceRef.current.nearbySearch(request, (results, status) => {
@@ -261,23 +243,28 @@ export function MapView({
   const handleCategoryClick = useCallback((category: CategoryButton) => {
     setSelectedCategory(currentCategory => {
       const newCategory = currentCategory === category.id ? null : category.id;
-      if (newCategory && newCategory !== currentCategory) {
-        refreshPlaces();
-      }
+      setTimeout(() => {
+        if (newCategory) {
+          refreshPlaces();
+        } else {
+          setPlaceResults([]);
+        }
+      }, 0);
       return newCategory;
     });
   }, [refreshPlaces]);
 
   const handleMapIdle = useCallback(() => {
-    refreshPlaces();
-  }, [refreshPlaces]);
+    if (selectedCategory) {
+      refreshPlaces();
+    }
+  }, [selectedCategory, refreshPlaces]);
 
   const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
     initPlacesService(map);
-    map.addListener('click', handleMapClick);
     map.addListener('idle', handleMapIdle);
-  }, [initPlacesService, handleMapClick, handleMapIdle]);
+  }, [initPlacesService, handleMapIdle]);
 
   const handleSearchSelect = useCallback(async (placeId: string, description: string) => {
     try {
@@ -858,6 +845,15 @@ export function MapView({
               key={`place-${place.place_id}`}
               position={place.geometry.location}
               title={place.name}
+              icon={{
+                path: google.maps.SymbolPath.MARKER,
+                fillColor: '#DB4437',
+                fillOpacity: 1,
+                strokeWeight: 1,
+                strokeColor: '#FFFFFF',
+                scale: 1,
+                labelOrigin: new google.maps.Point(0, -32)
+              }}
               onClick={() => {
                 if (place.place_id) {
                   fetchDetails(place.place_id);
