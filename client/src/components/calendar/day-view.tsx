@@ -61,7 +61,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
-// Update the form schema to be more specific about participant IDs
+// Update the event form schema to be more specific about participant IDs
 const eventFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
   startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format (HH:mm)"),
@@ -600,30 +600,72 @@ export function DayView({ trip }: { trip: Trip }) {
     });
   };
 
+  // Update the createEvent function with better error handling
   const createEvent = async (values: EventFormValues) => {
     try {
       const startTime = new Date(`${values.date}T${values.startTime}:00`);
       const endTime = new Date(`${values.date}T${values.endTime}:00`);
 
+      // Validate times are within trip dates
+      const tripStart = startOfDay(new Date(trip.startDate));
+      const tripEnd = endOfDay(new Date(trip.endDate));
+
+      if (startTime < tripStart || endTime > tripEnd) {
+        toast({
+          variant: "destructive",
+          title: "Invalid dates",
+          description: "Event must be within trip dates",
+        });
+        return;
+      }
+
+      // Log the request payload for debugging
+      console.log('Creating activity with payload:', {
+        title: values.title,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        location: values.location || null,
+        description: values.description || null,
+        participants: values.participants || [],
+        tripId: trip.id
+      });
+
       const res = await fetch(`/api/trips/${trip.id}/activities`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        credentials: "include",
         body: JSON.stringify({
           title: values.title,
           startTime: startTime.toISOString(),
           endTime: endTime.toISOString(),
-          location: values.location,
-          description: values.description,
-          participants: values.participants,
+          location: values.location || null,
+          description: values.description || null,
+          participants: values.participants || [],
+          tripId: trip.id
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to create activity");
+      // Log the response status and headers for debugging
+      console.log('Response status:', res.status);
+      console.log('Response headers:', Object.fromEntries(res.headers.entries()));
+
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ message: 'Failed to create activity' }));
+        console.error('Server error response:', error);
+        throw new Error(error.message);
+      }
+
+      const data = await res.json();
+      console.log('Activity created successfully:', data);
 
       await queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
       toast({ title: "Event created successfully" });
       setIsCreateDialogOpen(false);
     } catch (error) {
+      console.error("Create event error:", error);
       toast({
         variant: "destructive",
         title: "Failed to create event",
