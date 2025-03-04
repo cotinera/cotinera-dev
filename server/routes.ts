@@ -104,74 +104,141 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Get trip with share token
+  // Share Links
+  app.post("/api/trips/:tripId/share", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      if (isNaN(tripId)) {
+        return res.status(400).json({ error: "Invalid trip ID" });
+      }
+
+      // Verify trip exists and user has access
+      const [trip] = await db.select().from(trips).where(eq(trips.id, tripId)).limit(1);
+      if (!trip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+
+      const { expiresInDays = 7, accessLevel = "view" } = req.body;
+
+      let expiresAt = null;
+      if (expiresInDays > 0) {
+        expiresAt = addDays(new Date(), expiresInDays);
+      }
+
+      // Generate a unique token
+      const token = crypto.randomUUID();
+
+      // Create share link with the new token
+      const [shareLink] = await db
+        .insert(shareLinks)
+        .values({
+          tripId,
+          token,
+          accessLevel,
+          expiresAt,
+          isActive: true,
+        })
+        .returning();
+
+      if (!shareLink) {
+        throw new Error("Failed to create share link");
+      }
+
+      console.log('Created share link:', shareLink);
+      res.json(shareLink);
+    } catch (error) {
+      console.error('Error creating share link:', error);
+      res.status(500).json({ error: 'Failed to create share link' });
+    }
+  });
+
+  // Get shared trip details
   app.get("/api/share/:token", async (req, res) => {
     try {
-      const [shareLink] = await db.select().from(shareLinks).where(and(eq(shareLinks.token, req.params.token), eq(shareLinks.isActive, true))).limit(1);
+      console.log('Checking share link with token:', req.params.token);
+
+      const [shareLink] = await db.select()
+        .from(shareLinks)
+        .where(
+          and(
+            eq(shareLinks.token, req.params.token),
+            eq(shareLinks.isActive, true)
+          )
+        )
+        .limit(1);
+
+      console.log('Found share link:', shareLink);
 
       if (!shareLink) {
         return res.status(404).json({ error: "Share link not found or has been revoked" });
       }
 
       if (shareLink.expiresAt && new Date(shareLink.expiresAt) < new Date()) {
-        await db.update(shareLinks).set({ isActive: false }).where(eq(shareLinks.id, shareLink.id));
+        await db.update(shareLinks)
+          .set({ isActive: false })
+          .where(eq(shareLinks.id, shareLink.id));
         return res.status(404).json({ error: "Share link has expired" });
       }
 
+      // If authenticated user, add them as participant
       if (req.isAuthenticated() && req.user) {
-        const [existingParticipant] = await db.select().from(participants).where(and(eq(participants.tripId, shareLink.tripId), eq(participants.userId, req.user.id))).limit(1);
+        const [existingParticipant] = await db.select()
+          .from(participants)
+          .where(
+            and(
+              eq(participants.tripId, shareLink.tripId),
+              eq(participants.userId, req.user.id)
+            )
+          )
+          .limit(1);
 
         if (!existingParticipant) {
-          await db.insert(participants).values({
-            tripId: shareLink.tripId,
-            userId: req.user.id,
-            status: shareLink.accessLevel === 'edit' ? 'collaborator' : 'viewer',
-          });
-        } else if (existingParticipant.status === 'viewer' && shareLink.accessLevel === 'edit') {
-          await db.update(participants).set({ status: 'collaborator' }).where(eq(participants.id, existingParticipant.id));
+          await db.insert(participants)
+            .values({
+              tripId: shareLink.tripId,
+              userId: req.user.id,
+              name: req.user.name,
+              status: 'pending'
+            });
         }
       }
 
-      const [trip] = await db.select({
-        id: trips.id,
-        title: trips.title,
-        description: trips.description,
-        location: trips.location,
-        startDate: trips.startDate,
-        endDate: trips.endDate,
-        thumbnail: trips.thumbnail,
-        participants: sql`json_agg(json_build_object(
-          'id', p.id,
-          'name', p.name,
-          'userId', p.user_id,
-          'status', p.status
-        ))`.mapWith(JSON.parse)
-      })
-      .from(trips)
-      .leftJoin(participants.as('p'), eq(trips.id, sql`p.trip_id`))
-      .where(eq(trips.id, shareLink.tripId))
-      .groupBy(trips.id)
-      .limit(1);
+      // First get the trip details
+      const trip = await db.select().from(trips).where(eq(trips.id, shareLink.tripId)).limit(1);
 
       if (!trip) {
         return res.status(404).json({ error: "Trip not found" });
       }
 
-      const [activities, checklist] = await Promise.all([
+      // Get participants
+      const tripParticipants = await db.select({
+        id: participants.id,
+        name: participants.name,
+        userId: participants.userId,
+        status: participants.status
+      })
+        .from(participants)
+        .where(eq(participants.tripId, shareLink.tripId));
+
+      // Get activities and checklist
+      const [tripActivities, tripChecklist] = await Promise.all([
         db.select().from(activities).where(eq(activities.tripId, shareLink.tripId)),
-        db.select().from(checklist).where(eq(checklist.tripId, shareLink.tripId)),
+        db.select().from(checklist).where(eq(checklist.tripId, shareLink.tripId))
       ]);
 
+      const tripDetails = {
+        ...trip[0],
+        participants: tripParticipants,
+        activities: tripActivities,
+        checklist: tripChecklist
+      };
+
       res.json({
-        trip: {
-          ...trip,
-          participants: trip.participants || [],
-          activities,
-          checklist
-        },
+        trip: tripDetails,
         accessLevel: shareLink.accessLevel,
-        isParticipant: req.user ? (trip.participants || []).some(p => p.userId === req.user.id) : false
+        isParticipant: req.user ? tripParticipants.some(p => p.userId === req.user.id) : false
       });
+
     } catch (error) {
       console.error('Error handling share link:', error);
       res.status(500).json({ error: 'Failed to process share link' });
@@ -579,57 +646,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Share Links
-  app.post("/api/trips/:tripId/share", async (req, res) => {
-    try {
-      const tripId = parseInt(req.params.tripId);
-      const { expiresInDays = 7, accessLevel = "view" } = req.body;
-
-      let expiresAt = null;
-      if (expiresInDays > 0) {
-        expiresAt = addDays(new Date(), expiresInDays);
-      }
-
-      const [shareLink] = await db
-        .insert(shareLinks)
-        .values({
-          tripId,
-          accessLevel,
-          expiresAt,
-          isActive: true,
-        })
-        .returning();
-
-      res.json(shareLink);
-    } catch (error) {
-      console.error('Error creating share link:', error);
-      res.status(500).json({ error: 'Failed to create share link' });
-    }
-  });
-
-  app.delete("/api/trips/:tripId/share/:linkId", async (req, res) => {
-    try {
-      const [revokedLink] = await db
-        .update(shareLinks)
-        .set({ isActive: false })
-        .where(
-          and(
-            eq(shareLinks.id, parseInt(req.params.linkId)),
-            eq(shareLinks.tripId, parseInt(req.params.tripId))
-          )
-        )
-        .returning();
-
-      if (!revokedLink) {
-        return res.status(404).json({ error: 'Share link not found' });
-      }
-
-      res.json(revokedLink);
-    } catch (error) {
-      console.error('Error revoking share link:', error);
-      res.status(500).json({ error: 'Failed to revoke share link' });
-    }
-  });
 
   // Serve static files for uploads
   app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
@@ -918,7 +934,7 @@ export function registerRoutes(app: Express): Server {
           .where(
             and(
               eq(participants.id, participantId),
-              eq(participants.tripId, tripId)
+              eq(participants.tripId, tripId            )
             )
           );
 
