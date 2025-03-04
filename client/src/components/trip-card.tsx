@@ -46,17 +46,22 @@ export function TripCard({ trip, selectable, selected, onSelect, onDelete }: Tri
   const thumbnailIndex = trip.id % THUMBNAILS.length;
   const thumbnail = trip.thumbnail || THUMBNAILS[thumbnailIndex];
 
-  // Live query for participants
-  const { data: participants = [] } = useQuery({
+  // Live query for participants with proper error handling and retries
+  const { data: participants = [], isError } = useQuery({
     queryKey: [`/api/trips/${trip.id}/participants`],
     queryFn: async () => {
-      const res = await fetch(`/api/trips/${trip.id}/participants`);
+      const res = await fetch(`/api/trips/${trip.id}/participants`, {
+        credentials: 'include', // Ensure cookies are sent
+      });
       if (!res.ok) {
-        throw new Error("Failed to fetch participants");
+        const error = await res.text();
+        throw new Error(error || "Failed to fetch participants");
       }
       return res.json();
     },
-    refetchInterval: 2000, // Poll every 2 seconds for updates
+    retry: 3, // Retry failed requests up to 3 times
+    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
+    staleTime: 2000, // Consider data fresh for 2 seconds
   });
 
   const handleNavigate = () => {
@@ -68,7 +73,7 @@ export function TripCard({ trip, selectable, selected, onSelect, onDelete }: Tri
 
   // Get initial for avatar fallback
   const getInitial = (participant: { userId: number | null; name?: string }) => {
-    if (participant.name) {
+    if (participant?.name) {
       return participant.name[0].toUpperCase();
     }
     return '?';
@@ -156,7 +161,7 @@ export function TripCard({ trip, selectable, selected, onSelect, onDelete }: Tri
                 })}
               </span>
             </div>
-            {participants && participants.length > 0 && (
+            {participants && participants.length > 0 && !isError && (
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-muted-foreground" />
                 <HoverCard>

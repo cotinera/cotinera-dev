@@ -789,7 +789,9 @@ export function registerRoutes(app: Express): Server {
   app.get("/api/trips/:tripId/participants", async (req, res) => {
     try {
       const tripId = parseInt(req.params.tripId);
-      console.log('Fetching participants for trip:', tripId);
+      if (isNaN(tripId)) {
+        return res.status(400).json({ error: "Invalid trip ID" });
+      }
 
       const tripParticipants = await db.select({
         id: participants.id,
@@ -800,12 +802,15 @@ export function registerRoutes(app: Express): Server {
         departureDate: participants.departureDate,
         flightStatus: participants.flightStatus,
         hotelStatus: participants.hotelStatus,
-        accommodationId: participants.accommodationId
+        accommodationId: participants.accommodationId,
+        userId: participants.userId
       })
         .from(participants)
         .where(eq(participants.tripId, tripId));
 
-      console.log('Found participants:', tripParticipants);
+      if (!tripParticipants) {
+        return res.status(404).json({ error: "No participants found" });
+      }
 
       // Fetch all flights and accommodations for the trip
       const [tripFlights, tripAccommodations] = await Promise.all([
@@ -820,7 +825,6 @@ export function registerRoutes(app: Express): Server {
         accommodation: tripAccommodations.find(accommodation => accommodation.id === participant.accommodationId)
       }));
 
-      console.log('Returning participants with details:', participantsWithDetails);
       res.json(participantsWithDetails);
     } catch (error) {
       console.error('Error fetching participants:', error);
