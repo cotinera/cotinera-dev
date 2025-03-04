@@ -171,6 +171,10 @@ export const accommodations = pgTable("accommodations", {
   name: text("name").notNull(),
   type: text("type").notNull(),
   address: text("address").notNull(),
+  coordinates: json("coordinates").$type<{
+    lat: number;
+    lng: number;
+  }>(),
   checkInDate: date("check_in_date").notNull(),
   checkOutDate: date("check_out_date").notNull(),
   checkInTime: time("check_in_time"),

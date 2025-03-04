@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAccommodations } from "@/hooks/use-accommodations";
 import type { Accommodation } from "@db/schema";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Card,
   CardContent,
@@ -9,13 +10,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { MapPicker } from "@/components/map-picker";
 import {
   Form,
   FormControl,
@@ -23,10 +18,9 @@ import {
   FormItem,
   FormLabel,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { format } from "date-fns";
-import { Plus, Building2, Clock } from "lucide-react";
+import { Plus, Building2, Clock, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -35,6 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 interface AccommodationBookingsProps {
   tripId: number;
@@ -42,14 +38,15 @@ interface AccommodationBookingsProps {
 
 export function AccommodationBookings({ tripId }: AccommodationBookingsProps) {
   const { accommodations, createAccommodation, updateAccommodation, isLoading } = useAccommodations(tripId);
-  const [isAddAccommodationOpen, setIsAddAccommodationOpen] = useState(false);
   const [editingAccommodation, setEditingAccommodation] = useState<Accommodation | null>(null);
+  const [isAddAccommodationOpen, setIsAddAccommodationOpen] = useState(false);
 
   const form = useForm<Partial<Accommodation>>({
     defaultValues: editingAccommodation || {
       name: "",
       type: "hotel",
       address: "",
+      coordinates: { lat: 0, lng: 0 },
       checkInDate: "",
       checkOutDate: "",
       checkInTime: "",
@@ -83,7 +80,7 @@ export function AccommodationBookings({ tripId }: AccommodationBookingsProps) {
         <div className="flex justify-between items-center">
           <div>
             <CardTitle>Accommodation Bookings</CardTitle>
-            <CardDescription>Manage your hotel and accommodation reservations</CardDescription>
+            <CardDescription>Track your hotel and accommodation reservations</CardDescription>
           </div>
           <Dialog
             open={isAddAccommodationOpen}
@@ -151,6 +148,23 @@ export function AccommodationBookings({ tripId }: AccommodationBookingsProps) {
                   />
                   <FormField
                     control={form.control}
+                    name="coordinates"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Location</FormLabel>
+                        <FormControl>
+                          <div className="h-[300px] rounded-md overflow-hidden">
+                            <MapPicker
+                              initialPosition={field.value}
+                              onPositionChange={(pos) => field.onChange(pos)}
+                            />
+                          </div>
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
                     name="address"
                     render={({ field }) => (
                       <FormItem>
@@ -181,7 +195,7 @@ export function AccommodationBookings({ tripId }: AccommodationBookingsProps) {
                         <FormItem>
                           <FormLabel>Time</FormLabel>
                           <FormControl>
-                            <Input type="time" {...field} />
+                            <Input type="time" {...field} value={field.value || ''} />
                           </FormControl>
                         </FormItem>
                       )}
@@ -207,7 +221,7 @@ export function AccommodationBookings({ tripId }: AccommodationBookingsProps) {
                         <FormItem>
                           <FormLabel>Time</FormLabel>
                           <FormControl>
-                            <Input type="time" {...field} />
+                            <Input type="time" {...field} value={field.value || ''} />
                           </FormControl>
                         </FormItem>
                       )}
@@ -232,7 +246,7 @@ export function AccommodationBookings({ tripId }: AccommodationBookingsProps) {
                       <FormItem>
                         <FormLabel>Room Type</FormLabel>
                         <FormControl>
-                          <Input placeholder="e.g. Double Room, Suite" {...field} />
+                          <Input placeholder="e.g. Double Room, Suite" {...field} value={field.value || ''} />
                         </FormControl>
                       </FormItem>
                     )}
@@ -284,10 +298,9 @@ export function AccommodationBookings({ tripId }: AccommodationBookingsProps) {
           {accommodations.map((accommodation) => (
             <div
               key={accommodation.id}
-              className="flex items-center justify-between p-4 rounded-lg border bg-card"
+              className="flex items-center justify-between p-4 rounded-lg border bg-card cursor-pointer hover:bg-accent/50"
               onClick={() => {
                 setEditingAccommodation(accommodation);
-                setIsAddAccommodationOpen(true);
                 form.reset(accommodation);
               }}
             >
@@ -307,6 +320,12 @@ export function AccommodationBookings({ tripId }: AccommodationBookingsProps) {
                     {format(new Date(accommodation.checkOutDate), "MMM d, yyyy")}
                   </span>
                 </div>
+                {accommodation.coordinates && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <MapPin className="h-3 w-3" />
+                    <span>Location saved</span>
+                  </div>
+                )}
               </div>
               <div className="text-right">
                 <div className="font-medium">

@@ -1,11 +1,12 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus, ChevronDown, ChevronUp, Image } from "lucide-react";
+import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus, ChevronDown, ChevronUp, Image, Building2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useAccommodations } from "@/hooks/use-accommodations";
 import { cn } from "@/lib/utils";
 import {
   useGoogleMapsScript,
@@ -56,6 +57,15 @@ export interface MapViewProps {
   selectedPlace?: PinnedPlace | null;
 }
 
+interface Accommodation {
+  id: number;
+  name: string;
+  address?: string;
+  coordinates: { lat: number; lng: number; };
+  checkInTime?: string;
+  checkOutTime?: string;
+}
+
 export function MapView({
   location,
   tripId,
@@ -71,6 +81,7 @@ export function MapView({
   const [selectedPlaceDetails, setSelectedPlaceDetails] = useState<PlaceDetails | null>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [expandedReviews, setExpandedReviews] = useState(false);
+  const { accommodations = [] } = useAccommodations(tripId);
 
   const { isLoaded, loadError } = useGoogleMapsScript();
   const { coordinates, setCoordinates } = useMapCoordinates(location);
@@ -153,10 +164,37 @@ export function MapView({
     }
   }, [fetchDetails]);
 
-  const handleMarkerClick = useCallback((place: PinnedPlace) => {
-    handlePlaceNameClick(place);
-    onPinClick?.(place);
-  }, [onPinClick, handlePlaceNameClick]);
+  const handleMarkerClick = useCallback((place: PinnedPlace | Accommodation) => {
+    if (mapRef.current && 'coordinates' in place && place.coordinates) {
+      mapRef.current.panTo(place.coordinates);
+      mapRef.current.setZoom(17);
+    }
+
+    if ('placeId' in place && place.placeId) {
+      fetchDetails(place.placeId);
+    } else {
+      setSelectedPlaceDetails({
+        name: place.name,
+        formatted_address: place.address || '',
+        geometry: {
+          location: new google.maps.LatLng(
+            place.coordinates.lat,
+            place.coordinates.lng
+          )
+        },
+        types: ['lodging'],
+        opening_hours: {
+          weekday_text: [
+            `Check-in: ${place.checkInTime || 'Not specified'}`,
+            `Check-out: ${place.checkOutTime || 'Not specified'}`
+          ],
+          isOpen: () => true
+        }
+      } as PlaceDetails);
+    }
+
+    onPinClick?.(place as PinnedPlace);
+  }, [onPinClick, fetchDetails]);
 
   const handleLocalPlaceNameClick = useCallback((place: PinnedPlace) => {
     handlePlaceNameClick(place);
@@ -295,6 +333,22 @@ export function MapView({
       setSelectedPlaceDetails(null);
     }
   }, [selectedPlace, getPlaceDetails, findPlaceByQuery]);
+
+  const createAccommodationMarkers = useMemo(() => {
+    return accommodations.filter(acc => acc.coordinates).map(acc => ({
+      position: acc.coordinates,
+      title: acc.name,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        fillColor: '#4CAF50',
+        fillOpacity: 1,
+        strokeWeight: 2,
+        strokeColor: '#ffffff',
+        scale: 8,
+      }
+    }));
+  }, [accommodations]);
+
 
   if (loadError) {
     return (
@@ -605,6 +659,16 @@ export function MapView({
             position={place.coordinates}
             title={place.name}
             onClick={() => handleMarkerClick(place)}
+          />
+        ))}
+
+        {createAccommodationMarkers.map((marker, index) => (
+          <MarkerF
+            key={`accommodation-${index}`}
+            position={marker.position}
+            title={marker.title}
+            icon={marker.icon}
+            onClick={() => handleMarkerClick(accommodations[index])}
           />
         ))}
       </GoogleMap>
