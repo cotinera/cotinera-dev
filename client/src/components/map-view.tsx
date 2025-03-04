@@ -259,10 +259,13 @@ export function MapView({
   }, [selectedCategory]);
 
   const handleCategoryClick = useCallback((category: CategoryButton) => {
-    setSelectedCategory(prev => prev === category.id ? null : category.id);
-    if (!prev || prev !== category.id) {
-      refreshPlaces();
-    }
+    setSelectedCategory(currentCategory => {
+      const newCategory = currentCategory === category.id ? null : category.id;
+      if (newCategory && newCategory !== currentCategory) {
+        refreshPlaces();
+      }
+      return newCategory;
+    });
   }, [refreshPlaces]);
 
   const handleMapIdle = useCallback(() => {
