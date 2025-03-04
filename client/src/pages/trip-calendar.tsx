@@ -2,19 +2,23 @@ import { useQuery } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { DayView } from "@/components/calendar/day-view";
-import { Loader2, ArrowLeft, MapPin, Calendar } from "lucide-react";
-import type { Trip } from "@db/schema";
+import { CalendarSummary } from "@/components/calendar/calendar-summary";
+import { Loader2, ArrowLeft, Calendar } from "lucide-react";
+import type { Trip, Activity } from "@db/schema";
 import { format } from "date-fns";
-import { ViewToggle } from "@/components/view-toggle";
-import { TripHeaderEdit } from "@/components/trip-header-edit"; //Import added
+import { TripHeaderEdit } from "@/components/trip-header-edit";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useState } from "react";
 
+type ViewMode = "edit" | "summary";
 
 export default function TripCalendar() {
   const [, params] = useRoute("/trips/:id/calendar");
   const tripId = params ? parseInt(params.id) : null;
   const [, setLocation] = useLocation();
+  const [viewMode, setViewMode] = useState<ViewMode>("edit");
 
-  const { data: trip, isLoading, error } = useQuery<Trip>({
+  const { data: trip, isLoading: tripLoading } = useQuery<Trip>({
     queryKey: ["/api/trips", tripId],
     queryFn: async () => {
       const res = await fetch(`/api/trips/${tripId}`);
@@ -26,6 +30,18 @@ export default function TripCalendar() {
     enabled: !!tripId,
   });
 
+  const { data: activities = [], isLoading: activitiesLoading } = useQuery<Activity[]>({
+    queryKey: ["/api/trips", tripId, "activities"],
+    queryFn: async () => {
+      const res = await fetch(`/api/trips/${tripId}/activities`);
+      if (!res.ok) throw new Error("Failed to fetch activities");
+      return res.json();
+    },
+    enabled: !!tripId,
+  });
+
+  const isLoading = tripLoading || activitiesLoading;
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -34,13 +50,11 @@ export default function TripCalendar() {
     );
   }
 
-  if (error || !trip) {
+  if (!trip) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">
-            {error ? "Error loading trip" : "Trip not found"}
-          </h1>
+          <h1 className="text-2xl font-bold mb-4">Trip not found</h1>
           <Button onClick={() => setLocation("/")}>Back to Dashboard</Button>
         </div>
       </div>
@@ -82,8 +96,24 @@ export default function TripCalendar() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-8">
+          <h2 className="text-2xl font-bold">Calendar</h2>
+          <ToggleGroup type="single" value={viewMode} onValueChange={(value: ViewMode) => value && setViewMode(value)}>
+            <ToggleGroupItem value="edit" size="sm">
+              Edit
+            </ToggleGroupItem>
+            <ToggleGroupItem value="summary" size="sm">
+              Summary
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+
         <div className="space-y-8">
-          <DayView trip={trip} />
+          {viewMode === "edit" ? (
+            <DayView trip={trip} />
+          ) : (
+            <CalendarSummary trip={trip} activities={activities} />
+          )}
         </div>
       </main>
     </div>
