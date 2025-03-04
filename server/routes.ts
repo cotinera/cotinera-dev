@@ -110,12 +110,12 @@ export function registerRoutes(app: Express): Server {
       const [shareLink] = await db.select().from(shareLinks).where(and(eq(shareLinks.token, req.params.token), eq(shareLinks.isActive, true))).limit(1);
 
       if (!shareLink) {
-        return res.status(404).send("Share link not found or expired");
+        return res.status(404).json({ error: "Share link not found or has been revoked" });
       }
 
       if (shareLink.expiresAt && new Date(shareLink.expiresAt) < new Date()) {
         await db.update(shareLinks).set({ isActive: false }).where(eq(shareLinks.id, shareLink.id));
-        return res.status(404).send("Share link expired");
+        return res.status(404).json({ error: "Share link has expired" });
       }
 
       if (req.isAuthenticated() && req.user) {
@@ -132,27 +132,45 @@ export function registerRoutes(app: Express): Server {
         }
       }
 
-      const trip = await db.query.trips.findFirst({
-        where: eq(trips.id, shareLink.tripId),
-        with: {
-          participants: {
-            with: {
-              user: true,
-            },
-          },
-          activities: true,
-          checklist: true,
-        },
-      });
+      const [trip] = await db.select({
+        id: trips.id,
+        title: trips.title,
+        description: trips.description,
+        location: trips.location,
+        startDate: trips.startDate,
+        endDate: trips.endDate,
+        thumbnail: trips.thumbnail,
+        participants: sql`json_agg(json_build_object(
+          'id', p.id,
+          'name', p.name,
+          'userId', p.user_id,
+          'status', p.status
+        ))`.mapWith(JSON.parse)
+      })
+      .from(trips)
+      .leftJoin(participants.as('p'), eq(trips.id, sql`p.trip_id`))
+      .where(eq(trips.id, shareLink.tripId))
+      .groupBy(trips.id)
+      .limit(1);
 
       if (!trip) {
-        return res.status(404).send("Trip not found");
+        return res.status(404).json({ error: "Trip not found" });
       }
 
+      const [activities, checklist] = await Promise.all([
+        db.select().from(activities).where(eq(activities.tripId, shareLink.tripId)),
+        db.select().from(checklist).where(eq(checklist.tripId, shareLink.tripId)),
+      ]);
+
       res.json({
-        trip,
+        trip: {
+          ...trip,
+          participants: trip.participants || [],
+          activities,
+          checklist
+        },
         accessLevel: shareLink.accessLevel,
-        isParticipant: req.user ? trip.participants.some(p => p.userId === req.user.id) : false
+        isParticipant: req.user ? (trip.participants || []).some(p => p.userId === req.user.id) : false
       });
     } catch (error) {
       console.error('Error handling share link:', error);
@@ -892,7 +910,7 @@ export function registerRoutes(app: Express): Server {
       });
 
       // Start a transaction to handle all updates
-      const updatedParticipant = await db.transaction(async (tx) => {
+      const updatedParticipant = await db.transaction(async (tx)=> {
         // Get current participant
         const [currentParticipant] = await tx
           .select()
