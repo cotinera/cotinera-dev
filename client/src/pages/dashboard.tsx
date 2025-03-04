@@ -39,6 +39,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { TravelPreferencesForm } from "@/components/travel-preferences-form";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const tripFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -225,6 +226,7 @@ export default function Dashboard() {
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">Personal Group Coordinator</h1>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <Dialog open={isPreferencesOpen} onOpenChange={setIsPreferencesOpen}>
               <DialogTrigger asChild>
                 <Button variant="ghost" size="icon" title="Travel Preferences">
