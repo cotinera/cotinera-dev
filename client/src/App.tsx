@@ -4,6 +4,8 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/hooks/use-auth";
 import { TutorialProvider } from "@/hooks/use-tutorial";
+import { ThemeProvider } from "@/components/theme-provider";
+import { ThemeToggle } from "@/components/theme-toggle";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/dashboard";
 import SharedTrip from "@/pages/shared-trip";
@@ -33,14 +35,17 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TutorialProvider>
-          <Router />
-          <Toaster />
-        </TutorialProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ThemeProvider defaultTheme="light" storageKey="ui-theme">
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <TutorialProvider>
+            <Router />
+            <ThemeToggle />
+            <Toaster />
+          </TutorialProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 
