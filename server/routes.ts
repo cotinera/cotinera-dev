@@ -331,7 +331,8 @@ export function registerRoutes(app: Express): Server {
         endTime: new Date(req.body.endTime),
         description: req.body.description || null,
         location: req.body.location || null,
-        participants: req.body.participants || [],
+        coordinates: req.body.coordinates || null,
+        participants: req.body.participants || [], //Restored participants field
       }).returning();
 
       if (!newActivity) {
@@ -358,6 +359,7 @@ export function registerRoutes(app: Express): Server {
           startTime: new Date(req.body.startTime),
           endTime: new Date(req.body.endTime),
           participants: req.body.participants || [],
+          coordinates: req.body.coordinates || null,
         })
         .where(
           and(
@@ -932,7 +934,7 @@ export function registerRoutes(app: Express): Server {
         const [participant] = await tx          .update(participants)
           .set({
             ...(name && { name }),
-            ...(arrivalDate && { arrivalDate: new Date(arrivalarrivalDate) }),
+            ...(arrivalDate && { arrivalDate: new Date(arrivalDate) }),
             ...(departureDate && { departureDate: new Date(departureDate) }),
             hotelStatus: accommodation ? 'pending' : currentParticipant.hotelStatus,
             flightStatus: (flightNumber || airline) ? 'pending' : currentParticipant.flightStatus,

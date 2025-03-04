@@ -217,6 +217,10 @@ export const activities = pgTable("activities", {
   title: text("title").notNull(),
   description: text("description"),
   location: text("location"),
+  coordinates: json("coordinates").$type<{
+    lat: number;
+    lng: number;
+  }>(),
   startTime: timestamp("start_time").notNull(),
   endTime: timestamp("end_time").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
