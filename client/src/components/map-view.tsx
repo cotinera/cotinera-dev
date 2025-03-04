@@ -225,6 +225,7 @@ export function MapView({
 
     setIsLoadingPlaces(true);
     const category = categoryButtons.find(c => c.id === selectedCategory);
+
     if (!category) return;
 
     const request = {
@@ -243,13 +244,11 @@ export function MapView({
   const handleCategoryClick = useCallback((category: CategoryButton) => {
     setSelectedCategory(currentCategory => {
       const newCategory = currentCategory === category.id ? null : category.id;
-      setTimeout(() => {
-        if (newCategory) {
-          refreshPlaces();
-        } else {
-          setPlaceResults([]);
-        }
-      }, 0);
+      if (newCategory) {
+        refreshPlaces();
+      } else {
+        setPlaceResults([]);
+      }
       return newCategory;
     });
   }, [refreshPlaces]);
@@ -796,6 +795,7 @@ export function MapView({
           streetViewControl: false,
         }}
         onLoad={onMapLoad}
+        onClick={handleMapClick}
       >
         {allPinnedPlaces.map((place: PinnedPlace) => (
           <MarkerF
@@ -826,7 +826,7 @@ export function MapView({
               position={activity.coordinates}
               title={activity.title}
               icon={{
-                path: 'M12,0C7.6,0,3.2,4.4,3.2,8.8c0,7.2,7.2,14.4,8.8,14.4s8.8-7.2,8.8-14.4C20.8,4.4,16.4,0,12,0z M12,11.6 c-1.6,0-2.8-1.2-2.8-2.8s1.2-2.8,2.8-2.8s2.8,1.2,2.8,2.8S13.6,11.6,12,11.6z',
+                path: 'M12,0C7.6,0,3.2,4.4,3.2,8.8c07.2,7.2,14.4,8.8,14.4s8.8-7.2,8.8-14.4C20.8,4.4,16.4,0,12,0z M12,11.6 c-1.6,0-2.8-1.2-2.8-2.8s1.2-2.8,2.8-2.8s2.8,1.2,2.8,2.8S13.6,11.6,12,11.6z',
                 fillColor: '#1E88E5',
                 fillOpacity: 1,
                 strokeWeight: 1,
