@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus, ChevronDown, ChevronUp, Image, Building2, Calendar } from "lucide-react";
+import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus, ChevronDown, ChevronUp, Image, Building2, Calendar, Utensils, Hotel, Camera, Building } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -68,6 +68,21 @@ interface Accommodation {
   checkOutTime?: string;
 }
 
+interface CategoryButton {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  type: string[];
+}
+
+const categoryButtons: CategoryButton[] = [
+  { id: 'restaurants', label: 'Restaurants', icon: <Utensils className="w-4 h-4" />, type: ['restaurant'] },
+  { id: 'hotels', label: 'Hotels', icon: <Hotel className="w-4 h-4" />, type: ['lodging'] },
+  { id: 'attractions', label: 'Things to do', icon: <Camera className="w-4 h-4" />, type: ['tourist_attraction', 'point_of_interest'] },
+  { id: 'museums', label: 'Museums', icon: <Building className="w-4 h-4" />, type: ['museum'] },
+  { id: 'pharmacies', label: 'Pharmacies', icon: <Building className="w-4 h-4" />, type: ['pharmacy'] },
+];
+
 export function MapView({
   location,
   tripId,
@@ -84,6 +99,9 @@ export function MapView({
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [expandedReviews, setExpandedReviews] = useState(false);
   const { accommodations = [] } = useAccommodations(tripId);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [placeResults, setPlaceResults] = useState<google.maps.places.PlaceResult[]>([]);
+  const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
 
   const { isLoaded, loadError } = useGoogleMapsScript();
   const { coordinates, setCoordinates } = useMapCoordinates(location);
@@ -218,11 +236,45 @@ export function MapView({
     fetchDetails(event.placeId);
   }, [fetchDetails]);
 
+  const refreshPlaces = useCallback(() => {
+    if (!selectedCategory || !placesServiceRef.current || !mapRef.current) return;
+
+    setIsLoadingPlaces(true);
+    const category = categoryButtons.find(c => c.id === selectedCategory);
+
+    if (!category) return;
+
+    const request: google.maps.places.PlaceSearchRequest = {
+      location: mapRef.current.getCenter(),
+      radius: 1500, // 1.5km radius
+      type: category.type[0],
+    };
+
+    placesServiceRef.current.nearbySearch(request, (results, status) => {
+      setIsLoadingPlaces(false);
+      if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+        setPlaceResults(results);
+      }
+    });
+  }, [selectedCategory]);
+
+  const handleCategoryClick = useCallback((category: CategoryButton) => {
+    setSelectedCategory(prev => prev === category.id ? null : category.id);
+    if (!prev || prev !== category.id) {
+      refreshPlaces();
+    }
+  }, [refreshPlaces]);
+
+  const handleMapIdle = useCallback(() => {
+    refreshPlaces();
+  }, [refreshPlaces]);
+
   const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
     initPlacesService(map);
     map.addListener('click', handleMapClick);
-  }, [initPlacesService, handleMapClick]);
+    map.addListener('idle', handleMapIdle);
+  }, [initPlacesService, handleMapClick, handleMapIdle]);
 
   const handleSearchSelect = useCallback(async (placeId: string, description: string) => {
     try {
@@ -342,21 +394,24 @@ export function MapView({
   }, [selectedPlace, getPlaceDetails, findPlaceByQuery]);
 
   const createAccommodationMarkers = useMemo(() => {
-    return accommodations.filter(acc => acc.coordinates).map(acc => ({
-      position: acc.coordinates,
-      title: acc.name,
-      icon: {
-        path: google.maps.SymbolPath.CIRCLE,
-        fillColor: '#4CAF50',
-        fillOpacity: 1,
-        strokeWeight: 2,
-        strokeColor: '#ffffff',
-        scale: 8,
-      }
-    }));
+    return accommodations
+      .filter((acc): acc is Accommodation & { coordinates: NonNullable<Accommodation['coordinates']> } =>
+        acc.coordinates !== null
+      )
+      .map(acc => ({
+        position: acc.coordinates,
+        title: acc.name,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: '#4CAF50',
+          fillOpacity: 1,
+          strokeWeight: 2,
+          strokeColor: '#ffffff',
+          scale: 8,
+        }
+      }));
   }, [accommodations]);
 
-  // Add query for activities
   const { data: activities = [] } = useQuery<Activity[]>({
     queryKey: ["/api/trips", tripId, "activities"],
     queryFn: async () => {
@@ -368,21 +423,23 @@ export function MapView({
     enabled: !!tripId,
   });
 
-  // Create activity markers
   const createActivityMarkers = useMemo(() => {
     return activities
-      .filter(activity => activity.coordinates)
+      .filter((activity): activity is Activity & { coordinates: NonNullable<Activity['coordinates']> } =>
+        activity.coordinates !== null
+      )
       .map(activity => ({
         position: activity.coordinates,
         title: activity.title,
         icon: {
-          path: google.maps.SymbolPath.MARKER,
+          path: 'M12,0C7.6,0,3.2,4.4,3.2,8.8c0,7.2,7.2,14.4,8.8,14.4s8.8-7.2,8.8-14.4C20.8,4.4,16.4,0,12,0z M12,11.6 c-1.6,0-2.8-1.2-2.8-2.8s1.2-2.8,2.8-2.8s2.8,1.2,2.8,2.8S13.6,11.6,12,11.6z',
           fillColor: '#1E88E5',
           fillOpacity: 1,
-          strokeWeight: 2,
+          strokeWeight: 1,
           strokeColor: '#FFFFFF',
-          scale: 30,
-          labelOrigin: new google.maps.Point(0, -15)
+          scale: 1.5,
+          anchor: new google.maps.Point(12, 24),
+          labelOrigin: new google.maps.Point(12, -10)
         }
       }));
   }, [activities]);
@@ -406,6 +463,21 @@ export function MapView({
 
   return (
     <Card className={cn("overflow-hidden relative", className)}>
+      {/* Category Filter Bar */}
+      <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-50 bg-background rounded-full shadow-lg p-2 flex space-x-2">
+        {categoryButtons.map((category) => (
+          <Button
+            key={category.id}
+            variant={selectedCategory === category.id ? "default" : "outline"}
+            className="flex items-center space-x-2 rounded-full"
+            onClick={() => handleCategoryClick(category)}
+          >
+            {category.icon}
+            <span>{category.label}</span>
+          </Button>
+        ))}
+      </div>
+
       <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 w-[400px]">
         <div className="relative">
           <Input
@@ -433,6 +505,54 @@ export function MapView({
           )}
         </div>
       </div>
+
+      {selectedCategory && (
+        <div className="absolute top-32 left-0 w-[400px] bg-background shadow-lg z-40 rounded-r-lg max-h-[calc(100%-8rem)]">
+          <div className="p-4 border-b flex justify-between items-center">
+            <h3 className="text-lg font-semibold">
+              {categoryButtons.find(c => c.id === selectedCategory)?.label}
+            </h3>
+            <Button variant="ghost" size="icon" onClick={() => setSelectedCategory(null)}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+
+          <ScrollArea className="h-[calc(100vh-250px)]">
+            {isLoadingPlaces ? (
+              <div className="flex items-center justify-center p-8">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            ) : (
+              <div className="space-y-2 p-4">
+                {placeResults.map((place, index) => (
+                  <div
+                    key={place.place_id}
+                    className="p-4 hover:bg-accent rounded-lg cursor-pointer"
+                    onClick={() => {
+                      if (place.place_id) {
+                        fetchDetails(place.place_id);
+                      }
+                    }}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h4 className="font-medium">{place.name}</h4>
+                        <p className="text-sm text-muted-foreground">{place.vicinity}</p>
+                      </div>
+                      {place.rating && (
+                        <div className="flex items-center">
+                          <StarRating rating={place.rating} />
+                          <span className="ml-1 text-sm">({place.user_ratings_total})</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </div>
+      )}
 
       {selectedPlaceDetails && (
         <div className="absolute top-0 left-0 bottom-0 w-[400px] bg-background shadow-lg z-40 flex flex-col">
@@ -707,7 +827,9 @@ export function MapView({
         ))}
 
         {activities
-          .filter(activity => activity.coordinates)
+          .filter((activity): activity is Activity & { coordinates: NonNullable<Activity['coordinates']> } =>
+            activity.coordinates !== null
+          )
           .map((activity, index) => (
             <MarkerF
               key={`activity-${index}`}
@@ -726,6 +848,21 @@ export function MapView({
               onClick={() => handleMarkerClick(activity)}
             />
           ))}
+
+        {selectedCategory && placeResults.map((place) => (
+          place.geometry?.location && (
+            <MarkerF
+              key={`place-${place.place_id}`}
+              position={place.geometry.location}
+              title={place.name}
+              onClick={() => {
+                if (place.place_id) {
+                  fetchDetails(place.place_id);
+                }
+              }}
+            />
+          )
+        ))}
       </GoogleMap>
     </Card>
   );
