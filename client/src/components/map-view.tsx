@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus, ChevronDown, ChevronUp, Image, Building2 } from "lucide-react";
+import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus, ChevronDown, ChevronUp, Image, Building2, Calendar } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,8 @@ import {
   type PinnedPlace,
 } from "@/lib/google-maps";
 import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
+import { useQuery } from "@tanstack/react-query";
+import type { Activity } from "@db/schema";
 
 const StarRating = ({ rating }: { rating: number }) => {
   return (
@@ -164,36 +166,41 @@ export function MapView({
     }
   }, [fetchDetails]);
 
-  const handleMarkerClick = useCallback((place: PinnedPlace | Accommodation) => {
-    if (mapRef.current && 'coordinates' in place && place.coordinates) {
-      mapRef.current.panTo(place.coordinates);
+  const handleMarkerClick = useCallback((item: PinnedPlace | Accommodation | Activity) => {
+    if (mapRef.current && 'coordinates' in item && item.coordinates) {
+      mapRef.current.panTo(item.coordinates);
       mapRef.current.setZoom(17);
     }
 
-    if ('placeId' in place && place.placeId) {
-      fetchDetails(place.placeId);
+    if ('placeId' in item && item.placeId) {
+      fetchDetails(item.placeId);
     } else {
       setSelectedPlaceDetails({
-        name: place.name,
-        formatted_address: place.address || '',
+        name: item.title || item.name,
+        formatted_address: 'location' in item ? item.location : (item.address || ''),
         geometry: {
           location: new google.maps.LatLng(
-            place.coordinates.lat,
-            place.coordinates.lng
+            item.coordinates.lat,
+            item.coordinates.lng
           )
         },
-        types: ['lodging'],
+        types: ['activity' in item ? 'event' : 'lodging'],
         opening_hours: {
-          weekday_text: [
-            `Check-in: ${place.checkInTime || 'Not specified'}`,
-            `Check-out: ${place.checkOutTime || 'Not specified'}`
+          weekday_text: 'startTime' in item ? [
+            `Start: ${new Date(item.startTime).toLocaleTimeString()}`,
+            `End: ${new Date(item.endTime).toLocaleTimeString()}`
+          ] : [
+            `Check-in: ${item.checkInTime || 'Not specified'}`,
+            `Check-out: ${item.checkOutTime || 'Not specified'}`
           ],
           isOpen: () => true
         }
       } as PlaceDetails);
     }
 
-    onPinClick?.(place as PinnedPlace);
+    if ('placeId' in item) {
+      onPinClick?.(item as PinnedPlace);
+    }
   }, [onPinClick, fetchDetails]);
 
   const handleLocalPlaceNameClick = useCallback((place: PinnedPlace) => {
@@ -348,6 +355,36 @@ export function MapView({
       }
     }));
   }, [accommodations]);
+
+  // Add query for activities
+  const { data: activities = [] } = useQuery<Activity[]>({
+    queryKey: ["/api/trips", tripId, "activities"],
+    queryFn: async () => {
+      if (!tripId) return [];
+      const res = await fetch(`/api/trips/${tripId}/activities`);
+      if (!res.ok) throw new Error("Failed to fetch activities");
+      return res.json();
+    },
+    enabled: !!tripId,
+  });
+
+  // Create activity markers
+  const createActivityMarkers = useMemo(() => {
+    return activities
+      .filter(activity => activity.coordinates)
+      .map(activity => ({
+        position: activity.coordinates,
+        title: activity.title,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          fillColor: '#FF5722',
+          fillOpacity: 1,
+          strokeWeight: 2,
+          strokeColor: '#ffffff',
+          scale: 8,
+        }
+      }));
+  }, [activities]);
 
 
   if (loadError) {
@@ -669,6 +706,16 @@ export function MapView({
             title={marker.title}
             icon={marker.icon}
             onClick={() => handleMarkerClick(accommodations[index])}
+          />
+        ))}
+
+        {createActivityMarkers.map((marker, index) => (
+          <MarkerF
+            key={`activity-${index}`}
+            position={marker.position}
+            title={marker.title}
+            icon={marker.icon}
+            onClick={() => handleMarkerClick(activities[index])}
           />
         ))}
       </GoogleMap>

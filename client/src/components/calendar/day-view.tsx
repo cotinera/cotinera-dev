@@ -60,8 +60,9 @@ import { Pencil, Trash2, Loader2, Users } from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { MapPicker } from "@/components/map-picker";
 
-// Update the event form schema to be more specific about participant IDs
+// Update the event form schema to include location coordinates
 const eventFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
   startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format (HH:mm)"),
@@ -70,20 +71,21 @@ const eventFormSchema = z.object({
   location: z.string().optional(),
   description: z.string().optional(),
   participants: z.array(z.number()).default([]),
+  coordinates: z.object({
+    lat: z.number(),
+    lng: z.number()
+  }).optional(),
 });
 
 type EventFormValues = z.infer<typeof eventFormSchema>;
 
-// Helper function to snap time to nearest 15 minutes
 function snapToQuarterHour(date: Date): Date {
   const minutes = date.getMinutes();
   const snappedMinutes = Math.round(minutes / 15) * 15;
   return new Date(date.setMinutes(snappedMinutes, 0, 0));
 }
 
-// Helper function to convert pixels to minutes (with 15-minute snapping)
 function pixelsToMinutes(pixels: number): number {
-  // 48px = 1 hour, so 12px = 15 minutes
   const minutes = (pixels / 48) * 60;
   return Math.round(minutes / 15) * 15;
 }
@@ -114,11 +116,10 @@ function DraggableEvent({
   const initialHeightRef = useRef<number | null>(null);
   const initialEventRef = useRef<Activity>(event);
 
-  // Calculate initial height
   const eventStart = new Date(event.startTime);
   const eventEnd = new Date(event.endTime);
   const durationInMinutes = differenceInMinutes(eventEnd, eventStart);
-  const heightInPixels = Math.max((durationInMinutes / 60) * 48, 48); // 48px per hour, minimum 1 hour
+  const heightInPixels = Math.max((durationInMinutes / 60) * 48, 48);
 
   const handleResizeStart = (e: React.MouseEvent, edge: 'top' | 'bottom') => {
     e.preventDefault();
@@ -139,12 +140,11 @@ function DraggableEvent({
     const mouseY = e.clientY;
 
     if (resizeEdge === 'top') {
-      // When dragging top edge, only modify start time
-      const maxDelta = rect.bottom - rect.top - 48; // Minimum 1 hour
+      const maxDelta = rect.bottom - rect.top - 48;
       const delta = Math.min(Math.max(mouseY - rect.top, -maxDelta), maxDelta);
       const newHeight = initialHeightRef.current - delta;
 
-      if (newHeight >= 48) { // Minimum 1 hour
+      if (newHeight >= 48) {
         const minutesDelta = pixelsToMinutes(delta);
         const newStartTime = new Date(initialEventRef.current.startTime);
         newStartTime.setMinutes(newStartTime.getMinutes() + minutesDelta);
@@ -157,12 +157,11 @@ function DraggableEvent({
         }
       }
     } else {
-      // When dragging bottom edge, only modify end time
-      const maxDelta = (24 * 48) - (rect.bottom - rect.top); // Maximum 24 hours
+      const maxDelta = (24 * 48) - (rect.bottom - rect.top);
       const delta = Math.min(Math.max(mouseY - rect.bottom, -initialHeightRef.current + 48), maxDelta);
       const newHeight = initialHeightRef.current + delta;
 
-      if (newHeight >= 48) { // Minimum 1 hour
+      if (newHeight >= 48) {
         const minutesDelta = pixelsToMinutes(delta);
         const newEndTime = new Date(initialEventRef.current.endTime);
         newEndTime.setMinutes(newEndTime.getMinutes() + minutesDelta);
@@ -223,7 +222,6 @@ function DraggableEvent({
         isDragging ? 'ring-1 ring-primary/50' : ''
       }`}
     >
-      {/* Top resize handle */}
       <div
         className="absolute top-0 left-0 w-full h-1 cursor-ns-resize hover:bg-primary/50 rounded-t-md"
         onMouseDown={(e) => handleResizeStart(e, 'top')}
@@ -260,7 +258,6 @@ function DraggableEvent({
         {format(eventStart, "h:mm a")} - {format(eventEnd, "h:mm a")}
       </span>
 
-      {/* Bottom resize handle */}
       <div
         className="absolute bottom-0 left-0 w-full h-1 cursor-ns-resize hover:bg-primary/50 rounded-b-md"
         onMouseDown={(e) => handleResizeStart(e, 'bottom')}
@@ -312,6 +309,7 @@ function EventForm({
     defaultValues: {
       ...defaultValues,
       participants: defaultValues.participants || [],
+      coordinates: defaultValues.coordinates || null,
     },
   });
 
@@ -386,9 +384,16 @@ function EventForm({
           name="location"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Location (optional)</FormLabel>
+              <FormLabel>Location</FormLabel>
               <FormControl>
-                <Input {...field} />
+                <MapPicker // Assumed component
+                  value={field.value}
+                  onChange={(address, coordinates) => {
+                    field.onChange(address);
+                    form.setValue('coordinates', coordinates);
+                  }}
+                  placeholder="Search for a location..."
+                />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -454,6 +459,7 @@ function EventForm({
   );
 }
 
+// Component exports
 export function DayView({ trip }: { trip: Trip }) {
   const [newEventTitle, setNewEventTitle] = useState("");
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | null>(null);
@@ -509,16 +515,13 @@ export function DayView({ trip }: { trip: Trip }) {
     const endDate = new Date(activityToUpdate.endTime);
     const durationInMinutes = differenceInMinutes(endDate, startDate);
 
-    // Calculate preview position with 15-minute snapping
     const newStartTime = snapToQuarterHour(new Date(newDate.setHours(newHour, 0, 0)));
     const newEndTime = new Date(newStartTime);
     newEndTime.setMinutes(newStartTime.getMinutes() + durationInMinutes);
 
-    // Update the preview position immediately
     if (over) {
       setActiveDropId(over.id as string);
 
-      // Optimistically update the UI to show where the event will land
       queryClient.setQueryData(
         ["/api/trips", trip.id, "activities"],
         activities.map(activity =>
@@ -549,12 +552,10 @@ export function DayView({ trip }: { trip: Trip }) {
     const endDate = new Date(activityToUpdate.endTime);
     const durationInMinutes = differenceInMinutes(endDate, startDate);
 
-    // Snap to 15-minute intervals
     const newStartTime = snapToQuarterHour(new Date(newDate.setHours(newHour, 0, 0)));
     const newEndTime = new Date(newStartTime);
     newEndTime.setMinutes(newStartTime.getMinutes() + durationInMinutes);
 
-    // Validate that the new times are within trip dates
     const tripStart = startOfDay(new Date(trip.startDate));
     const tripEnd = endOfDay(new Date(trip.endDate));
 
@@ -600,13 +601,11 @@ export function DayView({ trip }: { trip: Trip }) {
     });
   };
 
-  // Update the createEvent function with better error handling
   const createEvent = async (values: EventFormValues) => {
     try {
       const startTime = new Date(`${values.date}T${values.startTime}:00`);
       const endTime = new Date(`${values.date}T${values.endTime}:00`);
 
-      // Validate times are within trip dates
       const tripStart = startOfDay(new Date(trip.startDate));
       const tripEnd = endOfDay(new Date(trip.endDate));
 
@@ -619,20 +618,9 @@ export function DayView({ trip }: { trip: Trip }) {
         return;
       }
 
-      // Log the request payload for debugging
-      console.log('Creating activity with payload:', {
-        title: values.title,
-        startTime: startTime.toISOString(),
-        endTime: endTime.toISOString(),
-        location: values.location || null,
-        description: values.description || null,
-        participants: values.participants || [],
-        tripId: trip.id
-      });
-
       const res = await fetch(`/api/trips/${trip.id}/activities`, {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Accept": "application/json"
         },
@@ -644,23 +632,17 @@ export function DayView({ trip }: { trip: Trip }) {
           location: values.location || null,
           description: values.description || null,
           participants: values.participants || [],
+          coordinates: values.coordinates || null,
           tripId: trip.id
         }),
       });
 
-      // Log the response status and headers for debugging
-      console.log('Response status:', res.status);
-      console.log('Response headers:', Object.fromEntries(res.headers.entries()));
-
       if (!res.ok) {
         const error = await res.json().catch(() => ({ message: 'Failed to create activity' }));
-        console.error('Server error response:', error);
         throw new Error(error.message);
       }
 
       const data = await res.json();
-      console.log('Activity created successfully:', data);
-
       await queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
       toast({ title: "Event created successfully" });
       setIsCreateDialogOpen(false);
@@ -714,7 +696,6 @@ export function DayView({ trip }: { trip: Trip }) {
 
       if (!res.ok) throw new Error("Failed to update activity");
 
-      // Optimistically update the UI
       queryClient.setQueryData(
         ["/api/trips", trip.id, "activities"],
         activities.map(activity =>
@@ -722,7 +703,6 @@ export function DayView({ trip }: { trip: Trip }) {
         )
       );
 
-      // Then refetch to ensure consistency
       await queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
     } catch (error) {
       toast({
@@ -746,6 +726,7 @@ export function DayView({ trip }: { trip: Trip }) {
       location: "",
       description: "",
       participants: [],
+      coordinates: null
     };
   };
 
@@ -761,6 +742,7 @@ export function DayView({ trip }: { trip: Trip }) {
       location: event.location || "",
       description: event.description || "",
       participants: event.participants?.map(p => p.userId) || [],
+      coordinates: event.coordinates || null
     };
   };
 
@@ -782,7 +764,6 @@ export function DayView({ trip }: { trip: Trip }) {
         onDragOver={handleDragOver}
       >
         <div className="min-w-fit relative">
-          {/* Header row with dates */}
           <div className="flex border-b bg-muted/5">
             <div className="w-24 flex-none border-r sticky left-0 z-20 bg-background" />
             {dates.map((date) => (
@@ -795,9 +776,7 @@ export function DayView({ trip }: { trip: Trip }) {
             ))}
           </div>
 
-          {/* Time slots and events grid */}
           <div className="flex">
-            {/* Time column */}
             <div className="w-24 flex-none border-r sticky left-0 z-20 bg-background">
               {hours.map((hour) => (
                 <div
@@ -809,7 +788,6 @@ export function DayView({ trip }: { trip: Trip }) {
               ))}
             </div>
 
-            {/* Days columns */}
             <div className="flex">
               {dates.map((date) => (
                 <div
@@ -880,7 +858,6 @@ export function DayView({ trip }: { trip: Trip }) {
       </DndContext>
       <ScrollBar orientation="horizontal" />
 
-      {/* Edit Event Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -905,6 +882,7 @@ export function DayView({ trip }: { trip: Trip }) {
                       location: values.location,
                       description: values.description,
                       participants: values.participants,
+                      coordinates: values.coordinates
                     }),
                   });
 
