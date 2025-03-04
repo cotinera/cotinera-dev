@@ -388,8 +388,8 @@ function EventForm({
               <FormControl>
                 <div className="h-[200px] rounded-md overflow-hidden">
                   <MapPicker
-                    location={field.value}
-                    onLocationChange={(address, coordinates) => {
+                    value={field.value}
+                    onChange={(address, coordinates) => {
                       field.onChange(address);
                       if (coordinates) {
                         form.setValue('coordinates', coordinates);
@@ -403,6 +403,7 @@ function EventForm({
             </FormItem>
           )}
         />
+
 
 
         <FormField
