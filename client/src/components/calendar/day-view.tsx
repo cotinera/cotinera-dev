@@ -386,31 +386,23 @@ function EventForm({
             <FormItem>
               <FormLabel>Location</FormLabel>
               <FormControl>
-                <Input {...field} />
+                <div className="h-[200px] rounded-md overflow-hidden">
+                  <MapPicker
+                    location={field.value}
+                    onLocationChange={(address, coordinates) => {
+                      field.onChange(address);
+                      if (coordinates) {
+                        form.setValue('coordinates', coordinates);
+                      }
+                    }}
+                    placeholder="Search for a location..."
+                  />
+                </div>
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
-
-        <FormField
-                    control={form.control}
-                    name="coordinates"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Location</FormLabel>
-                        <FormControl>
-                          <div className="h-[200px] rounded-md overflow-hidden">
-                            <MapPicker
-                              initialPosition={field.value}
-                              onPositionChange={(pos) => field.onChange(pos)}
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
 
 
         <FormField
