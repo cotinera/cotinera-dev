@@ -376,12 +376,13 @@ export function MapView({
         position: activity.coordinates,
         title: activity.title,
         icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          fillColor: '#FF5722',
+          path: google.maps.SymbolPath.MARKER,
+          fillColor: '#1E88E5',
           fillOpacity: 1,
           strokeWeight: 2,
-          strokeColor: '#ffffff',
-          scale: 8,
+          strokeColor: '#FFFFFF',
+          scale: 30,
+          labelOrigin: new google.maps.Point(0, -15)
         }
       }));
   }, [activities]);
