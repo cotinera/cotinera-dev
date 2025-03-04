@@ -687,10 +687,6 @@ export function MapView({
         }}
         onLoad={onMapLoad}
       >
-        <MarkerF
-          position={coordinates}
-        />
-
         {allPinnedPlaces.map((place: PinnedPlace) => (
           <MarkerF
             key={place.id}
@@ -710,15 +706,26 @@ export function MapView({
           />
         ))}
 
-        {createActivityMarkers.map((marker, index) => (
-          <MarkerF
-            key={`activity-${index}`}
-            position={marker.position}
-            title={marker.title}
-            icon={marker.icon}
-            onClick={() => handleMarkerClick(activities[index])}
-          />
-        ))}
+        {activities
+          .filter(activity => activity.coordinates)
+          .map((activity, index) => (
+            <MarkerF
+              key={`activity-${index}`}
+              position={activity.coordinates}
+              title={activity.title}
+              icon={{
+                path: 'M12,0C7.6,0,3.2,4.4,3.2,8.8c0,7.2,7.2,14.4,8.8,14.4s8.8-7.2,8.8-14.4C20.8,4.4,16.4,0,12,0z M12,11.6 c-1.6,0-2.8-1.2-2.8-2.8s1.2-2.8,2.8-2.8s2.8,1.2,2.8,2.8S13.6,11.6,12,11.6z',
+                fillColor: '#1E88E5',
+                fillOpacity: 1,
+                strokeWeight: 1,
+                strokeColor: '#FFFFFF',
+                scale: 1.5,
+                anchor: new google.maps.Point(12, 24),
+                labelOrigin: new google.maps.Point(12, -10)
+              }}
+              onClick={() => handleMarkerClick(activity)}
+            />
+          ))}
       </GoogleMap>
     </Card>
   );
