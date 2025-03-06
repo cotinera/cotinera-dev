@@ -18,7 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { format } from "date-fns";
-import { Pin, Plus, ChevronDown, Edit2, X } from "lucide-react";
+import { Pin, Plus, ChevronDown, Edit2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -226,9 +226,9 @@ export function TripDestinations({ tripId }: { tripId: number }) {
 
           <CollapsibleContent className="overflow-visible">
             <CardContent className="p-2 pt-0">
-              <div className="flex flex-col h-full">
-                <ScrollArea className="flex-1 h-[300px] w-full rounded-md border mb-2">
-                  <div className="space-y-1 p-2">
+              <div className="flex flex-col">
+                <ScrollArea className="h-[200px] w-full rounded-md border">
+                  <div className="p-2 space-y-1">
                     {trip && (
                       <div className="flex items-center justify-between py-1 px-2 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors">
                         <div className="flex-1 min-w-0">
@@ -278,16 +278,20 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                   <ScrollBar orientation="vertical" />
                 </ScrollArea>
 
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-2"
+                  onClick={() => setIsAddDestinationOpen(true)}
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add Stop
+                </Button>
+
                 <Dialog
                   open={isAddDestinationOpen}
                   onOpenChange={setIsAddDestinationOpen}
                 >
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="w-full">
-                      <Plus className="h-3 w-3 mr-1" />
-                      Add Stop
-                    </Button>
-                  </DialogTrigger>
                   <DialogContent className="fixed top-[50%] left-[50%] transform -translate-x-[50%] -translate-y-[50%] w-[90vw] max-w-[425px] max-h-[90vh] overflow-y-auto z-50">
                     <DialogHeader>
                       <DialogTitle>Add New Destination</DialogTitle>
