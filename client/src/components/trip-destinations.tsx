@@ -33,7 +33,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { MapPicker } from "@/components/map-picker";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -197,7 +197,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
   const sortedDestinations = destinations?.sort((a, b) => a.order - b.order) || [];
   const totalStops = (sortedDestinations.length || 0) + 1;
 
-  const handleScroll = (e: React.WheelEvent) => {
+  const handleScroll = (e: React.WheelEvent<HTMLDivElement>) => {
     e.stopPropagation();
   };
 
@@ -230,60 +230,60 @@ export function TripDestinations({ tripId }: { tripId: number }) {
           <CollapsibleContent className="overflow-visible">
             <CardContent className="p-2 pt-0 flex flex-col gap-2">
               <div className="border rounded-md overflow-hidden">
-                <ScrollArea
-                  className="h-[160px]"
+                <div 
+                  className="h-[160px] overflow-y-auto" 
                   onWheel={handleScroll}
-                  style={{ overflowY: 'auto' }}
                 >
-                  <div className="p-2 space-y-1">
-                    {trip && (
-                      <div className="flex items-center justify-between py-1 px-2 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate text-xs">
-                            {trip.location || 'Starting Point'}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {format(new Date(trip.startDate), "MMM d")} -{" "}
-                            {format(new Date(sortedDestinations[0]?.startDate || trip.endDate), "MMM d")}
-                          </p>
-                        </div>
-                        <Badge variant="outline" className="text-[10px] h-4 px-1">
-                          1
-                        </Badge>
-                      </div>
-                    )}
-                    {sortedDestinations.map((destination, index) => (
-                      <div
-                        key={destination.id}
-                        className="flex items-center justify-between py-1 px-2 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate text-xs">
-                            {destination.name}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground">
-                            {format(new Date(destination.startDate), "MMM d")} -{" "}
-                            {format(new Date(destination.endDate), "MMM d")}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-5 w-5"
-                            onClick={() => onEdit(destination)}
-                          >
-                            <Edit2 className="h-3 w-3" />
-                          </Button>
+                  <ScrollArea className="h-full" style={{ overflow: 'auto' }}>
+                    <div className="p-2 space-y-1">
+                      {trip && (
+                        <div className="flex items-center justify-between py-1 px-2 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate text-xs">
+                              {trip.location || 'Starting Point'}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {format(new Date(trip.startDate), "MMM d")} -{" "}
+                              {format(new Date(sortedDestinations[0]?.startDate || trip.endDate), "MMM d")}
+                            </p>
+                          </div>
                           <Badge variant="outline" className="text-[10px] h-4 px-1">
-                            {index + 2}
+                            1
                           </Badge>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                  <ScrollBar orientation="vertical" className="hover:bg-accent transition-colors" />
-                </ScrollArea>
+                      )}
+                      {sortedDestinations.map((destination, index) => (
+                        <div
+                          key={destination.id}
+                          className="flex items-center justify-between py-1 px-2 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate text-xs">
+                              {destination.name}
+                            </p>
+                            <p className="text-[11px] text-muted-foreground">
+                              {format(new Date(destination.startDate), "MMM d")} -{" "}
+                              {format(new Date(destination.endDate), "MMM d")}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              onClick={() => onEdit(destination)}
+                            >
+                              <Edit2 className="h-3 w-3" />
+                            </Button>
+                            <Badge variant="outline" className="text-[10px] h-4 px-1">
+                              {index + 2}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
               </div>
 
               <Button
