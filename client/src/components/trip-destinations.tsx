@@ -197,6 +197,10 @@ export function TripDestinations({ tripId }: { tripId: number }) {
   const sortedDestinations = destinations?.sort((a, b) => a.order - b.order) || [];
   const totalStops = (sortedDestinations.length || 0) + 1;
 
+  const handleScroll = (e: React.WheelEvent) => {
+    e.stopPropagation();
+  };
+
   return (
     <div className="relative z-10">
       <Collapsible
@@ -225,8 +229,12 @@ export function TripDestinations({ tripId }: { tripId: number }) {
 
           <CollapsibleContent className="overflow-visible">
             <CardContent className="p-2 pt-0 flex flex-col gap-2">
-              <div className="border rounded-md">
-                <ScrollArea className="h-[160px]">
+              <div className="border rounded-md overflow-hidden">
+                <ScrollArea
+                  className="h-[160px]"
+                  onWheel={handleScroll}
+                  style={{ overflowY: 'auto' }}
+                >
                   <div className="p-2 space-y-1">
                     {trip && (
                       <div className="flex items-center justify-between py-1 px-2 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors">
@@ -274,7 +282,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                       </div>
                     ))}
                   </div>
-                  <ScrollBar orientation="vertical" />
+                  <ScrollBar orientation="vertical" className="hover:bg-accent transition-colors" />
                 </ScrollArea>
               </div>
 
