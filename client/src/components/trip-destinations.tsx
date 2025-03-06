@@ -202,7 +202,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
     <Collapsible
       open={isOpen}
       onOpenChange={setIsOpen}
-      className="w-[250px]"
+      className="w-[250px] relative"
     >
       <Card className="border shadow-sm">
         <CollapsibleTrigger asChild>
@@ -223,14 +223,12 @@ export function TripDestinations({ tripId }: { tripId: number }) {
           </CardHeader>
         </CollapsibleTrigger>
 
-        <CollapsibleContent>
+        <CollapsibleContent className="relative">
           <CardContent className="p-2 pt-0">
-            <ScrollArea className="h-[300px] w-full">
+            <ScrollArea className="h-[300px] w-full rounded-md">
               <div className="space-y-1 px-1">
                 {trip && (
-                  <div
-                    className="flex items-center justify-between py-1 px-2 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors"
-                  >
+                  <div className="flex items-center justify-between py-1 px-2 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors">
                     <div className="flex-1 min-w-0">
                       <p className="font-medium truncate text-xs">
                         {trip.location || 'Starting Point'}
@@ -289,7 +287,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                   Add Stop
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                   <DialogTitle>Add New Destination</DialogTitle>
                 </DialogHeader>
@@ -356,7 +354,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
             </Dialog>
 
             <Dialog open={isEditDestinationOpen} onOpenChange={setIsEditDestinationOpen}>
-              <DialogContent>
+              <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
                   <DialogTitle>Edit Destination</DialogTitle>
                 </DialogHeader>
