@@ -13,11 +13,12 @@ import {
   FormField,
   FormItem,
   FormLabel,
+  FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { format } from "date-fns";
-import { Pin, Plus, ChevronDown, Edit2 } from "lucide-react";
+import { Pin, Plus, ChevronDown, Edit2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -34,20 +35,16 @@ import {
 } from "@/components/ui/collapsible";
 import { MapPicker } from "@/components/map-picker";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import * as z from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
-interface AddDestinationForm {
-  name: string;
-  startDate: string;
-  endDate: string;
-  coordinates?: {
-    lat: number;
-    lng: number;
-  };
-}
+const destinationSchema = z.object({
+  name: z.string().min(1, "Location name is required"),
+  startDate: z.string().min(1, "Start date is required"),
+  endDate: z.string().min(1, "End date is required"),
+});
 
-interface EditDestinationForm extends AddDestinationForm {
-  id: number;
-}
+type FormData = z.infer<typeof destinationSchema>;
 
 export function TripDestinations({ tripId }: { tripId: number }) {
   const queryClient = useQueryClient();
@@ -58,7 +55,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
   const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [editingDestination, setEditingDestination] = useState<Destination | null>(null);
 
-  const { data: destinations, refetch } = useQuery<Destination[]>({
+  const { data: destinations = [], refetch } = useQuery<Destination[]>({
     queryKey: [`/api/trips/${tripId}/destinations`],
     queryFn: async () => {
       const res = await fetch(`/api/trips/${tripId}/destinations`);
@@ -76,8 +73,27 @@ export function TripDestinations({ tripId }: { tripId: number }) {
     },
   });
 
+  const form = useForm<FormData>({
+    resolver: zodResolver(destinationSchema),
+    defaultValues: {
+      name: "",
+      startDate: "",
+      endDate: "",
+    },
+  });
+
+  const editForm = useForm<FormData & { id: number }>({
+    resolver: zodResolver(destinationSchema),
+    defaultValues: {
+      id: 0,
+      name: "",
+      startDate: "",
+      endDate: "",
+    },
+  });
+
   const addDestinationMutation = useMutation({
-    mutationFn: async (data: AddDestinationForm) => {
+    mutationFn: async (data: FormData) => {
       if (!selectedCoordinates) {
         throw new Error("Please select a location from the map");
       }
@@ -119,7 +135,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
   });
 
   const editDestinationMutation = useMutation({
-    mutationFn: async (data: EditDestinationForm) => {
+    mutationFn: async (data: FormData & { id: number }) => {
       const res = await fetch(`/api/trips/${tripId}/destinations/${data.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -159,27 +175,6 @@ export function TripDestinations({ tripId }: { tripId: number }) {
     },
   });
 
-  const form = useForm<AddDestinationForm>({
-    defaultValues: {
-      name: "",
-      startDate: "",
-      endDate: "",
-    },
-  });
-
-  const editForm = useForm<EditDestinationForm>({
-    defaultValues: {
-      id: 0,
-      name: "",
-      startDate: "",
-      endDate: "",
-    },
-  });
-
-  const onSubmit = (data: AddDestinationForm) => {
-    addDestinationMutation.mutate(data);
-  };
-
   const onEdit = (destination: Destination) => {
     setEditingDestination(destination);
     setSelectedCoordinates(destination.coordinates);
@@ -192,7 +187,11 @@ export function TripDestinations({ tripId }: { tripId: number }) {
     setIsEditDestinationOpen(true);
   };
 
-  const onEditSubmit = (data: EditDestinationForm) => {
+  const onSubmit = (data: FormData) => {
+    addDestinationMutation.mutate(data);
+  };
+
+  const onEditSubmit = (data: FormData & { id: number }) => {
     editDestinationMutation.mutate(data);
   };
 
@@ -312,6 +311,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                               placeholder="Search for a location..."
                             />
                           </FormControl>
+                          <FormMessage />
                         </FormItem>
                       )}
                     />
@@ -325,6 +325,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                             <FormControl>
                               <Input type="date" {...field} />
                             </FormControl>
+                            <FormMessage />
                           </FormItem>
                         )}
                       />
@@ -337,6 +338,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                             <FormControl>
                               <Input type="date" {...field} />
                             </FormControl>
+                            <FormMessage />
                           </FormItem>
                         )}
                       />
@@ -352,6 +354,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                 </Form>
               </DialogContent>
             </Dialog>
+
             <Dialog open={isEditDestinationOpen} onOpenChange={setIsEditDestinationOpen}>
               <DialogContent>
                 <DialogHeader>
@@ -375,6 +378,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                               placeholder="Search for a location..."
                             />
                           </FormControl>
+                          <FormMessage />
                         </FormItem>
                       )}
                     />
@@ -388,6 +392,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                             <FormControl>
                               <Input type="date" {...field} />
                             </FormControl>
+                            <FormMessage />
                           </FormItem>
                         )}
                       />
@@ -400,6 +405,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                             <FormControl>
                               <Input type="date" {...field} />
                             </FormControl>
+                            <FormMessage />
                           </FormItem>
                         )}
                       />
