@@ -20,28 +20,47 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import * as z from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
-interface TravelPreferences {
-  preferredActivities: string[];
-  interests: string[];
-  budgetRange: {
-    min: number;
-    max: number;
-    currency: string;
-  };
-  preferredAccommodations: string[];
-  dietaryRestrictions: string[];
-  accessibility: string[];
-  travelStyle: string[];
-  preferredClimate: string[];
-  tripDuration: {
-    min: number;
-    max: number;
-  };
-}
+// Define form schema using zod
+const travelPreferencesSchema = z.object({
+  preferredActivities: z.array(z.string()),
+  interests: z.array(z.string()),
+  budgetRange: z.object({
+    min: z.number(),
+    max: z.number(),
+    currency: z.string(),
+  }),
+  preferredAccommodations: z.array(z.string()),
+  preferredClimate: z.array(z.string()),
+  travelStyle: z.array(z.string()),
+  tripDuration: z.object({
+    min: z.number(),
+    max: z.number(),
+  }),
+  travelPace: z.string(),
+  mustHaveAmenities: z.array(z.string()),
+  transportationPreferences: z.array(z.string()),
+  specialInterests: z.array(z.string()),
+  languagesSpoken: z.array(z.string()),
+  travelCompanions: z.array(z.string()),
+  photoOpportunities: z.boolean(),
+  localExperiences: z.boolean(),
+  guidedTours: z.boolean(),
+  adventureLevel: z.number(),
+  partyingLevel: z.number(),
+  relaxationLevel: z.number(),
+  culturalImmersionLevel: z.number(),
+  seasonalPreferences: z.array(z.string()),
+});
 
+type FormData = z.infer<typeof travelPreferencesSchema>;
+
+// Constants for form options
 const ACTIVITY_OPTIONS = [
   "Sightseeing", "Museums", "Shopping", "Food & Dining",
   "Nightlife", "Adventure Sports", "Beach Activities", "Cultural Events",
@@ -69,12 +88,42 @@ const TRAVEL_STYLE_OPTIONS = [
   "Group Tours", "Solo Travel", "Family-Friendly"
 ];
 
+const TRAVEL_PACE_OPTIONS = [
+  "Slow", "Moderate", "Fast"
+];
+
+const AMENITY_OPTIONS = [
+  "Wi-Fi", "Air Conditioning", "Pool", "Gym",
+  "Restaurant", "Room Service", "Spa", "Business Center"
+];
+
+const TRANSPORTATION_OPTIONS = [
+  "Public Transit", "Rental Car", "Walking", "Biking",
+  "Rideshare", "Private Driver", "Train"
+];
+
+const SEASON_OPTIONS = [
+  "Spring", "Summer", "Fall", "Winter",
+  "Dry Season", "Rainy Season"
+];
+
+const LANGUAGE_OPTIONS = [
+  "English", "Spanish", "French", "German",
+  "Italian", "Mandarin", "Japanese", "Arabic"
+];
+
+const COMPANION_OPTIONS = [
+  "Solo", "Couple", "Family", "Friends",
+  "Group", "Business"
+];
+
 export function TravelPreferencesForm() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
 
-  const form = useForm<TravelPreferences>({
+  const form = useForm<FormData>({
+    resolver: zodResolver(travelPreferencesSchema),
     defaultValues: {
       preferredActivities: [],
       interests: [],
@@ -84,18 +133,30 @@ export function TravelPreferencesForm() {
         currency: "USD"
       },
       preferredAccommodations: [],
-      dietaryRestrictions: [],
-      accessibility: [],
-      travelStyle: [],
       preferredClimate: [],
+      travelStyle: [],
       tripDuration: {
         min: 1,
         max: 14
-      }
+      },
+      travelPace: "Moderate",
+      mustHaveAmenities: [],
+      transportationPreferences: [],
+      specialInterests: [],
+      languagesSpoken: [],
+      travelCompanions: [],
+      photoOpportunities: true,
+      localExperiences: true,
+      guidedTours: false,
+      adventureLevel: 3,
+      partyingLevel: 3,
+      relaxationLevel: 3,
+      culturalImmersionLevel: 3,
+      seasonalPreferences: [],
     }
   });
 
-  const onSubmit = async (data: TravelPreferences) => {
+  const onSubmit = async (data: FormData) => {
     setLoading(true);
     try {
       const response = await fetch('/api/user/preferences', {
@@ -118,8 +179,14 @@ export function TravelPreferencesForm() {
 
       toast({
         title: "Success",
-        description: "Your travel preferences have been updated",
+        description: "Your travel preferences have been updated. We'll start generating personalized recommendations for you.",
       });
+
+      // Trigger initial recommendations generation
+      await fetch('/api/recommendations/generate', {
+        method: 'POST',
+      });
+
     } catch (error) {
       toast({
         variant: "destructive",
@@ -135,6 +202,7 @@ export function TravelPreferencesForm() {
     <Card className="p-6">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+          {/* Basic Preferences */}
           <FormField
             control={form.control}
             name="preferredActivities"
@@ -147,7 +215,7 @@ export function TravelPreferencesForm() {
                 <FormControl>
                   <Select
                     value={field.value}
-                    onValueChange={field.onChange}
+                    onValueChange={(value) => field.onChange(value.split(','))}
                     multiple
                   >
                     <SelectTrigger>
@@ -167,143 +235,7 @@ export function TravelPreferencesForm() {
             )}
           />
 
-          <FormField
-            control={form.control}
-            name="interests"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Interests</FormLabel>
-                <FormDescription>
-                  Select your travel interests
-                </FormDescription>
-                <FormControl>
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                    multiple
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select interests" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {INTEREST_OPTIONS.map((interest) => (
-                        <SelectItem key={interest} value={interest}>
-                          {interest}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <div className="space-y-4">
-            <FormLabel>Budget Range (USD)</FormLabel>
-            <FormDescription>
-              Set your preferred budget range for trips
-            </FormDescription>
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="budgetRange.min"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="Min budget"
-                        {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value))}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="budgetRange.max"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="Max budget"
-                        {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value))}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </div>
-          </div>
-
-          <FormField
-            control={form.control}
-            name="preferredAccommodations"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Preferred Accommodations</FormLabel>
-                <FormDescription>
-                  Select your preferred types of accommodation
-                </FormDescription>
-                <FormControl>
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                    multiple
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select accommodations" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ACCOMMODATION_OPTIONS.map((accommodation) => (
-                        <SelectItem key={accommodation} value={accommodation}>
-                          {accommodation}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="preferredClimate"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Preferred Climate</FormLabel>
-                <FormDescription>
-                  Select your preferred climate types
-                </FormDescription>
-                <FormControl>
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                    multiple
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select climate preferences" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CLIMATE_OPTIONS.map((climate) => (
-                        <SelectItem key={climate} value={climate}>
-                          {climate}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
+          {/* Travel Style */}
           <FormField
             control={form.control}
             name="travelStyle"
@@ -311,12 +243,12 @@ export function TravelPreferencesForm() {
               <FormItem>
                 <FormLabel>Travel Style</FormLabel>
                 <FormDescription>
-                  Select your preferred travel styles
+                  How do you prefer to travel?
                 </FormDescription>
                 <FormControl>
                   <Select
                     value={field.value}
-                    onValueChange={field.onChange}
+                    onValueChange={(value) => field.onChange(value.split(','))}
                     multiple
                   >
                     <SelectTrigger>
@@ -336,45 +268,132 @@ export function TravelPreferencesForm() {
             )}
           />
 
+          {/* Travel Pace */}
+          <FormField
+            control={form.control}
+            name="travelPace"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Travel Pace</FormLabel>
+                <FormDescription>
+                  How quickly do you like to move through destinations?
+                </FormDescription>
+                <FormControl>
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select pace" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TRAVEL_PACE_OPTIONS.map((pace) => (
+                        <SelectItem key={pace} value={pace}>
+                          {pace}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Experience Levels */}
           <div className="space-y-4">
-            <FormLabel>Trip Duration (Days)</FormLabel>
-            <FormDescription>
-              Set your preferred trip duration range
-            </FormDescription>
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="tripDuration.min"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="Min days"
-                        {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value))}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="tripDuration.max"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="Max days"
-                        {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value))}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </div>
+            <FormField
+              control={form.control}
+              name="adventureLevel"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Adventure Level</FormLabel>
+                  <FormDescription>
+                    How adventurous do you want your trip to be? (1-5)
+                  </FormDescription>
+                  <FormControl>
+                    <Slider
+                      value={[field.value]}
+                      onValueChange={(values) => field.onChange(values[0])}
+                      min={1}
+                      max={5}
+                      step={1}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="culturalImmersionLevel"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cultural Immersion</FormLabel>
+                  <FormDescription>
+                    How deeply do you want to experience local culture? (1-5)
+                  </FormDescription>
+                  <FormControl>
+                    <Slider
+                      value={[field.value]}
+                      onValueChange={(values) => field.onChange(values[0])}
+                      min={1}
+                      max={5}
+                      step={1}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {/* Additional Preferences */}
+          <div className="space-y-4">
+            <FormField
+              control={form.control}
+              name="photoOpportunities"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between">
+                  <div>
+                    <FormLabel>Photo Opportunities</FormLabel>
+                    <FormDescription>
+                      Prioritize scenic spots and photo opportunities
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="localExperiences"
+              render={({ field }) => (
+                <FormItem className="flex items-center justify-between">
+                  <div>
+                    <FormLabel>Local Experiences</FormLabel>
+                    <FormDescription>
+                      Prioritize authentic local experiences
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
 
           <Button type="submit" disabled={loading}>

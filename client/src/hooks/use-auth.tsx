@@ -31,6 +31,14 @@ type RegisterData = LoginData & {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// Common fetch configuration
+const fetchConfig: RequestInit = {
+  credentials: 'include',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -44,9 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: ["/api/user"],
     queryFn: async () => {
       try {
-        const res = await fetch("/api/user", {
-          credentials: "include",
-        });
+        const res = await fetch("/api/user", fetchConfig);
         if (res.status === 401) {
           return null;
         }
@@ -67,12 +73,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
       const res = await fetch("/api/login", {
+        ...fetchConfig,
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(credentials),
-        credentials: "include",
       });
       if (!res.ok) {
         const errorText = await res.text();
@@ -95,12 +98,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const registerMutation = useMutation({
     mutationFn: async (newUser: RegisterData) => {
       const res = await fetch("/api/register", {
+        ...fetchConfig,
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify(newUser),
-        credentials: "include",
       });
       if (!res.ok) {
         const errorText = await res.text();
@@ -123,8 +123,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logoutMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch("/api/logout", {
+        ...fetchConfig,
         method: "POST",
-        credentials: "include",
       });
       if (!res.ok) {
         throw new Error("Logout failed");

@@ -40,12 +40,27 @@ export const users = pgTable("users", {
       preferredAccommodations: string[];
       dietaryRestrictions: string[];
       accessibility: string[];
-      travelStyle: string[];
-      preferredClimate: string[];
+      travelStyle: string[]; // e.g., ["adventure", "luxury", "budget", "cultural"]
+      preferredClimate: string[]; // e.g., ["tropical", "mediterranean", "alpine"]
       tripDuration: {
         min: number;
         max: number;
       };
+      travelPace: string; // "slow", "moderate", "fast"
+      mustHaveAmenities: string[];
+      transportationPreferences: string[];
+      mealPreferences: string[];
+      seasonalPreferences: string[];
+      specialInterests: string[];
+      languagesSpoken: string[];
+      travelCompanions: string[]; // "solo", "couple", "family", "friends"
+      photoOpportunities: boolean;
+      localExperiences: boolean;
+      guidedTours: boolean;
+      adventureLevel: number; // 1-5 scale
+      partyingLevel: number; // 1-5 scale
+      relaxationLevel: number; // 1-5 scale
+      culturalImmersionLevel: number; // 1-5 scale
     };
   }>(),
 });
@@ -290,6 +305,31 @@ export const travelRecommendations = pgTable("travel_recommendations", {
   currency: text("currency").default("USD"),
   recommendedDuration: integer("recommended_duration"),
   score: numeric("score"),
+  matchingPreferences: json("matching_preferences").$type<{
+    activityMatch: number;
+    budgetMatch: number;
+    climateMatch: number;
+    styleMatch: number;
+    seasonalMatch: number;
+    overallScore: number;
+  }>(),
+  seasonalInfo: json("seasonal_info").$type<{
+    bestTimeToVisit: string[];
+    weather: {
+      season: string;
+      temperature: string;
+      precipitation: string;
+    }[];
+  }>(),
+  localCuisine: json("local_cuisine").$type<string[]>(),
+  culturalHighlights: json("cultural_highlights").$type<string[]>(),
+  practicalInfo: json("practical_info").$type<{
+    languages: string[];
+    currency: string;
+    timeZone: string;
+    visaRequirements: string;
+    safetyInfo: string;
+  }>(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
