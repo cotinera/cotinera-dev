@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -28,135 +28,96 @@ import { zodResolver } from "@hookform/resolvers/zod";
 
 // Define form schema using zod
 const travelPreferencesSchema = z.object({
-  preferredActivities: z.array(z.string()),
-  interests: z.array(z.string()),
+  preferredActivities: z.array(z.string()).default([]),
+  interests: z.array(z.string()).default([]),
   budgetRange: z.object({
-    min: z.number(),
-    max: z.number(),
-    currency: z.string(),
+    min: z.number().default(0),
+    max: z.number().default(5000),
+    currency: z.string().default("USD"),
   }),
-  preferredAccommodations: z.array(z.string()),
-  preferredClimate: z.array(z.string()),
-  travelStyle: z.array(z.string()),
+  preferredAccommodations: z.array(z.string()).default([]),
+  preferredClimate: z.array(z.string()).default([]),
+  travelStyle: z.array(z.string()).default([]),
   tripDuration: z.object({
-    min: z.number(),
-    max: z.number(),
+    min: z.number().default(1),
+    max: z.number().default(14),
   }),
-  travelPace: z.string(),
-  mustHaveAmenities: z.array(z.string()),
-  transportationPreferences: z.array(z.string()),
-  specialInterests: z.array(z.string()),
-  languagesSpoken: z.array(z.string()),
-  travelCompanions: z.array(z.string()),
-  photoOpportunities: z.boolean(),
-  localExperiences: z.boolean(),
-  guidedTours: z.boolean(),
-  adventureLevel: z.number(),
-  partyingLevel: z.number(),
-  relaxationLevel: z.number(),
-  culturalImmersionLevel: z.number(),
-  seasonalPreferences: z.array(z.string()),
+  travelPace: z.string().default("Moderate"),
+  mustHaveAmenities: z.array(z.string()).default([]),
+  transportationPreferences: z.array(z.string()).default([]),
+  specialInterests: z.array(z.string()).default([]),
+  languagesSpoken: z.array(z.string()).default([]),
+  travelCompanions: z.array(z.string()).default([]),
+  photoOpportunities: z.boolean().default(true),
+  localExperiences: z.boolean().default(true),
+  guidedTours: z.boolean().default(false),
+  adventureLevel: z.number().default(3),
+  partyingLevel: z.number().default(3),
+  relaxationLevel: z.number().default(3),
+  culturalImmersionLevel: z.number().default(3),
+  seasonalPreferences: z.array(z.string()).default([]),
 });
 
 type FormData = z.infer<typeof travelPreferencesSchema>;
 
-// Constants for form options
-const ACTIVITY_OPTIONS = [
-  "Sightseeing", "Museums", "Shopping", "Food & Dining",
-  "Nightlife", "Adventure Sports", "Beach Activities", "Cultural Events",
-  "Nature Walks", "Historical Sites"
-];
+// Constants moved to external objects to prevent re-creation on render
+const FORM_OPTIONS = {
+  ACTIVITIES: [
+    "Sightseeing", "Museums", "Shopping", "Food & Dining",
+    "Nightlife", "Adventure Sports", "Beach Activities", "Cultural Events",
+    "Nature Walks", "Historical Sites"
+  ],
+  INTERESTS: [
+    "Art & Culture", "History", "Nature", "Food & Wine",
+    "Adventure", "Relaxation", "Photography", "Architecture",
+    "Local Experiences", "Wildlife"
+  ],
+  ACCOMMODATIONS: [
+    "Hotels", "Hostels", "Resorts", "Vacation Rentals",
+    "Boutique Hotels", "Camping", "B&Bs"
+  ],
+  CLIMATES: [
+    "Tropical", "Mediterranean", "Desert", "Alpine",
+    "Temperate", "Coastal", "Mountain"
+  ],
+  TRAVEL_STYLES: [
+    "Luxury", "Budget", "Mid-Range", "Backpacking",
+    "Group Tours", "Solo Travel", "Family-Friendly"
+  ],
+  TRAVEL_PACES: ["Slow", "Moderate", "Fast"],
+  AMENITIES: [
+    "Wi-Fi", "Air Conditioning", "Pool", "Gym",
+    "Restaurant", "Room Service", "Spa", "Business Center"
+  ],
+  TRANSPORTATION: [
+    "Public Transit", "Rental Car", "Walking", "Biking",
+    "Rideshare", "Private Driver", "Train"
+  ],
+  SEASONS: [
+    "Spring", "Summer", "Fall", "Winter",
+    "Dry Season", "Rainy Season"
+  ],
+  LANGUAGES: [
+    "English", "Spanish", "French", "German",
+    "Italian", "Mandarin", "Japanese", "Arabic"
+  ],
+  COMPANIONS: [
+    "Solo", "Couple", "Family", "Friends",
+    "Group", "Business"
+  ],
+} as const;
 
-const INTEREST_OPTIONS = [
-  "Art & Culture", "History", "Nature", "Food & Wine",
-  "Adventure", "Relaxation", "Photography", "Architecture",
-  "Local Experiences", "Wildlife"
-];
-
-const ACCOMMODATION_OPTIONS = [
-  "Hotels", "Hostels", "Resorts", "Vacation Rentals",
-  "Boutique Hotels", "Camping", "B&Bs"
-];
-
-const CLIMATE_OPTIONS = [
-  "Tropical", "Mediterranean", "Desert", "Alpine",
-  "Temperate", "Coastal", "Mountain"
-];
-
-const TRAVEL_STYLE_OPTIONS = [
-  "Luxury", "Budget", "Mid-Range", "Backpacking",
-  "Group Tours", "Solo Travel", "Family-Friendly"
-];
-
-const TRAVEL_PACE_OPTIONS = [
-  "Slow", "Moderate", "Fast"
-];
-
-const AMENITY_OPTIONS = [
-  "Wi-Fi", "Air Conditioning", "Pool", "Gym",
-  "Restaurant", "Room Service", "Spa", "Business Center"
-];
-
-const TRANSPORTATION_OPTIONS = [
-  "Public Transit", "Rental Car", "Walking", "Biking",
-  "Rideshare", "Private Driver", "Train"
-];
-
-const SEASON_OPTIONS = [
-  "Spring", "Summer", "Fall", "Winter",
-  "Dry Season", "Rainy Season"
-];
-
-const LANGUAGE_OPTIONS = [
-  "English", "Spanish", "French", "German",
-  "Italian", "Mandarin", "Japanese", "Arabic"
-];
-
-const COMPANION_OPTIONS = [
-  "Solo", "Couple", "Family", "Friends",
-  "Group", "Business"
-];
-
-export function TravelPreferencesForm() {
+export function TravelPreferencesForm({ onClose }: { onClose?: () => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(travelPreferencesSchema),
-    defaultValues: {
-      preferredActivities: [],
-      interests: [],
-      budgetRange: {
-        min: 0,
-        max: 5000,
-        currency: "USD"
-      },
-      preferredAccommodations: [],
-      preferredClimate: [],
-      travelStyle: [],
-      tripDuration: {
-        min: 1,
-        max: 14
-      },
-      travelPace: "Moderate",
-      mustHaveAmenities: [],
-      transportationPreferences: [],
-      specialInterests: [],
-      languagesSpoken: [],
-      travelCompanions: [],
-      photoOpportunities: true,
-      localExperiences: true,
-      guidedTours: false,
-      adventureLevel: 3,
-      partyingLevel: 3,
-      relaxationLevel: 3,
-      culturalImmersionLevel: 3,
-      seasonalPreferences: [],
-    }
+    defaultValues: travelPreferencesSchema.parse({}),
   });
 
-  const onSubmit = async (data: FormData) => {
+  const onSubmit = useCallback(async (data: FormData) => {
     setLoading(true);
     try {
       const response = await fetch('/api/user/preferences', {
@@ -164,6 +125,7 @@ export function TravelPreferencesForm() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           preferences: {
             travelPreferences: data
@@ -185,8 +147,12 @@ export function TravelPreferencesForm() {
       // Trigger initial recommendations generation
       await fetch('/api/recommendations/generate', {
         method: 'POST',
+        credentials: 'include',
       });
 
+      if (onClose) {
+        onClose();
+      }
     } catch (error) {
       toast({
         variant: "destructive",
@@ -196,7 +162,18 @@ export function TravelPreferencesForm() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast, queryClient, onClose]);
+
+  // Memoized handlers for multi-select fields
+  const handleMultiSelect = useCallback((field: any, onChange: (value: string[]) => void) => {
+    return (value: string) => {
+      const currentValues = field.value || [];
+      const newValues = currentValues.includes(value)
+        ? currentValues.filter((v: string) => v !== value)
+        : [...currentValues, value];
+      onChange(newValues);
+    };
+  }, []);
 
   return (
     <Card className="p-6">
@@ -215,14 +192,13 @@ export function TravelPreferencesForm() {
                 <FormControl>
                   <Select
                     value={field.value}
-                    onValueChange={(value) => field.onChange(value.split(','))}
-                    multiple
+                    onValueChange={handleMultiSelect(field, field.onChange)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select activities" />
                     </SelectTrigger>
                     <SelectContent>
-                      {ACTIVITY_OPTIONS.map((activity) => (
+                      {FORM_OPTIONS.ACTIVITIES.map((activity) => (
                         <SelectItem key={activity} value={activity}>
                           {activity}
                         </SelectItem>
@@ -248,48 +224,15 @@ export function TravelPreferencesForm() {
                 <FormControl>
                   <Select
                     value={field.value}
-                    onValueChange={(value) => field.onChange(value.split(','))}
-                    multiple
+                    onValueChange={handleMultiSelect(field, field.onChange)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select travel styles" />
                     </SelectTrigger>
                     <SelectContent>
-                      {TRAVEL_STYLE_OPTIONS.map((style) => (
+                      {FORM_OPTIONS.TRAVEL_STYLES.map((style) => (
                         <SelectItem key={style} value={style}>
                           {style}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          {/* Travel Pace */}
-          <FormField
-            control={form.control}
-            name="travelPace"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Travel Pace</FormLabel>
-                <FormDescription>
-                  How quickly do you like to move through destinations?
-                </FormDescription>
-                <FormControl>
-                  <Select
-                    value={field.value}
-                    onValueChange={field.onChange}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select pace" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {TRAVEL_PACE_OPTIONS.map((pace) => (
-                        <SelectItem key={pace} value={pace}>
-                          {pace}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -324,7 +267,6 @@ export function TravelPreferencesForm() {
                 </FormItem>
               )}
             />
-
             <FormField
               control={form.control}
               name="culturalImmersionLevel"
@@ -372,7 +314,6 @@ export function TravelPreferencesForm() {
                 </FormItem>
               )}
             />
-
             <FormField
               control={form.control}
               name="localExperiences"
