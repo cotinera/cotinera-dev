@@ -1126,6 +1126,50 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Delete destination route
+  app.delete("/api/trips/:tripId/destinations/:destinationId", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const destinationId = parseInt(req.params.destinationId);
+
+      // Verify destination exists and belongs to trip
+      const [destination] = await db
+        .select()
+        .from(destinations)
+        .where(
+          and(
+            eq(destinations.id, destinationId),
+            eq(destinations.tripId, tripId)
+          )
+        )
+        .limit(1);
+
+      if (!destination) {
+        return res.status(404).json({ error: "Destination not found" });
+      }
+
+      // Delete the destination
+      const [deletedDestination] = await db
+        .delete(destinations)
+        .where(
+          and(
+            eq(destinations.id, destinationId),
+            eq(destinations.tripId, tripId)
+          )
+        )
+        .returning();
+
+      res.json({ 
+        success: true, 
+        message: "Destination deleted successfully",
+        destination: deletedDestination
+      });
+    } catch (error) {
+      console.error('Error deleting destination:', error);
+      res.status(500).json({ error: 'Failed to delete destination' });
+    }
+  });
+
   // Update destination order
   app.patch("/api/trips/:tripId/destinations/reorder", async (req, res) => {
     try {

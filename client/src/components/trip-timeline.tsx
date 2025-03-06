@@ -58,14 +58,25 @@ export function TripTimeline({
 
   const deleteDestinationMutation = useMutation({
     mutationFn: async (destinationId: number) => {
-      const res = await fetch(`/api/trips/${tripId}/destinations/${destinationId}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || "Failed to delete destination");
+      try {
+        const res = await fetch(`/api/trips/${tripId}/destinations/${destinationId}`, {
+          method: "DELETE",
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include'
+        });
+
+        if (!res.ok) {
+          const errorData = await res.json();
+          throw new Error(errorData.error || 'Failed to delete destination');
+        }
+
+        return await res.json();
+      } catch (error) {
+        console.error('Delete destination error:', error);
+        throw error;
       }
-      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
