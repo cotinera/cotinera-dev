@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -25,6 +25,25 @@ import { useQueryClient } from "@tanstack/react-query";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 
+// Form options as constants
+const FORM_OPTIONS = {
+  ACTIVITIES: [
+    "Sightseeing", "Museums", "Shopping", "Food & Dining",
+    "Nightlife", "Adventure Sports", "Beach Activities", "Cultural Events",
+    "Nature Walks", "Historical Sites"
+  ],
+  INTERESTS: [
+    "Art & Culture", "History", "Nature", "Food & Wine",
+    "Adventure", "Relaxation", "Photography", "Architecture",
+    "Local Experiences", "Wildlife"
+  ],
+  TRAVEL_STYLES: [
+    "Luxury", "Budget", "Mid-Range", "Backpacking",
+    "Group Tours", "Solo Travel", "Family-Friendly"
+  ],
+  TRAVEL_PACES: ["Slow", "Moderate", "Fast"]
+} as const;
+
 // Define form schema using zod
 const travelPreferencesSchema = z.object({
   preferredActivities: z.array(z.string()).default([]),
@@ -42,41 +61,14 @@ const travelPreferencesSchema = z.object({
     max: z.number().default(14),
   }),
   travelPace: z.string().default("Moderate"),
-  mustHaveAmenities: z.array(z.string()).default([]),
-  transportationPreferences: z.array(z.string()).default([]),
-  specialInterests: z.array(z.string()).default([]),
-  languagesSpoken: z.array(z.string()).default([]),
-  travelCompanions: z.array(z.string()).default([]),
   photoOpportunities: z.boolean().default(true),
   localExperiences: z.boolean().default(true),
   guidedTours: z.boolean().default(false),
   adventureLevel: z.number().default(3),
-  partyingLevel: z.number().default(3),
-  relaxationLevel: z.number().default(3),
   culturalImmersionLevel: z.number().default(3),
-  seasonalPreferences: z.array(z.string()).default([]),
 });
 
 type FormData = z.infer<typeof travelPreferencesSchema>;
-
-// Form options as constants to prevent re-creation
-const FORM_OPTIONS = {
-  ACTIVITIES: [
-    "Sightseeing", "Museums", "Shopping", "Food & Dining",
-    "Nightlife", "Adventure Sports", "Beach Activities", "Cultural Events",
-    "Nature Walks", "Historical Sites"
-  ],
-  INTERESTS: [
-    "Art & Culture", "History", "Nature", "Food & Wine",
-    "Adventure", "Relaxation", "Photography", "Architecture",
-    "Local Experiences", "Wildlife"
-  ],
-  TRAVEL_STYLES: [
-    "Luxury", "Budget", "Mid-Range", "Backpacking",
-    "Group Tours", "Solo Travel", "Family-Friendly"
-  ],
-  TRAVEL_PACES: ["Slow", "Moderate", "Fast"],
-} as const;
 
 export function TravelPreferencesForm({ onClose }: { onClose?: () => void }) {
   const { toast } = useToast();
@@ -84,38 +76,32 @@ export function TravelPreferencesForm({ onClose }: { onClose?: () => void }) {
   const [loading, setLoading] = useState(false);
 
   // Initialize form with complete default values
+  const defaultValues = useMemo(() => ({
+    preferredActivities: [],
+    interests: [],
+    budgetRange: {
+      min: 0,
+      max: 5000,
+      currency: "USD"
+    },
+    preferredAccommodations: [],
+    preferredClimate: [],
+    travelStyle: [],
+    tripDuration: {
+      min: 1,
+      max: 14
+    },
+    travelPace: "Moderate",
+    photoOpportunities: true,
+    localExperiences: true,
+    guidedTours: false,
+    adventureLevel: 3,
+    culturalImmersionLevel: 3,
+  }), []);
+
   const form = useForm<FormData>({
     resolver: zodResolver(travelPreferencesSchema),
-    defaultValues: {
-      preferredActivities: [],
-      interests: [],
-      budgetRange: {
-        min: 0,
-        max: 5000,
-        currency: "USD"
-      },
-      preferredAccommodations: [],
-      preferredClimate: [],
-      travelStyle: [],
-      tripDuration: {
-        min: 1,
-        max: 14
-      },
-      travelPace: "Moderate",
-      mustHaveAmenities: [],
-      transportationPreferences: [],
-      specialInterests: [],
-      languagesSpoken: [],
-      travelCompanions: [],
-      photoOpportunities: true,
-      localExperiences: true,
-      guidedTours: false,
-      adventureLevel: 3,
-      partyingLevel: 3,
-      relaxationLevel: 3,
-      culturalImmersionLevel: 3,
-      seasonalPreferences: [],
-    }
+    defaultValues,
   });
 
   const onSubmit = useCallback(async (data: FormData) => {
@@ -165,17 +151,6 @@ export function TravelPreferencesForm({ onClose }: { onClose?: () => void }) {
     }
   }, [toast, queryClient, onClose]);
 
-  // Memoized handler for multi-select fields
-  const handleMultiSelect = useCallback((field: any, onChange: (value: string[]) => void) => {
-    return (value: string) => {
-      const currentValues = field.value || [];
-      const newValues = currentValues.includes(value)
-        ? currentValues.filter((v: string) => v !== value)
-        : [...currentValues, value];
-      onChange(newValues);
-    };
-  }, []);
-
   return (
     <Card className="p-6">
       <Form {...form}>
@@ -192,8 +167,14 @@ export function TravelPreferencesForm({ onClose }: { onClose?: () => void }) {
                 </FormDescription>
                 <FormControl>
                   <Select
-                    value={field.value}
-                    onValueChange={handleMultiSelect(field, field.onChange)}
+                    value={field.value[0] || ""}
+                    onValueChange={(value) => {
+                      const currentValues = field.value || [];
+                      const newValues = currentValues.includes(value)
+                        ? currentValues.filter(v => v !== value)
+                        : [...currentValues, value];
+                      field.onChange(newValues);
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select activities" />
@@ -224,8 +205,14 @@ export function TravelPreferencesForm({ onClose }: { onClose?: () => void }) {
                 </FormDescription>
                 <FormControl>
                   <Select
-                    value={field.value}
-                    onValueChange={handleMultiSelect(field, field.onChange)}
+                    value={field.value[0] || ""}
+                    onValueChange={(value) => {
+                      const currentValues = field.value || [];
+                      const newValues = currentValues.includes(value)
+                        ? currentValues.filter(v => v !== value)
+                        : [...currentValues, value];
+                      field.onChange(newValues);
+                    }}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select travel styles" />
@@ -246,7 +233,7 @@ export function TravelPreferencesForm({ onClose }: { onClose?: () => void }) {
 
           {/* Experience Levels */}
           <div className="space-y-4">
-            <FormField
+            <FormField 
               control={form.control}
               name="adventureLevel"
               render={({ field }) => (
