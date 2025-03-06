@@ -19,7 +19,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
@@ -60,7 +59,7 @@ const travelPreferencesSchema = z.object({
 
 type FormData = z.infer<typeof travelPreferencesSchema>;
 
-// Constants moved to external objects to prevent re-creation on render
+// Form options as constants to prevent re-creation
 const FORM_OPTIONS = {
   ACTIVITIES: [
     "Sightseeing", "Museums", "Shopping", "Food & Dining",
@@ -72,39 +71,11 @@ const FORM_OPTIONS = {
     "Adventure", "Relaxation", "Photography", "Architecture",
     "Local Experiences", "Wildlife"
   ],
-  ACCOMMODATIONS: [
-    "Hotels", "Hostels", "Resorts", "Vacation Rentals",
-    "Boutique Hotels", "Camping", "B&Bs"
-  ],
-  CLIMATES: [
-    "Tropical", "Mediterranean", "Desert", "Alpine",
-    "Temperate", "Coastal", "Mountain"
-  ],
   TRAVEL_STYLES: [
     "Luxury", "Budget", "Mid-Range", "Backpacking",
     "Group Tours", "Solo Travel", "Family-Friendly"
   ],
   TRAVEL_PACES: ["Slow", "Moderate", "Fast"],
-  AMENITIES: [
-    "Wi-Fi", "Air Conditioning", "Pool", "Gym",
-    "Restaurant", "Room Service", "Spa", "Business Center"
-  ],
-  TRANSPORTATION: [
-    "Public Transit", "Rental Car", "Walking", "Biking",
-    "Rideshare", "Private Driver", "Train"
-  ],
-  SEASONS: [
-    "Spring", "Summer", "Fall", "Winter",
-    "Dry Season", "Rainy Season"
-  ],
-  LANGUAGES: [
-    "English", "Spanish", "French", "German",
-    "Italian", "Mandarin", "Japanese", "Arabic"
-  ],
-  COMPANIONS: [
-    "Solo", "Couple", "Family", "Friends",
-    "Group", "Business"
-  ],
 } as const;
 
 export function TravelPreferencesForm({ onClose }: { onClose?: () => void }) {
@@ -112,9 +83,39 @@ export function TravelPreferencesForm({ onClose }: { onClose?: () => void }) {
   const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
 
+  // Initialize form with complete default values
   const form = useForm<FormData>({
     resolver: zodResolver(travelPreferencesSchema),
-    defaultValues: travelPreferencesSchema.parse({}),
+    defaultValues: {
+      preferredActivities: [],
+      interests: [],
+      budgetRange: {
+        min: 0,
+        max: 5000,
+        currency: "USD"
+      },
+      preferredAccommodations: [],
+      preferredClimate: [],
+      travelStyle: [],
+      tripDuration: {
+        min: 1,
+        max: 14
+      },
+      travelPace: "Moderate",
+      mustHaveAmenities: [],
+      transportationPreferences: [],
+      specialInterests: [],
+      languagesSpoken: [],
+      travelCompanions: [],
+      photoOpportunities: true,
+      localExperiences: true,
+      guidedTours: false,
+      adventureLevel: 3,
+      partyingLevel: 3,
+      relaxationLevel: 3,
+      culturalImmersionLevel: 3,
+      seasonalPreferences: [],
+    }
   });
 
   const onSubmit = useCallback(async (data: FormData) => {
@@ -164,7 +165,7 @@ export function TravelPreferencesForm({ onClose }: { onClose?: () => void }) {
     }
   }, [toast, queryClient, onClose]);
 
-  // Memoized handlers for multi-select fields
+  // Memoized handler for multi-select fields
   const handleMultiSelect = useCallback((field: any, onChange: (value: string[]) => void) => {
     return (value: string) => {
       const currentValues = field.value || [];
@@ -179,7 +180,7 @@ export function TravelPreferencesForm({ onClose }: { onClose?: () => void }) {
     <Card className="p-6">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-          {/* Basic Preferences */}
+          {/* Activities */}
           <FormField
             control={form.control}
             name="preferredActivities"
@@ -267,6 +268,7 @@ export function TravelPreferencesForm({ onClose }: { onClose?: () => void }) {
                 </FormItem>
               )}
             />
+
             <FormField
               control={form.control}
               name="culturalImmersionLevel"
@@ -314,6 +316,7 @@ export function TravelPreferencesForm({ onClose }: { onClose?: () => void }) {
                 </FormItem>
               )}
             />
+
             <FormField
               control={form.control}
               name="localExperiences"
