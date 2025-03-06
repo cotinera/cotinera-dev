@@ -26,7 +26,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Collapsible,
@@ -225,9 +224,9 @@ export function TripDestinations({ tripId }: { tripId: number }) {
           </CollapsibleTrigger>
 
           <CollapsibleContent className="overflow-visible">
-            <CardContent className="p-2 pt-0">
-              <div className="flex flex-col">
-                <ScrollArea className="h-[200px] w-full rounded-md border">
+            <CardContent className="p-2 pt-0 flex flex-col gap-2">
+              <div className="border rounded-md">
+                <ScrollArea className="h-[160px]">
                   <div className="p-2 space-y-1">
                     {trip && (
                       <div className="flex items-center justify-between py-1 px-2 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors">
@@ -277,157 +276,157 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                   </div>
                   <ScrollBar orientation="vertical" />
                 </ScrollArea>
+              </div>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full mt-2"
-                  onClick={() => setIsAddDestinationOpen(true)}
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Add Stop
-                </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setIsAddDestinationOpen(true)}
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Add Stop
+              </Button>
 
-                <Dialog
-                  open={isAddDestinationOpen}
-                  onOpenChange={setIsAddDestinationOpen}
-                >
-                  <DialogContent className="fixed top-[50%] left-[50%] transform -translate-x-[50%] -translate-y-[50%] w-[90vw] max-w-[425px] max-h-[90vh] overflow-y-auto z-50">
-                    <DialogHeader>
-                      <DialogTitle>Add New Destination</DialogTitle>
-                    </DialogHeader>
-                    <Form {...form}>
-                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <Dialog
+                open={isAddDestinationOpen}
+                onOpenChange={setIsAddDestinationOpen}
+              >
+                <DialogContent className="fixed top-[50%] left-[50%] transform -translate-x-[50%] -translate-y-[50%] w-[90vw] max-w-[425px] max-h-[90vh] overflow-y-auto z-50">
+                  <DialogHeader>
+                    <DialogTitle>Add New Destination</DialogTitle>
+                  </DialogHeader>
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                      <FormField
+                        control={form.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Location</FormLabel>
+                            <FormControl>
+                              <MapPicker
+                                value={field.value}
+                                onChange={(address, coordinates) => {
+                                  field.onChange(address);
+                                  setSelectedCoordinates(coordinates);
+                                }}
+                                placeholder="Search for a location..."
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="grid grid-cols-2 gap-4">
                         <FormField
                           control={form.control}
-                          name="name"
+                          name="startDate"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Location</FormLabel>
+                              <FormLabel>Start Date</FormLabel>
                               <FormControl>
-                                <MapPicker
-                                  value={field.value}
-                                  onChange={(address, coordinates) => {
-                                    field.onChange(address);
-                                    setSelectedCoordinates(coordinates);
-                                  }}
-                                  placeholder="Search for a location..."
-                                />
+                                <Input type="date" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            control={form.control}
-                            name="startDate"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Start Date</FormLabel>
-                                <FormControl>
-                                  <Input type="date" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="endDate"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>End Date</FormLabel>
-                                <FormControl>
-                                  <Input type="date" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        <Button
-                          type="submit"
-                          className="w-full"
-                          disabled={addDestinationMutation.isPending}
-                        >
-                          {addDestinationMutation.isPending ? "Adding..." : "Add Destination"}
-                        </Button>
-                      </form>
-                    </Form>
-                  </DialogContent>
-                </Dialog>
+                        <FormField
+                          control={form.control}
+                          name="endDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>End Date</FormLabel>
+                              <FormControl>
+                                <Input type="date" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={addDestinationMutation.isPending}
+                      >
+                        {addDestinationMutation.isPending ? "Adding..." : "Add Destination"}
+                      </Button>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
 
-                <Dialog
-                  open={isEditDestinationOpen}
-                  onOpenChange={setIsEditDestinationOpen}
-                >
-                  <DialogContent className="fixed top-[50%] left-[50%] transform -translate-x-[50%] -translate-y-[50%] w-[90vw] max-w-[425px] max-h-[90vh] overflow-y-auto z-50">
-                    <DialogHeader>
-                      <DialogTitle>Edit Destination</DialogTitle>
-                    </DialogHeader>
-                    <Form {...editForm}>
-                      <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+              <Dialog
+                open={isEditDestinationOpen}
+                onOpenChange={setIsEditDestinationOpen}
+              >
+                <DialogContent className="fixed top-[50%] left-[50%] transform -translate-x-[50%] -translate-y-[50%] w-[90vw] max-w-[425px] max-h-[90vh] overflow-y-auto z-50">
+                  <DialogHeader>
+                    <DialogTitle>Edit Destination</DialogTitle>
+                  </DialogHeader>
+                  <Form {...editForm}>
+                    <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+                      <FormField
+                        control={editForm.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Location</FormLabel>
+                            <FormControl>
+                              <MapPicker
+                                value={field.value}
+                                onChange={(address, coordinates) => {
+                                  field.onChange(address);
+                                  setSelectedCoordinates(coordinates);
+                                }}
+                                placeholder="Search for a location..."
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <div className="grid grid-cols-2 gap-4">
                         <FormField
                           control={editForm.control}
-                          name="name"
+                          name="startDate"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Location</FormLabel>
+                              <FormLabel>Start Date</FormLabel>
                               <FormControl>
-                                <MapPicker
-                                  value={field.value}
-                                  onChange={(address, coordinates) => {
-                                    field.onChange(address);
-                                    setSelectedCoordinates(coordinates);
-                                  }}
-                                  placeholder="Search for a location..."
-                                />
+                                <Input type="date" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-                        <div className="grid grid-cols-2 gap-4">
-                          <FormField
-                            control={editForm.control}
-                            name="startDate"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Start Date</FormLabel>
-                                <FormControl>
-                                  <Input type="date" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={editForm.control}
-                            name="endDate"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>End Date</FormLabel>
-                                <FormControl>
-                                  <Input type="date" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-                        <Button
-                          type="submit"
-                          className="w-full"
-                          disabled={editDestinationMutation.isPending}
-                        >
-                          {editDestinationMutation.isPending ? "Updating..." : "Update Destination"}
-                        </Button>
-                      </form>
-                    </Form>
-                  </DialogContent>
-                </Dialog>
-              </div>
+                        <FormField
+                          control={editForm.control}
+                          name="endDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>End Date</FormLabel>
+                              <FormControl>
+                                <Input type="date" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={editDestinationMutation.isPending}
+                      >
+                        {editDestinationMutation.isPending ? "Updating..." : "Update Destination"}
+                      </Button>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
             </CardContent>
           </CollapsibleContent>
         </Card>
