@@ -199,229 +199,235 @@ export function TripDestinations({ tripId }: { tripId: number }) {
   const totalStops = (sortedDestinations.length || 0) + 1;
 
   return (
-    <Collapsible
-      open={isOpen}
-      onOpenChange={setIsOpen}
-      className="w-[250px] relative"
-    >
-      <Card className="border shadow-sm">
-        <CollapsibleTrigger asChild>
-          <CardHeader className="p-2 cursor-pointer">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Pin className="h-4 w-4" />
-                <span className="font-medium text-sm">
-                  Destinations ({totalStops})
-                </span>
+    <div className="relative">
+      <Collapsible
+        open={isOpen}
+        onOpenChange={setIsOpen}
+        className="w-[250px]"
+      >
+        <Card className="border shadow-sm">
+          <CollapsibleTrigger asChild>
+            <CardHeader className="p-2 cursor-pointer">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <Pin className="h-4 w-4" />
+                  <span className="font-medium text-sm">
+                    Destinations ({totalStops})
+                  </span>
+                </div>
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform duration-200 ${
+                    isOpen ? "transform rotate-180" : ""
+                  }`}
+                />
               </div>
-              <ChevronDown
-                className={`h-4 w-4 transition-transform duration-200 ${
-                  isOpen ? "transform rotate-180" : ""
-                }`}
-              />
-            </div>
-          </CardHeader>
-        </CollapsibleTrigger>
+            </CardHeader>
+          </CollapsibleTrigger>
 
-        <CollapsibleContent className="relative">
-          <CardContent className="p-2 pt-0">
-            <ScrollArea className="h-[300px] w-full rounded-md">
-              <div className="space-y-1 px-1">
-                {trip && (
-                  <div className="flex items-center justify-between py-1 px-2 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate text-xs">
-                        {trip.location || 'Starting Point'}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {format(new Date(trip.startDate), "MMM d")} -{" "}
-                        {format(new Date(sortedDestinations[0]?.startDate || trip.endDate), "MMM d")}
-                      </p>
-                    </div>
-                    <Badge variant="outline" className="text-[10px] h-4 px-1">
-                      1
-                    </Badge>
-                  </div>
-                )}
-                {sortedDestinations.map((destination, index) => (
-                  <div
-                    key={destination.id}
-                    className="flex items-center justify-between py-1 px-2 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate text-xs">
-                        {destination.name}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {format(new Date(destination.startDate), "MMM d")} -{" "}
-                        {format(new Date(destination.endDate), "MMM d")}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-5 w-5"
-                        onClick={() => onEdit(destination)}
-                      >
-                        <Edit2 className="h-3 w-3" />
-                      </Button>
+          <CollapsibleContent>
+            <CardContent className="p-2 pt-0">
+              <ScrollArea className="h-[300px] w-full rounded-md">
+                <div className="space-y-1 px-1">
+                  {trip && (
+                    <div className="flex items-center justify-between py-1 px-2 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate text-xs">
+                          {trip.location || 'Starting Point'}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {format(new Date(trip.startDate), "MMM d")} -{" "}
+                          {format(new Date(sortedDestinations[0]?.startDate || trip.endDate), "MMM d")}
+                        </p>
+                      </div>
                       <Badge variant="outline" className="text-[10px] h-4 px-1">
-                        {index + 2}
+                        1
                       </Badge>
                     </div>
-                  </div>
-                ))}
-              </div>
-              <ScrollBar orientation="vertical" />
-            </ScrollArea>
+                  )}
+                  {sortedDestinations.map((destination, index) => (
+                    <div
+                      key={destination.id}
+                      className="flex items-center justify-between py-1 px-2 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate text-xs">
+                          {destination.name}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {format(new Date(destination.startDate), "MMM d")} -{" "}
+                          {format(new Date(destination.endDate), "MMM d")}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5"
+                          onClick={() => onEdit(destination)}
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </Button>
+                        <Badge variant="outline" className="text-[10px] h-4 px-1">
+                          {index + 2}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <ScrollBar orientation="vertical" />
+              </ScrollArea>
 
-            <Dialog open={isAddDestinationOpen} onOpenChange={setIsAddDestinationOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full mt-2"
+              <div className="mt-2">
+                <Dialog
+                  open={isAddDestinationOpen}
+                  onOpenChange={setIsAddDestinationOpen}
                 >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Add Stop
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Add New Destination</DialogTitle>
-                </DialogHeader>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Location</FormLabel>
-                          <FormControl>
-                            <MapPicker
-                              value={field.value}
-                              onChange={(address, coordinates) => {
-                                field.onChange(address);
-                                setSelectedCoordinates(coordinates);
-                              }}
-                              placeholder="Search for a location..."
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="startDate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Start Date</FormLabel>
-                            <FormControl>
-                              <Input type="date" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="endDate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>End Date</FormLabel>
-                            <FormControl>
-                              <Input type="date" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      className="w-full"
-                      disabled={addDestinationMutation.isPending}
-                    >
-                      {addDestinationMutation.isPending ? "Adding..." : "Add Destination"}
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="w-full">
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Stop
                     </Button>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
+                  </DialogTrigger>
+                  <DialogContent className="fixed top-[50%] left-[50%] transform -translate-x-[50%] -translate-y-[50%] w-[90vw] max-w-[425px] max-h-[90vh] overflow-y-auto z-50">
+                    <DialogHeader>
+                      <DialogTitle>Add New Destination</DialogTitle>
+                    </DialogHeader>
+                    <Form {...form}>
+                      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Location</FormLabel>
+                              <FormControl>
+                                <MapPicker
+                                  value={field.value}
+                                  onChange={(address, coordinates) => {
+                                    field.onChange(address);
+                                    setSelectedCoordinates(coordinates);
+                                  }}
+                                  placeholder="Search for a location..."
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="startDate"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Start Date</FormLabel>
+                                <FormControl>
+                                  <Input type="date" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="endDate"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>End Date</FormLabel>
+                                <FormControl>
+                                  <Input type="date" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <Button
+                          type="submit"
+                          className="w-full"
+                          disabled={addDestinationMutation.isPending}
+                        >
+                          {addDestinationMutation.isPending ? "Adding..." : "Add Destination"}
+                        </Button>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
 
-            <Dialog open={isEditDestinationOpen} onOpenChange={setIsEditDestinationOpen}>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>Edit Destination</DialogTitle>
-                </DialogHeader>
-                <Form {...editForm}>
-                  <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
-                    <FormField
-                      control={editForm.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Location</FormLabel>
-                          <FormControl>
-                            <MapPicker
-                              value={field.value}
-                              onChange={(address, coordinates) => {
-                                field.onChange(address);
-                                setSelectedCoordinates(coordinates);
-                              }}
-                              placeholder="Search for a location..."
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={editForm.control}
-                        name="startDate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Start Date</FormLabel>
-                            <FormControl>
-                              <Input type="date" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={editForm.control}
-                        name="endDate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>End Date</FormLabel>
-                            <FormControl>
-                              <Input type="date" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      className="w-full"
-                      disabled={editDestinationMutation.isPending}
-                    >
-                      {editDestinationMutation.isPending ? "Updating..." : "Update Destination"}
-                    </Button>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
-          </CardContent>
-        </CollapsibleContent>
-      </Card>
-    </Collapsible>
+                <Dialog
+                  open={isEditDestinationOpen}
+                  onOpenChange={setIsEditDestinationOpen}
+                >
+                  <DialogContent className="fixed top-[50%] left-[50%] transform -translate-x-[50%] -translate-y-[50%] w-[90vw] max-w-[425px] max-h-[90vh] overflow-y-auto z-50">
+                    <DialogHeader>
+                      <DialogTitle>Edit Destination</DialogTitle>
+                    </DialogHeader>
+                    <Form {...editForm}>
+                      <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+                        <FormField
+                          control={editForm.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Location</FormLabel>
+                              <FormControl>
+                                <MapPicker
+                                  value={field.value}
+                                  onChange={(address, coordinates) => {
+                                    field.onChange(address);
+                                    setSelectedCoordinates(coordinates);
+                                  }}
+                                  placeholder="Search for a location..."
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormField
+                            control={editForm.control}
+                            name="startDate"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Start Date</FormLabel>
+                                <FormControl>
+                                  <Input type="date" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={editForm.control}
+                            name="endDate"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>End Date</FormLabel>
+                                <FormControl>
+                                  <Input type="date" {...field} />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                        <Button
+                          type="submit"
+                          className="w-full"
+                          disabled={editDestinationMutation.isPending}
+                        >
+                          {editDestinationMutation.isPending ? "Updating..." : "Update Destination"}
+                        </Button>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+    </div>
   );
 }
