@@ -452,21 +452,7 @@ export function MapView({
 
   return (
     <Card className={cn("overflow-hidden relative", className)}>
-      {/* Category Filter Bar */}
-      <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-50 bg-background rounded-full shadow-lg p-2 flex space-x-2">
-        {categoryButtons.map((category) => (
-          <Button
-            key={category.id}
-            variant={selectedCategory === category.id ? "default" : "outline"}
-            className="flex items-center space-x-2 rounded-full"
-            onClick={() => handleCategoryClick(category)}
-          >
-            {category.icon}
-            <span>{category.label}</span>
-          </Button>
-        ))}
-      </div>
-
+      {/* Search Bar */}
       <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 w-[400px]">
         <div className="relative">
           <Input
@@ -493,6 +479,44 @@ export function MapView({
             </ul>
           )}
         </div>
+      </div>
+
+      {/* Collapsible Category Filter Bar */}
+      <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-50">
+        <Button
+          variant="outline"
+          size="sm"
+          className="mb-2 bg-background shadow-lg rounded-full px-4"
+          onClick={() => setSelectedCategory(selectedCategory ? null : 'show')}
+        >
+          {selectedCategory ? (
+            <>
+              <ChevronUp className="h-4 w-4 mr-2" />
+              Hide Filters
+            </>
+          ) : (
+            <>
+              <ChevronDown className="h-4 w-4 mr-2" />
+              Show Filters
+            </>
+          )}
+        </Button>
+
+        {selectedCategory && (
+          <div className="bg-background rounded-full shadow-lg p-2 flex space-x-2 animate-in fade-in slide-in-from-top-2 duration-200">
+            {categoryButtons.map((category) => (
+              <Button
+                key={category.id}
+                variant={selectedCategory === category.id ? "default" : "outline"}
+                className="flex items-center space-x-2 rounded-full"
+                onClick={() => handleCategoryClick(category)}
+              >
+                {category.icon}
+                <span>{category.label}</span>
+              </Button>
+            ))}
+          </div>
+        )}
       </div>
 
       {selectedCategory && (
