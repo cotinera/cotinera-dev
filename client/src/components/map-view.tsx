@@ -481,7 +481,7 @@ export function MapView({
         </div>
       </div>
 
-      {/* Collapsible Category Filter Bar - moved to right side */}
+      {/* Collapsible Category Filter Bar - right side */}
       <div className="absolute top-4 right-4 z-50">
         <Button
           variant="outline"
@@ -520,7 +520,7 @@ export function MapView({
       </div>
 
       {selectedCategory && (
-        <div className="absolute top-32 right-0 w-[400px] bg-background shadow-lg z-40 rounded-l-lg max-h-[calc(100%-8rem)]">
+        <div className="absolute top-32 left-0 w-[400px] bg-background shadow-lg z-40 rounded-r-lg max-h-[calc(100%-8rem)]">
           <div className="p-4 border-b flex justify-between items-center">
             <h3 className="text-lg font-semibold">
               {categoryButtons.find(c => c.id === selectedCategory)?.label}
