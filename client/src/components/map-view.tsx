@@ -234,6 +234,8 @@ export function MapView({
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
   const [activeFilters, setActiveFilters] = useState<Record<string, any>>({});
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const { isLoaded, loadError } = useGoogleMapsScript();
   const { coordinates, setCoordinates } = useMapCoordinates(location);
@@ -684,13 +686,29 @@ export function MapView({
     });
   };
 
+  const handleInputFocus = () => {
+    setIsSearchFocused(true);
+  };
+
+  const handleInputBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    // Check if the click is outside the search results
+    const searchResultsElement = document.querySelector('.absolute.top-full.left-0.right-0.mt-1.bg-background.rounded-lg.shadow-lg.overflow-hidden.z-50');
+    if (searchResultsElement && !searchResultsElement.contains(e.relatedTarget as Node)) {
+      setIsSearchFocused(false);
+    }
+  };
 
   return (
     <Card className={cn("overflow-hidden relative", className)}>
       {/* Search Bar */}
       <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 w-[400px]">
-        <div className="relative">
+        <div
+          className="relative"
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
+        >
           <Input
+            ref={searchInputRef}
             type="text"
             placeholder="Search on map"
             value={value}
@@ -700,13 +718,17 @@ export function MapView({
           />
           <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
 
-          {searchResults.length > 0 && (
+          {searchResults.length > 0 && isSearchFocused && (
             <ul className="absolute top-full left-0 right-0 mt-1 bg-background rounded-lg shadow-lg overflow-hidden z-50">
               {searchResults.map((result) => (
                 <li
                   key={result.id}
-                  onClick={() => handleSearchSelect(result)}
+                  onClick={() => {
+                    handleSearchSelect(result);
+                    setIsSearchFocused(false);
+                  }}
                   className="px-4 py-2 hover:bg-accent cursor-pointer flex items-center gap-2"
+                  tabIndex={0}
                 >
                   {result.type === 'category' ? (
                     <Search className="h-4 w-4 text-primary flex-shrink-0" />
