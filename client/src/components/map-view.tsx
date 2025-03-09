@@ -871,7 +871,7 @@ export function MapView({
       )}
 
       {selectedPlaceDetails && (
-        <div className="absolute top-0 left-0 bottom-0 w-[400px] bg-background shadow-lg z-40 flex flex-col rounded-r-lg">
+        <div className="absolute top-0 left-0 bottom-0 w[400px] bg-background shadow-lg z-40 flex flex-col rounded-r-lg">
           <div className="p-6 border-b">
             <div className="space-y-2">
               <h2 className="text-[22px] font-medium leading-7 text-foreground">{selectedPlaceDetails.name}</h2>
@@ -1127,12 +1127,14 @@ export function MapView({
           <MarkerF
             position={searchedLocation}
             icon={{
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 8,
-              fillColor: "#1E88E5",
+              path: 'M12,0C7.6,0,3.2,4.4,3.2,8.8c0,7.2,7.2,14.4,8.8,14.4s8.8-7.2,8.8-14.4C20.8,4.4,16.4,0,12,0z M12,11.6 c-1.6,0-2.8-1.2-2.8-2.8s1.2-2.8,2.8-2.8s2.8,1.2,2.8,2.8S13.6,11.6,12,11.6z',
+              fillColor: '#1E88E5',
               fillOpacity: 1,
-              strokeWeight: 2,
-              strokeColor: "#FFFFFF",
+              strokeWeight: 1,
+              strokeColor: '#FFFFFF',
+              scale: 1.5,
+              anchor: new google.maps.Point(12, 24),
+              labelOrigin: new google.maps.Point(12, -10)
             }}
           />
         )}
