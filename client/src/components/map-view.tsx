@@ -54,14 +54,45 @@ interface CategoryButton {
   label: string;
   icon: React.ReactNode;
   type: string[];
+  searchTerms: string[];
 }
 
 const categoryButtons: CategoryButton[] = [
-  { id: 'restaurants', label: 'Restaurants', icon: <Utensils className="w-4 h-4" />, type: ['restaurant'] },
-  { id: 'hotels', label: 'Hotels', icon: <Hotel className="w-4 h-4" />, type: ['lodging'] },
-  { id: 'attractions', label: 'Things to do', icon: <Camera className="w-4 h-4" />, type: ['tourist_attraction', 'point_of_interest'] },
-  { id: 'museums', label: 'Museums', icon: <Building className="w-4 h-4" />, type: ['museum'] },
-  { id: 'pharmacies', label: 'Pharmacies', icon: <Building className="w-4 h-4" />, type: ['pharmacy'] },
+  { 
+    id: 'restaurants', 
+    label: 'Restaurants', 
+    icon: <Utensils className="w-4 h-4" />, 
+    type: ['restaurant'],
+    searchTerms: ['restaurant', 'restaurants', 'food', 'dining', 'eat']
+  },
+  { 
+    id: 'hotels', 
+    label: 'Hotels', 
+    icon: <Hotel className="w-4 h-4" />, 
+    type: ['lodging'],
+    searchTerms: ['hotel', 'hotels', 'lodging', 'motel', 'accommodation']
+  },
+  { 
+    id: 'attractions', 
+    label: 'Things to do', 
+    icon: <Camera className="w-4 h-4" />, 
+    type: ['tourist_attraction', 'point_of_interest'],
+    searchTerms: ['attraction', 'attractions', 'activities', 'things to do', 'tourism']
+  },
+  { 
+    id: 'museums', 
+    label: 'Museums', 
+    icon: <Building className="w-4 h-4" />, 
+    type: ['museum'],
+    searchTerms: ['museum', 'museums', 'gallery', 'galleries', 'exhibition']
+  },
+  { 
+    id: 'pharmacies', 
+    label: 'Pharmacies', 
+    icon: <Building className="w-4 h-4" />, 
+    type: ['pharmacy'],
+    searchTerms: ['pharmacy', 'pharmacies', 'drugstore', 'chemist']
+  },
 ];
 
 interface SubFilter {
@@ -152,6 +183,15 @@ const subFilters: Record<string, SubFilter[]> = {
   ]
 };
 
+interface SearchResult {
+  type: 'category' | 'place';
+  id: string;
+  description: string;
+  placeId?: string;
+  icon?: React.ReactNode;
+  secondaryText?: string;
+}
+
 export function MapView({
   location,
   tripId,
@@ -172,6 +212,7 @@ export function MapView({
   const [placeResults, setPlaceResults] = useState<google.maps.places.PlaceResult[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
   const [activeFilters, setActiveFilters] = useState<Record<string, any>>({});
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
 
   const { isLoaded, loadError } = useGoogleMapsScript();
   const { coordinates, setCoordinates } = useMapCoordinates(location);
@@ -377,29 +418,61 @@ export function MapView({
     map.addListener('idle', handleMapIdle);
   }, [initPlacesService, handleMapIdle]);
 
-  const handleSearchSelect = useCallback(async (placeId: string, description: string) => {
-    try {
-      clearSuggestions();
-      setValue(description, false);
-
-      const results = await getGeocode({ placeId });
-      const { lat, lng } = await getLatLng(results[0]);
-
-      setCoordinates({ lat, lng });
-      if (mapRef.current) {
-        mapRef.current.panTo({ lat, lng });
-        mapRef.current.setZoom(15);
+  const handleSearchSelect = useCallback(async (result: SearchResult) => {
+    if (result.type === 'category') {
+      // Handle category selection
+      const category = categoryButtons.find(c => c.id === result.id);
+      if (category) {
+        setSelectedCategory(category.id);
+        setValue(category.label, false);
+        clearSuggestions();
       }
+    } else {
+      // Handle place selection
+      if (result.placeId) {
+        try {
+          clearSuggestions();
+          setValue(result.description, false);
 
-      fetchDetails(placeId);
-    } catch (error) {
-      console.error("Error selecting place:", error);
+          const results = await getGeocode({ placeId: result.placeId });
+          const { lat, lng } = await getLatLng(results[0]);
+
+          setCoordinates({ lat, lng });
+          if (mapRef.current) {
+            mapRef.current.panTo({ lat, lng });
+            mapRef.current.setZoom(15);
+          }
+
+          fetchDetails(result.placeId);
+        } catch (error) {
+          console.error("Error selecting place:", error);
+        }
+      }
     }
   }, [clearSuggestions, setValue, setCoordinates, fetchDetails]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setValue(e.target.value);
-  };
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const searchValue = e.target.value;
+    setValue(searchValue);
+
+    // Find matching categories
+    const matchingCategories = categoryButtons.filter(category =>
+      category.searchTerms.some(term => 
+        term.toLowerCase().includes(searchValue.toLowerCase()) ||
+        searchValue.toLowerCase().includes(term.toLowerCase())
+      )
+    );
+
+    // Combine category and place results
+    const categoryResults: SearchResult[] = matchingCategories.map(category => ({
+      type: 'category',
+      id: category.id,
+      description: category.label,
+      icon: category.icon
+    }));
+
+    setSearchResults([...categoryResults]);
+  }, [setValue]);
 
   const handlePinPlace = useCallback(async () => {
     if (!selectedPlaceDetails || !tripId) return;
@@ -574,6 +647,22 @@ export function MapView({
     });
   };
 
+  useEffect(() => {
+    if (status === "OK") {
+      const placeResults: SearchResult[] = data.map(suggestion => ({
+        type: 'place',
+        id: suggestion.place_id,
+        description: suggestion.description,
+        placeId: suggestion.place_id,
+        icon: <MapPin className="h-4 w-4" />,
+      }));
+
+      // Combine with any existing category results
+      const categoryResults = searchResults.filter(r => r.type === 'category');
+      setSearchResults([...categoryResults, ...placeResults]);
+    }
+  }, [status, data]);
+
   return (
     <Card className={cn("overflow-hidden relative", className)}>
       {/* Search Bar */}
@@ -589,15 +678,27 @@ export function MapView({
           />
           <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-5 w-5" />
 
-          {status === "OK" && (
+          {searchResults.length > 0 && (
             <ul className="absolute top-full left-0 right-0 mt-1 bg-background rounded-lg shadow-lg overflow-hidden z-50">
-              {data.map(({ place_id, description }) => (
+              {searchResults.map((result) => (
                 <li
-                  key={place_id}
-                  onClick={() => handleSearchSelect(place_id, description)}
-                  className="px-4 py-2 hover:bg-accent cursor-pointer"
+                  key={result.id}
+                  onClick={() => handleSearchSelect(result)}
+                  className="px-4 py-2 hover:bg-accent cursor-pointer flex items-center gap-2"
                 >
-                  {description}
+                  {result.type === 'category' ? (
+                    <Search className="h-4 w-4 text-primary flex-shrink-0" />
+                  ) : (
+                    <MapPin className="h-4 w-4 text-primary flex-shrink-0" />
+                  )}
+                  <div>
+                    <span className="text-sm">{result.description}</span>
+                    {result.secondaryText && (
+                      <span className="text-xs text-muted-foreground ml-2">
+                        {result.secondaryText}
+                      </span>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
