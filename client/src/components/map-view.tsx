@@ -481,12 +481,12 @@ export function MapView({
         </div>
       </div>
 
-      {/* Collapsible Category Filter Bar */}
-      <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-50">
+      {/* Collapsible Category Filter Bar - moved to left side */}
+      <div className="absolute top-4 left-4 z-50">
         <Button
           variant="outline"
           size="sm"
-          className="mb-2 bg-background shadow-lg rounded-full px-4"
+          className="bg-background shadow-lg rounded-full px-4"
           onClick={() => setSelectedCategory(selectedCategory ? null : 'show')}
         >
           {selectedCategory ? (
@@ -503,12 +503,12 @@ export function MapView({
         </Button>
 
         {selectedCategory && (
-          <div className="bg-background rounded-full shadow-lg p-2 flex space-x-2 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="mt-2 bg-background rounded-lg shadow-lg p-2 flex flex-col space-y-2 animate-in fade-in slide-in-from-left-2 duration-200">
             {categoryButtons.map((category) => (
               <Button
                 key={category.id}
                 variant={selectedCategory === category.id ? "default" : "outline"}
-                className="flex items-center space-x-2 rounded-full"
+                className="flex items-center justify-start space-x-2 w-full"
                 onClick={() => handleCategoryClick(category)}
               >
                 {category.icon}
