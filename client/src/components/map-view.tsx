@@ -481,8 +481,8 @@ export function MapView({
         </div>
       </div>
 
-      {/* Collapsible Category Filter Bar - moved to left side */}
-      <div className="absolute top-4 left-4 z-50">
+      {/* Collapsible Category Filter Bar - moved to right side */}
+      <div className="absolute top-4 right-4 z-50">
         <Button
           variant="outline"
           size="sm"
@@ -503,7 +503,7 @@ export function MapView({
         </Button>
 
         {selectedCategory && (
-          <div className="mt-2 bg-background rounded-lg shadow-lg p-2 flex flex-col space-y-2 animate-in fade-in slide-in-from-left-2 duration-200">
+          <div className="mt-2 bg-background rounded-lg shadow-lg p-2 flex flex-col space-y-2 animate-in fade-in slide-in-from-right-2 duration-200">
             {categoryButtons.map((category) => (
               <Button
                 key={category.id}
@@ -520,7 +520,7 @@ export function MapView({
       </div>
 
       {selectedCategory && (
-        <div className="absolute top-32 left-0 w-[400px] bg-background shadow-lg z-40 rounded-r-lg max-h-[calc(100%-8rem)]">
+        <div className="absolute top-32 right-0 w-[400px] bg-background shadow-lg z-40 rounded-l-lg max-h-[calc(100%-8rem)]">
           <div className="p-4 border-b flex justify-between items-center">
             <h3 className="text-lg font-semibold">
               {categoryButtons.find(c => c.id === selectedCategory)?.label}
@@ -568,7 +568,7 @@ export function MapView({
       )}
 
       {selectedPlaceDetails && (
-        <div className="absolute top-0 left-0 bottom-0 w-[400px] bg-background shadow-lg z-40 flex flex-col">
+        <div className="absolute top-0 right-0 bottom-0 w-[400px] bg-background shadow-lg z-40 flex flex-col">
           <div className="p-6 border-b">
             <div className="space-y-2">
               <h2 className="text-[22px] font-medium leading-7 text-foreground">{selectedPlaceDetails.name}</h2>
@@ -817,7 +817,7 @@ export function MapView({
           ...DEFAULT_MAP_OPTIONS,
           clickableIcons: true,
           streetViewControl: false,
-        }}
+                }}
         onLoad={onMapLoad}
         onClick={handleMapClick}
       >
