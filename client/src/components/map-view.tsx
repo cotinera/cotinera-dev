@@ -236,6 +236,7 @@ export function MapView({
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [searchedLocation, setSearchedLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const { isLoaded, loadError } = useGoogleMapsScript();
   const { coordinates, setCoordinates } = useMapCoordinates(location);
@@ -461,9 +462,11 @@ export function MapView({
           const { lat, lng } = await getLatLng(results[0]);
 
           setCoordinates({ lat, lng });
+          setSearchedLocation({ lat, lng }); // Set the searched location for the marker
+
           if (mapRef.current) {
             mapRef.current.panTo({ lat, lng });
-            mapRef.current.setZoom(15);
+            mapRef.current.setZoom(17); // Increased zoom level
           }
 
           fetchDetails(result.placeId);
@@ -605,6 +608,13 @@ export function MapView({
       setSelectedPlaceDetails(null);
     }
   }, [selectedPlace, getPlaceDetails, findPlaceByQuery]);
+
+  useEffect(() => {
+    if (selectedPlaceDetails) {
+      setSearchedLocation(null);
+    }
+  }, [selectedPlaceDetails]);
+
 
   const createAccommodationMarkers = useMemo(() => {
     return accommodations
@@ -1104,7 +1114,6 @@ export function MapView({
 
       <GoogleMap
         mapContainerStyle={MAP_CONTAINER_STYLE}
-        zoom={13}
         center={coordinates}
         options={{
           ...DEFAULT_MAP_OPTIONS,
@@ -1114,6 +1123,20 @@ export function MapView({
         onLoad={onMapLoad}
         onClick={handleMapClick}
       >
+        {searchedLocation && (
+          <MarkerF
+            position={searchedLocation}
+            icon={{
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 8,
+              fillColor: "#1E88E5",
+              fillOpacity: 1,
+              strokeWeight: 2,
+              strokeColor: "#FFFFFF",
+            }}
+          />
+        )}
+
         {allPinnedPlaces.map((place: PinnedPlace) => (
           <MarkerF
             key={place.id}
