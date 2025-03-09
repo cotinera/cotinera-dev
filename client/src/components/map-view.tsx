@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus, ChevronDown, ChevronUp, Image, Building2, Calendar, Utensils, Hotel, Camera, Building } from "lucide-react";
+import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus, ChevronDown, ChevronUp, Image, Building2, Calendar, Utensils, Hotel, Camera, Building, DollarSign } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -64,6 +64,94 @@ const categoryButtons: CategoryButton[] = [
   { id: 'pharmacies', label: 'Pharmacies', icon: <Building className="w-4 h-4" />, type: ['pharmacy'] },
 ];
 
+interface SubFilter {
+  id: string;
+  label: string;
+  icon?: React.ReactNode;
+  options: {
+    id: string;
+    label: string;
+    value: any;
+  }[];
+}
+
+const subFilters: Record<string, SubFilter[]> = {
+  restaurants: [
+    {
+      id: 'price',
+      label: 'Price',
+      icon: <DollarSign className="w-4 h-4" />,
+      options: [
+        { id: '1', label: '$', value: 1 },
+        { id: '2', label: '$$', value: 2 },
+        { id: '3', label: '$$$', value: 3 },
+        { id: '4', label: '$$$$', value: 4 },
+      ]
+    },
+    {
+      id: 'rating',
+      label: 'Rating',
+      icon: <Star className="w-4 h-4" />,
+      options: [
+        { id: '4.5', label: '4.5+', value: 4.5 },
+        { id: '4.0', label: '4.0+', value: 4.0 },
+        { id: '3.5', label: '3.5+', value: 3.5 },
+      ]
+    },
+    {
+      id: 'hours',
+      label: 'Hours',
+      icon: <Clock className="w-4 h-4" />,
+      options: [
+        { id: 'open', label: 'Open now', value: true },
+      ]
+    }
+  ],
+  hotels: [
+    {
+      id: 'price',
+      label: 'Price',
+      icon: <DollarSign className="w-4 h-4" />,
+      options: [
+        { id: '1', label: '$', value: 1 },
+        { id: '2', label: '$$', value: 2 },
+        { id: '3', label: '$$$', value: 3 },
+        { id: '4', label: '$$$$', value: 4 },
+      ]
+    },
+    {
+      id: 'rating',
+      label: 'Rating',
+      icon: <Star className="w-4 h-4" />,
+      options: [
+        { id: '4.5', label: '4.5+', value: 4.5 },
+        { id: '4.0', label: '4.0+', value: 4.0 },
+        { id: '3.5', label: '3.5+', value: 3.5 },
+      ]
+    }
+  ],
+  attractions: [
+    {
+      id: 'rating',
+      label: 'Rating',
+      icon: <Star className="w-4 h-4" />,
+      options: [
+        { id: '4.5', label: '4.5+', value: 4.5 },
+        { id: '4.0', label: '4.0+', value: 4.0 },
+        { id: '3.5', label: '3.5+', value: 3.5 },
+      ]
+    },
+    {
+      id: 'hours',
+      label: 'Hours',
+      icon: <Clock className="w-4 h-4" />,
+      options: [
+        { id: 'open', label: 'Open now', value: true },
+      ]
+    }
+  ]
+};
+
 export function MapView({
   location,
   tripId,
@@ -83,6 +171,7 @@ export function MapView({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [placeResults, setPlaceResults] = useState<google.maps.places.PlaceResult[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<Record<string, any>>({});
 
   const { isLoaded, loadError } = useGoogleMapsScript();
   const { coordinates, setCoordinates } = useMapCoordinates(location);
@@ -228,18 +317,41 @@ export function MapView({
     const bounds = mapRef.current.getBounds();
     if (!bounds) return;
 
-    const request = {
+    const request: google.maps.places.PlaceSearchRequest = {
       bounds,
       type: category.type[0] as google.maps.places.PlaceType,
     };
 
+    // Add price level filter if set
+    if (activeFilters.price) {
+      request.minPriceLevel = activeFilters.price;
+      request.maxPriceLevel = activeFilters.price;
+    }
+
     placesServiceRef.current.nearbySearch(request, (results, status) => {
       setIsLoadingPlaces(false);
       if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-        setPlaceResults(results);
+        // Apply post-query filters
+        let filteredResults = results;
+
+        // Filter by rating
+        if (activeFilters.rating) {
+          filteredResults = filteredResults.filter(
+            place => (place.rating || 0) >= activeFilters.rating
+          );
+        }
+
+        // Filter by open now
+        if (activeFilters.hours === true) {
+          filteredResults = filteredResults.filter(
+            place => place.opening_hours?.isOpen?.() === true
+          );
+        }
+
+        setPlaceResults(filteredResults);
       }
     });
-  }, [selectedCategory]);
+  }, [selectedCategory, activeFilters]);
 
   const handleCategoryClick = useCallback((category: CategoryButton) => {
     setSelectedCategory(currentCategory => {
@@ -450,6 +562,18 @@ export function MapView({
     );
   }
 
+  const handleFilterClick = (filterId: string, value: any) => {
+    setActiveFilters(prev => {
+      const newFilters = { ...prev };
+      if (prev[filterId] === value) {
+        delete newFilters[filterId];
+      } else {
+        newFilters[filterId] = value;
+      }
+      return newFilters;
+    });
+  };
+
   return (
     <Card className={cn("overflow-hidden relative", className)}>
       {/* Search Bar */}
@@ -518,6 +642,30 @@ export function MapView({
           </div>
         )}
       </div>
+
+      {/* Sub-filters bar */}
+      {selectedCategory && subFilters[selectedCategory] && (
+        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-40">
+          <div className="bg-background rounded-lg shadow-lg p-2 flex space-x-2 animate-in fade-in-50 slide-in-from-top-2 duration-200">
+            {subFilters[selectedCategory].map((filter) => (
+              <div key={filter.id} className="flex items-center space-x-2">
+                {filter.options.map((option) => (
+                  <Button
+                    key={option.id}
+                    variant={activeFilters[filter.id] === option.value ? "default" : "outline"}
+                    size="sm"
+                    className="rounded-full"
+                    onClick={() => handleFilterClick(filter.id, option.value)}
+                  >
+                    {filter.icon && <span className="mr-1">{filter.icon}</span>}
+                    {option.label}
+                  </Button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {selectedCategory && (
         <div className="absolute top-32 left-0 w-[400px] bg-background shadow-lg z-40 rounded-r-lg max-h-[calc(100%-8rem)]">
@@ -678,7 +826,7 @@ export function MapView({
               </div>
 
               {(selectedPlaceDetails.formatted_phone_number || selectedPlaceDetails.website) && (
-                <div className="space-y-3">
+                <div className="spacey-3">
                   <h3 className="text-sm font-medium text-foreground">Contact</h3>
                   {selectedPlaceDetails.formatted_phone_number && (
                     <div className="flex items-center gap-4">
