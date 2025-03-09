@@ -568,7 +568,7 @@ export function MapView({
       )}
 
       {selectedPlaceDetails && (
-        <div className="absolute top-0 right-0 bottom-0 w-[400px] bg-background shadow-lg z-40 flex flex-col">
+        <div className="absolute top-0 left-0 bottom-0 w-[400px] bg-background shadow-lg z-40 flex flex-col rounded-r-lg">
           <div className="p-6 border-b">
             <div className="space-y-2">
               <h2 className="text-[22px] font-medium leading-7 text-foreground">{selectedPlaceDetails.name}</h2>
@@ -817,7 +817,7 @@ export function MapView({
           ...DEFAULT_MAP_OPTIONS,
           clickableIcons: true,
           streetViewControl: false,
-                }}
+        }}
         onLoad={onMapLoad}
         onClick={handleMapClick}
       >
