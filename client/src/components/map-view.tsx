@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAccommodations } from "@/hooks/use-accommodations";
 import { cn } from "@/lib/utils";
+
 import {
   useGoogleMapsScript,
   useMapCoordinates,
@@ -58,38 +59,38 @@ interface CategoryButton {
 }
 
 const categoryButtons: CategoryButton[] = [
-  { 
-    id: 'restaurants', 
-    label: 'Restaurants', 
-    icon: <Utensils className="w-4 h-4" />, 
+  {
+    id: 'restaurants',
+    label: 'Restaurants',
+    icon: <Utensils className="w-4 h-4" />,
     type: ['restaurant'],
     searchTerms: ['restaurant', 'restaurants', 'food', 'dining', 'eat']
   },
-  { 
-    id: 'hotels', 
-    label: 'Hotels', 
-    icon: <Hotel className="w-4 h-4" />, 
+  {
+    id: 'hotels',
+    label: 'Hotels',
+    icon: <Hotel className="w-4 h-4" />,
     type: ['lodging'],
     searchTerms: ['hotel', 'hotels', 'lodging', 'motel', 'accommodation']
   },
-  { 
-    id: 'attractions', 
-    label: 'Things to do', 
-    icon: <Camera className="w-4 h-4" />, 
+  {
+    id: 'attractions',
+    label: 'Things to do',
+    icon: <Camera className="w-4 h-4" />,
     type: ['tourist_attraction', 'point_of_interest'],
     searchTerms: ['attraction', 'attractions', 'activities', 'things to do', 'tourism']
   },
-  { 
-    id: 'museums', 
-    label: 'Museums', 
-    icon: <Building className="w-4 h-4" />, 
+  {
+    id: 'museums',
+    label: 'Museums',
+    icon: <Building className="w-4 h-4" />,
     type: ['museum'],
     searchTerms: ['museum', 'museums', 'gallery', 'galleries', 'exhibition']
   },
-  { 
-    id: 'pharmacies', 
-    label: 'Pharmacies', 
-    icon: <Building className="w-4 h-4" />, 
+  {
+    id: 'pharmacies',
+    label: 'Pharmacies',
+    icon: <Building className="w-4 h-4" />,
     type: ['pharmacy'],
     searchTerms: ['pharmacy', 'pharmacies', 'drugstore', 'chemist']
   },
@@ -190,6 +191,26 @@ interface SearchResult {
   placeId?: string;
   icon?: React.ReactNode;
   secondaryText?: string;
+}
+
+interface MapViewProps {
+  location: { lat: number; lng: number };
+  tripId?: string;
+  pinnedPlaces?: PinnedPlace[];
+  onPinClick?: (place: PinnedPlace) => void;
+  onPlaceNameClick?: (place: PinnedPlace) => void;
+  className?: string;
+  selectedPlace?: PinnedPlace | null;
+}
+
+interface Accommodation {
+  id: string;
+  name: string;
+  coordinates: { lat: number; lng: number } | null;
+  checkInTime?: string;
+  checkOutTime?: string;
+  address?: string;
+  location?: string;
 }
 
 export function MapView({
@@ -457,7 +478,7 @@ export function MapView({
 
     // Find matching categories
     const matchingCategories = categoryButtons.filter(category =>
-      category.searchTerms.some(term => 
+      category.searchTerms.some(term =>
         term.toLowerCase().includes(searchValue.toLowerCase()) ||
         searchValue.toLowerCase().includes(term.toLowerCase())
       )
@@ -521,6 +542,22 @@ export function MapView({
       });
     }
   }, [selectedPlaceDetails, tripId, coordinates, toast, queryClient]);
+
+  useEffect(() => {
+    if (status === "OK") {
+      const placeResults: SearchResult[] = data.map(suggestion => ({
+        type: 'place',
+        id: suggestion.place_id,
+        description: suggestion.description,
+        placeId: suggestion.place_id,
+        icon: <MapPin className="h-4 w-4" />,
+      }));
+
+      // Combine with any existing category results
+      const categoryResults = searchResults.filter(r => r.type === 'category');
+      setSearchResults([...categoryResults, ...placeResults]);
+    }
+  }, [status, data, searchResults]);
 
   useEffect(() => {
     if (selectedPlace) {
@@ -647,21 +684,6 @@ export function MapView({
     });
   };
 
-  useEffect(() => {
-    if (status === "OK") {
-      const placeResults: SearchResult[] = data.map(suggestion => ({
-        type: 'place',
-        id: suggestion.place_id,
-        description: suggestion.description,
-        placeId: suggestion.place_id,
-        icon: <MapPin className="h-4 w-4" />,
-      }));
-
-      // Combine with any existing category results
-      const categoryResults = searchResults.filter(r => r.type === 'category');
-      setSearchResults([...categoryResults, ...placeResults]);
-    }
-  }, [status, data]);
 
   return (
     <Card className={cn("overflow-hidden relative", className)}>
