@@ -91,25 +91,27 @@ export default function TripMap() {
         </div>
       </header>
 
-      <main className="flex h-[calc(100vh-200px)]">
-        <div className="w-1/4 min-w-[300px] border-r">
-          <PinnedPlaces
-            tripId={trip.id}
-            defaultLocation={trip.location || ""}
-            showMap={false}
-            onPinClick={handlePinClick}
-          />
-        </div>
+      <main className="container mx-auto px-4 py-8">
+        <div className="space-y-8">
+          <section className="h-[600px]">
+            <MapView 
+              location={{ lat: trip.coordinates?.lat || 0, lng: trip.coordinates?.lng || 0 }}
+              tripId={trip.id.toString()}
+              pinnedPlaces={pinnedPlacesData?.places || []}
+              selectedPlace={selectedPlace}
+              onPinClick={handlePinClick}
+              className="w-full h-full"
+            />
+          </section>
 
-        <div className="flex-1">
-          <MapView 
-            location={{ lat: trip.latitude || 0, lng: trip.longitude || 0 }}
-            tripId={trip.id.toString()}
-            pinnedPlaces={pinnedPlacesData?.places || []}
-            selectedPlace={selectedPlace}
-            onPinClick={handlePinClick}
-            className="h-full"
-          />
+          <section>
+            <PinnedPlaces
+              tripId={trip.id}
+              defaultLocation={trip.location || ""}
+              showMap={false}
+              onPinClick={handlePinClick}
+            />
+          </section>
         </div>
       </main>
     </div>
