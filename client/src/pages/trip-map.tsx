@@ -7,7 +7,7 @@ import { TripHeaderEdit } from "@/components/trip-header-edit";
 import { MapView } from "@/components/map-view";
 import { PinnedPlaces } from "@/components/pinned-places";
 import { useState } from "react";
-import type { PinnedPlace } from "@/types/PinnedPlace";
+import type { PinnedPlace } from "@/lib/google-maps";
 
 export default function TripMap() {
   const [, params] = useRoute("/trips/:id/map");
@@ -91,26 +91,25 @@ export default function TripMap() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="space-y-8">
-          <section>
-            <MapView 
-              location={trip.location || ""} 
-              tripId={trip.id} 
-              pinnedPlaces={pinnedPlacesData?.places || []}
-              selectedPlace={selectedPlace}
-              onPinClick={handlePinClick}
-            />
-          </section>
+      <main className="flex h-[calc(100vh-200px)]">
+        <div className="w-1/4 min-w-[300px] border-r">
+          <PinnedPlaces
+            tripId={trip.id}
+            defaultLocation={trip.location || ""}
+            showMap={false}
+            onPinClick={handlePinClick}
+          />
+        </div>
 
-          <section>
-            <PinnedPlaces
-              tripId={trip.id}
-              defaultLocation={trip.location || ""}
-              showMap={false}
-              onPinClick={handlePinClick}
-            />
-          </section>
+        <div className="flex-1">
+          <MapView 
+            location={{ lat: trip.latitude || 0, lng: trip.longitude || 0 }}
+            tripId={trip.id.toString()}
+            pinnedPlaces={pinnedPlacesData?.places || []}
+            selectedPlace={selectedPlace}
+            onPinClick={handlePinClick}
+            className="h-full"
+          />
         </div>
       </main>
     </div>
