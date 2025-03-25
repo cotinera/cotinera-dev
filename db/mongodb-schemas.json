@@ -1,0 +1,138 @@
+{
+  "users": {
+    "bsonType": "object",
+    "required": ["username", "email", "password"],
+    "properties": {
+      "_id": { "bsonType": "objectId" },
+      "username": { "bsonType": "string" },
+      "email": { "bsonType": "string" },
+      "password": { "bsonType": "string" },
+      "createdAt": { "bsonType": "date" },
+      "updatedAt": { "bsonType": "date" }
+    }
+  },
+  "trips": {
+    "bsonType": "object",
+    "required": ["title", "ownerId", "startDate", "endDate"],
+    "properties": {
+      "_id": { "bsonType": "objectId" },
+      "title": { "bsonType": "string" },
+      "description": { "bsonType": "string" },
+      "ownerId": { "bsonType": "objectId" },
+      "startDate": { "bsonType": "date" },
+      "endDate": { "bsonType": "date" },
+      "location": { "bsonType": "string" },
+      "coordinates": {
+        "bsonType": "object",
+        "required": ["lat", "lng"],
+        "properties": {
+          "lat": { "bsonType": "double" },
+          "lng": { "bsonType": "double" }
+        }
+      },
+      "thumbnail": { "bsonType": "string" },
+      "participants": {
+        "bsonType": "array",
+        "items": {
+          "bsonType": "objectId"
+        }
+      },
+      "createdAt": { "bsonType": "date" },
+      "updatedAt": { "bsonType": "date" }
+    }
+  },
+  "pinnedPlaces": {
+    "bsonType": "object",
+    "required": ["tripId", "name"],
+    "properties": {
+      "_id": { "bsonType": "objectId" },
+      "tripId": { "bsonType": "objectId" },
+      "name": { "bsonType": "string" },
+      "placeId": { "bsonType": "string" },
+      "coordinates": {
+        "bsonType": "object",
+        "required": ["lat", "lng"],
+        "properties": {
+          "lat": { "bsonType": "double" },
+          "lng": { "bsonType": "double" }
+        }
+      },
+      "address": { "bsonType": "string" },
+      "phone": { "bsonType": "string" },
+      "website": { "bsonType": "string" },
+      "rating": { "bsonType": "double" },
+      "openingHours": {
+        "bsonType": "array",
+        "items": { "bsonType": "string" }
+      },
+      "createdAt": { "bsonType": "date" },
+      "updatedAt": { "bsonType": "date" }
+    }
+  },
+  "accommodations": {
+    "bsonType": "object",
+    "required": ["tripId", "name"],
+    "properties": {
+      "_id": { "bsonType": "objectId" },
+      "tripId": { "bsonType": "objectId" },
+      "name": { "bsonType": "string" },
+      "coordinates": {
+        "bsonType": "object",
+        "required": ["lat", "lng"],
+        "properties": {
+          "lat": { "bsonType": "double" },
+          "lng": { "bsonType": "double" }
+        }
+      },
+      "checkInTime": { "bsonType": "string" },
+      "checkOutTime": { "bsonType": "string" },
+      "address": { "bsonType": "string" },
+      "location": { "bsonType": "string" },
+      "bookingReference": { "bsonType": "string" },
+      "notes": { "bsonType": "string" },
+      "createdAt": { "bsonType": "date" },
+      "updatedAt": { "bsonType": "date" }
+    }
+  },
+  "activities": {
+    "bsonType": "object",
+    "required": ["tripId", "title", "startTime", "endTime"],
+    "properties": {
+      "_id": { "bsonType": "objectId" },
+      "tripId": { "bsonType": "objectId" },
+      "title": { "bsonType": "string" },
+      "description": { "bsonType": "string" },
+      "startTime": { "bsonType": "date" },
+      "endTime": { "bsonType": "date" },
+      "location": { "bsonType": "string" },
+      "coordinates": {
+        "bsonType": "object",
+        "required": ["lat", "lng"],
+        "properties": {
+          "lat": { "bsonType": "double" },
+          "lng": { "bsonType": "double" }
+        }
+      },
+      "participants": {
+        "bsonType": "array",
+        "items": {
+          "bsonType": "objectId"
+        }
+      },
+      "createdAt": { "bsonType": "date" },
+      "updatedAt": { "bsonType": "date" }
+    }
+  },
+  "shareLinks": {
+    "bsonType": "object",
+    "required": ["tripId", "token"],
+    "properties": {
+      "_id": { "bsonType": "objectId" },
+      "tripId": { "bsonType": "objectId" },
+      "token": { "bsonType": "string" },
+      "expiresAt": { "bsonType": "date" },
+      "createdAt": { "bsonType": "date" },
+      "updatedAt": { "bsonType": "date" }
+    }
+  }
+}
