@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
-type Theme = "dark" | "light" | "system";
+// Remove the "system" option, only use "dark" or "light"
+type Theme = "dark" | "light";
 
 interface ThemeProviderProps {
   children: React.ReactNode;
@@ -14,7 +15,7 @@ type ThemeProviderState = {
 };
 
 const initialState: ThemeProviderState = {
-  theme: "system",
+  theme: "light", // Default to light theme
   setTheme: () => null,
 };
 
@@ -22,29 +23,27 @@ const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
 export function ThemeProvider({
   children,
-  defaultTheme = "system",
+  defaultTheme = "light", // Default to light theme
   storageKey = "ui-theme",
   ...props
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
+    () => {
+      // Get the stored theme, defaulting to light if not found
+      const storedTheme = localStorage.getItem(storageKey);
+      // If stored theme is "system", convert to light to prevent errors
+      if (storedTheme === "system" || !storedTheme) {
+        return defaultTheme;
+      }
+      return storedTheme as Theme;
+    }
   );
 
   useEffect(() => {
     const root = window.document.documentElement;
-
+    // Remove both theme classes
     root.classList.remove("light", "dark");
-
-    if (theme === "system") {
-      const systemTheme = window.matchMedia("(prefers-color-scheme: dark)")
-        .matches
-        ? "dark"
-        : "light";
-
-      root.classList.add(systemTheme);
-      return;
-    }
-
+    // Add the current theme
     root.classList.add(theme);
   }, [theme]);
 

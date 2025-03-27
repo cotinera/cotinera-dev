@@ -3,7 +3,9 @@ import { queryClient } from "@/lib";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui";
 import { AuthProvider, TutorialProvider } from "@/hooks";
-import { ThemeProvider, ThemeToggle } from "@/components/shared";
+// Import ThemeProvider and ThemeToggle directly to avoid module resolution issues
+import { ThemeProvider } from "@/components/shared/theme-provider";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
 import {
   NotFound,
   Dashboard,
