@@ -2,10 +2,12 @@
 import { useLoadScript, GoogleMap, MarkerF } from "@react-google-maps/api";
 import { MdRestaurant, MdHotel } from "react-icons/md";
 import { FaLandmark, FaShoppingBag, FaUmbrellaBeach, FaGlassCheers, FaStore, FaTree } from "react-icons/fa";
-import { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import type { Libraries } from "@react-google-maps/api";
 
 // Define the required Google Maps libraries
-export const GOOGLE_MAPS_LIBRARIES: ("places")[] = ["places"];
+const libraries: Libraries = ["places"];
+export const GOOGLE_MAPS_LIBRARIES = libraries;
 
 // Map container styling configuration
 export const MAP_CONTAINER_STYLE = {
@@ -249,8 +251,8 @@ export const usePlacesService = () => {
           // Use Google Maps URL for booking
           booking_url: place.url,
           // Other fields
-          menu_url: null,
-          located_in: null
+          menu_url: undefined,
+          located_in: undefined
         };
         callback(processedPlace, status);
       } else {
@@ -328,8 +330,9 @@ export const useMapCoordinates = (initialLocation: string) => {
 export const useGoogleMapsScript = () => {
   return useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
-    libraries: GOOGLE_MAPS_LIBRARIES,
+    libraries: libraries,
   });
 };
 
+// Export components from @react-google-maps/api
 export { GoogleMap, MarkerF };
