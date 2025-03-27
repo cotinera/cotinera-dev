@@ -254,7 +254,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         }
       );
       addForm.reset();
-      setIsAddParticipantOpen(false);
+      // Dialog is already closed in the submit handler
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
@@ -487,10 +487,15 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   };
 
   const handleSubmit = async (data: ParticipantForm) => {
-    // Let the mutation handle success/error states
-    // Don't catch errors here, as they're handled in mutation's onError
-    addParticipantMutation.mutate(data);
-    // Dialog will be closed in onSuccess callback
+    try {
+      // Close the dialog immediately to avoid error states showing
+      setIsAddParticipantOpen(false);
+      // Then perform the mutation
+      await addParticipantMutation.mutateAsync(data);
+    } catch (error) {
+      console.error('Failed to add participant:', error);
+      // No need to reopen the dialog
+    }
   };
 
   return (
