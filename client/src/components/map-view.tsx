@@ -609,11 +609,8 @@ export function MapView({
     }
   }, [selectedPlace, getPlaceDetails, findPlaceByQuery]);
 
-  useEffect(() => {
-    if (selectedPlaceDetails) {
-      setSearchedLocation(null);
-    }
-  }, [selectedPlaceDetails]);
+  // Keep the blue marker visible even when place details are showing
+  // Removed the effect that was clearing searchedLocation when selectedPlaceDetails is set
 
 
   const createAccommodationMarkers = useMemo(() => {
@@ -871,7 +868,7 @@ export function MapView({
       )}
 
       {selectedPlaceDetails && (
-        <div className="absolute top-0 left-0 bottom-0 w[400px] bg-background shadow-lg z-40 flex flex-col rounded-r-lg">
+        <div className="absolute top-0 left-0 bottom-0 w-[400px] bg-background shadow-lg z-40 flex flex-col rounded-r-lg">
           <div className="p-6 border-b">
             <div className="space-y-2">
               <h2 className="text-[22px] font-medium leading-7 text-foreground">{selectedPlaceDetails.name}</h2>

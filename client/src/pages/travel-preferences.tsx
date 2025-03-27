@@ -32,3 +32,5 @@ export function TravelPreferencesPage() {
     </div>
   );
 }
+
+export default TravelPreferencesPage;
