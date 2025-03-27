@@ -487,12 +487,10 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   };
 
   const handleSubmit = async (data: ParticipantForm) => {
-    try {
-      await addParticipantMutation.mutateAsync(data);
-      setIsAddParticipantOpen(false);
-    } catch (error) {
-      console.error('Failed to add participant:', error);
-    }
+    // Let the mutation handle success/error states
+    // Don't catch errors here, as they're handled in mutation's onError
+    addParticipantMutation.mutate(data);
+    // Dialog will be closed in onSuccess callback
   };
 
   return (
