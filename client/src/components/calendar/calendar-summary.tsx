@@ -102,7 +102,7 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
     }
   });
 
-  // Delete activity mutation
+  // Delete activity mutation with proper optimistic updates
   const deleteActivityMutation = useMutation({
     mutationFn: async () => {
       if (!activityToDelete) return null;
@@ -128,24 +128,52 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
         return response.json();
       }
       
-      return { success: true };
+      return { success: true, deletedId: activityToDelete.id };
+    },
+    onMutate: async () => {
+      // This function runs before the mutation is executed
+      // Cancel any outgoing refetches to avoid overwriting our optimistic update
+      await queryClient.cancelQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+
+      // Snapshot the previous value
+      const previousActivities = queryClient.getQueryData<Activity[]>(["/api/trips", trip.id, "activities"]);
+
+      // Optimistically update to the new value
+      if (previousActivities && activityToDelete) {
+        queryClient.setQueryData(
+          ["/api/trips", trip.id, "activities"],
+          previousActivities.filter(activity => activity.id !== activityToDelete.id)
+        );
+      }
+
+      // Return a context with the previous value
+      return { previousActivities };
+    },
+    onError: (error, variables, context) => {
+      // If the mutation fails, use the context returned from onMutate to roll back
+      if (context?.previousActivities) {
+        queryClient.setQueryData(
+          ["/api/trips", trip.id, "activities"], 
+          context.previousActivities
+        );
+      }
+      
+      console.error('Delete activity mutation error:', error);
+      toast({
+        title: "Failed to delete activity",
+        description: error.message,
+        variant: "destructive"
+      });
     },
     onSuccess: (data) => {
-      console.log('Successfully deleted activity, invalidating queries', data);
+      console.log('Successfully deleted activity:', data);
       
-      // First update the cache to remove the deleted activity
-      queryClient.setQueryData(
-        ["/api/trips", trip.id, "activities"], 
-        (oldData: Activity[] | undefined) => {
-          if (!oldData || !activityToDelete) return oldData;
-          return oldData.filter(activity => activity.id !== activityToDelete.id);
-        }
-      );
+      // We don't need to update the cache here, as it was already updated optimistically
+      // We just need to make sure that the server state is synced with our optimistic update
+      // by invalidating the query to trigger a background refetch
       
-      // Then force a complete refetch to ensure server and client are in sync
-      queryClient.invalidateQueries({ 
-        queryKey: ["/api/trips", trip.id, "activities"]
-      });
+      // If the optimistic update was successful, there's no need to invalidate
+      // queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
       
       setActivityToDelete(null);
       toast({
@@ -153,13 +181,9 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
         description: "The activity has been deleted successfully."
       });
     },
-    onError: (error: Error) => {
-      console.error('Delete activity mutation error:', error);
-      toast({
-        title: "Failed to delete activity",
-        description: error.message,
-        variant: "destructive"
-      });
+    onSettled: () => {
+      // Always ensure a clean state by invalidating after any mutation
+      queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
     }
   });
 
@@ -168,26 +192,10 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
     updateActivityMutation.mutate(data);
   };
 
-  // Handle delete confirmation
+  // Handle delete confirmation - now simplified since optimistic updates are handled in the mutation
   const handleDelete = () => {
     if (!activityToDelete) return;
-    
     console.log('Confirming delete for activity:', activityToDelete);
-    
-    // Force a flush of pending queries
-    queryClient.cancelQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
-    
-    // Update the local cache with the activity removed
-    queryClient.setQueryData(
-      ["/api/trips", trip.id, "activities"], 
-      (oldData: Activity[] | undefined) => {
-        if (!oldData) return oldData;
-        // Filter out the activity to be deleted
-        return oldData.filter(activity => activity.id !== activityToDelete.id);
-      }
-    );
-    
-    // Execute the delete
     deleteActivityMutation.mutate();
   };
 

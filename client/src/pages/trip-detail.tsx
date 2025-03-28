@@ -238,7 +238,7 @@ export default function TripDetail() {
                   <MapRouteView destinations={destinations} />
                 ) : (
                   <MapViewComp 
-                    location={trip.location || ""}
+                    location={trip.coordinates ? trip.coordinates : trip.location || ""}
                     tripId={trip.id}
                     pinnedPlaces={pinnedPlaces || []}
                   />

@@ -284,18 +284,26 @@ export const usePlacesService = () => {
 
 /**
  * Custom hook for managing map coordinates and geocoding
- * @param initialLocation - Initial location string to geocode
+ * @param initialLocation - Initial location string to geocode or coordinates
  * @returns Object containing coordinates and geocoding methods
  */
 export const useMapCoordinates = (initialLocation: string | { lat: number; lng: number }) => {
-  // Default to San Francisco coordinates
+  // Default to San Francisco coordinates only as a fallback
   const defaultCoords = {
     lat: 37.7749,
     lng: -122.4194,
   };
   
-  const [coordinates, setCoordinates] = useState<Coordinates>(defaultCoords);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [coordinates, setCoordinates] = useState<Coordinates>(
+    // If initialLocation is coordinates, use them immediately
+    typeof initialLocation === 'object' && 'lat' in initialLocation && 'lng' in initialLocation 
+      ? initialLocation 
+      : defaultCoords
+  );
+  const [isInitialized, setIsInitialized] = useState(
+    // Consider initialized if we already have coordinates
+    typeof initialLocation === 'object' && 'lat' in initialLocation && 'lng' in initialLocation
+  );
 
   // Geocode a location string to coordinates
   const geocodeLocation = useCallback(async (location: string) => {
