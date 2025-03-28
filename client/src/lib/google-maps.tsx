@@ -133,6 +133,12 @@ export interface PlaceDetails {
  * @returns Google Maps Icon configuration object
  */
 export const getCategoryIcon = (category: PlaceCategory = 'attraction') => {
+  // First, ensure Google Maps is loaded
+  if (!window.google || !window.google.maps) {
+    console.warn('Google Maps not loaded yet, cannot create icon');
+    return {};
+  }
+
   const IconComponent = CATEGORY_ICONS[category];
   const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
     ${IconComponent ? IconComponent({}).props.children : ''}

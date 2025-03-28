@@ -667,6 +667,11 @@ export function MapView({
   });
 
   const createActivityMarkers = useMemo(() => {
+    // Only proceed if Google Maps is loaded
+    if (!window.google || !window.google.maps) {
+      return [];
+    }
+    
     return activities
       .filter((activity): activity is Activity & { coordinates: NonNullable<Activity['coordinates']> } =>
         activity.coordinates !== null
