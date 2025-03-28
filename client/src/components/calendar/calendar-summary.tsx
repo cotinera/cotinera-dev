@@ -130,10 +130,19 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
       
       return { success: true };
     },
-    onSuccess: () => {
-      console.log('Successfully deleted activity, invalidating queries');
+    onSuccess: (data) => {
+      console.log('Successfully deleted activity, invalidating queries', data);
       
-      // Force refetch the activities
+      // First update the cache to remove the deleted activity
+      queryClient.setQueryData(
+        ["/api/trips", trip.id, "activities"], 
+        (oldData: Activity[] | undefined) => {
+          if (!oldData || !activityToDelete) return oldData;
+          return oldData.filter(activity => activity.id !== activityToDelete.id);
+        }
+      );
+      
+      // Then force a complete refetch to ensure server and client are in sync
       queryClient.invalidateQueries({ 
         queryKey: ["/api/trips", trip.id, "activities"]
       });
@@ -161,10 +170,24 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
 
   // Handle delete confirmation
   const handleDelete = () => {
+    if (!activityToDelete) return;
+    
     console.log('Confirming delete for activity:', activityToDelete);
-    // Force a flush of all pending queries before executing the delete
-    // This helps ensure we have the latest data before making changes
+    
+    // Force a flush of pending queries
     queryClient.cancelQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+    
+    // Update the local cache with the activity removed
+    queryClient.setQueryData(
+      ["/api/trips", trip.id, "activities"], 
+      (oldData: Activity[] | undefined) => {
+        if (!oldData) return oldData;
+        // Filter out the activity to be deleted
+        return oldData.filter(activity => activity.id !== activityToDelete.id);
+      }
+    );
+    
+    // Execute the delete
     deleteActivityMutation.mutate();
   };
 
