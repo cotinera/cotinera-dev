@@ -239,7 +239,13 @@ export function MapView({
   const [searchedLocation, setSearchedLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const { isLoaded, loadError } = useGoogleMapsScript();
-  const { coordinates, setCoordinates } = useMapCoordinates(location);
+  
+  // Handle both string locations and coordinate objects
+  const locationObj = typeof location === 'string' 
+    ? undefined  // Will use default in useMapCoordinates
+    : location;  // Pass through lat/lng object directly
+  
+  const { coordinates, setCoordinates } = useMapCoordinates(locationObj || "");
   const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
 
   const initPlacesService = useCallback((map: google.maps.Map) => {
@@ -439,8 +445,17 @@ export function MapView({
   const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
     initPlacesService(map);
+    
+    // Only add the idle listener once
+    google.maps.event.clearListeners(map, 'idle');
     map.addListener('idle', handleMapIdle);
-  }, [initPlacesService, handleMapIdle]);
+    
+    // Set initial center explicitly to ensure the map displays properly on first load
+    if (coordinates) {
+      map.setCenter(coordinates);
+      map.setZoom(12);
+    }
+  }, [initPlacesService, handleMapIdle, coordinates]);
 
   const handleSearchSelect = useCallback(async (result: SearchResult) => {
     if (result.type === 'category') {
@@ -611,6 +626,14 @@ export function MapView({
 
   // Keep the blue marker visible even when place details are showing
   // Removed the effect that was clearing searchedLocation when selectedPlaceDetails is set
+  
+  // Set the initial searchedLocation based on the provided coordinates
+  useEffect(() => {
+    if (coordinates && !searchedLocation) {
+      console.log('Setting initial searchedLocation:', coordinates);
+      setSearchedLocation(coordinates);
+    }
+  }, [coordinates, searchedLocation]);
 
 
   const createAccommodationMarkers = useMemo(() => {

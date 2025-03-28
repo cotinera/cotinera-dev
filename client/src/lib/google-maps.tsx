@@ -112,16 +112,19 @@ export interface PlaceDetails {
   price_level?: number;
   business_status?: string;
   url?: string; // Google Maps URL
+  // Additional properties for enhanced place details
   reservable?: boolean;
   serves_food?: boolean;
   takeout?: boolean;
   delivery?: boolean;
   dine_in?: boolean;
   located_in?: string;
-  menu_url?: string;
-  booking_url?: string;
+  menu_url?: string | undefined;
+  booking_url?: string | undefined;
   check_in_time?: string;
   check_out_time?: string;
+  // Properties to make this compatible with the intersection type when spreading from Google Places object
+  [key: string]: any;
 }
 
 /**
@@ -207,7 +210,7 @@ export const usePlacesService = () => {
 
   // Fetch detailed information about a specific place
   const getPlaceDetails = useCallback((
-    placeId: string,
+    requestedPlaceId: string,
     callback: (place: PlaceDetails | null, status: google.maps.places.PlacesServiceStatus) => void
   ) => {
     if (!placesService.current) {
@@ -217,7 +220,7 @@ export const usePlacesService = () => {
     }
 
     const request = {
-      placeId,
+      placeId: requestedPlaceId,
       fields: [
         'name',
         'formatted_address',
@@ -242,6 +245,10 @@ export const usePlacesService = () => {
         // Process additional fields based on available data
         const processedPlace: PlaceDetails = {
           ...place,
+          // Ensure required fields are always set
+          place_id: place.place_id || requestedPlaceId,
+          name: place.name || 'Unnamed Place',
+          formatted_address: place.formatted_address || 'No address available',
           // Derive reservable status from types and business_status
           reservable: place.types?.includes('restaurant') || place.types?.includes('lodging'),
           // Derive dining options from types
@@ -274,14 +281,23 @@ export const usePlacesService = () => {
  * @param initialLocation - Initial location string to geocode
  * @returns Object containing coordinates and geocoding methods
  */
-export const useMapCoordinates = (initialLocation: string) => {
-  const [coordinates, setCoordinates] = useState<Coordinates>({
+export const useMapCoordinates = (initialLocation: string | { lat: number; lng: number }) => {
+  // Default to San Francisco coordinates
+  const defaultCoords = {
     lat: 37.7749,
     lng: -122.4194,
-  });
+  };
+  
+  const [coordinates, setCoordinates] = useState<Coordinates>(defaultCoords);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Geocode a location string to coordinates
   const geocodeLocation = useCallback(async (location: string) => {
+    if (!location || location.trim() === '') {
+      console.log("Empty location string, using default coordinates");
+      return defaultCoords;
+    }
+    
     try {
       const response = await fetch(
         `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(
@@ -290,7 +306,8 @@ export const useMapCoordinates = (initialLocation: string) => {
       );
 
       if (!response.ok) {
-        throw new Error("Failed to geocode location");
+        console.warn("Failed to geocode location, using default coordinates");
+        return defaultCoords;
       }
 
       const data = await response.json();
@@ -302,19 +319,31 @@ export const useMapCoordinates = (initialLocation: string) => {
       }
 
       console.warn("Location not found:", data.status);
-      return null;
+      return defaultCoords;
     } catch (err) {
       console.error("Geocoding error:", err);
-      return null;
+      return defaultCoords;
     }
   }, []);
 
-  // Initialize coordinates when component mounts
+  // Initialize coordinates once when component mounts
   useEffect(() => {
-    if (initialLocation) {
-      geocodeLocation(initialLocation);
+    if (isInitialized) return;
+    
+    if (typeof initialLocation === 'object' && 'lat' in initialLocation && 'lng' in initialLocation) {
+      // If initial location is already coordinates, use them directly
+      setCoordinates(initialLocation);
+      setIsInitialized(true);
+    } else if (typeof initialLocation === 'string' && initialLocation.trim() !== '') {
+      // Only geocode if it's a non-empty string
+      geocodeLocation(initialLocation)
+        .then(() => setIsInitialized(true))
+        .catch(() => setIsInitialized(true));
+    } else {
+      // Use default coordinates for empty input
+      setIsInitialized(true);
     }
-  }, [initialLocation, geocodeLocation]);
+  }, [initialLocation, geocodeLocation, isInitialized]);
 
   return {
     coordinates,

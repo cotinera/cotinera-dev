@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Plus, Trash2, Pencil } from "lucide-react";
+import { MapPin, Plus, Trash2, Pencil, Calendar as CalendarIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -31,10 +31,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
+import { format, addHours } from "date-fns";
 
 interface PinnedPlace {
   id: number;
@@ -93,6 +96,10 @@ export function PinnedPlaces({
   const [editedPlaceCoordinates, setEditedPlaceCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [editedPlaceName, setEditedPlaceName] = useState<string>("");
   const [searchInputRef, setSearchInputRef] = useState<HTMLInputElement | null>(null);
+  const [placeToAddToCalendar, setPlaceToAddToCalendar] = useState<PinnedPlace | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [startTime, setStartTime] = useState("12:00");
+  const [endTime, setEndTime] = useState("13:00");
 
   useEffect(() => {
     console.log('Trip coordinates:', tripCoordinates);
@@ -318,6 +325,88 @@ export function PinnedPlaces({
     },
   });
 
+  const addToCalendarMutation = useMutation({
+    mutationFn: async (data: { 
+      place: PinnedPlace; 
+      date: Date; 
+      startTime: string; 
+      endTime: string; 
+    }) => {
+      if (!data.date) {
+        throw new Error("Please select a date");
+      }
+
+      // Create start and end date objects from the selected date and times
+      const [startHours, startMinutes] = data.startTime.split(':').map(Number);
+      const [endHours, endMinutes] = data.endTime.split(':').map(Number);
+      
+      const startDate = new Date(data.date);
+      startDate.setHours(startHours, startMinutes, 0);
+      
+      const endDate = new Date(data.date);
+      endDate.setHours(endHours, endMinutes, 0);
+
+      const res = await fetch(`/api/trips/${tripId}/activities`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify({
+          title: data.place.name,
+          description: data.place.notes || '',
+          location: data.place.address,
+          coordinates: data.place.coordinates,
+          startTime: startDate.toISOString(),
+          endTime: endDate.toISOString()
+        }),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || "Failed to add to calendar");
+      }
+
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [`/api/trips/${tripId}/activities`]
+      });
+      
+      setPlaceToAddToCalendar(null);
+      setSelectedDate(undefined);
+      
+      toast({
+        title: "Success",
+        description: "Place added to calendar",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to add to calendar",
+      });
+    },
+  });
+
+  const handleAddToCalendar = () => {
+    if (!placeToAddToCalendar || !selectedDate) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select a date",
+      });
+      return;
+    }
+
+    addToCalendarMutation.mutate({
+      place: placeToAddToCalendar,
+      date: selectedDate,
+      startTime,
+      endTime
+    });
+  };
+
   const handleDeletePlace = () => {
     if (!placeToDelete) return;
     deletePinnedPlaceMutation.mutate(placeToDelete.id);
@@ -440,7 +529,7 @@ export function PinnedPlaces({
                     <FormItem>
                       <FormLabel>Notes</FormLabel>
                       <FormControl>
-                        <Textarea {...field} placeholder="Add any notes about this place..." tabIndex="-1" />
+                        <Textarea {...field} placeholder="Add any notes about this place..." />
                       </FormControl>
                     </FormItem>
                   )}
@@ -478,6 +567,18 @@ export function PinnedPlaces({
                   <Button
                     variant="ghost"
                     size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPlaceToAddToCalendar(place);
+                    }}
+                    className="p-0 h-8 w-8 text-muted-foreground hover:text-primary"
+                    title="Add to Calendar"
+                  >
+                    <CalendarIcon className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={(e) => handleEditClick(e, place)}
                     className="p-0 h-8 w-8 text-muted-foreground hover:text-primary"
                   >
@@ -504,6 +605,55 @@ export function PinnedPlaces({
         </ScrollArea>
       </CardContent>
 
+      <Dialog open={!!placeToAddToCalendar} onOpenChange={(open) => !open && setPlaceToAddToCalendar(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add to Calendar</DialogTitle>
+            <DialogDescription>
+              Select a date and time to add {placeToAddToCalendar?.name} to your trip calendar.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <h4 className="font-medium">Select Date</h4>
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={setSelectedDate}
+                className="border rounded-md mx-auto"
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <h4 className="font-medium">Start Time</h4>
+                <Input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <h4 className="font-medium">End Time</h4>
+                <Input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              onClick={handleAddToCalendar}
+              disabled={!selectedDate || addToCalendarMutation.isPending}
+            >
+              {addToCalendarMutation.isPending ? "Adding..." : "Add to Calendar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       <Dialog open={!!placeToEdit} onOpenChange={(open) => !open && setPlaceToEdit(null)}>
         <DialogContent className="sm:max-w-[800px]">
           <DialogHeader>
@@ -550,7 +700,7 @@ export function PinnedPlaces({
                   <FormItem>
                     <FormLabel>Notes</FormLabel>
                     <FormControl>
-                      <Textarea {...field} placeholder="Add any notes about this place..." tabIndex="-1" />
+                      <Textarea {...field} placeholder="Add any notes about this place..." />
                     </FormControl>
                   </FormItem>
                 )}
