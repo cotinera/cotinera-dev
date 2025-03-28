@@ -21,14 +21,7 @@ import { ShareTripDialog } from "@/components/share-trip-dialog";
 import { useLocation } from "wouter";
 import { ImageUpload } from "@/components/image-upload";
 import { useState } from "react";
-import { cn } from "@/lib/utils";
-
-const THUMBNAILS = [
-  "https://images.unsplash.com/photo-1605130284535-11dd9eedc58a",
-  "https://images.unsplash.com/photo-1554366347-897a5113f6ab",
-  "https://images.unsplash.com/photo-1606944331341-72bf6523ff5e",
-  "https://images.unsplash.com/photo-1594661745200-810105bcf054",
-];
+import { cn, generateGradientImage } from "@/lib/utils";
 
 interface TripCardProps {
   trip: Trip & {
@@ -43,8 +36,9 @@ interface TripCardProps {
 export function TripCard({ trip, selectable, selected, onSelect, onDelete }: TripCardProps) {
   const [, setLocation] = useLocation();
   const [isEditingImage, setIsEditingImage] = useState(false);
-  const thumbnailIndex = trip.id % THUMBNAILS.length;
-  const thumbnail = trip.thumbnail || THUMBNAILS[thumbnailIndex];
+  // Generate a gradient image based on trip ID for consistent, unique thumbnails
+  const gradientThumbnail = generateGradientImage(trip.id);
+  const thumbnail = trip.thumbnail || gradientThumbnail;
 
   // Live query for participants with proper error handling and retries
   const { data: participants = [], isError } = useQuery({
