@@ -561,21 +561,19 @@ export function PinnedPlaces({
                   <div className="flex items-center gap-2">
                     <MapPin className="h-4 w-4" />
                     <p className="text-sm font-medium truncate">{place.name}</p>
+                    <span 
+                      className="text-xs bg-primary/10 hover:bg-primary/20 text-primary rounded-full px-2 py-0.5 cursor-pointer flex items-center"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPlaceToAddToCalendar(place);
+                      }}
+                    >
+                      <CalendarIcon className="h-3 w-3 mr-1" />
+                      Add to Calendar
+                    </span>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setPlaceToAddToCalendar(place);
-                    }}
-                    className="p-0 h-8 w-8 text-muted-foreground hover:text-primary"
-                    title="Add to Calendar"
-                  >
-                    <CalendarIcon className="h-4 w-4" />
-                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"
