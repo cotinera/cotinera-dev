@@ -476,8 +476,10 @@ export function MapView({
           const results = await getGeocode({ placeId: result.placeId });
           const { lat, lng } = await getLatLng(results[0]);
 
+          // Important: Always update both coordinates
           setCoordinates({ lat, lng });
-          setSearchedLocation({ lat, lng }); // Set the searched location for the marker
+          // Always set searchedLocation for user-initiated searches
+          setSearchedLocation({ lat, lng });
 
           if (mapRef.current) {
             mapRef.current.panTo({ lat, lng });
@@ -627,13 +629,12 @@ export function MapView({
   // Keep the blue marker visible even when place details are showing
   // Removed the effect that was clearing searchedLocation when selectedPlaceDetails is set
   
-  // Set the initial searchedLocation based on the provided coordinates
+  // No longer automatically set the searchedLocation based on trip coordinates
+  // Only set searchedLocation when user performs a search or clicks on the map
   useEffect(() => {
-    if (coordinates && !searchedLocation) {
-      console.log('Setting initial searchedLocation:', coordinates);
-      setSearchedLocation(coordinates);
-    }
-  }, [coordinates, searchedLocation]);
+    console.log('Trip coordinates:', locationObj);
+    console.log('Selected coordinates:', searchedLocation);
+  }, [locationObj, searchedLocation]);
 
 
   const createAccommodationMarkers = useMemo(() => {
@@ -1173,6 +1174,8 @@ export function MapView({
         onLoad={onMapLoad}
         onClick={handleMapClick}
       >
+        {/* Only show the blue marker for user-initiated searches */}
+        {/* We don't want to show the overall trip location marker, only pinned places */}
         {searchedLocation && (
           <MarkerF
             position={searchedLocation}
