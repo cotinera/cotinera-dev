@@ -665,6 +665,31 @@ export function MapView({
     },
     enabled: !!tripId,
   });
+  
+  // Filter out activities that have the same coordinates as pinned places
+  // to avoid duplicate pins on the map
+  const uniqueActivities = useMemo(() => {
+    if (!allPinnedPlaces.length) return activities;
+    
+    return activities.filter(activity => {
+      if (!activity.coordinates) return true;
+      
+      // Check if this activity's coordinates match any pinned place
+      const isDuplicate = allPinnedPlaces.some(pinnedPlace => {
+        if (!pinnedPlace.coordinates) return false;
+        
+        // Compare coordinates (with small epsilon for floating point comparison)
+        const latDiff = Math.abs(activity.coordinates!.lat - pinnedPlace.coordinates.lat);
+        const lngDiff = Math.abs(activity.coordinates!.lng - pinnedPlace.coordinates.lng);
+        
+        // If the coordinates are very close (within ~5 meters), consider them the same location
+        return latDiff < 0.0001 && lngDiff < 0.0001;
+      });
+      
+      // Only keep activities that don't have duplicate coordinates with pinned places
+      return !isDuplicate;
+    });
+  }, [activities, allPinnedPlaces]);
 
   const createActivityMarkers = useMemo(() => {
     // Only proceed if Google Maps is loaded
@@ -672,7 +697,7 @@ export function MapView({
       return [];
     }
     
-    return activities
+    return uniqueActivities
       .filter((activity): activity is Activity & { coordinates: NonNullable<Activity['coordinates']> } =>
         activity.coordinates !== null
       )
@@ -690,7 +715,7 @@ export function MapView({
           labelOrigin: new google.maps.Point(12, -10)
         }
       }));
-  }, [activities]);
+  }, [uniqueActivities]);
 
 
   if (loadError) {

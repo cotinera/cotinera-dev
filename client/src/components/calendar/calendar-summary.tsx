@@ -107,18 +107,37 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
     mutationFn: async () => {
       if (!activityToDelete) return null;
       
+      console.log(`Deleting activity: ${activityToDelete.id} from trip: ${trip.id}`);
+      
       const response = await fetch(`/api/trips/${trip.id}/activities/${activityToDelete.id}`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
       
       if (!response.ok) {
-        throw new Error('Failed to delete activity');
+        const errorText = await response.text();
+        console.error('Delete activity error:', errorText);
+        throw new Error(`Failed to delete activity: ${errorText}`);
       }
       
-      return response.json();
+      // Some DELETE endpoints may not return JSON
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        return response.json();
+      }
+      
+      return { success: true };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+      console.log('Successfully deleted activity, invalidating queries');
+      
+      // Force refetch the activities
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/trips", trip.id, "activities"]
+      });
+      
       setActivityToDelete(null);
       toast({
         title: "Activity deleted",
@@ -126,6 +145,7 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
       });
     },
     onError: (error: Error) => {
+      console.error('Delete activity mutation error:', error);
       toast({
         title: "Failed to delete activity",
         description: error.message,
@@ -141,6 +161,10 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
 
   // Handle delete confirmation
   const handleDelete = () => {
+    console.log('Confirming delete for activity:', activityToDelete);
+    // Force a flush of all pending queries before executing the delete
+    // This helps ensure we have the latest data before making changes
+    queryClient.cancelQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
     deleteActivityMutation.mutate();
   };
 
