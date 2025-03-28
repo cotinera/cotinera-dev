@@ -230,16 +230,16 @@ export default function TripDetail() {
               <section>
                 {currentDestination ? (
                   <MapViewComp 
-                    location={currentDestination.name || ""}
-                    tripId={trip.id}
+                    location={currentDestination.coordinates || { lat: 0, lng: 0 }}
+                    tripId={trip.id.toString()}
                     pinnedPlaces={pinnedPlaces || []}
                   />
                 ) : destinations && destinations.length >= 2 ? (
                   <MapRouteView destinations={destinations} />
                 ) : (
                   <MapViewComp 
-                    location={trip.coordinates ? trip.coordinates : trip.location || ""}
-                    tripId={trip.id}
+                    location={trip.coordinates || { lat: 0, lng: 0 }}
+                    tripId={trip.id.toString()}
                     pinnedPlaces={pinnedPlaces || []}
                   />
                 )}

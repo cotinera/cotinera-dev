@@ -100,17 +100,31 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
 
   if (!isEditing) {
     return (
-      <div className="text-center cursor-pointer" onClick={() => setIsEditing(true)}>
-        <h1 className="text-3xl font-bold mb-2 hover:text-primary/80 transition-colors">
+      <div className="text-center">
+        <h1 
+          className="text-3xl font-bold mb-2 hover:text-primary/80 transition-colors cursor-pointer inline-block" 
+          onClick={() => setIsEditing(true)}
+          title="Click to edit title"
+        >
           {trip.title}
         </h1>
-        <div className="flex items-center justify-center gap-2 text-muted-foreground mt-2 hover:text-primary/80 transition-colors">
+        <div className="flex items-center justify-center gap-2 text-muted-foreground mt-2">
           <MapPin className="h-4 w-4" />
-          <span>{trip.location}</span>
+          <span 
+            className="hover:text-primary/80 transition-colors cursor-pointer"
+            onClick={() => setIsEditing(true)}
+            title="Click to edit location"
+          >
+            {trip.location}
+          </span>
         </div>
-        <div className="flex items-center justify-center gap-2 text-muted-foreground mt-1 hover:text-primary/80 transition-colors">
+        <div className="flex items-center justify-center gap-2 text-muted-foreground mt-1">
           <Calendar className="h-4 w-4" />
-          <span>
+          <span 
+            className="hover:text-primary/80 transition-colors cursor-pointer"
+            onClick={() => setIsEditing(true)}
+            title="Click to edit dates"
+          >
             {format(new Date(trip.startDate), "MMM d, yyyy")} -{" "}
             {format(new Date(trip.endDate), "MMM d, yyyy")}
           </span>
