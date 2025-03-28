@@ -176,22 +176,14 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
     onSuccess: (data) => {
       console.log('Successfully deleted activity:', data);
       
-      // Force a cache update to ensure the deleted item is removed
-      const currentActivities = queryClient.getQueryData<Activity[]>(["/api/trips", trip.id, "activities"]);
-      
-      if (currentActivities && activityToDelete) {
-        const updatedActivities = currentActivities.filter(
-          activity => activity.id !== activityToDelete.id
-        );
-        
-        queryClient.setQueryData(
-          ["/api/trips", trip.id, "activities"],
-          updatedActivities
-        );
-      }
-      
-      // Always invalidate to ensure cache is fresh
-      queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+      // Update the cache directly to ensure the deleted item is removed
+      queryClient.setQueryData<Activity[]>(
+        ["/api/trips", trip.id, "activities"],
+        (old) => {
+          if (!old || !activityToDelete) return old;
+          return old.filter(activity => activity.id !== activityToDelete.id);
+        }
+      );
       
       setActivityToDelete(null);
       toast({

@@ -74,7 +74,7 @@ const eventFormSchema = z.object({
   coordinates: z.object({
     lat: z.number(),
     lng: z.number()
-  }).optional(),
+  }).optional().nullable(),
 });
 
 type EventFormValues = z.infer<typeof eventFormSchema>;
