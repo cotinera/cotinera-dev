@@ -19,7 +19,7 @@ export default function TripCalendar() {
   const [viewMode, setViewMode] = useState<ViewMode>("edit");
 
   const { data: trip, isLoading: tripLoading } = useQuery<Trip>({
-    queryKey: ["/api/trips", tripId],
+    queryKey: [`/api/trips/${tripId}`],
     queryFn: async () => {
       const res = await fetch(`/api/trips/${tripId}`);
       if (!res.ok) {
@@ -31,7 +31,7 @@ export default function TripCalendar() {
   });
 
   const { data: activities = [], isLoading: activitiesLoading } = useQuery<Activity[]>({
-    queryKey: ["/api/trips", tripId, "activities"],
+    queryKey: [`/api/trips/${tripId}/activities`],
     queryFn: async () => {
       const res = await fetch(`/api/trips/${tripId}/activities`);
       if (!res.ok) throw new Error("Failed to fetch activities");

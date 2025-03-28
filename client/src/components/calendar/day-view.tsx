@@ -492,7 +492,7 @@ export function DayView({ trip }: { trip: Trip }) {
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
   const { data: activities = [], isLoading } = useQuery<Activity[]>({
-    queryKey: ["/api/trips", trip.id, "activities"],
+    queryKey: [`/api/trips/${trip.id}/activities`],
     queryFn: async () => {
       const res = await fetch(`/api/trips/${trip.id}/activities`);
       if (!res.ok) throw new Error("Failed to fetch activities");
@@ -529,7 +529,7 @@ export function DayView({ trip }: { trip: Trip }) {
       setActiveDropId(over.id as string);
 
       queryClient.setQueryData(
-        ["/api/trips", trip.id, "activities"],
+        [`/api/trips/${trip.id}/activities`],
         activities.map(activity =>
           activity.id === eventId
             ? { ...activity, startTime: newStartTime.toISOString(), endTime: newEndTime.toISOString() }
@@ -587,7 +587,7 @@ export function DayView({ trip }: { trip: Trip }) {
 
       if (!res.ok) throw new Error("Failed to update activity");
 
-      await queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
     } catch (error) {
       toast({
         variant: "destructive",
@@ -649,7 +649,7 @@ export function DayView({ trip }: { trip: Trip }) {
       }
 
       const data = await res.json();
-      await queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
       toast({ title: "Event created successfully" });
       setIsCreateDialogOpen(false);
     } catch (error) {
@@ -670,7 +670,7 @@ export function DayView({ trip }: { trip: Trip }) {
 
       if (!res.ok) throw new Error("Failed to delete activity");
 
-      await queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
       toast({ title: "Event deleted successfully" });
       setIsEditDialogOpen(false);
     } catch (error) {
@@ -703,13 +703,13 @@ export function DayView({ trip }: { trip: Trip }) {
       if (!res.ok) throw new Error("Failed to update activity");
 
       queryClient.setQueryData(
-        ["/api/trips", trip.id, "activities"],
+        [`/api/trips/${trip.id}/activities`],
         activities.map(activity =>
           activity.id === eventId ? updatedActivity : activity
         )
       );
 
-      await queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
     } catch (error) {
       toast({
         variant: "destructive",
@@ -894,7 +894,7 @@ export function DayView({ trip }: { trip: Trip }) {
 
                   if (!res.ok) throw new Error("Failed to update activity");
 
-                  await queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+                  await queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
                   toast({ title: "Event updated successfully" });
                   setIsEditDialogOpen(false);
                 } catch (error) {

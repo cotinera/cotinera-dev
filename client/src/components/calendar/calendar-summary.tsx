@@ -86,7 +86,7 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
       setActivityToEdit(null);
       toast({
         title: "Activity updated",
@@ -135,10 +135,10 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
       
       // This function runs before the mutation is executed
       // Cancel any outgoing refetches to avoid overwriting our optimistic update
-      await queryClient.cancelQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+      await queryClient.cancelQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
 
       // Snapshot the previous value
-      const previousActivities = queryClient.getQueryData<Activity[]>(["/api/trips", trip.id, "activities"]);
+      const previousActivities = queryClient.getQueryData<Activity[]>([`/api/trips/${trip.id}/activities`]);
 
       // Optimistically update to the new value
       if (previousActivities) {
@@ -149,7 +149,7 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
         console.log('Optimistically updating with filtered activities:', filteredActivities);
         
         queryClient.setQueryData(
-          ["/api/trips", trip.id, "activities"],
+          [`/api/trips/${trip.id}/activities`],
           filteredActivities
         );
       }
@@ -161,7 +161,7 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
       // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousActivities) {
         queryClient.setQueryData(
-          ["/api/trips", trip.id, "activities"], 
+          [`/api/trips/${trip.id}/activities`], 
           context.previousActivities
         );
       }
@@ -178,7 +178,7 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
       
       // Update the cache directly to ensure the deleted item is removed
       queryClient.setQueryData<Activity[]>(
-        ["/api/trips", trip.id, "activities"],
+        [`/api/trips/${trip.id}/activities`],
         (old) => {
           if (!old || !activityToDelete) return old;
           return old.filter(activity => activity.id !== activityToDelete.id);
@@ -193,7 +193,7 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
     },
     onSettled: () => {
       // Always ensure a clean state by invalidating after any mutation
-      queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
     }
   });
 
