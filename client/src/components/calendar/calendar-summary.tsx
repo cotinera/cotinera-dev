@@ -131,6 +131,8 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
       return { success: true, deletedId: activityToDelete.id };
     },
     onMutate: async () => {
+      if (!activityToDelete) return { previousActivities: null };
+      
       // This function runs before the mutation is executed
       // Cancel any outgoing refetches to avoid overwriting our optimistic update
       await queryClient.cancelQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
@@ -139,10 +141,16 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
       const previousActivities = queryClient.getQueryData<Activity[]>(["/api/trips", trip.id, "activities"]);
 
       // Optimistically update to the new value
-      if (previousActivities && activityToDelete) {
+      if (previousActivities) {
+        const filteredActivities = previousActivities.filter(
+          activity => activity.id !== activityToDelete.id
+        );
+        
+        console.log('Optimistically updating with filtered activities:', filteredActivities);
+        
         queryClient.setQueryData(
           ["/api/trips", trip.id, "activities"],
-          previousActivities.filter(activity => activity.id !== activityToDelete.id)
+          filteredActivities
         );
       }
 
@@ -168,12 +176,22 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
     onSuccess: (data) => {
       console.log('Successfully deleted activity:', data);
       
-      // We don't need to update the cache here, as it was already updated optimistically
-      // We just need to make sure that the server state is synced with our optimistic update
-      // by invalidating the query to trigger a background refetch
+      // Force a cache update to ensure the deleted item is removed
+      const currentActivities = queryClient.getQueryData<Activity[]>(["/api/trips", trip.id, "activities"]);
       
-      // If the optimistic update was successful, there's no need to invalidate
-      // queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
+      if (currentActivities && activityToDelete) {
+        const updatedActivities = currentActivities.filter(
+          activity => activity.id !== activityToDelete.id
+        );
+        
+        queryClient.setQueryData(
+          ["/api/trips", trip.id, "activities"],
+          updatedActivities
+        );
+      }
+      
+      // Always invalidate to ensure cache is fresh
+      queryClient.invalidateQueries({ queryKey: ["/api/trips", trip.id, "activities"] });
       
       setActivityToDelete(null);
       toast({
