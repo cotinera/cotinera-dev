@@ -48,29 +48,43 @@ type FormData = z.infer<typeof destinationSchema>;
 export function TripDestinations({ tripId }: { tripId: number }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const [isOpen, setIsOpen] = useState(false);
   const [isAddDestinationOpen, setIsAddDestinationOpen] = useState(false);
   const [isEditDestinationOpen, setIsEditDestinationOpen] = useState(false);
-  const [isOpen, setIsOpen] = useState(false);
+  const [selectedDestination, setSelectedDestination] = useState<Destination | null>(null);
   const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
-  const [editingDestination, setEditingDestination] = useState<Destination | null>(null);
 
-  const { data: destinations = [], refetch } = useQuery<Destination[]>({
-    queryKey: [`/api/trips/${tripId}/destinations`],
+  const { data: trip } = useQuery({
+    queryKey: ["trip", tripId],
     queryFn: async () => {
-      const res = await fetch(`/api/trips/${tripId}/destinations`);
-      if (!res.ok) throw new Error("Failed to fetch destinations");
-      return res.json();
+      const response = await fetch(`/api/trips/${tripId}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch trip");
+      }
+      return response.json();
     },
+    enabled: !!tripId,
   });
 
-  const { data: trip } = useQuery<Trip>({
-    queryKey: ["/api/trips", tripId],
+  const { data: destinations = [] } = useQuery({
+    queryKey: ["trip-destinations", tripId],
     queryFn: async () => {
-      const res = await fetch(`/api/trips/${tripId}`);
-      if (!res.ok) throw new Error("Failed to fetch trip");
-      return res.json();
+      const response = await fetch(`/api/trips/${tripId}/destinations`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch destinations");
+      }
+      return response.json();
     },
+    enabled: !!tripId,
   });
+
+  // Sort destinations by start date
+  const sortedDestinations = [...destinations].sort((a, b) => {
+    return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+  });
+
+  const totalStops = sortedDestinations.length + 1; // +1 for the starting point
 
   const form = useForm<FormData>({
     resolver: zodResolver(destinationSchema),
@@ -80,50 +94,10 @@ export function TripDestinations({ tripId }: { tripId: number }) {
       endDate: "",
     },
   });
-  
-  // Pre-calculate default dates based on current state with better chaining logic
-  const getDefaultDates = () => {
-    let previousEndDate;
-    let sourceName = '';
-    
-    if (sortedDestinations.length > 0) {
-      // Use the most recent destination's end date
-      const lastDestination = sortedDestinations[sortedDestinations.length - 1];
-      previousEndDate = new Date(lastDestination.endDate);
-      sourceName = lastDestination.name;
-    } else if (trip) {
-      // No destinations yet, use the trip END date (not start date)
-      // This creates proper continuity for the first destination after the trip starting point
-      previousEndDate = new Date(trip.endDate);
-      sourceName = trip.location || 'Starting Point';
-    } else {
-      // Fallback to today
-      previousEndDate = new Date();
-    }
-    
-    // Ensure we're starting from the next day after the previous end date
-    // This creates a continuous timeline without gaps or overlaps
-    const nextDay = new Date(previousEndDate);
-    nextDay.setDate(nextDay.getDate() + 1); // Start the day after previous end
-    
-    const defaultStartDate = format(nextDay, "yyyy-MM-dd");
-    
-    // End date is a week after start date by default
-    const defaultEndDate = new Date(nextDay);
-    defaultEndDate.setDate(defaultEndDate.getDate() + 7);
-    
-    return {
-      startDate: defaultStartDate,
-      endDate: format(defaultEndDate, "yyyy-MM-dd"),
-      sourceDate: format(previousEndDate, "yyyy-MM-dd"),
-      sourceName
-    };
-  };
 
-  const editForm = useForm<FormData & { id: number }>({
+  const editForm = useForm<FormData>({
     resolver: zodResolver(destinationSchema),
     defaultValues: {
-      id: 0,
       name: "",
       startDate: "",
       endDate: "",
@@ -132,111 +106,148 @@ export function TripDestinations({ tripId }: { tripId: number }) {
 
   const addDestinationMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      if (!selectedCoordinates) {
-        throw new Error("Please select a location from the map");
-      }
-
-      const res = await fetch(`/api/trips/${tripId}/destinations`, {
+      const response = await fetch(`/api/trips/${tripId}/destinations`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           ...data,
-          coordinates: selectedCoordinates
+          coordinates: selectedCoordinates,
         }),
       });
 
-      if (!res.ok) {
-        const errorData = await res.json();
+      if (!response.ok) {
+        const errorData = await response.json();
         throw new Error(errorData.error || "Failed to add destination");
       }
 
-      return res.json();
+      return response.json();
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
-      await refetch();
-      setIsAddDestinationOpen(false);
-      form.reset();
-      setSelectedCoordinates(null);
+    onSuccess: () => {
       toast({
-        title: "Success",
-        description: "Destination added successfully",
+        title: "Destination added",
+        description: "The destination has been added to your trip.",
       });
+      setIsAddDestinationOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["trip-destinations", tripId] });
     },
     onError: (error: Error) => {
       toast({
-        variant: "destructive",
         title: "Error",
-        description: error.message || "Failed to add destination",
+        description: error.message,
+        variant: "destructive",
       });
     },
   });
 
   const editDestinationMutation = useMutation({
-    mutationFn: async (data: FormData & { id: number }) => {
-      const res = await fetch(`/api/trips/${tripId}/destinations/${data.id}`, {
+    mutationFn: async (data: FormData) => {
+      if (!selectedDestination) return null;
+
+      const response = await fetch(`/api/trips/${tripId}/destinations/${selectedDestination.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          name: data.name,
-          startDate: data.startDate,
-          endDate: data.endDate,
-          coordinates: selectedCoordinates || undefined,
+          ...data,
+          coordinates: selectedCoordinates,
         }),
       });
 
-      if (!res.ok) {
-        const errorData = await res.json();
+      if (!response.ok) {
+        const errorData = await response.json();
         throw new Error(errorData.error || "Failed to update destination");
       }
 
-      return res.json();
+      return response.json();
     },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
-      await refetch();
-      setIsEditDestinationOpen(false);
-      editForm.reset();
-      setSelectedCoordinates(null);
-      setEditingDestination(null);
+    onSuccess: () => {
       toast({
-        title: "Success",
-        description: "Destination updated successfully",
+        title: "Destination updated",
+        description: "The destination has been updated.",
       });
+      setIsEditDestinationOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["trip-destinations", tripId] });
     },
     onError: (error: Error) => {
       toast({
-        variant: "destructive",
         title: "Error",
-        description: error.message || "Failed to update destination",
+        description: error.message,
+        variant: "destructive",
       });
     },
   });
 
-  const onEdit = (destination: Destination) => {
-    setEditingDestination(destination);
-    setSelectedCoordinates(destination.coordinates);
-    editForm.reset({
-      id: destination.id,
-      name: destination.name,
-      startDate: format(new Date(destination.startDate), "yyyy-MM-dd"),
-      endDate: format(new Date(destination.endDate), "yyyy-MM-dd"),
-    });
-    setIsEditDestinationOpen(true);
+  const getDefaultDates = () => {
+    // If there are destinations, set the start date to the day after the last destination's end date
+    if (sortedDestinations.length > 0) {
+      const lastDestination = sortedDestinations[sortedDestinations.length - 1];
+      const lastEndDate = new Date(lastDestination.endDate);
+      
+      // Add one day to the last end date
+      const nextDay = new Date(lastEndDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      
+      // Set the default end date to be 3 days after the start date
+      const defaultEndDate = new Date(nextDay);
+      defaultEndDate.setDate(defaultEndDate.getDate() + 3);
+      
+      return {
+        startDate: nextDay.toISOString().split('T')[0],
+        endDate: defaultEndDate.toISOString().split('T')[0]
+      };
+    } 
+    // If there are no destinations but we have the trip, set the start date to the day after the trip end date
+    else if (trip) {
+      const tripEndDate = new Date(trip.endDate);
+      
+      // Add one day to the trip end date
+      const nextDay = new Date(tripEndDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      
+      // Set the default end date to be 3 days after the start date
+      const defaultEndDate = new Date(nextDay);
+      defaultEndDate.setDate(defaultEndDate.getDate() + 3);
+      
+      return {
+        startDate: nextDay.toISOString().split('T')[0],
+        endDate: defaultEndDate.toISOString().split('T')[0]
+      };
+    } 
+    // Fallback to today and today + 3 days if neither destinations nor trip data is available
+    else {
+      const today = new Date();
+      const threeDaysLater = new Date(today);
+      threeDaysLater.setDate(threeDaysLater.getDate() + 3);
+      
+      return {
+        startDate: today.toISOString().split('T')[0],
+        endDate: threeDaysLater.toISOString().split('T')[0]
+      };
+    }
   };
 
   const onSubmit = (data: FormData) => {
     addDestinationMutation.mutate(data);
   };
 
-  const onEditSubmit = (data: FormData & { id: number }) => {
+  const onEdit = (destination: Destination) => {
+    setSelectedDestination(destination);
+    editForm.reset({
+      name: destination.name,
+      startDate: new Date(destination.startDate).toISOString().split('T')[0],
+      endDate: new Date(destination.endDate).toISOString().split('T')[0],
+    });
+    setSelectedCoordinates(destination.coordinates);
+    setIsEditDestinationOpen(true);
+  };
+
+  const onEditSubmit = (data: FormData) => {
     editDestinationMutation.mutate(data);
   };
 
-  const sortedDestinations = destinations?.sort((a, b) => a.order - b.order) || [];
-  const totalStops = (sortedDestinations.length || 0) + 1;
-  
-  // Reset form with default dates whenever relevant data changes or when dialog opens
   useEffect(() => {
     if (isAddDestinationOpen && (sortedDestinations?.length > 0 || trip)) {
       const defaultDates = getDefaultDates();
@@ -250,12 +261,8 @@ export function TripDestinations({ tripId }: { tripId: number }) {
   };
 
   return (
-    <div className="relative z-10">
-      <Collapsible
-        open={isOpen}
-        onOpenChange={setIsOpen}
-        className="w-[250px]"
-      >
+    <div className="relative z-50">
+      <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-[250px]">
         <Card className="border shadow-sm">
           <CollapsibleTrigger asChild>
             <CardHeader className="p-2 cursor-pointer">
@@ -276,7 +283,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
           </CollapsibleTrigger>
 
           <CollapsibleContent className="overflow-visible">
-            <CardContent className="p-2 pt-0 flex flex-col gap-2">
+            <CardContent className="p-2 pt-0 flex flex-col gap-2 relative">
               <div className="border rounded-md overflow-hidden">
                 <ScrollArea className="h-[200px]">
                   <div className="p-2 space-y-2">
@@ -345,6 +352,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                 </ScrollArea>
               </div>
 
+              {/* Add Destination Dialog */}
               <Dialog
                 open={isAddDestinationOpen}
                 onOpenChange={(open) => {
@@ -361,7 +369,9 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                   setIsAddDestinationOpen(open);
                 }}
               >
-                <DialogContent className="fixed top-[50%] left-[50%] transform -translate-x-[50%] -translate-y-[50%] w-[90vw] max-w-[425px] max-h-[90vh] overflow-y-auto z-50">
+                <DialogContent 
+                  className="fixed top-[50%] left-[50%] transform -translate-x-[50%] -translate-y-[50%] w-[90vw] max-w-[425px] max-h-[90vh] overflow-y-auto z-[100]"
+                >
                   <DialogHeader>
                     <DialogTitle>Add New Destination</DialogTitle>
                   </DialogHeader>
@@ -446,11 +456,14 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                 </DialogContent>
               </Dialog>
 
+              {/* Edit Destination Dialog */}
               <Dialog
                 open={isEditDestinationOpen}
                 onOpenChange={setIsEditDestinationOpen}
               >
-                <DialogContent className="fixed top-[50%] left-[50%] transform -translate-x-[50%] -translate-y-[50%] w-[90vw] max-w-[425px] max-h-[90vh] overflow-y-auto z-50">
+                <DialogContent 
+                  className="fixed top-[50%] left-[50%] transform -translate-x-[50%] -translate-y-[50%] w-[90vw] max-w-[425px] max-h-[90vh] overflow-y-auto z-[100]"
+                >
                   <DialogHeader>
                     <DialogTitle>Edit Destination</DialogTitle>
                   </DialogHeader>
