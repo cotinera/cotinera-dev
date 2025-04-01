@@ -53,26 +53,72 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
 
   const updateTripMutation = useMutation({
     mutationFn: async (data: EditTripData) => {
-      // IMPORTANT: Pass dates exactly as user selected them, without any Date object manipulation
-      // This ensures the date the user selects is exactly the date that gets saved
+      // First, we need to determine if we should update either date
+      // Get the current destinations to see if we need to respect their dates
+      let respectEndDate = false;
+      let shouldUpdateEndDate = true;
+      let shouldUpdateStartDate = true;
+      
+      try {
+        const destResponse = await fetch(`/api/trips/${trip.id}/destinations`);
+        if (destResponse.ok) {
+          const destinations = await destResponse.json();
+          
+          // If there are destinations, we need to respect their dates
+          if (destinations && destinations.length > 0) {
+            respectEndDate = true;
+            
+            // Sort destinations by start date
+            const sortedDestinations = [...destinations].sort(
+              (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+            );
+            
+            // Get the last destination's end date
+            const lastDestination = sortedDestinations[sortedDestinations.length - 1];
+            
+            // If we're updating the trip end date to be earlier than the last destination's end date,
+            // we shouldn't actually update it
+            if (new Date(data.endDate) < new Date(lastDestination.endDate)) {
+              shouldUpdateEndDate = false;
+              // Use the last destination's end date instead
+              data.endDate = new Date(lastDestination.endDate).toISOString().split('T')[0];
+            }
+          }
+        }
+      } catch (error) {
+        console.warn("Could not fetch destinations to validate trip dates", error);
+      }
+      
+      // Create the request body, only including fields that should be updated
+      const body: any = {
+        title: data.title,
+        location: data.location,
+        coordinates
+      };
+      
+      // Only include dates if they should be updated
+      if (shouldUpdateStartDate) {
+        body.startDate = data.startDate;
+      }
+      
+      if (shouldUpdateEndDate) {
+        body.endDate = data.endDate;
+      }
+      
+      // Send the update request with the appropriate fields
       const res = await fetch(`/api/trips/${trip.id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          ...data,
-          coordinates,
-          // Pass dates as plain strings to avoid any timezone issues
-          // The server will append a fixed time (12:00:00 UTC) to keep the date consistent
-          startDate: data.startDate,
-          endDate: data.endDate, 
-        }),
+        body: JSON.stringify(body),
         credentials: 'include'
       });
+      
       if (!res.ok) {
         throw new Error(await res.text());
       }
+      
       const updatedTrip = await res.json();
       return updatedTrip;
     },
