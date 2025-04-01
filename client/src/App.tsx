@@ -6,6 +6,7 @@ import { AuthProvider, TutorialProvider } from "@/hooks";
 // Import ThemeProvider and ThemeToggle directly to avoid module resolution issues
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { AppHeader } from "@/components";
 import {
   NotFound,
   Dashboard,
@@ -41,8 +42,13 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <TutorialProvider>
-            <Router />
-            <ThemeToggle />
+            <div className="flex flex-col min-h-screen">
+              <AppHeader />
+              <main className="flex-1">
+                <Router />
+              </main>
+              <ThemeToggle />
+            </div>
             <Toaster />
           </TutorialProvider>
         </AuthProvider>
