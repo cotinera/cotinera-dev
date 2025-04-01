@@ -18,7 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { format } from "date-fns";
-import { Pin, Plus, ChevronDown, Edit2 } from "lucide-react";
+import { Pin, Plus, ChevronDown, Edit2, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -27,6 +27,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Collapsible,
   CollapsibleContent,
@@ -54,6 +64,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
   const [isEditDestinationOpen, setIsEditDestinationOpen] = useState(false);
   const [selectedDestination, setSelectedDestination] = useState<Destination | null>(null);
   const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  const [destinationToDelete, setDestinationToDelete] = useState<Destination | null>(null);
 
   const { data: trip } = useQuery({
     queryKey: ["trip", tripId],
@@ -164,6 +175,97 @@ export function TripDestinations({ tripId }: { tripId: number }) {
         description: error.message,
         variant: "destructive",
       });
+    },
+  });
+
+  const deleteDestinationMutation = useMutation({
+    mutationFn: async () => {
+      if (!destinationToDelete) return null;
+
+      // First, delete the destination
+      const response = await fetch(`/api/trips/${tripId}/destinations/${destinationToDelete.id}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete destination");
+      }
+
+      // After deleting the destination, we need to update the trip end date
+      // Find the latest destination end date from the remaining destinations
+      const remainingDestinations = destinations.filter((d: Destination) => d.id !== destinationToDelete.id);
+      
+      if (remainingDestinations.length === 0) {
+        // If no destinations left, we should update the trip end date to the original trip value
+        if (trip) {
+          const updateTripResponse = await fetch(`/api/trips/${tripId}`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              // Reset to original trip end date which should match the trip start date if no destinations
+              endDate: trip.startDate,
+            }),
+            credentials: 'include'
+          });
+          
+          if (!updateTripResponse.ok) {
+            console.warn("Failed to update trip end date, but destination was deleted successfully");
+          }
+        }
+      } else {
+        // Get the latest end date from the remaining destinations
+        const latestEndDate = new Date(
+          Math.max(...remainingDestinations.map((d: Destination) => new Date(d.endDate).getTime()))
+        );
+        
+        // Only update if the deleted destination was the one with the latest end date
+        if (trip && destinationToDelete && new Date(destinationToDelete.endDate) > new Date(trip.endDate) 
+            || new Date(destinationToDelete.endDate).getTime() === latestEndDate.getTime()) {
+          const updateTripResponse = await fetch(`/api/trips/${tripId}`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              endDate: latestEndDate.toISOString().split('T')[0],
+            }),
+            credentials: 'include'
+          });
+          
+          if (!updateTripResponse.ok) {
+            console.warn("Failed to update trip end date, but destination was deleted successfully");
+          }
+        }
+      }
+
+      return { success: true };
+    },
+    onSuccess: () => {
+      toast({
+        title: "Destination deleted",
+        description: "The destination has been removed from your trip.",
+      });
+      setDestinationToDelete(null);
+      
+      // Invalidate all relevant queries to update the UI in real-time
+      queryClient.invalidateQueries({ queryKey: ["trip-destinations", tripId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/trips"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      setDestinationToDelete(null);
     },
   });
 
@@ -381,6 +483,17 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                           >
                             <Edit2 className="h-3 w-3" />
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDestinationToDelete(destination);
+                            }}
+                          >
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
                           <Badge variant="outline" className="text-[10px] h-4 px-1">
                             {index + 2}
                           </Badge>
@@ -580,6 +693,35 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                   </Form>
                 </DialogContent>
               </Dialog>
+
+              {/* Delete Destination Confirmation Dialog */}
+              <AlertDialog
+                open={!!destinationToDelete}
+                onOpenChange={(open) => {
+                  if (!open) setDestinationToDelete(null);
+                }}
+              >
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Destination</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      Are you sure you want to remove "{destinationToDelete?.name}" from your trip? 
+                      This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => {
+                        deleteDestinationMutation.mutate();
+                      }}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </CardContent>
           </CollapsibleContent>
         </Card>
