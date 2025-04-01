@@ -164,6 +164,8 @@ export const taskAssignments = pgTable("task_assignments", {
 export const flights = pgTable("flights", {
   id: serial("id").primaryKey(),
   tripId: integer("trip_id").notNull().references(() => trips.id),
+  participantId: integer("participant_id").references(() => participants.id),
+  direction: text("direction").default("inbound"), // 'inbound' or 'outbound'
   airline: text("airline").notNull(),
   flightNumber: text("flight_number").notNull(),
   departureAirport: text("departure_airport").notNull(),
@@ -379,6 +381,10 @@ export const flightsRelations = relations(flights, ({ one }) => ({
     fields: [flights.tripId],
     references: [trips.id],
   }),
+  participant: one(participants, {
+    fields: [flights.participantId],
+    references: [participants.id],
+  }),
 }));
 
 export const accommodationsRelations = relations(accommodations, ({ one, many }) => ({
@@ -396,7 +402,7 @@ export const shareLinksRelations = relations(shareLinks, ({ one }) => ({
   }),
 }));
 
-export const participantsRelations = relations(participants, ({ one }) => ({
+export const participantsRelations = relations(participants, ({ one, many }) => ({
   trip: one(trips, {
     fields: [participants.tripId],
     references: [trips.id],
@@ -410,6 +416,7 @@ export const participantsRelations = relations(participants, ({ one }) => ({
     references: [accommodations.id],
     relationName: "participant_accommodation"
   }),
+  flights: many(flights),
 }));
 
 export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({

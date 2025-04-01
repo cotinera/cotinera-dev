@@ -1,7 +1,23 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Trip } from "@db/schema";
+import type { Trip, Flight } from "@db/schema";
+import { format, parse } from "date-fns";
+import { useForm } from "react-hook-form";
+import { useFlights } from "@/hooks/use-flights";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { 
+  Plus, 
+  X, 
+  Check, 
+  X as XIcon, 
+  Clock, 
+  Edit2, 
+  Settings2, 
+  Search, 
+  Loader2, 
+  Plane 
+} from "lucide-react";
 import {
   Card,
   CardContent,
@@ -22,6 +38,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -30,6 +47,7 @@ import {
   FormItem,
   FormLabel,
   FormDescription,
+  FormMessage,
 } from "@/components/ui/form";
 import {
   Select,
@@ -45,12 +63,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { useForm } from "react-hook-form";
-import { format } from "date-fns";
-import { Plus, X, Check, X as XIcon, Clock, Edit2, Settings2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { z } from "zod";
 
 interface TripParticipantDetailsProps {
   tripId: number;
@@ -117,12 +131,114 @@ const customColumnSchema = z.object({
 export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const { createFlight, updateFlight } = useFlights(tripId);
   const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
   const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
   const [updatingParticipants, setUpdatingParticipants] = useState<number[]>([]);
   const [customColumns, setCustomColumns] = useState<CustomColumn[]>([]);
   const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
   const [customValues, setCustomValues] = useState<Record<string, Record<number, string | boolean>>>({});
+  
+  // Flight management states
+  const [isAddFlightInOpen, setIsAddFlightInOpen] = useState(false);
+  const [isAddFlightOutOpen, setIsAddFlightOutOpen] = useState(false);
+  const [currentParticipantId, setCurrentParticipantId] = useState<number | null>(null);
+  const [isLookingUpFlight, setIsLookingUpFlight] = useState(false);
+  
+  // Flight form
+  const flightForm = useForm<Partial<Flight>>({
+    defaultValues: {
+      airline: "",
+      flightNumber: "",
+      departureAirport: "",
+      arrivalAirport: "",
+      departureDate: "",
+      departureTime: "",
+      arrivalDate: "",
+      arrivalTime: "",
+      bookingReference: "",
+      bookingStatus: "confirmed",
+    },
+  });
+  
+  // Function to lookup flight details from the API
+  const lookupFlightDetails = async () => {
+    const flightNumber = flightForm.getValues("flightNumber");
+    const departureDate = flightForm.getValues("departureDate");
+    
+    if (!flightNumber) {
+      toast({
+        title: "Flight number required",
+        description: "Please enter a flight number to lookup flight details",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!departureDate) {
+      toast({
+        title: "Departure date required",
+        description: "Please select a departure date to lookup flight details",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsLookingUpFlight(true);
+      
+      // Call the flight lookup API
+      const response = await fetch(`/api/flights/lookup?flightNumber=${flightNumber}&date=${departureDate}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to lookup flight details");
+      }
+      
+      const data = await response.json();
+      
+      if (!data || !data.flight) {
+        throw new Error("No flight information found");
+      }
+      
+      // Parse date and time from ISO string
+      const departureDateObj = new Date(data.flight.scheduledDeparture);
+      const arrivalDateObj = new Date(data.flight.scheduledArrival);
+      
+      // Update form with flight details
+      flightForm.setValue("airline", data.flight.airline);
+      flightForm.setValue("departureAirport", data.flight.departureAirport.code);
+      flightForm.setValue("arrivalAirport", data.flight.arrivalAirport.code);
+      
+      // Format dates and times for form fields
+      flightForm.setValue("departureDate", format(departureDateObj, "yyyy-MM-dd"));
+      flightForm.setValue("departureTime", format(departureDateObj, "HH:mm"));
+      flightForm.setValue("arrivalDate", format(arrivalDateObj, "yyyy-MM-dd"));
+      flightForm.setValue("arrivalTime", format(arrivalDateObj, "HH:mm"));
+      
+      // Set booking reference to flight number if not already set
+      if (!flightForm.getValues("bookingReference")) {
+        flightForm.setValue("bookingReference", flightNumber);
+      }
+      
+      // Set booking status based on API response
+      flightForm.setValue("bookingStatus", data.flight.status.toLowerCase() || "confirmed");
+      
+      toast({
+        title: "Flight details found",
+        description: `Found details for ${data.flight.airline} flight ${flightNumber}`,
+      });
+    } catch (error) {
+      console.error("Error looking up flight:", error);
+      toast({
+        title: "Failed to find flight",
+        description: error instanceof Error ? error.message : "Could not retrieve flight details",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLookingUpFlight(false);
+    }
+  };
 
   const { data: trip } = useQuery<Trip>({
     queryKey: ["/api/trips", tripId],
@@ -432,19 +548,141 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     }
   };
 
-  const getStatusDisplay = (status: string) => {
-    switch (status) {
-      case 'yes':
-        return 'Confirmed';
-      case 'no':
-        return 'Declined';
-      default:
-        return 'Pending';
-    }
+  const getNextStatus = (currentStatus: Status): Status => {
+    const currentIndex = STATUS_CYCLE.indexOf(currentStatus);
+    return STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
   };
 
   const handleStatusChange = (participantId: number, newStatus: Status) => {
     updateStatusMutation.mutate({ participantId, status: newStatus });
+  };
+
+  const handleAddCustomColumn = (newColumn: z.infer<typeof customColumnSchema>) => {
+    const id = `custom-${Date.now()}`;
+    setCustomColumns(prev => [...prev, { ...newColumn, id }]);
+
+    // Initialize custom values for this column
+    setCustomValues(prev => ({
+      ...prev,
+      [id]: {}
+    }));
+  };
+
+  const handleDeleteCustomColumn = (columnId: string) => {
+    setCustomColumns(prev => prev.filter(c => c.id !== columnId));
+    
+    // Remove values for this column
+    setCustomValues(prev => {
+      const newValues = { ...prev };
+      delete newValues[columnId];
+      return newValues;
+    });
+  };
+
+  const handleCustomValueChange = (columnId: string, participantId: number, value: string | boolean) => {
+    setCustomValues(prev => ({
+      ...prev,
+      [columnId]: {
+        ...prev[columnId],
+        [participantId]: value
+      }
+    }));
+  };
+
+  // Submit flight information for inbound flight
+  const handleFlightInSubmit = async () => {
+    if (!currentParticipantId) return;
+    
+    const values = flightForm.getValues();
+    const selectedParticipant = participants.find(p => p.id === currentParticipantId);
+    
+    if (!selectedParticipant) return;
+    
+    try {
+      // Format the flight description
+      const flightDescription = `${values.airline} ${values.flightNumber} (${values.departureAirport} → ${values.arrivalAirport})`;
+      
+      // Update the participant with the new flight information
+      await updateParticipantMutation.mutateAsync({
+        participantId: currentParticipantId,
+        data: { flightIn: flightDescription }
+      });
+      
+      // Create actual flight record in database
+      await createFlight({
+        ...values,
+        tripId,
+        departureDate: values.departureDate || '',
+        departureTime: values.departureTime || '',
+        arrivalDate: values.arrivalDate || '',
+        arrivalTime: values.arrivalTime || '',
+        participantId: currentParticipantId,
+        direction: 'inbound'
+      });
+      
+      // Close dialog and reset form
+      setIsAddFlightInOpen(false);
+      
+      toast({
+        title: "Success",
+        description: "Inbound flight information added successfully",
+      });
+    } catch (error) {
+      console.error("Error adding inbound flight:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to add inbound flight",
+      });
+    }
+  };
+  
+  // Submit flight information for outbound flight
+  const handleFlightOutSubmit = async () => {
+    if (!currentParticipantId) return;
+    
+    const values = flightForm.getValues();
+    const selectedParticipant = participants.find(p => p.id === currentParticipantId);
+    
+    if (!selectedParticipant) return;
+    
+    try {
+      // Format the flight description
+      const flightDescription = `${values.airline} ${values.flightNumber} (${values.departureAirport} → ${values.arrivalAirport})`;
+      
+      // Update the participant with the new flight information
+      await updateParticipantMutation.mutateAsync({
+        participantId: currentParticipantId,
+        data: { flightOut: flightDescription }
+      });
+      
+      // Create actual flight record in database
+      await createFlight({
+        ...values,
+        tripId,
+        departureDate: values.departureDate || '',
+        departureTime: values.departureTime || '',
+        arrivalDate: values.arrivalDate || '',
+        arrivalTime: values.arrivalTime || '',
+        participantId: currentParticipantId,
+        direction: 'outbound'
+      });
+      
+      // Close dialog and reset form
+      setIsAddFlightOutOpen(false);
+      
+      toast({
+        title: "Success",
+        description: "Outbound flight information added successfully",
+      });
+    } catch (error) {
+      console.error("Error adding outbound flight:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to add outbound flight",
+      });
+    }
   };
 
   const customColumnForm = useForm({
@@ -454,373 +692,181 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
   });
 
-  const handleAddCustomColumn = (data: { name: string; type: 'boolean' | 'text' }) => {
-    const newColumn: CustomColumn = {
-      id: `custom-${Date.now()}`,
-      name: data.name,
-      type: data.type,
-    };
-    setCustomColumns(prev => [...prev, newColumn]);
-    customColumnForm.reset();
-    setCustomValues(prev => ({
-      ...prev,
-      [newColumn.id]: {},
-    }));
-  };
-
-  const handleRemoveCustomColumn = (columnId: string) => {
-    setCustomColumns(prev => prev.filter(col => col.id !== columnId));
-    setCustomValues(prev => {
-      const { [columnId]: _, ...rest } = prev;
-      return rest;
-    });
-  };
-
-  const handleCustomValueChange = (participantId: number, columnId: string, value: string | boolean) => {
-    setCustomValues(prev => ({
-      ...prev,
-      [columnId]: {
-        ...prev[columnId],
-        [participantId]: value,
-      },
-    }));
-  };
-
   const handleSubmit = async (data: ParticipantForm) => {
-    try {
-      // Close the dialog immediately to avoid error states showing
-      setIsAddParticipantOpen(false);
-      // Then perform the mutation
-      await addParticipantMutation.mutateAsync(data);
-    } catch (error) {
-      console.error('Failed to add participant:', error);
-      // No need to reopen the dialog
-    }
+    await addParticipantMutation.mutateAsync(data);
+    setIsAddParticipantOpen(false);
+  };
+
+  const handleEditSubmit = async (data: ParticipantForm) => {
+    if (!editingParticipant) return;
+    await updateParticipantMutation.mutateAsync({
+      participantId: editingParticipant.id,
+      data
+    });
   };
 
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <div className="flex justify-between items-center">
-          <CardTitle>People</CardTitle>
-          <div className="flex gap-2">
-            <Dialog
-              open={isAddParticipantOpen}
-              onOpenChange={setIsAddParticipantOpen}
-            >
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Person
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Add New Person</DialogTitle>
-                </DialogHeader>
-                <Form {...addForm}>
-                  <form onSubmit={addForm.handleSubmit(handleSubmit)} className="space-y-4">
-                    <FormField
-                      control={addForm.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter name" {...field} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-
-                    <div className="space-y-2">
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                          control={addForm.control}
-                          name="arrivalDate"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Arrival Date</FormLabel>
-                              <FormControl>
-                                <Input type="date" {...field} />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={addForm.control}
-                          name="departureDate"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Departure Date</FormLabel>
-                              <FormControl>
-                                <Input type="date" {...field} />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <FormField
-                          control={addForm.control}
-                          name="flightIn"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Flight In</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Enter arrival flight" {...field} />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={addForm.control}
-                          name="flightOut"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Flight Out</FormLabel>
-                              <FormControl>
-                                <Input placeholder="Enter departure flight" {...field} />
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
-                      </div>
-                    </div>
-
-                    <FormField
-                      control={addForm.control}
-                      name="accommodation"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Accommodation</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter hotel or accommodation" {...field} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <Button
-                      type="submit"
-                      className="w-full"
-                      disabled={addParticipantMutation.isPending}
-                    >
-                      {addParticipantMutation.isPending ? "Adding..." : "Add Person"}
-                    </Button>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
-            <Dialog
-              open={isCustomizeOpen}
-              onOpenChange={setIsCustomizeOpen}
-            >
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Settings2 className="h-4 w-4 mr-2" />
-                  Customize Columns
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Customize Table Columns</DialogTitle>
-                </DialogHeader>
-                <Form {...customColumnForm}>
-                  <form
-                    onSubmit={customColumnForm.handleSubmit(handleAddCustomColumn)}
-                    className="space-y-4"
-                  >
-                    <FormField
-                      control={customColumnForm.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Column Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Enter column name" {...field} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={customColumnForm.control}
-                      name="type"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Column Type</FormLabel>
-                          <Select
-                            value={field.value}
-                            onValueChange={field.onChange}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select column type" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="text">Text Input</SelectItem>
-                              <SelectItem value="boolean">Yes/No</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormDescription>
-                            Choose how data will be entered in this column
-                          </FormDescription>
-                        </FormItem>
-                      )}
-                    />
-                    <Button type="submit">Add Column</Button>
-                  </form>
-                </Form>
-                {customColumns.length > 0 && (
-                  <div className="mt-6 space-y-2">
-                    <h4 className="text-sm font-medium">Custom Columns</h4>
-                    <div className="space-y-2">
-                      {customColumns.map((column) => (
-                        <div
-                          key={column.id}
-                          className="flex items-center justify-between p-2 border rounded-md"
-                        >
-                          <div>
-                            <span className="font-medium">{column.name}</span>
-                            <span className="ml-2 text-sm text-muted-foreground">
-                              ({column.type})
-                            </span>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleRemoveCustomColumn(column.id)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </DialogContent>
-            </Dialog>
-          </div>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-xl font-bold">Participants</CardTitle>
+        <div className="flex space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1"
+            onClick={() => setIsCustomizeOpen(true)}
+          >
+            <Settings2 className="h-4 w-4" />
+            Customize
+          </Button>
+          <Button
+            size="sm"
+            className="h-8 gap-1"
+            onClick={() => setIsAddParticipantOpen(true)}
+          >
+            <Plus className="h-4 w-4" />
+            Add Participant
+          </Button>
         </div>
       </CardHeader>
       <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Arrival</TableHead>
-              <TableHead>Flight In</TableHead>
-              <TableHead>Departure</TableHead>
-              <TableHead>Flight Out</TableHead>
-              <TableHead>Hotel</TableHead>
-              {customColumns.map((column) => (
-                <TableHead key={column.id}>{column.name}</TableHead>
-              ))}
-              <TableHead className="w-[100px]">Status</TableHead>
-              <TableHead className="w-[100px]">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {participants && participants.length > 0 ? (
-              [...participants].sort(sortParticipants).map((participant) => (
+        <div className="overflow-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[150px]">Name</TableHead>
+                <TableHead className="w-[100px] text-center">Status</TableHead>
+                <TableHead className="w-[120px]">Arrival</TableHead>
+                <TableHead className="w-[120px]">Departure</TableHead>
+                <TableHead className="w-[180px]">
+                  <div className="flex items-center">
+                    <span>Flight In</span>
+                  </div>
+                </TableHead>
+                <TableHead className="w-[180px]">
+                  <div className="flex items-center">
+                    <span>Flight Out</span>
+                  </div>
+                </TableHead>
+                <TableHead className="w-[180px]">Accommodation</TableHead>
+                {customColumns.map(column => (
+                  <TableHead key={column.id} className="w-[120px]">
+                    {column.name}
+                  </TableHead>
+                ))}
+                <TableHead className="w-[80px] text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {participants.sort(sortParticipants).map((participant) => (
                 <TableRow key={participant.id}>
-                  <TableCell>{participant.name}</TableCell>
+                  <TableCell className="font-medium">
+                    {participant.name}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge 
+                      variant={getStatusBadgeVariant(participant.status as Status)}
+                      className="cursor-pointer"
+                      onClick={() => handleStatusChange(
+                        participant.id, 
+                        getNextStatus(participant.status as Status)
+                      )}
+                    >
+                      {updatingParticipants.includes(participant.id) ? (
+                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                      ) : (
+                        getStatusIcon(participant.status)
+                      )}
+                      {participant.status}
+                    </Badge>
+                  </TableCell>
                   <TableCell>
                     {participant.arrivalDate && format(new Date(participant.arrivalDate), "dd/MM/yyyy")}
                   </TableCell>
-                  <TableCell>{participant.flightIn || "-"}</TableCell>
                   <TableCell>
                     {participant.departureDate && format(new Date(participant.departureDate), "dd/MM/yyyy")}
                   </TableCell>
-                  <TableCell>{participant.flightOut || "-"}</TableCell>
                   <TableCell>
-                    {(() => {
-                      if (!participant.accommodation) return "-";
-
-                      // Ensure we only display the name string
-                      const accName = typeof participant.accommodation === 'string'
-                        ? JSON.parse(participant.accommodation).name
-                        : participant.accommodation.name;
-
-                      return accName || "-";
-                    })()}
+                    <div className="flex items-center space-x-2">
+                      <span>{participant.flightIn || "-"}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => {
+                          setCurrentParticipantId(participant.id);
+                          flightForm.reset();
+                          if (participant.arrivalDate) {
+                            flightForm.setValue("arrivalDate", participant.arrivalDate);
+                          }
+                          setIsAddFlightInOpen(true);
+                        }}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
-                  {customColumns.map((column) => (
+                  <TableCell>
+                    <div className="flex items-center space-x-2">
+                      <span>{participant.flightOut || "-"}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => {
+                          setCurrentParticipantId(participant.id);
+                          flightForm.reset();
+                          if (participant.departureDate) {
+                            flightForm.setValue("departureDate", participant.departureDate);
+                          }
+                          setIsAddFlightOutOpen(true);
+                        }}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {participant.accommodation?.name || "-"}
+                  </TableCell>
+                  {customColumns.map(column => (
                     <TableCell key={column.id}>
                       {column.type === 'boolean' ? (
-                        <Select
-                          value={String(customValues[column.id]?.[participant.id] ?? '')}
-                          onValueChange={(value) => handleCustomValueChange(participant.id, column.id, value === 'true')}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="-" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="true">Yes</SelectItem>
-                            <SelectItem value="false">No</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <input
+                          type="checkbox"
+                          checked={!!customValues[column.id]?.[participant.id]}
+                          onChange={(e) => handleCustomValueChange(
+                            column.id,
+                            participant.id,
+                            e.target.checked
+                          )}
+                          className="h-4 w-4"
+                        />
                       ) : (
-                        <Input
-                          value={String(customValues[column.id]?.[participant.id] ?? '')}
-                          onChange={(e) => handleCustomValueChange(participant.id, column.id, e.target.value)}
-                          className="h-8"
+                        <input
+                          type="text"
+                          value={customValues[column.id]?.[participant.id] as string || ""}
+                          onChange={(e) => handleCustomValueChange(
+                            column.id,
+                            participant.id,
+                            e.target.value
+                          )}
+                          className="w-full p-1 text-sm border rounded"
                         />
                       )}
                     </TableCell>
                   ))}
-                  <TableCell>
+                  <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          className="flex items-center gap-2 px-2 py-1 h-8"
-                          disabled={updatingParticipants.includes(participant.id)}
-                        >
-                          <Badge
-                            variant={getStatusBadgeVariant(participant.status as Status)}
-                            className="gap-1"
-                          >
-                            {updatingParticipants.includes(participant.id) ? (
-                              <span className="animate-spin">⟳</span>
-                            ) : (
-                              getStatusIcon(participant.status)
-                            )}
-                            {getStatusDisplay(participant.status)}
-                          </Badge>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <span className="sr-only">Open menu</span>
+                          <Settings2 className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem
-                          onClick={() => handleStatusChange(participant.id, 'yes')}
-                          className="gap-2"
-                          disabled={updatingParticipants.includes(participant.id)}
-                        >
-                          <Check className="h-4 w-4" /> Confirm
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleStatusChange(participant.id, 'no')}
-                          className="gap-2"
-                          disabled={updatingParticipants.includes(participant.id)}
-                        >
-                          <XIcon className="h-4 w-4" /> Decline
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => handleStatusChange(participant.id, 'pending')}
-                          className="gap-2"
-                          disabled={updatingParticipants.includes(participant.id)}
-                        >
-                          <Clock className="h-4 w-4" /> Reset to Pending
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Dialog
-                        open={editingParticipant?.id === participant.id}
-                        onOpenChange={(open) => {
-                          if (!open) setEditingParticipant(null);
-                          if (open) {
+                          onClick={() => {
                             setEditingParticipant(participant);
                             editForm.reset({
                               name: participant.name || "",
@@ -830,137 +876,729 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                               flightOut: participant.flightOut || "",
                               accommodation: participant.accommodation?.name || "",
                             });
-                          }
-                        }}
-                      >
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Edit Participant</DialogTitle>
-                          </DialogHeader>
-                          <Form {...editForm}>
-                            <form
-                              onSubmit={editForm.handleSubmit((data) =>
-                                updateParticipantMutation.mutate({
-                                  participantId: participant.id,
-                                  data,
-                                })
-                              )}
-                              className="space-y-4"
-                            >
-                              <FormField
-                                control={editForm.control}
-                                name="name"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Name</FormLabel>
-                                    <FormControl>
-                                      <Input placeholder="Enter name" {...field} />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                              <div className="grid grid-cols-2 gap-4">
-                                <FormField
-                                  control={editForm.control}
-                                  name="arrivalDate"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Arrival</FormLabel>
-                                      <FormControl>
-                                        <Input type="date" {...field} />
-                                      </FormControl>
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={editForm.control}
-                                  name="departureDate"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Departure</FormLabel>
-                                      <FormControl>
-                                        <Input type="date" {...field} />
-                                      </FormControl>
-                                    </FormItem>
-                                  )}
-                                />
-                              </div>
-                              <div className="grid grid-cols-2 gap-4">
-                                <FormField
-                                  control={editForm.control}
-                                  name="flightIn"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Flight In</FormLabel>
-                                      <FormControl>
-                                        <Input placeholder="Enter arrival flight" {...field} />
-                                      </FormControl>
-                                    </FormItem>
-                                  )}
-                                />
-                                <FormField
-                                  control={editForm.control}
-                                  name="flightOut"
-                                  render={({ field }) => (
-                                    <FormItem>
-                                      <FormLabel>Flight Out</FormLabel>
-                                      <FormControl>
-                                        <Input placeholder="Enter departure flight" {...field} />
-                                      </FormControl>
-                                    </FormItem>
-                                  )}
-                                />
-                              </div>
-                              <FormField
-                                control={editForm.control}
-                                name="accommodation"
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Accommodation</FormLabel>
-                                    <FormControl>
-                                      <Input placeholder="Enter hotel or accommodation" {...field} />
-                                    </FormControl>
-                                  </FormItem>
-                                )}
-                              />
-                              <Button type="submit" className="w-full">
-                                {updateParticipantMutation.isPending ? "Updating..." : "Update Person"}
-                              </Button>
-                            </form>
-                          </Form>
-                        </DialogContent>
-                      </Dialog>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => deleteParticipantMutation.mutate(participant.id)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
+                          }}
+                        >
+                          <Edit2 className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive focus:bg-destructive focus:text-destructive-foreground"
+                          onClick={() => deleteParticipantMutation.mutate(participant.id)}
+                        >
+                          <X className="mr-2 h-4 w-4" />
+                          Remove
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={8 + customColumns.length} className="text-center py-4 text-muted-foreground">
-                  No people added yet
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       </CardContent>
+
+      {/* Add participant dialog */}
+      <Dialog open={isAddParticipantOpen} onOpenChange={setIsAddParticipantOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add Participant</DialogTitle>
+            <DialogDescription>
+              Enter participant details. Click save when you're done.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...addForm}>
+            <form onSubmit={addForm.handleSubmit(handleSubmit)} className="space-y-4">
+              <FormField
+                control={addForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={addForm.control}
+                name="arrivalDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Arrival Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={addForm.control}
+                name="departureDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Departure Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={addForm.control}
+                name="flightIn"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Flight In</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Optional" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Or add flight details later after creating.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={addForm.control}
+                name="flightOut"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Flight Out</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Optional" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Or add flight details later after creating.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={addForm.control}
+                name="accommodation"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Accommodation</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Optional" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end">
+                <Button type="submit">Save</Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit participant dialog */}
+      <Dialog open={!!editingParticipant} onOpenChange={(open) => !open && setEditingParticipant(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Edit Participant</DialogTitle>
+            <DialogDescription>
+              Update the participant details.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...editForm}>
+            <form onSubmit={editForm.handleSubmit(handleEditSubmit)} className="space-y-4">
+              <FormField
+                control={editForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="arrivalDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Arrival Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="departureDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Departure Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="flightIn"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Flight In</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Optional" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="flightOut"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Flight Out</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Optional" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="accommodation"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Accommodation</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Optional" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mr-2"
+                  onClick={() => setEditingParticipant(null)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit">Save</Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Customize dialog */}
+      <Dialog open={isCustomizeOpen} onOpenChange={setIsCustomizeOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Customize Participant Table</DialogTitle>
+            <DialogDescription>
+              Add custom columns to track additional participant information.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...customColumnForm}>
+            <form
+              onSubmit={customColumnForm.handleSubmit((data) => {
+                handleAddCustomColumn(data);
+                customColumnForm.reset();
+              })}
+              className="space-y-4"
+            >
+              <FormField
+                control={customColumnForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Column Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter column name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={customColumnForm.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Column Type</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select column type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="text">Text</SelectItem>
+                        <SelectItem value="boolean">Checkbox</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit">Add Column</Button>
+            </form>
+          </Form>
+
+          <div className="mt-4">
+            <h4 className="text-sm font-medium mb-2">Current Custom Columns</h4>
+            {customColumns.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No custom columns yet</p>
+            ) : (
+              <ul className="space-y-2">
+                {customColumns.map(column => (
+                  <li key={column.id} className="flex items-center justify-between">
+                    <span>
+                      {column.name} ({column.type})
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteCustomColumn(column.id)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Add Flight In Dialog */}
+      <Dialog open={isAddFlightInOpen} onOpenChange={setIsAddFlightInOpen}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle>Add Inbound Flight</DialogTitle>
+            <DialogDescription>
+              Add flight details for arrival to the destination.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...flightForm}>
+            <form onSubmit={flightForm.handleSubmit(handleFlightInSubmit)} className="space-y-4">
+              <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
+                <FormField
+                  control={flightForm.control}
+                  name="flightNumber"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Flight Number</FormLabel>
+                      <div className="flex space-x-2">
+                        <FormControl>
+                          <Input placeholder="e.g. BA123" {...field} />
+                        </FormControl>
+                        <Button 
+                          type="button" 
+                          variant="secondary"
+                          onClick={lookupFlightDetails}
+                          disabled={isLookingUpFlight}
+                        >
+                          {isLookingUpFlight ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <Search className="h-4 w-4 mr-2" />
+                          )}
+                          Lookup
+                        </Button>
+                      </div>
+                      <FormDescription>
+                        Enter an airline code followed by flight number
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={flightForm.control}
+                  name="airline"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Airline</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. British Airways" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
+                <FormField
+                  control={flightForm.control}
+                  name="departureAirport"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Departure Airport</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. LHR" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={flightForm.control}
+                  name="arrivalAirport"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Arrival Airport</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. JFK" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
+                <FormField
+                  control={flightForm.control}
+                  name="departureDate"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Departure Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={flightForm.control}
+                  name="departureTime"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Departure Time</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
+                <FormField
+                  control={flightForm.control}
+                  name="arrivalDate"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Arrival Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={flightForm.control}
+                  name="arrivalTime"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Arrival Time</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
+                <FormField
+                  control={flightForm.control}
+                  name="bookingReference"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Booking Reference</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. ABC123" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={flightForm.control}
+                  name="bookingStatus"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Status</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="confirmed">Confirmed</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="delayed">Delayed</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAddFlightInOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  <Plane className="h-4 w-4 mr-2" />
+                  Save Flight
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Add Flight Out Dialog */}
+      <Dialog open={isAddFlightOutOpen} onOpenChange={setIsAddFlightOutOpen}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle>Add Outbound Flight</DialogTitle>
+            <DialogDescription>
+              Add flight details for departure from the destination.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...flightForm}>
+            <form onSubmit={flightForm.handleSubmit(handleFlightOutSubmit)} className="space-y-4">
+              <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
+                <FormField
+                  control={flightForm.control}
+                  name="flightNumber"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Flight Number</FormLabel>
+                      <div className="flex space-x-2">
+                        <FormControl>
+                          <Input placeholder="e.g. BA123" {...field} />
+                        </FormControl>
+                        <Button 
+                          type="button" 
+                          variant="secondary"
+                          onClick={lookupFlightDetails}
+                          disabled={isLookingUpFlight}
+                        >
+                          {isLookingUpFlight ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <Search className="h-4 w-4 mr-2" />
+                          )}
+                          Lookup
+                        </Button>
+                      </div>
+                      <FormDescription>
+                        Enter an airline code followed by flight number
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={flightForm.control}
+                  name="airline"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Airline</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. British Airways" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
+                <FormField
+                  control={flightForm.control}
+                  name="departureAirport"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Departure Airport</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. LHR" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={flightForm.control}
+                  name="arrivalAirport"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Arrival Airport</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. JFK" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
+                <FormField
+                  control={flightForm.control}
+                  name="departureDate"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Departure Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={flightForm.control}
+                  name="departureTime"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Departure Time</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
+                <FormField
+                  control={flightForm.control}
+                  name="arrivalDate"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Arrival Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={flightForm.control}
+                  name="arrivalTime"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Arrival Time</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
+                <FormField
+                  control={flightForm.control}
+                  name="bookingReference"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Booking Reference</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. ABC123" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={flightForm.control}
+                  name="bookingStatus"
+                  render={({ field }) => (
+                    <FormItem className="flex-1">
+                      <FormLabel>Status</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="confirmed">Confirmed</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="delayed">Delayed</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAddFlightOutOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit">
+                  <Plane className="h-4 w-4 mr-2" />
+                  Save Flight
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

@@ -23,7 +23,7 @@ export * from "@/components/trip-header-edit";
 export * from "@/components/trip-timeline";
 export * from "@/components/trip-destinations";
 export * from "@/components/trip-destination-tabs";
-export * from "@/components/trip-participant-details";
+// TripParticipantDetails is now directly imported in pages that use it
 
 // Authentication UI
 export * from "@/components/login-form";
