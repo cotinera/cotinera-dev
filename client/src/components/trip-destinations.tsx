@@ -230,71 +230,72 @@ export function TripDestinations({ tripId }: { tripId: number }) {
           <CollapsibleContent className="overflow-visible">
             <CardContent className="p-2 pt-0 flex flex-col gap-2">
               <div className="border rounded-md overflow-hidden">
-                <div 
-                  className="h-[160px] overflow-y-auto" 
-                  onWheel={handleScroll}
-                >
-                  <ScrollArea className="h-full" style={{ overflow: 'auto' }}>
-                    <div className="p-2 space-y-1">
-                      {trip && (
-                        <div className="flex items-center justify-between py-1 px-2 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate text-xs">
-                              {trip.location || 'Starting Point'}
-                            </p>
-                            <p className="text-[11px] text-muted-foreground">
-                              {format(new Date(trip.startDate), "MMM d")} -{" "}
-                              {format(new Date(sortedDestinations[0]?.startDate || trip.endDate), "MMM d")}
-                            </p>
-                          </div>
+                <ScrollArea className="h-[200px]">
+                  <div className="p-2 space-y-2">
+                    {trip && (
+                      <div className="flex items-center justify-between py-1 px-2 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate text-xs">
+                            {trip.location || 'Starting Point'}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {format(new Date(trip.startDate), "MMM d")} -{" "}
+                            {format(new Date(sortedDestinations[0]?.startDate || trip.endDate), "MMM d")}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="text-[10px] h-4 px-1">
+                          1
+                        </Badge>
+                      </div>
+                    )}
+                    {sortedDestinations.map((destination, index) => (
+                      <div
+                        key={destination.id}
+                        className="flex items-center justify-between py-1 px-2 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate text-xs">
+                            {destination.name}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {format(new Date(destination.startDate), "MMM d")} -{" "}
+                            {format(new Date(destination.endDate), "MMM d")}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEdit(destination);
+                            }}
+                          >
+                            <Edit2 className="h-3 w-3" />
+                          </Button>
                           <Badge variant="outline" className="text-[10px] h-4 px-1">
-                            1
+                            {index + 2}
                           </Badge>
                         </div>
-                      )}
-                      {sortedDestinations.map((destination, index) => (
-                        <div
-                          key={destination.id}
-                          className="flex items-center justify-between py-1 px-2 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate text-xs">
-                              {destination.name}
-                            </p>
-                            <p className="text-[11px] text-muted-foreground">
-                              {format(new Date(destination.startDate), "MMM d")} -{" "}
-                              {format(new Date(destination.endDate), "MMM d")}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-5 w-5"
-                              onClick={() => onEdit(destination)}
-                            >
-                              <Edit2 className="h-3 w-3" />
-                            </Button>
-                            <Badge variant="outline" className="text-[10px] h-4 px-1">
-                              {index + 2}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                </div>
+                      </div>
+                    ))}
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-2"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsAddDestinationOpen(true);
+                      }}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Stop
+                    </Button>
+                  </div>
+                </ScrollArea>
               </div>
-
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => setIsAddDestinationOpen(true)}
-              >
-                <Plus className="h-3 w-3 mr-1" />
-                Add Stop
-              </Button>
 
               <Dialog
                 open={isAddDestinationOpen}
