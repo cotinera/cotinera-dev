@@ -162,10 +162,10 @@ export function FlightBookings({ tripId }: FlightBookingsProps) {
   return (
     <Card>
       <CardHeader>
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center flex-wrap gap-2">
           <div>
             <CardTitle>Flight Bookings</CardTitle>
-            <CardDescription>Manage your flight reservations</CardDescription>
+            <CardDescription>Manage your flight reservations with auto-complete lookup</CardDescription>
           </div>
           <Dialog
             open={isAddFlightOpen}
@@ -222,21 +222,22 @@ export function FlightBookings({ tripId }: FlightBookingsProps) {
                           </FormControl>
                           <Button
                             type="button"
-                            variant="secondary"
+                            variant="default"
                             size="sm"
                             onClick={lookupFlightDetails}
                             disabled={isLookingUpFlight}
+                            className="whitespace-nowrap"
                           >
                             {isLookingUpFlight ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
                             ) : (
                               <Search className="h-4 w-4 mr-1" />
                             )}
-                            {isLookingUpFlight ? "Looking up..." : "Lookup"}
+                            {isLookingUpFlight ? "Looking up..." : "Lookup Flight"}
                           </Button>
                         </div>
                         <FormDescription>
-                          Enter a flight number and select a departure date, then click "Lookup" to automatically fill flight details.
+                          Enter a flight number and select a departure date, then click "Lookup Flight" to automatically fetch flight details.
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -416,8 +417,11 @@ export function FlightBookings({ tripId }: FlightBookingsProps) {
             </div>
           ))}
           {flights.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              No flights booked yet
+            <div className="text-center py-8 space-y-2">
+              <p className="text-muted-foreground">No flights booked yet</p>
+              <p className="text-sm text-muted-foreground">
+                Click "Add Flight" and use the lookup feature to quickly add flights by entering a flight number
+              </p>
             </div>
           )}
         </div>

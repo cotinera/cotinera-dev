@@ -15,6 +15,7 @@ import { CalendarView } from "@/components/calendar-view";
 import { MapView as MapViewComp } from "@/components/map-view";
 import { ChatMessages } from "@/components/chat-messages";
 import { BudgetTracker } from "@/components/budget-tracker";
+import { FlightBookings } from "@/components/flight-bookings";
 import { Loader2, ArrowLeft, Trash2 } from "lucide-react";
 import type { Destination } from "@db/schema";
 import {
@@ -274,6 +275,12 @@ export default function TripDetail() {
               
               <section className="mt-8">
                 <BudgetTracker
+                  tripId={trip.id}
+                />
+              </section>
+              
+              <section className="mt-8">
+                <FlightBookings
                   tripId={trip.id}
                 />
               </section>
