@@ -114,11 +114,19 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Flight number and date are required" });
       }
       
+      console.log(`Flight lookup requested for ${flightNumber} on ${date}`);
+      
       // Import the flight API utility
       const { lookupFlightInfo } = await import('./utils/flightApi');
       
       // Get API key from environment variables
       const apiKey = process.env.AVIATION_STACK_API_KEY;
+      
+      if (!apiKey) {
+        console.warn('Aviation Stack API key is not set. Using mock data.');
+      } else {
+        console.log('Using Aviation Stack API with provided API key');
+      }
       
       // Lookup flight information
       const flightInfo = await lookupFlightInfo(
@@ -129,13 +137,17 @@ export function registerRoutes(app: Express): Server {
       
       // Check if there was an error
       if ('error' in flightInfo) {
+        console.log('Flight lookup error:', flightInfo.error);
         return res.status(404).json(flightInfo);
       }
       
+      console.log('Flight lookup successful:', flightInfo.flight.airline, flightInfo.flight.flightNumber);
       res.json(flightInfo);
     } catch (error) {
       console.error('Error looking up flight information:', error);
-      res.status(500).json({ error: 'Failed to lookup flight information' });
+      res.status(500).json({ 
+        error: error instanceof Error ? error.message : 'Failed to lookup flight information' 
+      });
     }
   });
   
@@ -171,12 +183,23 @@ export function registerRoutes(app: Express): Server {
       if (existingTrip.length === 0) {
         return res.status(404).json({ error: "Trip not found" });
       }
+      
+      // Prepare data and handle empty dates
+      const flightData = { ...req.body, tripId };
+      
+      // Handle empty strings for dates by setting defaults
+      if (!flightData.departureDate || flightData.departureDate === '') {
+        const today = new Date();
+        flightData.departureDate = today.toISOString().split('T')[0];
+      }
+      
+      if (!flightData.arrivalDate || flightData.arrivalDate === '') {
+        const today = new Date();
+        flightData.arrivalDate = today.toISOString().split('T')[0];
+      }
 
       const [flight] = await db.insert(flights)
-        .values({
-          ...req.body,
-          tripId
-        })
+        .values(flightData)
         .returning();
 
       res.status(201).json(flight);

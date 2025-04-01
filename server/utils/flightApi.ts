@@ -99,61 +99,99 @@ export async function lookupFlightInfo(
   flightDate: string,
   apiKey?: string
 ): Promise<FlightApiResponse | ErrorResponse> {
+  // Validate input
+  if (!flightNumber) {
+    return { error: 'Flight number is required.' };
+  }
+  
+  if (!flightDate) {
+    return { error: 'Flight date is required.' };
+  }
+  
+  // Clean the flight number (remove spaces)
+  const cleanFlightNumber = flightNumber.replace(/\s+/g, '').toUpperCase();
+  
   if (!apiKey) {
     console.warn('No API key provided for flight lookup. Using mock data.');
     // For development, return mock data when no API key is available
-    return generateMockFlightData(flightNumber, flightDate);
+    return generateMockFlightData(cleanFlightNumber, flightDate);
   }
 
   try {
-    // Parse the input flight number to extract airline IATA code and flight number
-    const airlineCode = flightNumber.substring(0, 2); // Assuming 2-letter airline code
-    const flightNum = flightNumber.substring(2); // Rest is the flight number
-    
     // Format date to YYYY-MM-DD as required by Aviation Stack API
-    const formattedDate = new Date(flightDate).toISOString().split('T')[0];
+    let formattedDate: string;
+    
+    try {
+      formattedDate = new Date(flightDate).toISOString().split('T')[0];
+    } catch (e) {
+      console.error('Invalid date format provided:', flightDate);
+      return { error: 'Invalid date format. Please use YYYY-MM-DD format.' };
+    }
+    
+    console.log(`Looking up flight: ${cleanFlightNumber} on ${formattedDate}`);
     
     // Make request to Aviation Stack API
     const response = await axios.get('http://api.aviationstack.com/v1/flights', {
       params: {
         access_key: apiKey,
-        flight_iata: flightNumber,
+        flight_iata: cleanFlightNumber,
         flight_date: formattedDate
       }
     });
     
+    console.log('Aviation Stack API response received');
+    
     // Check if the response contains data
     if (!response.data || !response.data.data || response.data.data.length === 0) {
+      console.log('No flight data found in API response');
       return { error: 'No flight information found for the given flight number and date.' };
     }
     
     // Extract relevant flight information
     const flightData = response.data.data[0];
+    console.log('Flight data found:', JSON.stringify(flightData, null, 2).substring(0, 200) + '...');
+    
+    // Validate required flight data
+    if (!flightData.airline || !flightData.departure || !flightData.arrival) {
+      console.error('Incomplete flight data received from API');
+      return { error: 'Incomplete flight information received from the API.' };
+    }
     
     // Format the response to match our application's data structure
     return {
       flight: {
-        airline: flightData.airline.name,
-        flightNumber: flightNumber,
+        airline: flightData.airline.name || 'Unknown Airline',
+        flightNumber: cleanFlightNumber,
         departureAirport: {
-          code: flightData.departure.iata,
-          name: flightData.departure.airport,
-          city: flightData.departure.city,
-          country: flightData.departure.country
+          code: flightData.departure.iata || 'N/A',
+          name: flightData.departure.airport || 'Unknown Airport',
+          city: flightData.departure.city || 'Unknown City',
+          country: flightData.departure.country || 'Unknown Country'
         },
         arrivalAirport: {
-          code: flightData.arrival.iata,
-          name: flightData.arrival.airport,
-          city: flightData.arrival.city,
-          country: flightData.arrival.country
+          code: flightData.arrival.iata || 'N/A',
+          name: flightData.arrival.airport || 'Unknown Airport',
+          city: flightData.arrival.city || 'Unknown City',
+          country: flightData.arrival.country || 'Unknown Country'
         },
-        scheduledDeparture: flightData.departure.scheduled,
-        scheduledArrival: flightData.arrival.scheduled,
-        status: flightData.flight_status
+        scheduledDeparture: flightData.departure.scheduled || new Date().toISOString(),
+        scheduledArrival: flightData.arrival.scheduled || new Date().toISOString(),
+        status: flightData.flight_status || 'Unknown'
       }
     };
   } catch (error) {
     console.error('Error fetching flight information:', error);
+    
+    // Check if it's an API error with details
+    if (axios.isAxiosError(error) && error.response) {
+      console.error('API error details:', error.response.data);
+      
+      // Check for API-specific error messages
+      if (error.response.data && error.response.data.error) {
+        return { error: `API Error: ${error.response.data.error.message || error.response.data.error.info || 'Unknown API error'}` };
+      }
+    }
+    
     return { error: 'Failed to fetch flight information. Please try again.' };
   }
 }

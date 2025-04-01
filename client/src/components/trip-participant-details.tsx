@@ -526,10 +526,11 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
   });
 
+  // Get the appropriate badge variant based on participant status
   const getStatusBadgeVariant = (status: Status) => {
     switch (status) {
       case 'yes':
-        return 'default';
+        return 'default'; // Use 'default' instead of 'success' for compatibility with Badge variant type
       case 'no':
         return 'destructive';
       default:
@@ -537,6 +538,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     }
   };
 
+  // Get the appropriate icon for each status
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'yes':
@@ -548,6 +550,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     }
   };
 
+  // Get the next status in the cycle when clicking on the badge
   const getNextStatus = (currentStatus: Status): Status => {
     const currentIndex = STATUS_CYCLE.indexOf(currentStatus);
     return STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
