@@ -299,12 +299,59 @@ export function TripDestinations({ tripId }: { tripId: number }) {
 
               <Dialog
                 open={isAddDestinationOpen}
-                onOpenChange={setIsAddDestinationOpen}
+                onOpenChange={(open) => {
+                  if (open) {
+                    // Get the last destination or trip end date to set default values
+                    let previousEndDate;
+                    let previousLocationInfo = "";
+                    
+                    if (sortedDestinations.length > 0) {
+                      // Use the most recent destination's end date
+                      const lastDestination = sortedDestinations[sortedDestinations.length - 1];
+                      previousEndDate = new Date(lastDestination.endDate);
+                      previousLocationInfo = `Your previous destination was ${lastDestination.name} (ends on ${format(new Date(lastDestination.endDate), "MMM d, yyyy")})`;
+                    } else if (trip) {
+                      // No destinations yet, use the trip end date
+                      previousEndDate = new Date(trip.endDate);
+                      previousLocationInfo = `Your trip starts at ${trip.location || 'Starting Point'} (ends on ${format(new Date(trip.endDate), "MMM d, yyyy")})`;
+                    } else {
+                      // Fallback to today
+                      previousEndDate = new Date();
+                      previousLocationInfo = "Please select dates for your new destination";
+                    }
+                    
+                    // Set default dates - start date is the end date of the previous destination
+                    const defaultStartDate = format(previousEndDate, "yyyy-MM-dd");
+                    
+                    // End date is a week after start date by default
+                    const defaultEndDate = new Date(previousEndDate);
+                    defaultEndDate.setDate(defaultEndDate.getDate() + 7);
+                    
+                    form.reset({
+                      name: "",
+                      startDate: defaultStartDate,
+                      endDate: format(defaultEndDate, "yyyy-MM-dd"),
+                    });
+                  }
+                  
+                  setIsAddDestinationOpen(open);
+                }}
               >
                 <DialogContent className="fixed top-[50%] left-[50%] transform -translate-x-[50%] -translate-y-[50%] w-[90vw] max-w-[425px] max-h-[90vh] overflow-y-auto z-50">
                   <DialogHeader>
                     <DialogTitle>Add New Destination</DialogTitle>
                   </DialogHeader>
+                  
+                  <div className="mb-4 p-3 text-sm rounded-md bg-muted">
+                    {sortedDestinations.length > 0 ? (
+                      <p>Your previous destination was <span className="font-semibold">{sortedDestinations[sortedDestinations.length - 1].name}</span> (ends on {format(new Date(sortedDestinations[sortedDestinations.length - 1].endDate), "MMM d, yyyy")})</p>
+                    ) : trip ? (
+                      <p>Your trip starts at <span className="font-semibold">{trip.location || 'Starting Point'}</span> (ends on {format(new Date(trip.endDate), "MMM d, yyyy")})</p>
+                    ) : (
+                      <p>Please select dates for your new destination</p>
+                    )}
+                  </div>
+                  
                   <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                       <FormField
