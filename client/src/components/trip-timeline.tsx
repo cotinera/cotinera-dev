@@ -79,7 +79,11 @@ export function TripTimeline({
       }
     },
     onSuccess: () => {
+      // Invalidate all related queries to ensure real-time updates everywhere
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
+      // Also invalidate the query used by the destinations dropdown in the TripDestinations component
+      queryClient.invalidateQueries({ queryKey: ["trip-destinations", tripId] });
+      
       if (currentDestinationId === destinationToDelete?.id) {
         onDestinationChange(undefined);
       }
