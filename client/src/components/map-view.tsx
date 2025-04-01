@@ -9,6 +9,117 @@ import { useToast } from "@/hooks/use-toast";
 import { useAccommodations } from "@/hooks/use-accommodations";
 import { cn } from "@/lib/utils";
 
+// Smooth map animation function for transitions between locations
+const smoothMapAnimation = (
+  mapRef: React.RefObject<google.maps.Map>,
+  currentCoordinates: { lat: number; lng: number },
+  targetCoordinates: { lat: number; lng: number },
+  onComplete?: () => void
+) => {
+  if (!mapRef.current) return;
+  
+  // Get current zoom and position
+  const currentZoom = mapRef.current.getZoom() || 12;
+  
+  // Calculate zoom levels for animation - find best values for different distance ranges
+  const distance = calculateDistance(currentCoordinates, targetCoordinates);
+  
+  // Adjust zoom level based on distance between points for better spatial context
+  let midZoom;
+  if (distance < 1) { // Very close points (<1km)
+    midZoom = Math.max(currentZoom - 1, 10); // Minimal zoom out
+  } else if (distance < 5) { // Close points (1-5km)
+    midZoom = Math.max(currentZoom - 2, 9);
+  } else if (distance < 20) { // Medium distance (5-20km)
+    midZoom = Math.max(currentZoom - 3, 8);
+  } else { // Long distance (>20km)
+    midZoom = Math.max(currentZoom - 4, 7); // More zoom out to see relation
+  }
+  
+  const finalZoom = 16; // Standardized final zoom level for better context
+  
+  // Animation parameters
+  let step = 0;
+  const totalSteps = 36; // More steps for smoother animation
+  const initialZoom = currentZoom;
+  
+  // Animation function
+  const animate = () => {
+    if (!mapRef.current) return;
+    
+    step++;
+    
+    if (step <= totalSteps / 2) {
+      // First half: zoom out smoothly with easing
+      const zoomProgress = step / (totalSteps / 2);
+      const easedProgress = easeInOutCubic(zoomProgress);
+      const newZoom = initialZoom - (easedProgress * (initialZoom - midZoom));
+      mapRef.current.setZoom(newZoom);
+      
+      // Start moving toward destination
+      const lat = currentCoordinates.lat + (easedProgress * (targetCoordinates.lat - currentCoordinates.lat) * 0.5);
+      const lng = currentCoordinates.lng + (easedProgress * (targetCoordinates.lng - currentCoordinates.lng) * 0.5);
+      mapRef.current.panTo({ lat, lng });
+      
+      requestAnimationFrame(animate);
+    } else if (step <= totalSteps) {
+      // Second half: zoom in smoothly with easing
+      const zoomProgress = (step - totalSteps / 2) / (totalSteps / 2);
+      const easedProgress = easeInOutCubic(zoomProgress);
+      const newZoom = midZoom + (easedProgress * (finalZoom - midZoom));
+      mapRef.current.setZoom(newZoom);
+      
+      // Complete movement to destination with curved path
+      const moveProgress = (step - totalSteps / 2) / (totalSteps / 2);
+      const easedMoveProgress = easeInOutCubic(moveProgress);
+      
+      // Calculate midpoint for curved path, with a slight offset for a more natural curve
+      // This creates a more appealing arc in the camera movement
+      const latMid = currentCoordinates.lat + 0.5 * (targetCoordinates.lat - currentCoordinates.lat);
+      const lngMid = currentCoordinates.lng + 0.5 * (targetCoordinates.lng - currentCoordinates.lng);
+      
+      const lat = latMid + (easedMoveProgress * (targetCoordinates.lat - latMid));
+      const lng = lngMid + (easedMoveProgress * (targetCoordinates.lng - lngMid));
+      
+      mapRef.current.panTo({ lat, lng });
+      
+      if (step < totalSteps) {
+        requestAnimationFrame(animate);
+      } else if (onComplete) {
+        onComplete();
+      }
+    }
+  };
+  
+  // Start the animation
+  animate();
+};
+
+// Helper function to calculate distance between two coordinates in km
+const calculateDistance = (
+  point1: { lat: number; lng: number }, 
+  point2: { lat: number; lng: number }
+): number => {
+  const R = 6371; // Earth's radius in km
+  const dLat = (point2.lat - point1.lat) * Math.PI / 180;
+  const dLng = (point2.lng - point1.lng) * Math.PI / 180;
+  
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(point1.lat * Math.PI / 180) * Math.cos(point2.lat * Math.PI / 180) * 
+    Math.sin(dLng/2) * Math.sin(dLng/2);
+  
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c; // Distance in km
+};
+
+// Easing function for smoother animation
+const easeInOutCubic = (t: number): number => {
+  return t < 0.5 
+    ? 4 * t * t * t 
+    : 1 - Math.pow(-2 * t + 2, 3) / 2;
+};
+
 import {
   useGoogleMapsScript,
   useMapCoordinates,
@@ -319,61 +430,14 @@ export function MapView({
 
   const handlePlaceNameClick = useCallback((place: PinnedPlace) => {
     if (mapRef.current && place.coordinates) {
-      // Get current zoom and position
-      const currentZoom = mapRef.current.getZoom() || 12;
-      
-      // Calculate a moderately zoomed out level - not too far
-      const midZoom = Math.max(currentZoom - 1, 10);
-      
-      // Store final destination coordinates
-      const destination = place.coordinates;
-      
-      // Start animation sequence
-      let step = 0;
-      const totalSteps = 20; // More steps for smoother animation
-      const initialZoom = currentZoom;
-      const finalZoom = 17;
-      
-      const animate = () => {
-        if (!mapRef.current) return;
-        
-        step++;
-        
-        if (step <= totalSteps / 2) {
-          // First half: zoom out smoothly
-          const zoomProgress = step / (totalSteps / 2);
-          const newZoom = initialZoom - (zoomProgress * (initialZoom - midZoom));
-          mapRef.current.setZoom(newZoom);
-          
-          // Start moving toward destination
-          const lat = coordinates.lat + (zoomProgress * (destination.lat - coordinates.lat) * 0.5);
-          const lng = coordinates.lng + (zoomProgress * (destination.lng - coordinates.lng) * 0.5);
-          mapRef.current.panTo({ lat, lng });
-          
-          requestAnimationFrame(animate);
-        } else if (step <= totalSteps) {
-          // Second half: zoom in smoothly
-          const zoomProgress = (step - totalSteps / 2) / (totalSteps / 2);
-          const newZoom = midZoom + (zoomProgress * (finalZoom - midZoom));
-          mapRef.current.setZoom(newZoom);
-          
-          // Complete movement to destination
-          const moveProgress = (step - totalSteps / 2) / (totalSteps / 2);
-          const latMid = coordinates.lat + 0.5 * (destination.lat - coordinates.lat);
-          const lngMid = coordinates.lng + 0.5 * (destination.lng - coordinates.lng);
-          
-          const lat = latMid + (moveProgress * (destination.lat - latMid));
-          const lng = lngMid + (moveProgress * (destination.lng - lngMid));
-          mapRef.current.panTo({ lat, lng });
-          
-          if (step < totalSteps) {
-            requestAnimationFrame(animate);
-          }
-        }
-      };
-      
-      // Start the animation
-      animate();
+      // Use our shared animation function for better spatial context
+      smoothMapAnimation(
+        mapRef, 
+        coordinates, 
+        place.coordinates,
+        // Optional callback when animation completes
+        undefined
+      );
     }
     
     if (place.placeId) {
@@ -383,61 +447,12 @@ export function MapView({
 
   const handleMarkerClick = useCallback((item: PinnedPlace | Accommodation | Activity) => {
     if (mapRef.current && 'coordinates' in item && item.coordinates) {
-      // Get current zoom and position
-      const currentZoom = mapRef.current.getZoom() || 12;
-      
-      // Calculate a moderately zoomed out level - not too far
-      const midZoom = Math.max(currentZoom - 1, 10);
-      
-      // Store final destination coordinates
-      const destination = item.coordinates;
-      
-      // Start animation sequence
-      let step = 0;
-      const totalSteps = 20; // More steps for smoother animation
-      const initialZoom = currentZoom;
-      const finalZoom = 17;
-      
-      const animate = () => {
-        if (!mapRef.current) return;
-        
-        step++;
-        
-        if (step <= totalSteps / 2) {
-          // First half: zoom out smoothly
-          const zoomProgress = step / (totalSteps / 2);
-          const newZoom = initialZoom - (zoomProgress * (initialZoom - midZoom));
-          mapRef.current.setZoom(newZoom);
-          
-          // Start moving toward destination
-          const lat = coordinates.lat + (zoomProgress * (destination.lat - coordinates.lat) * 0.5);
-          const lng = coordinates.lng + (zoomProgress * (destination.lng - coordinates.lng) * 0.5);
-          mapRef.current.panTo({ lat, lng });
-          
-          requestAnimationFrame(animate);
-        } else if (step <= totalSteps) {
-          // Second half: zoom in smoothly
-          const zoomProgress = (step - totalSteps / 2) / (totalSteps / 2);
-          const newZoom = midZoom + (zoomProgress * (finalZoom - midZoom));
-          mapRef.current.setZoom(newZoom);
-          
-          // Complete movement to destination
-          const moveProgress = (step - totalSteps / 2) / (totalSteps / 2);
-          const latMid = coordinates.lat + 0.5 * (destination.lat - coordinates.lat);
-          const lngMid = coordinates.lng + 0.5 * (destination.lng - coordinates.lng);
-          
-          const lat = latMid + (moveProgress * (destination.lat - latMid));
-          const lng = lngMid + (moveProgress * (destination.lng - lngMid));
-          mapRef.current.panTo({ lat, lng });
-          
-          if (step < totalSteps) {
-            requestAnimationFrame(animate);
-          }
-        }
-      };
-      
-      // Start the animation
-      animate();
+      // Use our shared animation function with easing and better spatial context
+      smoothMapAnimation(
+        mapRef, 
+        coordinates, 
+        item.coordinates
+      );
     }
 
     if ('placeId' in item && item.placeId) {
@@ -591,61 +606,14 @@ export function MapView({
           setSearchedLocation({ lat, lng });
 
           if (mapRef.current) {
-            // Get current zoom and position
-            const currentZoom = mapRef.current.getZoom() || 12;
-            
-            // Calculate a moderately zoomed out level - not too far
-            const midZoom = Math.max(currentZoom - 1, 10);
-            
-            // Store final destination coordinates
-            const destination = { lat, lng };
-            
-            // Start animation sequence
-            let step = 0;
-            const totalSteps = 20; // More steps for smoother animation
-            const initialZoom = currentZoom;
-            const finalZoom = 17;
-            
-            const animate = () => {
-              if (!mapRef.current) return;
-              
-              step++;
-              
-              if (step <= totalSteps / 2) {
-                // First half: zoom out smoothly
-                const zoomProgress = step / (totalSteps / 2);
-                const newZoom = initialZoom - (zoomProgress * (initialZoom - midZoom));
-                mapRef.current.setZoom(newZoom);
-                
-                // Start moving toward destination
-                const lat = coordinates.lat + (zoomProgress * (destination.lat - coordinates.lat) * 0.5);
-                const lng = coordinates.lng + (zoomProgress * (destination.lng - coordinates.lng) * 0.5);
-                mapRef.current.panTo({ lat, lng });
-                
-                requestAnimationFrame(animate);
-              } else if (step <= totalSteps) {
-                // Second half: zoom in smoothly
-                const zoomProgress = (step - totalSteps / 2) / (totalSteps / 2);
-                const newZoom = midZoom + (zoomProgress * (finalZoom - midZoom));
-                mapRef.current.setZoom(newZoom);
-                
-                // Complete movement to destination
-                const moveProgress = (step - totalSteps / 2) / (totalSteps / 2);
-                const latMid = coordinates.lat + 0.5 * (destination.lat - coordinates.lat);
-                const lngMid = coordinates.lng + 0.5 * (destination.lng - coordinates.lng);
-                
-                const lat = latMid + (moveProgress * (destination.lat - latMid));
-                const lng = lngMid + (moveProgress * (destination.lng - lngMid));
-                mapRef.current.panTo({ lat, lng });
-                
-                if (step < totalSteps) {
-                  requestAnimationFrame(animate);
-                }
-              }
-            };
-            
-            // Start the animation
-            animate();
+            // Use our shared animation function with easing and better spatial context
+            smoothMapAnimation(
+              mapRef, 
+              coordinates, 
+              { lat, lng },
+              // Optional callback when animation completes
+              undefined
+            );
           }
 
           fetchDetails(result.placeId);
@@ -746,61 +714,14 @@ export function MapView({
   useEffect(() => {
     if (selectedPlace) {
       if (mapRef.current && selectedPlace.coordinates) {
-        // Get current zoom and position
-        const currentZoom = mapRef.current.getZoom() || 12;
-        
-        // Calculate a moderately zoomed out level - not too far
-        const midZoom = Math.max(currentZoom - 1, 10);
-        
-        // Store final destination coordinates
-        const destination = selectedPlace.coordinates;
-        
-        // Start animation sequence
-        let step = 0;
-        const totalSteps = 20; // More steps for smoother animation
-        const initialZoom = currentZoom;
-        const finalZoom = 17;
-        
-        const animate = () => {
-          if (!mapRef.current) return;
-          
-          step++;
-          
-          if (step <= totalSteps / 2) {
-            // First half: zoom out smoothly
-            const zoomProgress = step / (totalSteps / 2);
-            const newZoom = initialZoom - (zoomProgress * (initialZoom - midZoom));
-            mapRef.current.setZoom(newZoom);
-            
-            // Start moving toward destination
-            const lat = coordinates.lat + (zoomProgress * (destination.lat - coordinates.lat) * 0.5);
-            const lng = coordinates.lng + (zoomProgress * (destination.lng - coordinates.lng) * 0.5);
-            mapRef.current.panTo({ lat, lng });
-            
-            requestAnimationFrame(animate);
-          } else if (step <= totalSteps) {
-            // Second half: zoom in smoothly
-            const zoomProgress = (step - totalSteps / 2) / (totalSteps / 2);
-            const newZoom = midZoom + (zoomProgress * (finalZoom - midZoom));
-            mapRef.current.setZoom(newZoom);
-            
-            // Complete movement to destination
-            const moveProgress = (step - totalSteps / 2) / (totalSteps / 2);
-            const latMid = coordinates.lat + 0.5 * (destination.lat - coordinates.lat);
-            const lngMid = coordinates.lng + 0.5 * (destination.lng - coordinates.lng);
-            
-            const lat = latMid + (moveProgress * (destination.lat - latMid));
-            const lng = lngMid + (moveProgress * (destination.lng - lngMid));
-            mapRef.current.panTo({ lat, lng });
-            
-            if (step < totalSteps) {
-              requestAnimationFrame(animate);
-            }
-          }
-        };
-        
-        // Start the animation
-        animate();
+        // Use our shared animation function with easing and better spatial context
+        smoothMapAnimation(
+          mapRef, 
+          coordinates, 
+          selectedPlace.coordinates,
+          // Optional callback when animation completes
+          undefined
+        );
       }
 
       if (selectedPlace.placeId) {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Trip, Destination } from "@db/schema";
 import { Button } from "@/components/ui/button";
@@ -80,6 +80,45 @@ export function TripDestinations({ tripId }: { tripId: number }) {
       endDate: "",
     },
   });
+  
+  // Pre-calculate default dates based on current state with better chaining logic
+  const getDefaultDates = () => {
+    let previousEndDate;
+    let sourceName = '';
+    
+    if (sortedDestinations.length > 0) {
+      // Use the most recent destination's end date
+      const lastDestination = sortedDestinations[sortedDestinations.length - 1];
+      previousEndDate = new Date(lastDestination.endDate);
+      sourceName = lastDestination.name;
+    } else if (trip) {
+      // No destinations yet, use the trip start date (not end date)
+      // This is more logical for the first destination in a trip
+      previousEndDate = new Date(trip.startDate);
+      sourceName = trip.location || 'Starting Point';
+    } else {
+      // Fallback to today
+      previousEndDate = new Date();
+    }
+    
+    // Ensure we're starting from the next day after the previous end date
+    // This creates a continuous timeline without gaps or overlaps
+    const nextDay = new Date(previousEndDate);
+    nextDay.setDate(nextDay.getDate() + 1); // Start the day after previous end
+    
+    const defaultStartDate = format(nextDay, "yyyy-MM-dd");
+    
+    // End date is a week after start date by default
+    const defaultEndDate = new Date(nextDay);
+    defaultEndDate.setDate(defaultEndDate.getDate() + 7);
+    
+    return {
+      startDate: defaultStartDate,
+      endDate: format(defaultEndDate, "yyyy-MM-dd"),
+      sourceDate: format(previousEndDate, "yyyy-MM-dd"),
+      sourceName
+    };
+  };
 
   const editForm = useForm<FormData & { id: number }>({
     resolver: zodResolver(destinationSchema),
@@ -196,6 +235,15 @@ export function TripDestinations({ tripId }: { tripId: number }) {
 
   const sortedDestinations = destinations?.sort((a, b) => a.order - b.order) || [];
   const totalStops = (sortedDestinations.length || 0) + 1;
+  
+  // Reset form with default dates whenever relevant data changes or when dialog opens
+  useEffect(() => {
+    if (isAddDestinationOpen && (sortedDestinations?.length > 0 || trip)) {
+      const defaultDates = getDefaultDates();
+      form.setValue("startDate", defaultDates.startDate);
+      form.setValue("endDate", defaultDates.endDate);
+    }
+  }, [isAddDestinationOpen, sortedDestinations, trip, form]);
 
   const handleScroll = (e: React.WheelEvent<HTMLDivElement>) => {
     e.stopPropagation();
@@ -301,36 +349,12 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                 open={isAddDestinationOpen}
                 onOpenChange={(open) => {
                   if (open) {
-                    // Get the last destination or trip end date to set default values
-                    let previousEndDate;
-                    let previousLocationInfo = "";
-                    
-                    if (sortedDestinations.length > 0) {
-                      // Use the most recent destination's end date
-                      const lastDestination = sortedDestinations[sortedDestinations.length - 1];
-                      previousEndDate = new Date(lastDestination.endDate);
-                      previousLocationInfo = `Your previous destination was ${lastDestination.name} (ends on ${format(new Date(lastDestination.endDate), "MMM d, yyyy")})`;
-                    } else if (trip) {
-                      // No destinations yet, use the trip end date
-                      previousEndDate = new Date(trip.endDate);
-                      previousLocationInfo = `Your trip starts at ${trip.location || 'Starting Point'} (ends on ${format(new Date(trip.endDate), "MMM d, yyyy")})`;
-                    } else {
-                      // Fallback to today
-                      previousEndDate = new Date();
-                      previousLocationInfo = "Please select dates for your new destination";
-                    }
-                    
-                    // Set default dates - start date is the end date of the previous destination
-                    const defaultStartDate = format(previousEndDate, "yyyy-MM-dd");
-                    
-                    // End date is a week after start date by default
-                    const defaultEndDate = new Date(previousEndDate);
-                    defaultEndDate.setDate(defaultEndDate.getDate() + 7);
+                    const defaultDates = getDefaultDates();
                     
                     form.reset({
                       name: "",
-                      startDate: defaultStartDate,
-                      endDate: format(defaultEndDate, "yyyy-MM-dd"),
+                      startDate: defaultDates.startDate,
+                      endDate: defaultDates.endDate,
                     });
                   }
                   
@@ -344,9 +368,17 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                   
                   <div className="mb-4 p-3 text-sm rounded-md bg-muted">
                     {sortedDestinations.length > 0 ? (
-                      <p>Your previous destination was <span className="font-semibold">{sortedDestinations[sortedDestinations.length - 1].name}</span> (ends on {format(new Date(sortedDestinations[sortedDestinations.length - 1].endDate), "MMM d, yyyy")})</p>
+                      <div>
+                        <p>Your previous destination was <span className="font-semibold">{sortedDestinations[sortedDestinations.length - 1].name}</span></p>
+                        <p className="mt-1 text-xs text-muted-foreground">Ends on {format(new Date(sortedDestinations[sortedDestinations.length - 1].endDate), "MMM d, yyyy")}</p>
+                        <p className="mt-1">Your new destination will start on the following day</p>
+                      </div>
                     ) : trip ? (
-                      <p>Your trip starts at <span className="font-semibold">{trip.location || 'Starting Point'}</span> (ends on {format(new Date(trip.endDate), "MMM d, yyyy")})</p>
+                      <div>
+                        <p>Your trip starts at <span className="font-semibold">{trip.location || 'Starting Point'}</span></p>
+                        <p className="mt-1 text-xs text-muted-foreground">Trip begins on {format(new Date(trip.startDate), "MMM d, yyyy")}</p>
+                        <p className="mt-1">Your new destination will be automatically scheduled to start after this date</p>
+                      </div>
                     ) : (
                       <p>Please select dates for your new destination</p>
                     )}
