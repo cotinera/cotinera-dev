@@ -3,6 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { DayView } from "@/components/calendar/day-view";
 import { Checklist } from "@/components/checklist";
+import { TripDestinations } from "@/components/trip-destinations";
 import { Loader2, ArrowLeft, MapPin } from "lucide-react";
 import type { Trip, Destination } from "@db/schema";
 
@@ -76,6 +77,9 @@ export default function DestinationDetail() {
                 <span>Location in trip: Stop {destination.order + 1}</span>
               </div>
             </div>
+            <div className="z-[1000]">
+              {tripId && <TripDestinations tripId={tripId} />}
+            </div>
           </div>
         </div>
       </header>
@@ -87,7 +91,7 @@ export default function DestinationDetail() {
           </div>
           
           <div>
-            <Checklist tripId={tripId} />
+            {tripId && <Checklist tripId={tripId} />}
           </div>
         </div>
       </main>

@@ -7,6 +7,7 @@ import { Loader2, ArrowLeft, Calendar } from "lucide-react";
 import type { Trip, Activity } from "@db/schema";
 import { format } from "date-fns";
 import { TripHeaderEdit } from "@/components/trip-header-edit";
+import { TripDestinations } from "@/components/trip-destinations";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useState } from "react";
 
@@ -86,6 +87,10 @@ export default function TripCalendar() {
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
+            
+            <div className="absolute right-4 top-0 z-[1000]">
+              <TripDestinations tripId={trip.id} />
+            </div>
 
             <TripHeaderEdit 
               trip={trip} 

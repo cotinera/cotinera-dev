@@ -197,7 +197,7 @@ export default function TripDetail() {
               </Button>
             </div>
 
-            <div className="absolute right-4 top-0">
+            <div className="absolute right-4 top-0 z-[1000]">
               <TripDestinations tripId={trip.id} />
             </div>
 
