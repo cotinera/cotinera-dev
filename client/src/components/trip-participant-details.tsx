@@ -102,6 +102,12 @@ interface ParticipantForm {
 const STATUS_CYCLE = ['pending', 'yes', 'no'] as const;
 type Status = (typeof STATUS_CYCLE)[number];
 
+const STATUS_LABELS = {
+  'pending': 'Pending',
+  'yes': 'Confirmed',
+  'no': 'Declined'
+};
+
 const sortParticipants = (a: Participant, b: Participant) => {
   const statusOrder = {
     yes: 0,
@@ -576,7 +582,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     }
   };
 
-  // Get the next status in the cycle when clicking on the badge
   const getNextStatus = (currentStatus: Status): Status => {
     const currentIndex = STATUS_CYCLE.indexOf(currentStatus);
     return STATUS_CYCLE[(currentIndex + 1) % STATUS_CYCLE.length];
@@ -837,21 +842,34 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                     {participant.name}
                   </TableCell>
                   <TableCell className="text-center">
-                    <Badge 
-                      variant={getStatusBadgeVariant(participant.status as Status)}
-                      className="cursor-pointer"
-                      onClick={() => handleStatusChange(
-                        participant.id, 
-                        getNextStatus(participant.status as Status)
-                      )}
-                    >
-                      {updatingParticipants.includes(participant.id) ? (
-                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                      ) : (
-                        getStatusIcon(participant.status)
-                      )}
-                      {participant.status}
-                    </Badge>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger>
+                        <div className="inline-flex cursor-pointer">
+                          <Badge 
+                            variant={getStatusBadgeVariant(participant.status as Status)}
+                            className="cursor-pointer"
+                          >
+                            {updatingParticipants.includes(participant.id) ? (
+                              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                            ) : (
+                              getStatusIcon(participant.status)
+                            )}
+                            {STATUS_LABELS[participant.status as Status]}
+                          </Badge>
+                        </div>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        {STATUS_CYCLE.map((status) => (
+                          <DropdownMenuItem 
+                            key={status}
+                            onClick={() => handleStatusChange(participant.id, status)}
+                          >
+                            {getStatusIcon(status)}
+                            <span className="ml-2">{STATUS_LABELS[status]}</span>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                   <TableCell>
                     {participant.arrivalDate && format(new Date(participant.arrivalDate), "dd/MM/yyyy")}
