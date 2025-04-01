@@ -18,7 +18,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
 import { format } from "date-fns";
-import { Pin, Plus, ChevronDown, Edit2, Trash2 } from "lucide-react";
+import { Pin, Plus, ChevronDown, Edit2, Trash2, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -207,26 +207,45 @@ export function TripDestinations({ tripId }: { tripId: number }) {
     mutationFn: async () => {
       if (!destinationToDelete) return null;
 
+      console.log("Deleting destination:", destinationToDelete.id);
+
       // First, delete the destination
       const response = await fetch(`/api/trips/${tripId}/destinations/${destinationToDelete.id}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
         },
+        // Adding credentials to ensure cookies are sent
+        credentials: 'include'
       });
 
+      const responseText = await response.text();
+      console.log("Delete response:", response.status, responseText);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to delete destination");
+        let errorMessage = "Failed to delete destination";
+        try {
+          // Try to parse the response as JSON if possible
+          const errorData = JSON.parse(responseText);
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          // If parsing fails, use the raw response text
+          if (responseText) errorMessage = responseText;
+        }
+        throw new Error(errorMessage);
       }
 
       // Get all destinations after deletion
-      const destinationsResponse = await fetch(`/api/trips/${tripId}/destinations`);
+      const destinationsResponse = await fetch(`/api/trips/${tripId}/destinations`, {
+        credentials: 'include'
+      });
       
       if (!destinationsResponse.ok) {
         console.warn("Failed to fetch destinations after deletion, but destination was deleted successfully");
       } else {
+        // Log to confirm we're getting the updated list
         const remainingDestinations = await destinationsResponse.json();
+        console.log("Remaining destinations:", remainingDestinations.length);
         
         if (remainingDestinations.length === 0) {
           // If no destinations left, we should update the trip end date to match the trip start date
@@ -329,33 +348,57 @@ export function TripDestinations({ tripId }: { tripId: number }) {
         previousTripDestinations 
       };
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast({
         title: "Destination deleted",
         description: "The destination has been removed from your trip.",
       });
       setDestinationToDelete(null);
       
+      console.log("Deletion successful, performing cleanup...");
+      
       // First, completely remove the cached queries to ensure no stale data remains
       queryClient.removeQueries({ queryKey: ["trip-destinations", tripId] });
       queryClient.removeQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
       queryClient.removeQueries({ queryKey: ["/api/trips", tripId, "destinations"] });
       
-      // Also invalidate general trip data since we might have updated the trip end date
-      queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/trips"] });
+      // Clear any other related caches
+      queryClient.removeQueries({ queryKey: ["/api/trips", tripId] });
       
-      // Invalidate all destination queries to be safe
-      queryClient.invalidateQueries({ queryKey: ["trip-destinations"] });
+      // Forcefully fetch new data from the server
+      try {
+        console.log("Fetching fresh data...");
+        
+        // Fetch destinations directly
+        const destResponse = await fetch(`/api/trips/${tripId}/destinations`, {
+          credentials: 'include'
+        });
+        
+        if (destResponse.ok) {
+          const freshDestinations = await destResponse.json();
+          console.log("Got fresh destinations:", freshDestinations.length);
+          
+          // Manually update the cache with new data
+          queryClient.setQueryData(["trip-destinations", tripId], freshDestinations);
+          queryClient.setQueryData([`/api/trips/${tripId}/destinations`], freshDestinations);
+          queryClient.setQueryData(["/api/trips", tripId, "destinations"], freshDestinations);
+        }
+        
+        // Fetch updated trip data
+        const tripResponse = await fetch(`/api/trips/${tripId}`, {
+          credentials: 'include'
+        });
+        
+        if (tripResponse.ok) {
+          const freshTrip = await tripResponse.json();
+          queryClient.setQueryData(["/api/trips", tripId], freshTrip);
+        }
+      } catch (error) {
+        console.error("Error refreshing data after deletion:", error);
+      }
       
-      // Force immediate refetching of critical queries to ensure UI gets updated data
-      setTimeout(() => {
-        Promise.all([
-          queryClient.refetchQueries({ queryKey: ["trip-destinations", tripId] }),
-          queryClient.refetchQueries({ queryKey: [`/api/trips/${tripId}/destinations`] }),
-          queryClient.refetchQueries({ queryKey: ["/api/trips", tripId] })
-        ]);
-      }, 100); // Small delay to ensure server has time to process the deletion
+      // Also invalidate all queries to ensure any dependent components refresh
+      queryClient.invalidateQueries();
     },
     onError: (error: Error, _, context) => {
       // Restore previous data if there was an error
@@ -839,22 +882,32 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete Destination</AlertDialogTitle>
                       <AlertDialogDescription>
-                        Are you sure you want to remove "{destinationToDelete?.name}" from your trip? 
-                        This action cannot be undone.
+                        <p>Are you sure you want to remove <strong>"{destinationToDelete?.name}"</strong> from your trip?</p>
+                        <p className="mt-2 text-destructive font-semibold">This action cannot be undone.</p>
+                        {destinationToDelete && (
+                          <p className="mt-2 text-xs text-muted-foreground">Destination ID: {destinationToDelete.id}</p>
+                        )}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={() => {
+                          console.log("Confirmed deletion of destination:", destinationToDelete?.id);
                           // Reset overflow style when deletion is confirmed
                           document.body.style.overflow = '';
                           // Proceed with the deletion
                           deleteDestinationMutation.mutate();
                         }}
+                        disabled={deleteDestinationMutation.isPending}
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       >
-                        Delete
+                        {deleteDestinationMutation.isPending ? (
+                          <div className="flex items-center">
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            <span>Deleting...</span>
+                          </div>
+                        ) : "Delete"}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>

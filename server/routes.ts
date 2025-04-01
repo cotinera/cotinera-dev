@@ -7,7 +7,7 @@ import { crypto } from "./auth.js";
 import express from "express";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations, chatMessages, users, destinations, pinnedPlaces, polls, pollVotes } from "@db/schema";
+import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations, chatMessages, users, destinations, pinnedPlaces, polls, pollVotes, expenses, expenseSplits } from "@db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { addDays } from "date-fns";
 
@@ -1179,8 +1179,10 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: "Destination not found" });
       }
 
+      console.log(`Attempting to delete destination with ID ${destinationId} from trip ${tripId}`);
+      
       // Delete the destination
-      const [deletedDestination] = await db
+      const deleted = await db
         .delete(destinations)
         .where(
           and(
@@ -1190,6 +1192,23 @@ export function registerRoutes(app: Express): Server {
         )
         .returning();
 
+      console.log(`Deletion result:`, deleted);
+      
+      // Check if anything was actually deleted
+      if (!deleted || deleted.length === 0) {
+        console.warn(`No destination found with ID ${destinationId} in trip ${tripId}`);
+        return res.status(404).json({ 
+          success: false,
+          error: "Destination not found or already deleted"
+        });
+      }
+      
+      // Return the deleted destination in the response
+      const [deletedDestination] = deleted;
+      
+      // Log success
+      console.log(`Successfully deleted destination ${destinationId} from trip ${tripId}`);
+      
       res.json({ 
         success: true, 
         message: "Destination deleted successfully",
@@ -1717,6 +1736,414 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error closing poll:', error);
       res.status(500).json({ error: 'Failed to close poll' });
+    }
+  });
+
+  // ===== EXPENSE MANAGEMENT ROUTES =====
+  
+  // Get all expenses for a trip
+  app.get("/api/trips/:tripId/expenses", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      
+      // Fetch expenses with user information
+      const allExpenses = await db.select().from(expenses)
+        .where(eq(expenses.tripId, tripId))
+        .orderBy(sql`${expenses.date} DESC`);
+      
+      // For each expense, get the paid by user info
+      const expensesWithUsers = await Promise.all(
+        allExpenses.map(async (expense) => {
+          const [user] = await db.select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            avatar: users.avatar
+          })
+          .from(users)
+          .where(eq(users.id, expense.paidBy))
+          .limit(1);
+          
+          const splits = await db.select().from(expenseSplits)
+            .where(eq(expenseSplits.expenseId, expense.id));
+            
+          const splitsWithUsers = await Promise.all(
+            splits.map(async (split) => {
+              const [user] = await db.select({
+                id: users.id,
+                name: users.name,
+                email: users.email,
+                avatar: users.avatar
+              })
+              .from(users)
+              .where(eq(users.id, split.userId))
+              .limit(1);
+              
+              return {
+                ...split,
+                user
+              };
+            })
+          );
+          
+          return {
+            ...expense,
+            user,
+            splits: splitsWithUsers
+          };
+        })
+      );
+      
+      res.json(expensesWithUsers);
+    } catch (error) {
+      console.error('Error fetching trip expenses:', error);
+      res.status(500).json({ error: 'Failed to fetch expenses' });
+    }
+  });
+  
+  // Create a new expense
+  app.post("/api/trips/:tripId/expenses", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const userId = req.user?.id || 1; // Default to user 1 for testing
+      const { title, amount, currency, category, date, splits } = req.body;
+      
+      // Start a transaction to ensure both expense and splits are created
+      const result = await db.transaction(async (tx) => {
+        // Create the expense
+        const [newExpense] = await tx.insert(expenses).values({
+          tripId,
+          paidBy: userId,
+          title,
+          amount: amount,
+          currency: currency || 'USD',
+          category,
+          date: new Date(date),
+        }).returning();
+        
+        if (!newExpense?.id) {
+          throw new Error('Failed to create expense');
+        }
+        
+        // Create the expense splits if provided
+        let expenseSplitsData = [];
+        if (Array.isArray(splits) && splits.length > 0) {
+          // Create splits based on provided data
+          const splitsToInsert = splits.map(split => ({
+            expenseId: newExpense.id,
+            userId: parseInt(split.userId),
+            amount: parseFloat(split.amount),
+            status: 'pending'
+          }));
+          
+          expenseSplitsData = await tx.insert(expenseSplits)
+            .values(splitsToInsert)
+            .returning();
+        } else {
+          // Default: split equally among all trip participants
+          const tripParticipants = await tx.select().from(participants)
+            .where(eq(participants.tripId, tripId));
+          
+          if (tripParticipants.length > 0) {
+            const equalAmount = parseFloat(amount) / tripParticipants.length;
+            
+            const splitsToInsert = tripParticipants.map(participant => ({
+              expenseId: newExpense.id,
+              userId: participant.userId,
+              amount: equalAmount,
+              status: participant.userId === userId ? 'paid' : 'pending'
+            }));
+            
+            expenseSplitsData = await tx.insert(expenseSplits)
+              .values(splitsToInsert)
+              .returning();
+          }
+        }
+        
+        return {
+          expense: newExpense,
+          splits: expenseSplitsData
+        };
+      });
+      
+      res.status(201).json(result);
+    } catch (error) {
+      console.error('Error creating expense:', error);
+      res.status(500).json({ 
+        error: 'Failed to create expense',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+  
+  // Get expense details
+  app.get("/api/trips/:tripId/expenses/:expenseId", async (req, res) => {
+    try {
+      const expenseId = parseInt(req.params.expenseId);
+      
+      const expense = await db.select().from(expenses)
+        .where(eq(expenses.id, expenseId))
+        .limit(1);
+        
+      if (expense.length === 0) {
+        return res.status(404).json({ error: 'Expense not found' });
+      }
+      
+      const [paidByUser] = await db.select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        avatar: users.avatar
+      })
+      .from(users)
+      .where(eq(users.id, expense[0].paidBy))
+      .limit(1);
+      
+      const splits = await db.select().from(expenseSplits)
+        .where(eq(expenseSplits.expenseId, expenseId));
+        
+      const splitsWithUsers = await Promise.all(
+        splits.map(async (split) => {
+          const [user] = await db.select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            avatar: users.avatar
+          })
+          .from(users)
+          .where(eq(users.id, split.userId))
+          .limit(1);
+          
+          return {
+            ...split,
+            user
+          };
+        })
+      );
+      
+      res.json({
+        ...expense[0],
+        user: paidByUser,
+        splits: splitsWithUsers
+      });
+    } catch (error) {
+      console.error('Error fetching expense details:', error);
+      res.status(500).json({ error: 'Failed to fetch expense details' });
+    }
+  });
+  
+  // Update an expense
+  app.patch("/api/trips/:tripId/expenses/:expenseId", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const expenseId = parseInt(req.params.expenseId);
+      const userId = req.user?.id || 1;
+      const { title, amount, currency, category, date, splits } = req.body;
+      
+      // Verify the expense exists and belongs to the trip
+      const [expense] = await db.select().from(expenses)
+        .where(and(
+          eq(expenses.id, expenseId),
+          eq(expenses.tripId, tripId)
+        ))
+        .limit(1);
+      
+      if (!expense) {
+        return res.status(404).json({ error: 'Expense not found' });
+      }
+      
+      // Verify the user is the one who paid (or implement other permission logic)
+      if (expense.paidBy !== userId) {
+        return res.status(403).json({ error: 'You can only update expenses you paid for' });
+      }
+      
+      // Start a transaction for updating expense and splits
+      const result = await db.transaction(async (tx) => {
+        // Update the expense
+        const [updatedExpense] = await tx.update(expenses)
+          .set({
+            title: title || expense.title,
+            amount: amount ? parseFloat(amount) : expense.amount,
+            currency: currency || expense.currency,
+            category: category || expense.category,
+            date: date ? new Date(date) : expense.date,
+          })
+          .where(eq(expenses.id, expenseId))
+          .returning();
+        
+        // If splits were provided, update them
+        if (Array.isArray(splits) && splits.length > 0) {
+          // First delete existing splits
+          await tx.delete(expenseSplits)
+            .where(eq(expenseSplits.expenseId, expenseId));
+          
+          // Then insert new splits
+          const splitsToInsert = splits.map(split => ({
+            expenseId,
+            userId: parseInt(split.userId),
+            amount: parseFloat(split.amount),
+            status: split.status || 'pending'
+          }));
+          
+          const newSplits = await tx.insert(expenseSplits)
+            .values(splitsToInsert)
+            .returning();
+          
+          return {
+            expense: updatedExpense,
+            splits: newSplits
+          };
+        }
+        
+        // Otherwise just return the updated expense with existing splits
+        const existingSplits = await tx.select().from(expenseSplits)
+          .where(eq(expenseSplits.expenseId, expenseId));
+        
+        return {
+          expense: updatedExpense,
+          splits: existingSplits
+        };
+      });
+      
+      res.json(result);
+    } catch (error) {
+      console.error('Error updating expense:', error);
+      res.status(500).json({ error: 'Failed to update expense' });
+    }
+  });
+  
+  // Delete an expense
+  app.delete("/api/trips/:tripId/expenses/:expenseId", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const expenseId = parseInt(req.params.expenseId);
+      const userId = req.user?.id || 1;
+      
+      // Verify the expense exists and belongs to the trip
+      const [expense] = await db.select().from(expenses)
+        .where(and(
+          eq(expenses.id, expenseId),
+          eq(expenses.tripId, tripId)
+        ))
+        .limit(1);
+      
+      if (!expense) {
+        return res.status(404).json({ error: 'Expense not found' });
+      }
+      
+      // Verify the user is the one who paid (or implement other permission logic)
+      if (expense.paidBy !== userId) {
+        return res.status(403).json({ error: 'You can only delete expenses you paid for' });
+      }
+      
+      // Delete the expense and related splits in a transaction
+      await db.transaction(async (tx) => {
+        // First delete the splits
+        await tx.delete(expenseSplits)
+          .where(eq(expenseSplits.expenseId, expenseId));
+        
+        // Then delete the expense
+        await tx.delete(expenses)
+          .where(eq(expenses.id, expenseId));
+      });
+      
+      res.json({ success: true, message: 'Expense deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting expense:', error);
+      res.status(500).json({ error: 'Failed to delete expense' });
+    }
+  });
+  
+  // Update expense split status (mark as paid)
+  app.patch("/api/trips/:tripId/expenses/:expenseId/splits/:splitId", async (req, res) => {
+    try {
+      const splitId = parseInt(req.params.splitId);
+      const { status } = req.body;
+      
+      if (!status || !['pending', 'paid'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid status' });
+      }
+      
+      const [updatedSplit] = await db.update(expenseSplits)
+        .set({ status })
+        .where(eq(expenseSplits.id, splitId))
+        .returning();
+      
+      if (!updatedSplit) {
+        return res.status(404).json({ error: 'Split not found' });
+      }
+      
+      res.json(updatedSplit);
+    } catch (error) {
+      console.error('Error updating expense split:', error);
+      res.status(500).json({ error: 'Failed to update expense split' });
+    }
+  });
+  
+  // Get expense summary/breakdown by category for a trip
+  app.get("/api/trips/:tripId/expenses/summary", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      
+      // Get all expenses for the trip
+      const tripExpenses = await db.select().from(expenses)
+        .where(eq(expenses.tripId, tripId));
+      
+      if (tripExpenses.length === 0) {
+        return res.json({
+          totalExpenses: 0,
+          currency: 'USD',
+          categoryBreakdown: [],
+          dateBreakdown: []
+        });
+      }
+      
+      // Calculate total expenses
+      const total = tripExpenses.reduce((sum, expense) => {
+        return sum + parseFloat(expense.amount.toString());
+      }, 0);
+      
+      // Group by category
+      const byCategory = {};
+      tripExpenses.forEach(expense => {
+        const category = expense.category;
+        if (!byCategory[category]) {
+          byCategory[category] = 0;
+        }
+        byCategory[category] += parseFloat(expense.amount.toString());
+      });
+      
+      // Convert to percentage and array format for charts
+      const categoryBreakdown = Object.entries(byCategory).map(([category, amount]) => ({
+        category,
+        amount,
+        percentage: ((amount as number) / total * 100).toFixed(1)
+      }));
+      
+      // Get expenses by date (for timeline/trends)
+      const byDate = {};
+      tripExpenses.forEach(expense => {
+        const dateStr = expense.date.toISOString().split('T')[0];
+        if (!byDate[dateStr]) {
+          byDate[dateStr] = 0;
+        }
+        byDate[dateStr] += parseFloat(expense.amount.toString());
+      });
+      
+      // Convert to array format for charts
+      const dateBreakdown = Object.entries(byDate)
+        .map(([date, amount]) => ({ date, amount }))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      
+      res.json({
+        totalExpenses: total,
+        currency: tripExpenses[0]?.currency || 'USD',
+        categoryBreakdown,
+        dateBreakdown
+      });
+    } catch (error) {
+      console.error('Error generating expense summary:', error);
+      res.status(500).json({ error: 'Failed to generate expense summary' });
     }
   });
 

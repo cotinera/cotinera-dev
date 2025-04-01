@@ -26,6 +26,10 @@ export const crypto = {
     )) as Buffer;
     return timingSafeEqual(hashedPasswordBuf, suppliedPasswordBuf);
   },
+  randomUUID: () => {
+    // Generate a UUID v4 for share links and tokens
+    return randomBytes(16).toString('hex');
+  }
 };
 
 // extend express user object with our schema
