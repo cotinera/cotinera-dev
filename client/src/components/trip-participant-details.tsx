@@ -161,11 +161,35 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
   });
   
+  // State for tracking if flight details have been loaded successfully
+  const [flightDetails, setFlightDetails] = useState<{
+    airline: string;
+    flightNumber: string;
+    departureAirport: {
+      code: string;
+      name: string;
+      city: string;
+      country: string;
+    };
+    arrivalAirport: {
+      code: string;
+      name: string;
+      city: string;
+      country: string;
+    };
+    scheduledDeparture: string;
+    scheduledArrival: string;
+    status: string;
+  } | null>(null);
+  
   // Function to lookup flight details from the API
   const lookupFlightDetails = async () => {
     const flightNumber = flightForm.getValues("flightNumber");
     // Use current date if no departureDate is provided
     let departureDate = flightForm.getValues("departureDate");
+    
+    // Reset flight details when looking up a new flight
+    setFlightDetails(null);
     
     if (!flightNumber) {
       toast({
@@ -198,6 +222,9 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       if (!data || !data.flight) {
         throw new Error("No flight information found");
       }
+      
+      // Store the flight details for display
+      setFlightDetails(data.flight);
       
       // Parse date and time from ISO string
       const departureDateObj = new Date(data.flight.scheduledDeparture);
@@ -1236,8 +1263,14 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       </Dialog>
       
       {/* Add Flight In Dialog */}
-      <Dialog open={isAddFlightInOpen} onOpenChange={setIsAddFlightInOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+      <Dialog 
+        open={isAddFlightInOpen} 
+        onOpenChange={(open) => {
+          if (!open) setFlightDetails(null);
+          setIsAddFlightInOpen(open);
+        }}
+      >
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Add Inbound Flight</DialogTitle>
             <DialogDescription>
@@ -1277,6 +1310,62 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   </FormItem>
                 )}
               />
+              
+              {/* Flight Details Card - Only shown after successful lookup */}
+              {flightDetails && (
+                <Card className="bg-accent/50">
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-center">
+                      <CardTitle className="text-lg flex items-center">
+                        <Plane className="h-5 w-5 mr-2 inline" />
+                        {flightDetails.airline} {flightDetails.flightNumber}
+                      </CardTitle>
+                      <Badge variant={
+                        flightDetails.status.toLowerCase() === 'landed' ? 'default' :
+                        flightDetails.status.toLowerCase() === 'delayed' ? 'destructive' :
+                        'secondary'
+                      }>
+                        {flightDetails.status}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pb-2">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <div className="text-sm font-semibold">Departure</div>
+                        <div className="flex items-center">
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center bg-background mr-2">
+                            <span className="text-sm font-medium">{flightDetails.departureAirport.code}</span>
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium">{flightDetails.departureAirport.city}</div>
+                            <div className="text-xs text-muted-foreground">{flightDetails.departureAirport.name}</div>
+                            <div className="text-xs">
+                              {format(new Date(flightDetails.scheduledDeparture), "MMM d, yyyy")} • {format(new Date(flightDetails.scheduledDeparture), "HH:mm")}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <div className="text-sm font-semibold">Arrival</div>
+                        <div className="flex items-center">
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center bg-background mr-2">
+                            <span className="text-sm font-medium">{flightDetails.arrivalAirport.code}</span>
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium">{flightDetails.arrivalAirport.city}</div>
+                            <div className="text-xs text-muted-foreground">{flightDetails.arrivalAirport.name}</div>
+                            <div className="text-xs">
+                              {format(new Date(flightDetails.scheduledArrival), "MMM d, yyyy")} • {format(new Date(flightDetails.scheduledArrival), "HH:mm")}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
               
               {/* Hidden fields that will be auto-populated by the API */}
               <div className="hidden">
@@ -1328,8 +1417,14 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       </Dialog>
       
       {/* Add Flight Out Dialog */}
-      <Dialog open={isAddFlightOutOpen} onOpenChange={setIsAddFlightOutOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+      <Dialog 
+        open={isAddFlightOutOpen} 
+        onOpenChange={(open) => {
+          if (!open) setFlightDetails(null);
+          setIsAddFlightOutOpen(open);
+        }}
+      >
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Add Outbound Flight</DialogTitle>
             <DialogDescription>
@@ -1369,6 +1464,62 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   </FormItem>
                 )}
               />
+              
+              {/* Flight Details Card - Only shown after successful lookup */}
+              {flightDetails && (
+                <Card className="bg-accent/50">
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-center">
+                      <CardTitle className="text-lg flex items-center">
+                        <Plane className="h-5 w-5 mr-2 inline" />
+                        {flightDetails.airline} {flightDetails.flightNumber}
+                      </CardTitle>
+                      <Badge variant={
+                        flightDetails.status.toLowerCase() === 'landed' ? 'default' :
+                        flightDetails.status.toLowerCase() === 'delayed' ? 'destructive' :
+                        'secondary'
+                      }>
+                        {flightDetails.status}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pb-2">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <div className="text-sm font-semibold">Departure</div>
+                        <div className="flex items-center">
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center bg-background mr-2">
+                            <span className="text-sm font-medium">{flightDetails.departureAirport.code}</span>
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium">{flightDetails.departureAirport.city}</div>
+                            <div className="text-xs text-muted-foreground">{flightDetails.departureAirport.name}</div>
+                            <div className="text-xs">
+                              {format(new Date(flightDetails.scheduledDeparture), "MMM d, yyyy")} • {format(new Date(flightDetails.scheduledDeparture), "HH:mm")}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <div className="text-sm font-semibold">Arrival</div>
+                        <div className="flex items-center">
+                          <div className="w-12 h-12 rounded-full flex items-center justify-center bg-background mr-2">
+                            <span className="text-sm font-medium">{flightDetails.arrivalAirport.code}</span>
+                          </div>
+                          <div>
+                            <div className="text-sm font-medium">{flightDetails.arrivalAirport.city}</div>
+                            <div className="text-xs text-muted-foreground">{flightDetails.arrivalAirport.name}</div>
+                            <div className="text-xs">
+                              {format(new Date(flightDetails.scheduledArrival), "MMM d, yyyy")} • {format(new Date(flightDetails.scheduledArrival), "HH:mm")}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
               
               {/* Hidden fields that will be auto-populated by the API */}
               <div className="hidden">
