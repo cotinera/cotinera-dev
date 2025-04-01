@@ -136,8 +136,9 @@ export function TripDestinations({ tripId }: { tripId: number }) {
 
       const newDestination = await response.json();
       
-      // Now update the trip end date if the new destination's end date is later than the current trip end date
-      if (trip && new Date(data.endDate) > new Date(trip.endDate)) {
+      // Now update the trip end date to match the latest destination end date
+      // This ensures the trip end date is always synchronized with the latest destination
+      if (trip) {
         const updateTripResponse = await fetch(`/api/trips/${tripId}`, {
           method: "PATCH",
           headers: {

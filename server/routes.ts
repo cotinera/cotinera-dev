@@ -304,21 +304,33 @@ export function registerRoutes(app: Express): Server {
       // CRITICAL FIX: Don't create new Date objects here as they can shift the date
       // when converted back to strings due to timezone differences
       
+      // Create update object with only the fields that are provided
+      const updateData: Record<string, any> = {};
+      
+      if (req.body.title !== undefined) updateData.title = req.body.title;
+      if (req.body.location !== undefined) updateData.location = req.body.location;
+      if (req.body.coordinates !== undefined) updateData.coordinates = req.body.coordinates;
+      if (req.body.description !== undefined) updateData.description = req.body.description;
+      
       // Store dates directly as ISO strings with time at 12:00:00 UTC to prevent any timezone issues
       // This ensures the date stays exactly as the user selected it
-      const startDateISO = `${req.body.startDate}T12:00:00.000Z`;
-      const endDateISO = `${req.body.endDate}T12:00:00.000Z`;
+      if (req.body.startDate) {
+        updateData.startDate = `${req.body.startDate}T12:00:00.000Z`;
+      }
       
-      // Need to handle coordinates separately since we can't reference updatedTrip before it exists
+      if (req.body.endDate) {
+        updateData.endDate = `${req.body.endDate}T12:00:00.000Z`;
+      }
+      
+      // If there are no fields to update, return early
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ error: "No valid fields provided for update" });
+      }
+      
+      // Perform the update with only the fields that were provided
       const [updatedTrip] = await db
         .update(trips)
-        .set({
-          title: req.body.title,
-          location: req.body.location,
-          startDate: startDateISO, 
-          endDate: endDateISO,
-          coordinates: req.body.coordinates,
-        })
+        .set(updateData)
         .where(eq(trips.id, parseInt(req.params.id)))
         .returning();
 
