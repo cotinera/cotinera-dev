@@ -5,6 +5,7 @@ import { format, parse } from "date-fns";
 import { useForm } from "react-hook-form";
 import { useFlights } from "@/hooks/use-flights";
 import { z } from "zod";
+import { FlightInDialog, FlightOutDialog } from "./trip-participant-details-updated";
 import { Button } from "@/components/ui/button";
 import { 
   Plus, 
@@ -867,10 +868,24 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                         className="h-6 w-6"
                         onClick={() => {
                           setCurrentParticipantId(participant.id);
-                          flightForm.reset();
-                          if (participant.arrivalDate) {
-                            flightForm.setValue("arrivalDate", participant.arrivalDate);
-                          }
+                          
+                          // Pre-populate the flight date with the participant's arrival date if available
+                          const arrivalDate = participant.arrivalDate || format(new Date(), "yyyy-MM-dd");
+                          
+                          flightForm.reset({
+                            flightNumber: "",
+                            airline: "",
+                            departureAirport: "",
+                            arrivalAirport: "",
+                            departureDate: arrivalDate,
+                            departureTime: "",
+                            arrivalDate: "",
+                            arrivalTime: "",
+                            bookingReference: "",
+                            bookingStatus: "confirmed",
+                          });
+                          
+                          setFlightDetails(null);
                           setIsAddFlightInOpen(true);
                         }}
                       >
@@ -887,10 +902,24 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                         className="h-6 w-6"
                         onClick={() => {
                           setCurrentParticipantId(participant.id);
-                          flightForm.reset();
-                          if (participant.departureDate) {
-                            flightForm.setValue("departureDate", participant.departureDate);
-                          }
+                          
+                          // Pre-populate the flight date with the participant's departure date if available
+                          const departureDate = participant.departureDate || format(new Date(), "yyyy-MM-dd");
+                          
+                          flightForm.reset({
+                            flightNumber: "",
+                            airline: "",
+                            departureAirport: "",
+                            arrivalAirport: "",
+                            departureDate: departureDate,
+                            departureTime: "",
+                            arrivalDate: "",
+                            arrivalTime: "",
+                            bookingReference: "",
+                            bookingStatus: "confirmed",
+                          });
+                          
+                          setFlightDetails(null);
                           setIsAddFlightOutOpen(true);
                         }}
                       >
@@ -1263,312 +1292,28 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       </Dialog>
       
       {/* Add Flight In Dialog */}
-      <Dialog 
-        open={isAddFlightInOpen} 
-        onOpenChange={(open) => {
-          if (!open) setFlightDetails(null);
-          setIsAddFlightInOpen(open);
-        }}
-      >
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Add Inbound Flight</DialogTitle>
-            <DialogDescription>
-              Enter flight number to automatically retrieve flight details.
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...flightForm}>
-            <form onSubmit={flightForm.handleSubmit(handleFlightInSubmit)} className="space-y-4">
-              <FormField
-                control={flightForm.control}
-                name="flightNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Flight Number</FormLabel>
-                    <div className="flex space-x-2">
-                      <FormControl>
-                        <Input placeholder="e.g. BA123" {...field} />
-                      </FormControl>
-                      <Button 
-                        type="button" 
-                        variant="secondary"
-                        onClick={lookupFlightDetails}
-                        disabled={isLookingUpFlight}
-                      >
-                        {isLookingUpFlight ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <Search className="h-4 w-4 mr-2" />
-                        )}
-                        Lookup
-                      </Button>
-                    </div>
-                    <FormDescription>
-                      Enter an airline code followed by flight number (e.g. BA123)
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              {/* Flight Details Card - Only shown after successful lookup */}
-              {flightDetails && (
-                <Card className="bg-accent/50">
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-center">
-                      <CardTitle className="text-lg flex items-center">
-                        <Plane className="h-5 w-5 mr-2 inline" />
-                        {flightDetails.airline} {flightDetails.flightNumber}
-                      </CardTitle>
-                      <Badge variant={
-                        flightDetails.status.toLowerCase() === 'landed' ? 'default' :
-                        flightDetails.status.toLowerCase() === 'delayed' ? 'destructive' :
-                        'secondary'
-                      }>
-                        {flightDetails.status}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pb-2">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <div className="text-sm font-semibold">Departure</div>
-                        <div className="flex items-center">
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center bg-background mr-2">
-                            <span className="text-sm font-medium">{flightDetails.departureAirport.code}</span>
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium">{flightDetails.departureAirport.city}</div>
-                            <div className="text-xs text-muted-foreground">{flightDetails.departureAirport.name}</div>
-                            <div className="text-xs">
-                              {format(new Date(flightDetails.scheduledDeparture), "MMM d, yyyy")} • {format(new Date(flightDetails.scheduledDeparture), "HH:mm")}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-1">
-                        <div className="text-sm font-semibold">Arrival</div>
-                        <div className="flex items-center">
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center bg-background mr-2">
-                            <span className="text-sm font-medium">{flightDetails.arrivalAirport.code}</span>
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium">{flightDetails.arrivalAirport.city}</div>
-                            <div className="text-xs text-muted-foreground">{flightDetails.arrivalAirport.name}</div>
-                            <div className="text-xs">
-                              {format(new Date(flightDetails.scheduledArrival), "MMM d, yyyy")} • {format(new Date(flightDetails.scheduledArrival), "HH:mm")}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              
-              {/* Hidden fields that will be auto-populated by the API */}
-              <div className="hidden">
-                <FormField name="airline" control={flightForm.control} render={({ field }) => (
-                  <Input {...field} type="hidden" />
-                )} />
-                <FormField name="departureAirport" control={flightForm.control} render={({ field }) => (
-                  <Input {...field} type="hidden" />
-                )} />
-                <FormField name="arrivalAirport" control={flightForm.control} render={({ field }) => (
-                  <Input {...field} type="hidden" />
-                )} />
-                <FormField name="departureDate" control={flightForm.control} render={({ field }) => (
-                  <Input {...field} type="hidden" />
-                )} />
-                <FormField name="departureTime" control={flightForm.control} render={({ field }) => (
-                  <Input {...field} type="hidden" />
-                )} />
-                <FormField name="arrivalDate" control={flightForm.control} render={({ field }) => (
-                  <Input {...field} type="hidden" />
-                )} />
-                <FormField name="arrivalTime" control={flightForm.control} render={({ field }) => (
-                  <Input {...field} type="hidden" />
-                )} />
-                <FormField name="bookingReference" control={flightForm.control} render={({ field }) => (
-                  <Input {...field} type="hidden" />
-                )} />
-                <FormField name="bookingStatus" control={flightForm.control} render={({ field }) => (
-                  <Input {...field} type="hidden" />
-                )} />
-              </div>
-              
-              <div className="flex justify-end space-x-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsAddFlightInOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isLookingUpFlight || !flightForm.getValues("airline")}>
-                  <Plane className="h-4 w-4 mr-2" />
-                  Save Flight
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+      <FlightInDialog
+        isAddFlightInOpen={isAddFlightInOpen}
+        setIsAddFlightInOpen={setIsAddFlightInOpen}
+        flightForm={flightForm}
+        flightDetails={flightDetails}
+        setFlightDetails={setFlightDetails}
+        isLookingUpFlight={isLookingUpFlight}
+        lookupFlightDetails={lookupFlightDetails}
+        handleFlightInSubmit={handleFlightInSubmit}
+      />
       
       {/* Add Flight Out Dialog */}
-      <Dialog 
-        open={isAddFlightOutOpen} 
-        onOpenChange={(open) => {
-          if (!open) setFlightDetails(null);
-          setIsAddFlightOutOpen(open);
-        }}
-      >
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Add Outbound Flight</DialogTitle>
-            <DialogDescription>
-              Enter flight number to automatically retrieve flight details.
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...flightForm}>
-            <form onSubmit={flightForm.handleSubmit(handleFlightOutSubmit)} className="space-y-4">
-              <FormField
-                control={flightForm.control}
-                name="flightNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Flight Number</FormLabel>
-                    <div className="flex space-x-2">
-                      <FormControl>
-                        <Input placeholder="e.g. BA123" {...field} />
-                      </FormControl>
-                      <Button 
-                        type="button" 
-                        variant="secondary"
-                        onClick={lookupFlightDetails}
-                        disabled={isLookingUpFlight}
-                      >
-                        {isLookingUpFlight ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <Search className="h-4 w-4 mr-2" />
-                        )}
-                        Lookup
-                      </Button>
-                    </div>
-                    <FormDescription>
-                      Enter an airline code followed by flight number (e.g. BA123)
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              {/* Flight Details Card - Only shown after successful lookup */}
-              {flightDetails && (
-                <Card className="bg-accent/50">
-                  <CardHeader className="pb-2">
-                    <div className="flex justify-between items-center">
-                      <CardTitle className="text-lg flex items-center">
-                        <Plane className="h-5 w-5 mr-2 inline" />
-                        {flightDetails.airline} {flightDetails.flightNumber}
-                      </CardTitle>
-                      <Badge variant={
-                        flightDetails.status.toLowerCase() === 'landed' ? 'default' :
-                        flightDetails.status.toLowerCase() === 'delayed' ? 'destructive' :
-                        'secondary'
-                      }>
-                        {flightDetails.status}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pb-2">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <div className="text-sm font-semibold">Departure</div>
-                        <div className="flex items-center">
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center bg-background mr-2">
-                            <span className="text-sm font-medium">{flightDetails.departureAirport.code}</span>
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium">{flightDetails.departureAirport.city}</div>
-                            <div className="text-xs text-muted-foreground">{flightDetails.departureAirport.name}</div>
-                            <div className="text-xs">
-                              {format(new Date(flightDetails.scheduledDeparture), "MMM d, yyyy")} • {format(new Date(flightDetails.scheduledDeparture), "HH:mm")}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="space-y-1">
-                        <div className="text-sm font-semibold">Arrival</div>
-                        <div className="flex items-center">
-                          <div className="w-12 h-12 rounded-full flex items-center justify-center bg-background mr-2">
-                            <span className="text-sm font-medium">{flightDetails.arrivalAirport.code}</span>
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium">{flightDetails.arrivalAirport.city}</div>
-                            <div className="text-xs text-muted-foreground">{flightDetails.arrivalAirport.name}</div>
-                            <div className="text-xs">
-                              {format(new Date(flightDetails.scheduledArrival), "MMM d, yyyy")} • {format(new Date(flightDetails.scheduledArrival), "HH:mm")}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              
-              {/* Hidden fields that will be auto-populated by the API */}
-              <div className="hidden">
-                <FormField name="airline" control={flightForm.control} render={({ field }) => (
-                  <Input {...field} type="hidden" />
-                )} />
-                <FormField name="departureAirport" control={flightForm.control} render={({ field }) => (
-                  <Input {...field} type="hidden" />
-                )} />
-                <FormField name="arrivalAirport" control={flightForm.control} render={({ field }) => (
-                  <Input {...field} type="hidden" />
-                )} />
-                <FormField name="departureDate" control={flightForm.control} render={({ field }) => (
-                  <Input {...field} type="hidden" />
-                )} />
-                <FormField name="departureTime" control={flightForm.control} render={({ field }) => (
-                  <Input {...field} type="hidden" />
-                )} />
-                <FormField name="arrivalDate" control={flightForm.control} render={({ field }) => (
-                  <Input {...field} type="hidden" />
-                )} />
-                <FormField name="arrivalTime" control={flightForm.control} render={({ field }) => (
-                  <Input {...field} type="hidden" />
-                )} />
-                <FormField name="bookingReference" control={flightForm.control} render={({ field }) => (
-                  <Input {...field} type="hidden" />
-                )} />
-                <FormField name="bookingStatus" control={flightForm.control} render={({ field }) => (
-                  <Input {...field} type="hidden" />
-                )} />
-              </div>
-              
-              <div className="flex justify-end space-x-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsAddFlightOutOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isLookingUpFlight || !flightForm.getValues("airline")}>
-                  <Plane className="h-4 w-4 mr-2" />
-                  Save Flight
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
+      <FlightOutDialog
+        isAddFlightOutOpen={isAddFlightOutOpen}
+        setIsAddFlightOutOpen={setIsAddFlightOutOpen}
+        flightForm={flightForm}
+        flightDetails={flightDetails}
+        setFlightDetails={setFlightDetails}
+        isLookingUpFlight={isLookingUpFlight}
+        lookupFlightDetails={lookupFlightDetails}
+        handleFlightOutSubmit={handleFlightOutSubmit}
+      />
     </Card>
   );
 }
