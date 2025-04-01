@@ -164,7 +164,8 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   // Function to lookup flight details from the API
   const lookupFlightDetails = async () => {
     const flightNumber = flightForm.getValues("flightNumber");
-    const departureDate = flightForm.getValues("departureDate");
+    // Use current date if no departureDate is provided
+    let departureDate = flightForm.getValues("departureDate");
     
     if (!flightNumber) {
       toast({
@@ -175,13 +176,10 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       return;
     }
 
+    // If no departure date, use today's date
     if (!departureDate) {
-      toast({
-        title: "Departure date required",
-        description: "Please select a departure date to lookup flight details",
-        variant: "destructive",
-      });
-      return;
+      departureDate = format(new Date(), "yyyy-MM-dd");
+      flightForm.setValue("departureDate", departureDate);
     }
 
     try {
@@ -1239,189 +1237,76 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       
       {/* Add Flight In Dialog */}
       <Dialog open={isAddFlightInOpen} onOpenChange={setIsAddFlightInOpen}>
-        <DialogContent className="sm:max-w-[550px]">
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Add Inbound Flight</DialogTitle>
             <DialogDescription>
-              Add flight details for arrival to the destination.
+              Enter flight number to automatically retrieve flight details.
             </DialogDescription>
           </DialogHeader>
           <Form {...flightForm}>
             <form onSubmit={flightForm.handleSubmit(handleFlightInSubmit)} className="space-y-4">
-              <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
-                <FormField
-                  control={flightForm.control}
-                  name="flightNumber"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Flight Number</FormLabel>
-                      <div className="flex space-x-2">
-                        <FormControl>
-                          <Input placeholder="e.g. BA123" {...field} />
-                        </FormControl>
-                        <Button 
-                          type="button" 
-                          variant="secondary"
-                          onClick={lookupFlightDetails}
-                          disabled={isLookingUpFlight}
-                        >
-                          {isLookingUpFlight ? (
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          ) : (
-                            <Search className="h-4 w-4 mr-2" />
-                          )}
-                          Lookup
-                        </Button>
-                      </div>
-                      <FormDescription>
-                        Enter an airline code followed by flight number
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={flightForm.control}
-                  name="airline"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Airline</FormLabel>
+              <FormField
+                control={flightForm.control}
+                name="flightNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Flight Number</FormLabel>
+                    <div className="flex space-x-2">
                       <FormControl>
-                        <Input placeholder="e.g. British Airways" {...field} />
+                        <Input placeholder="e.g. BA123" {...field} />
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
-                <FormField
-                  control={flightForm.control}
-                  name="departureAirport"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Departure Airport</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. LHR" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={flightForm.control}
-                  name="arrivalAirport"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Arrival Airport</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. JFK" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
-                <FormField
-                  control={flightForm.control}
-                  name="departureDate"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Departure Date</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={flightForm.control}
-                  name="departureTime"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Departure Time</FormLabel>
-                      <FormControl>
-                        <Input type="time" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
-                <FormField
-                  control={flightForm.control}
-                  name="arrivalDate"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Arrival Date</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={flightForm.control}
-                  name="arrivalTime"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Arrival Time</FormLabel>
-                      <FormControl>
-                        <Input type="time" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
-                <FormField
-                  control={flightForm.control}
-                  name="bookingReference"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Booking Reference</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. ABC123" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={flightForm.control}
-                  name="bookingStatus"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Status</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
+                      <Button 
+                        type="button" 
+                        variant="secondary"
+                        onClick={lookupFlightDetails}
+                        disabled={isLookingUpFlight}
                       >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="confirmed">Confirmed</SelectItem>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="delayed">Delayed</SelectItem>
-                          <SelectItem value="cancelled">Cancelled</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        {isLookingUpFlight ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Search className="h-4 w-4 mr-2" />
+                        )}
+                        Lookup
+                      </Button>
+                    </div>
+                    <FormDescription>
+                      Enter an airline code followed by flight number (e.g. BA123)
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              {/* Hidden fields that will be auto-populated by the API */}
+              <div className="hidden">
+                <FormField name="airline" control={flightForm.control} render={({ field }) => (
+                  <Input {...field} type="hidden" />
+                )} />
+                <FormField name="departureAirport" control={flightForm.control} render={({ field }) => (
+                  <Input {...field} type="hidden" />
+                )} />
+                <FormField name="arrivalAirport" control={flightForm.control} render={({ field }) => (
+                  <Input {...field} type="hidden" />
+                )} />
+                <FormField name="departureDate" control={flightForm.control} render={({ field }) => (
+                  <Input {...field} type="hidden" />
+                )} />
+                <FormField name="departureTime" control={flightForm.control} render={({ field }) => (
+                  <Input {...field} type="hidden" />
+                )} />
+                <FormField name="arrivalDate" control={flightForm.control} render={({ field }) => (
+                  <Input {...field} type="hidden" />
+                )} />
+                <FormField name="arrivalTime" control={flightForm.control} render={({ field }) => (
+                  <Input {...field} type="hidden" />
+                )} />
+                <FormField name="bookingReference" control={flightForm.control} render={({ field }) => (
+                  <Input {...field} type="hidden" />
+                )} />
+                <FormField name="bookingStatus" control={flightForm.control} render={({ field }) => (
+                  <Input {...field} type="hidden" />
+                )} />
               </div>
               
               <div className="flex justify-end space-x-2">
@@ -1432,7 +1317,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                 >
                   Cancel
                 </Button>
-                <Button type="submit">
+                <Button type="submit" disabled={isLookingUpFlight || !flightForm.getValues("airline")}>
                   <Plane className="h-4 w-4 mr-2" />
                   Save Flight
                 </Button>
@@ -1444,189 +1329,76 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       
       {/* Add Flight Out Dialog */}
       <Dialog open={isAddFlightOutOpen} onOpenChange={setIsAddFlightOutOpen}>
-        <DialogContent className="sm:max-w-[550px]">
+        <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Add Outbound Flight</DialogTitle>
             <DialogDescription>
-              Add flight details for departure from the destination.
+              Enter flight number to automatically retrieve flight details.
             </DialogDescription>
           </DialogHeader>
           <Form {...flightForm}>
             <form onSubmit={flightForm.handleSubmit(handleFlightOutSubmit)} className="space-y-4">
-              <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
-                <FormField
-                  control={flightForm.control}
-                  name="flightNumber"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Flight Number</FormLabel>
-                      <div className="flex space-x-2">
-                        <FormControl>
-                          <Input placeholder="e.g. BA123" {...field} />
-                        </FormControl>
-                        <Button 
-                          type="button" 
-                          variant="secondary"
-                          onClick={lookupFlightDetails}
-                          disabled={isLookingUpFlight}
-                        >
-                          {isLookingUpFlight ? (
-                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                          ) : (
-                            <Search className="h-4 w-4 mr-2" />
-                          )}
-                          Lookup
-                        </Button>
-                      </div>
-                      <FormDescription>
-                        Enter an airline code followed by flight number
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={flightForm.control}
-                  name="airline"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Airline</FormLabel>
+              <FormField
+                control={flightForm.control}
+                name="flightNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Flight Number</FormLabel>
+                    <div className="flex space-x-2">
                       <FormControl>
-                        <Input placeholder="e.g. British Airways" {...field} />
+                        <Input placeholder="e.g. BA123" {...field} />
                       </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
-                <FormField
-                  control={flightForm.control}
-                  name="departureAirport"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Departure Airport</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. LHR" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={flightForm.control}
-                  name="arrivalAirport"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Arrival Airport</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. JFK" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
-                <FormField
-                  control={flightForm.control}
-                  name="departureDate"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Departure Date</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={flightForm.control}
-                  name="departureTime"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Departure Time</FormLabel>
-                      <FormControl>
-                        <Input type="time" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
-                <FormField
-                  control={flightForm.control}
-                  name="arrivalDate"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Arrival Date</FormLabel>
-                      <FormControl>
-                        <Input type="date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={flightForm.control}
-                  name="arrivalTime"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Arrival Time</FormLabel>
-                      <FormControl>
-                        <Input type="time" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              
-              <div className="flex flex-col space-y-4 md:flex-row md:space-x-4 md:space-y-0">
-                <FormField
-                  control={flightForm.control}
-                  name="bookingReference"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Booking Reference</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. ABC123" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={flightForm.control}
-                  name="bookingStatus"
-                  render={({ field }) => (
-                    <FormItem className="flex-1">
-                      <FormLabel>Status</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
+                      <Button 
+                        type="button" 
+                        variant="secondary"
+                        onClick={lookupFlightDetails}
+                        disabled={isLookingUpFlight}
                       >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="confirmed">Confirmed</SelectItem>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="delayed">Delayed</SelectItem>
-                          <SelectItem value="cancelled">Cancelled</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        {isLookingUpFlight ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Search className="h-4 w-4 mr-2" />
+                        )}
+                        Lookup
+                      </Button>
+                    </div>
+                    <FormDescription>
+                      Enter an airline code followed by flight number (e.g. BA123)
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              {/* Hidden fields that will be auto-populated by the API */}
+              <div className="hidden">
+                <FormField name="airline" control={flightForm.control} render={({ field }) => (
+                  <Input {...field} type="hidden" />
+                )} />
+                <FormField name="departureAirport" control={flightForm.control} render={({ field }) => (
+                  <Input {...field} type="hidden" />
+                )} />
+                <FormField name="arrivalAirport" control={flightForm.control} render={({ field }) => (
+                  <Input {...field} type="hidden" />
+                )} />
+                <FormField name="departureDate" control={flightForm.control} render={({ field }) => (
+                  <Input {...field} type="hidden" />
+                )} />
+                <FormField name="departureTime" control={flightForm.control} render={({ field }) => (
+                  <Input {...field} type="hidden" />
+                )} />
+                <FormField name="arrivalDate" control={flightForm.control} render={({ field }) => (
+                  <Input {...field} type="hidden" />
+                )} />
+                <FormField name="arrivalTime" control={flightForm.control} render={({ field }) => (
+                  <Input {...field} type="hidden" />
+                )} />
+                <FormField name="bookingReference" control={flightForm.control} render={({ field }) => (
+                  <Input {...field} type="hidden" />
+                )} />
+                <FormField name="bookingStatus" control={flightForm.control} render={({ field }) => (
+                  <Input {...field} type="hidden" />
+                )} />
               </div>
               
               <div className="flex justify-end space-x-2">
@@ -1637,7 +1409,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                 >
                   Cancel
                 </Button>
-                <Button type="submit">
+                <Button type="submit" disabled={isLookingUpFlight || !flightForm.getValues("airline")}>
                   <Plane className="h-4 w-4 mr-2" />
                   Save Flight
                 </Button>
