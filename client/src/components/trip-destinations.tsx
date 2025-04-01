@@ -373,6 +373,10 @@ export function TripDestinations({ tripId }: { tripId: number }) {
       });
       setDestinationToDelete(null);
     },
+    onSettled: () => {
+      // Ensure page scroll is restored regardless of success or error
+      document.body.style.overflow = '';
+    },
   });
 
   const editDestinationMutation = useMutation({
@@ -612,7 +616,10 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                               className="h-5 w-5"
                               onClick={(e) => {
                                 e.stopPropagation();
+                                // Set the destination to delete, which will trigger the confirmation dialog
                                 setDestinationToDelete(destination);
+                                // Force the dialog to be in the correct stacking context
+                                document.body.style.overflow = 'hidden';
                               }}
                             >
                               <Trash2 className="h-3 w-3 text-destructive" />
@@ -821,10 +828,14 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                 <AlertDialog
                   open={!!destinationToDelete}
                   onOpenChange={(open) => {
-                    if (!open) setDestinationToDelete(null);
+                    if (!open) {
+                      setDestinationToDelete(null);
+                      // Restore page scroll
+                      document.body.style.overflow = '';
+                    }
                   }}
                 >
-                  <AlertDialogContent>
+                  <AlertDialogContent className="z-[10000]">
                     <AlertDialogHeader>
                       <AlertDialogTitle>Delete Destination</AlertDialogTitle>
                       <AlertDialogDescription>
@@ -836,6 +847,9 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
                       <AlertDialogAction
                         onClick={() => {
+                          // Reset overflow style when deletion is confirmed
+                          document.body.style.overflow = '';
+                          // Proceed with the deletion
                           deleteDestinationMutation.mutate();
                         }}
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
