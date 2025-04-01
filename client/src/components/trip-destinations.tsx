@@ -220,14 +220,15 @@ export function TripDestinations({ tripId }: { tripId: number }) {
           }
         }
       } else {
-        // Get the latest end date from the remaining destinations
-        const latestEndDate = new Date(
-          Math.max(...remainingDestinations.map((d: Destination) => new Date(d.endDate).getTime()))
-        );
+        // Sort the destinations by order to ensure we're respecting the chronological sequence
+        const sortedDestinations = [...remainingDestinations].sort((a, b) => a.order - b.order);
         
-        // Only update if the deleted destination was the one with the latest end date
-        if (trip && destinationToDelete && new Date(destinationToDelete.endDate) > new Date(trip.endDate) 
-            || new Date(destinationToDelete.endDate).getTime() === latestEndDate.getTime()) {
+        // Get the end date of the last destination in the chronological order
+        const lastDestination = sortedDestinations[sortedDestinations.length - 1];
+        const latestEndDate = new Date(lastDestination.endDate);
+        
+        // Always update the trip end date to match the last destination's end date
+        if (trip) {
           const updateTripResponse = await fetch(`/api/trips/${tripId}`, {
             method: "PATCH",
             headers: {
@@ -331,21 +332,38 @@ export function TripDestinations({ tripId }: { tripId: number }) {
 
       const updatedDestination = await response.json();
       
-      // Now update the trip end date if this updated destination's end date is later than the current trip end date
-      if (trip && new Date(data.endDate) > new Date(trip.endDate)) {
-        const updateTripResponse = await fetch(`/api/trips/${tripId}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            endDate: data.endDate,
-          }),
-          credentials: 'include'
-        });
+      // Get all destinations to check if we need to update the trip end date
+      const destinationsResponse = await fetch(`/api/trips/${tripId}/destinations`);
+      if (!destinationsResponse.ok) {
+        console.warn("Failed to fetch destinations after updating one, but the destination was updated successfully");
+      } else {
+        const allDestinations = await destinationsResponse.json();
         
-        if (!updateTripResponse.ok) {
-          console.warn("Failed to update trip end date, but destination was updated successfully");
+        // Sort the destinations by order to get the chronological sequence
+        const sortedDestinations = [...allDestinations].sort((a, b) => a.order - b.order);
+        
+        // Find if the edited destination is the last one chronologically
+        if (sortedDestinations.length > 0) {
+          const lastDestination = sortedDestinations[sortedDestinations.length - 1];
+          
+          // If the edited destination is the last one or if its end date is later than the trip end date
+          if ((lastDestination.id === selectedDestination?.id && trip) ||
+              (trip && new Date(data.endDate) > new Date(trip.endDate))) {
+            const updateTripResponse = await fetch(`/api/trips/${tripId}`, {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                endDate: data.endDate,
+              }),
+              credentials: 'include'
+            });
+            
+            if (!updateTripResponse.ok) {
+              console.warn("Failed to update trip end date, but destination was updated successfully");
+            }
+          }
         }
       }
 

@@ -86,15 +86,12 @@ export function TripTimeline({
           let newEndDate = tripData.startDate; // Default to trip start date
           
           if (remainingDestinations && remainingDestinations.length > 0) {
-            // Sort the destinations by endDate to find the last one
-            const sortedDests = [...remainingDestinations].sort((a, b) => {
-              return new Date(b.endDate).getTime() - new Date(a.endDate).getTime();
-            });
+            // Sort the destinations by order to ensure we're respecting the chronological sequence
+            const sortedDests = [...remainingDestinations].sort((a, b) => a.order - b.order);
             
-            // Use the end date of the latest destination
-            if (sortedDests[0]) {
-              newEndDate = sortedDests[0].endDate;
-            }
+            // Get the end date of the last destination in the chronological order
+            const lastDestination = sortedDests[sortedDests.length - 1];
+            newEndDate = lastDestination.endDate;
           }
           
           // Update the trip end date if needed
