@@ -174,20 +174,25 @@ export async function lookupFlightInfo(
 ): Promise<FlightApiResponse | ErrorResponse> {
   // Validate input
   if (!flightNumber) {
+    console.warn('Flight lookup called without flight number');
     return { error: 'Flight number is required.' };
   }
   
   if (!flightDate) {
+    console.warn('Flight lookup called without flight date');
     return { error: 'Flight date is required.' };
   }
   
-  // Clean the flight number (remove spaces)
-  const cleanFlightNumber = flightNumber.replace(/\s+/g, '').toUpperCase();
+  // Clean and standardize the flight number
+  const cleanFlightNumber = flightNumber.trim().replace(/\s+/g, '').toUpperCase();
+  console.log(`Cleaned flight number: "${cleanFlightNumber}" from input: "${flightNumber}"`);
   
   if (!apiKey) {
     console.warn('No API key provided for flight lookup. Using mock data.');
     // For development, return mock data when no API key is available
-    return generateMockFlightData(cleanFlightNumber, flightDate);
+    const mockData = generateMockFlightData(cleanFlightNumber, flightDate);
+    console.log('Generated mock flight data successfully');
+    return mockData;
   }
 
   try {
@@ -195,87 +200,144 @@ export async function lookupFlightInfo(
     let formattedDate: string;
     
     try {
-      formattedDate = new Date(flightDate).toISOString().split('T')[0];
+      // Try to parse the date
+      const dateObj = new Date(flightDate);
+      if (isNaN(dateObj.getTime())) {
+        throw new Error('Invalid date');
+      }
+      formattedDate = dateObj.toISOString().split('T')[0];
+      console.log(`Formatted date: ${formattedDate} from input: ${flightDate}`);
     } catch (e) {
-      console.error('Invalid date format provided:', flightDate);
+      console.error('Invalid date format provided:', flightDate, e);
       return { error: 'Invalid date format. Please use YYYY-MM-DD format.' };
     }
     
-    console.log(`Looking up flight: ${cleanFlightNumber} on ${formattedDate}`);
+    console.log(`Looking up flight: ${cleanFlightNumber} on ${formattedDate} with Aviation Stack API`);
     
-    // Make request to Aviation Stack API
-    // Note: API changed to use HTTPS to fix potential security issues
-    const response = await axios.get('https://api.aviationstack.com/v1/flights', {
-      params: {
-        access_key: apiKey,
-        flight_iata: cleanFlightNumber,
-        flight_date: formattedDate
-      },
-      timeout: 10000 // 10 second timeout for better error handling
-    });
-    
-    console.log('Aviation Stack API response received');
-    
-    // Check if the response contains data
-    if (!response.data || !response.data.data || response.data.data.length === 0) {
-      console.log('No flight data found in API response');
-      return { error: 'No flight information found for the given flight number and date.' };
-    }
-    
-    // Extract relevant flight information
-    const flightData = response.data.data[0];
-    console.log('Flight data found:', JSON.stringify(flightData, null, 2).substring(0, 200) + '...');
-    
-    // Validate required flight data
-    if (!flightData.airline || !flightData.departure || !flightData.arrival) {
-      console.error('Incomplete flight data received from API');
-      return { error: 'Incomplete flight information received from the API.' };
-    }
-    
-    // Format the response to match our application's data structure
-    return {
-      flight: {
-        airline: flightData.airline.name || 'Unknown Airline',
-        flightNumber: cleanFlightNumber,
-        departureAirport: {
-          code: flightData.departure.iata || 'N/A',
-          name: flightData.departure.airport || 'Unknown Airport',
-          city: flightData.departure.city || 'Unknown City',
-          country: flightData.departure.country || 'Unknown Country'
+    // Make request to Aviation Stack API with additional logging and validation
+    try {
+      console.log('Making request to Aviation Stack API...');
+      // Note: API changed to use HTTPS to fix potential security issues
+      const response = await axios.get('https://api.aviationstack.com/v1/flights', {
+        params: {
+          access_key: apiKey,
+          flight_iata: cleanFlightNumber,
+          flight_date: formattedDate
         },
-        arrivalAirport: {
-          code: flightData.arrival.iata || 'N/A',
-          name: flightData.arrival.airport || 'Unknown Airport',
-          city: flightData.arrival.city || 'Unknown City',
-          country: flightData.arrival.country || 'Unknown Country'
-        },
-        scheduledDeparture: flightData.departure.scheduled || new Date().toISOString(),
-        scheduledArrival: flightData.arrival.scheduled || new Date().toISOString(),
-        status: flightData.flight_status || 'Unknown'
+        timeout: 15000 // 15 second timeout for better error handling
+      });
+      
+      console.log('Aviation Stack API response received with status:', response.status);
+      
+      // Validate API response format first
+      if (!response.data) {
+        console.error('API returned empty response');
+        throw new Error('Empty response from Aviation Stack API');
       }
-    };
+      
+      // Check for API error messages
+      if (response.data.error) {
+        console.error('API returned an error:', response.data.error);
+        throw new Error(`Aviation Stack API error: ${response.data.error.message || 'Unknown API error'}`);
+      }
+      
+      // Check if the response contains flight data
+      if (!response.data.data || !Array.isArray(response.data.data) || response.data.data.length === 0) {
+        console.log('No flight data found in API response');
+        return { error: 'No flight information found for the given flight number and date.' };
+      }
+      
+      // Extract relevant flight information
+      const flightData = response.data.data[0];
+      console.log('Flight data found:', JSON.stringify(flightData, null, 2).substring(0, 200) + '...');
+      
+      // Validate required flight data
+      if (!flightData.airline || !flightData.departure || !flightData.arrival) {
+        console.error('Incomplete flight data received from API');
+        return { error: 'Incomplete flight information received from the API.' };
+      }
+      
+      // Format the response to match our application's data structure
+      const formattedResponse: FlightApiResponse = {
+        flight: {
+          airline: flightData.airline.name || 'Unknown Airline',
+          flightNumber: cleanFlightNumber,
+          departureAirport: {
+            code: flightData.departure.iata || 'N/A',
+            name: flightData.departure.airport || 'Unknown Airport',
+            city: flightData.departure.city || 'Unknown City',
+            country: flightData.departure.country || 'Unknown Country'
+          },
+          arrivalAirport: {
+            code: flightData.arrival.iata || 'N/A',
+            name: flightData.arrival.airport || 'Unknown Airport',
+            city: flightData.arrival.city || 'Unknown City',
+            country: flightData.arrival.country || 'Unknown Country'
+          },
+          scheduledDeparture: flightData.departure.scheduled || new Date().toISOString(),
+          scheduledArrival: flightData.arrival.scheduled || new Date().toISOString(),
+          status: flightData.flight_status || 'Unknown'
+        }
+      };
+      
+      console.log('Successfully formatted API response:', {
+        airline: formattedResponse.flight.airline,
+        flightNumber: formattedResponse.flight.flightNumber,
+        departure: formattedResponse.flight.departureAirport.code,
+        arrival: formattedResponse.flight.arrivalAirport.code,
+        status: formattedResponse.flight.status
+      });
+      
+      return formattedResponse;
+    } catch (apiError) {
+      throw apiError; // Re-throw to be handled by the outer catch block
+    }
   } catch (error) {
     console.error('Error fetching flight information:', error);
     
-    // Check if it's an API error with details
-    if (axios.isAxiosError(error) && error.response) {
-      console.error('API error details:', error.response.data);
-      
-      // Check for authorization errors (common with API keys)
-      if (error.response.status === 401 || error.response.status === 403) {
-        console.warn('API key authorization failed. Using mock data instead.');
+    // Enhanced error handling for different error types
+    if (axios.isAxiosError(error)) {
+      // Network or Axios specific errors
+      if (error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') {
+        console.error(`Network error (${error.code}): Could not connect to Aviation Stack API`);
+        console.log('Using mock data due to network error');
         return generateMockFlightData(cleanFlightNumber, flightDate);
       }
       
-      // Handle other API error responses
-      if (error.response.data && error.response.data.error) {
-        console.log('Using mock data due to API error');
-        return generateMockFlightData(cleanFlightNumber, flightDate);
+      // Check response errors
+      if (error.response) {
+        console.error('API error status:', error.response.status);
+        console.error('API error details:', error.response.data);
+        
+        // Check for authorization/authentication errors
+        if (error.response.status === 401 || error.response.status === 403) {
+          console.warn('API key authorization failed (status ' + error.response.status + '). Using mock data instead.');
+          console.log('This may be due to an invalid API key or the free plan request limit being reached');
+          return generateMockFlightData(cleanFlightNumber, flightDate);
+        }
+        
+        // Handle rate limiting
+        if (error.response.status === 429) {
+          console.warn('API rate limit exceeded. Using mock data instead.');
+          return generateMockFlightData(cleanFlightNumber, flightDate);
+        }
+        
+        // Handle other API error responses
+        if (error.response.data && error.response.data.error) {
+          const apiErrorMsg = error.response.data.error.message || error.response.data.error;
+          console.error('Aviation Stack API error message:', apiErrorMsg);
+          console.log('Using mock data due to API error');
+          return generateMockFlightData(cleanFlightNumber, flightDate);
+        }
       }
     }
     
-    // For any other errors, also use mock data to provide a better user experience
-    console.log('Using mock data due to API connection error');
+    // For any other errors, use mock data to provide a better user experience
+    console.log('Using mock data due to unexpected error');
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
     return generateMockFlightData(cleanFlightNumber, flightDate);
   }
 }

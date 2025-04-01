@@ -110,7 +110,10 @@ export function registerRoutes(app: Express): Server {
     try {
       const { flightNumber, date } = req.query;
       
+      console.log(`Flight lookup request received with params:`, { flightNumber, date });
+      
       if (!flightNumber || !date) {
+        console.warn('Missing required parameters for flight lookup');
         return res.status(400).json({ error: "Flight number and date are required" });
       }
       
@@ -125,15 +128,20 @@ export function registerRoutes(app: Express): Server {
       if (!apiKey) {
         console.warn('Aviation Stack API key is not set. Using mock data.');
       } else {
+        // Don't log the actual API key, just confirm it exists
         console.log('Using Aviation Stack API with provided API key');
       }
       
       // Lookup flight information
+      console.log(`Calling lookupFlightInfo with flight number: ${flightNumber}, date: ${date}, apiKey: ${apiKey ? 'provided' : 'missing'}`);
+      
       const flightInfo = await lookupFlightInfo(
         flightNumber as string, 
         date as string,
         apiKey
       );
+      
+      console.log('Flight info response received:', 'error' in flightInfo ? 'Error response' : 'Success response');
       
       // Check if there was an error message in the response
       // But we should still have flight data from mock generator if API failed
@@ -143,18 +151,32 @@ export function registerRoutes(app: Express): Server {
       }
       
       // If we have flight data (either from API or mock generator), return it
-      if (flightInfo.flight) {
+      if (flightInfo && 'flight' in flightInfo && flightInfo.flight) {
         console.log('Flight lookup successful:', flightInfo.flight.airline, flightInfo.flight.flightNumber);
+        console.log('Flight details:', {
+          airline: flightInfo.flight.airline,
+          flightNumber: flightInfo.flight.flightNumber,
+          departure: flightInfo.flight.departureAirport.code,
+          arrival: flightInfo.flight.arrivalAirport.code,
+          status: flightInfo.flight.status
+        });
         return res.json(flightInfo);
       }
       
       // This should never happen with our current implementation
+      console.error('Unexpected response format from flight lookup:', flightInfo);
       return res.status(500).json({ error: 'No flight data available' });
     } catch (error) {
       console.error('Error looking up flight information:', error);
       
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
+      
       // Use fallback mock data in case of unexpected errors
       try {
+        console.log('Attempting to generate mock flight data as fallback');
         const { generateMockFlightData } = await import('./utils/flightApi');
         const mockData = generateMockFlightData(req.query.flightNumber as string, req.query.date as string);
         

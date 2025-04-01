@@ -594,16 +594,25 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
   // Submit flight information for inbound flight
   const handleFlightInSubmit = async () => {
-    if (!currentParticipantId) return;
+    if (!currentParticipantId) {
+      console.warn("Cannot add flight: No participant selected");
+      return;
+    }
     
     const values = flightForm.getValues();
+    console.log("Flight form values:", values);
+    
     const selectedParticipant = participants.find(p => p.id === currentParticipantId);
     
-    if (!selectedParticipant) return;
+    if (!selectedParticipant) {
+      console.warn("Cannot add flight: Selected participant not found", { currentParticipantId });
+      return;
+    }
     
     try {
       // Format the flight description
       const flightDescription = `${values.airline} ${values.flightNumber} (${values.departureAirport} → ${values.arrivalAirport})`;
+      console.log("Adding inbound flight for participant:", selectedParticipant.name, "Flight:", flightDescription);
       
       // Update the participant with the new flight information
       await updateParticipantMutation.mutateAsync({
@@ -612,7 +621,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       });
       
       // Create actual flight record in database
-      await createFlight({
+      const flightData = {
         ...values,
         tripId,
         departureDate: values.departureDate || '',
@@ -621,7 +630,11 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         arrivalTime: values.arrivalTime || '',
         participantId: currentParticipantId,
         direction: 'inbound'
-      });
+      };
+      
+      console.log("Creating flight record with data:", flightData);
+      
+      await createFlight(flightData);
       
       // Close dialog and reset form
       setIsAddFlightInOpen(false);
@@ -632,26 +645,44 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       });
     } catch (error) {
       console.error("Error adding inbound flight:", error);
+      
+      // More detailed error logging
+      if (error instanceof Error) {
+        console.error("Error message:", error.message);
+        console.error("Error stack:", error.stack);
+      } else {
+        console.error("Non-error object thrown:", error);
+      }
+      
       toast({
         variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to add inbound flight",
+        title: "Error adding flight",
+        description: error instanceof Error ? error.message : "Failed to add inbound flight. Please try again.",
       });
     }
   };
   
   // Submit flight information for outbound flight
   const handleFlightOutSubmit = async () => {
-    if (!currentParticipantId) return;
+    if (!currentParticipantId) {
+      console.warn("Cannot add flight: No participant selected");
+      return;
+    }
     
     const values = flightForm.getValues();
+    console.log("Flight form values (outbound):", values);
+    
     const selectedParticipant = participants.find(p => p.id === currentParticipantId);
     
-    if (!selectedParticipant) return;
+    if (!selectedParticipant) {
+      console.warn("Cannot add flight: Selected participant not found", { currentParticipantId });
+      return;
+    }
     
     try {
       // Format the flight description
       const flightDescription = `${values.airline} ${values.flightNumber} (${values.departureAirport} → ${values.arrivalAirport})`;
+      console.log("Adding outbound flight for participant:", selectedParticipant.name, "Flight:", flightDescription);
       
       // Update the participant with the new flight information
       await updateParticipantMutation.mutateAsync({
@@ -660,7 +691,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       });
       
       // Create actual flight record in database
-      await createFlight({
+      const flightData = {
         ...values,
         tripId,
         departureDate: values.departureDate || '',
@@ -669,7 +700,11 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         arrivalTime: values.arrivalTime || '',
         participantId: currentParticipantId,
         direction: 'outbound'
-      });
+      };
+      
+      console.log("Creating flight record with data:", flightData);
+      
+      await createFlight(flightData);
       
       // Close dialog and reset form
       setIsAddFlightOutOpen(false);
@@ -680,10 +715,19 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       });
     } catch (error) {
       console.error("Error adding outbound flight:", error);
+      
+      // More detailed error logging
+      if (error instanceof Error) {
+        console.error("Error message:", error.message);
+        console.error("Error stack:", error.stack);
+      } else {
+        console.error("Non-error object thrown:", error);
+      }
+      
       toast({
         variant: "destructive",
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to add outbound flight",
+        title: "Error adding flight",
+        description: error instanceof Error ? error.message : "Failed to add outbound flight. Please try again.",
       });
     }
   };
