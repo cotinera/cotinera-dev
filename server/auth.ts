@@ -127,13 +127,15 @@ export function setupAuth(app: Express) {
       // Hash the password
       const hashedPassword = await crypto.hash(password);
 
-      // Create the new user
+      // Create the new user - only use fields from the validated schema
+      const userData = {
+        ...result.data,  // This includes any optional fields from the schema
+        password: hashedPassword,  // Override with hashed password
+      };
+      
       const [newUser] = await db
         .insert(users)
-        .values({
-          email,
-          password: hashedPassword,
-        })
+        .values(userData)
         .returning();
 
       // Log the user in after registration
