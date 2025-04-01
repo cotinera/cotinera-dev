@@ -53,9 +53,8 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
 
   const updateTripMutation = useMutation({
     mutationFn: async (data: EditTripData) => {
-      // Adjust dates to avoid timezone issues
-      // We need to ensure that dates are interpreted as UTC midnight
-      // to prevent off-by-one errors when the date is displayed or saved
+      // IMPORTANT: Pass dates exactly as user selected them, without any Date object manipulation
+      // This ensures the date the user selects is exactly the date that gets saved
       const res = await fetch(`/api/trips/${trip.id}`, {
         method: "PATCH",
         headers: {
@@ -64,9 +63,10 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
         body: JSON.stringify({
           ...data,
           coordinates,
-          // Pass the dates exactly as selected, without timezone adjustments
+          // Pass dates as plain strings to avoid any timezone issues
+          // The server will append a fixed time (12:00:00 UTC) to keep the date consistent
           startDate: data.startDate,
-          endDate: data.endDate,
+          endDate: data.endDate, 
         }),
         credentials: 'include'
       });
