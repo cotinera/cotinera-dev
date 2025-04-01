@@ -106,6 +106,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
 
   const addDestinationMutation = useMutation({
     mutationFn: async (data: FormData) => {
+      // First, add the destination
       const response = await fetch(`/api/trips/${tripId}/destinations`, {
         method: "POST",
         headers: {
@@ -122,7 +123,27 @@ export function TripDestinations({ tripId }: { tripId: number }) {
         throw new Error(errorData.error || "Failed to add destination");
       }
 
-      return response.json();
+      const newDestination = await response.json();
+      
+      // Now update the trip end date if the new destination's end date is later than the current trip end date
+      if (trip && new Date(data.endDate) > new Date(trip.endDate)) {
+        const updateTripResponse = await fetch(`/api/trips/${tripId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            endDate: data.endDate,
+          }),
+          credentials: 'include'
+        });
+        
+        if (!updateTripResponse.ok) {
+          console.warn("Failed to update trip end date, but destination was added successfully");
+        }
+      }
+
+      return newDestination;
     },
     onSuccess: () => {
       toast({
@@ -130,7 +151,12 @@ export function TripDestinations({ tripId }: { tripId: number }) {
         description: "The destination has been added to your trip.",
       });
       setIsAddDestinationOpen(false);
+      
+      // Invalidate all relevant queries to update the UI in real-time
       queryClient.invalidateQueries({ queryKey: ["trip-destinations", tripId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/trips"] });
     },
     onError: (error: Error) => {
       toast({
@@ -145,6 +171,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
     mutationFn: async (data: FormData) => {
       if (!selectedDestination) return null;
 
+      // First, update the destination
       const response = await fetch(`/api/trips/${tripId}/destinations/${selectedDestination.id}`, {
         method: "PATCH",
         headers: {
@@ -161,7 +188,27 @@ export function TripDestinations({ tripId }: { tripId: number }) {
         throw new Error(errorData.error || "Failed to update destination");
       }
 
-      return response.json();
+      const updatedDestination = await response.json();
+      
+      // Now update the trip end date if this updated destination's end date is later than the current trip end date
+      if (trip && new Date(data.endDate) > new Date(trip.endDate)) {
+        const updateTripResponse = await fetch(`/api/trips/${tripId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            endDate: data.endDate,
+          }),
+          credentials: 'include'
+        });
+        
+        if (!updateTripResponse.ok) {
+          console.warn("Failed to update trip end date, but destination was updated successfully");
+        }
+      }
+
+      return updatedDestination;
     },
     onSuccess: () => {
       toast({
@@ -169,7 +216,12 @@ export function TripDestinations({ tripId }: { tripId: number }) {
         description: "The destination has been updated.",
       });
       setIsEditDestinationOpen(false);
+      
+      // Invalidate all relevant queries to update the UI in real-time
       queryClient.invalidateQueries({ queryKey: ["trip-destinations", tripId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/trips"] });
     },
     onError: (error: Error) => {
       toast({

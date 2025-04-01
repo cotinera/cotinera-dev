@@ -72,6 +72,48 @@ export function TripTimeline({
           throw new Error(errorData.error || 'Failed to delete destination');
         }
 
+        // Get remaining destinations to determine if we need to update the trip end date
+        const remainingRes = await fetch(`/api/trips/${tripId}/destinations`);
+        if (!remainingRes.ok) {
+          throw new Error('Failed to fetch remaining destinations after deletion');
+        }
+        
+        const remainingDestinations = await remainingRes.json();
+        
+        // If there are no more destinations, update trip end date to match trip start date
+        // If there are remaining destinations, update trip end date to match the latest destination's end date
+        if (tripData) {
+          let newEndDate = tripData.startDate; // Default to trip start date
+          
+          if (remainingDestinations && remainingDestinations.length > 0) {
+            // Sort the destinations by endDate to find the last one
+            const sortedDests = [...remainingDestinations].sort((a, b) => {
+              return new Date(b.endDate).getTime() - new Date(a.endDate).getTime();
+            });
+            
+            // Use the end date of the latest destination
+            if (sortedDests[0]) {
+              newEndDate = sortedDests[0].endDate;
+            }
+          }
+          
+          // Update the trip end date if needed
+          const updateTripRes = await fetch(`/api/trips/${tripId}`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              endDate: newEndDate,
+            }),
+            credentials: 'include'
+          });
+          
+          if (!updateTripRes.ok) {
+            console.warn("Failed to update trip end date after destination deletion");
+          }
+        }
+
         return await res.json();
       } catch (error) {
         console.error('Delete destination error:', error);
@@ -81,6 +123,10 @@ export function TripTimeline({
     onSuccess: () => {
       // Invalidate all related queries to ensure real-time updates everywhere
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
+      // Also invalidate the trip data query to update the trip timeline
+      queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId] });
+      // Invalidate the trips list
+      queryClient.invalidateQueries({ queryKey: ["/api/trips"] });
       // Also invalidate the query used by the destinations dropdown in the TripDestinations component
       queryClient.invalidateQueries({ queryKey: ["trip-destinations", tripId] });
       
