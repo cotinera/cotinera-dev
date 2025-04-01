@@ -120,6 +120,23 @@ export function TripTimeline({
         throw error;
       }
     },
+    onMutate: async (destinationId: number) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
+      
+      // Snapshot the previous destination data
+      const previousDestinations = queryClient.getQueryData<Destination[]>([`/api/trips/${tripId}/destinations`]);
+      
+      // Optimistically remove the deleted destination from the destinations array
+      if (previousDestinations) {
+        queryClient.setQueryData<Destination[]>(
+          [`/api/trips/${tripId}/destinations`],
+          previousDestinations.filter(d => d.id !== destinationId)
+        );
+      }
+      
+      return { previousDestinations };
+    },
     onSuccess: () => {
       // Invalidate all related queries to ensure real-time updates everywhere
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
@@ -139,7 +156,12 @@ export function TripTimeline({
       });
       setDestinationToDelete(null);
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _, context) => {
+      // Revert to the previous state if there was an error
+      if (context?.previousDestinations) {
+        queryClient.setQueryData([`/api/trips/${tripId}/destinations`], context.previousDestinations);
+      }
+      
       toast({
         variant: "destructive",
         title: "Error",

@@ -247,6 +247,36 @@ export function TripDestinations({ tripId }: { tripId: number }) {
 
       return { success: true };
     },
+    onMutate: async () => {
+      // Cancel any outgoing refetches to prevent them overwriting our optimistic update
+      await queryClient.cancelQueries({ queryKey: ["trip-destinations", tripId] });
+      await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
+      
+      // Snapshot the previous destinations
+      const previousDestinations = queryClient.getQueryData<Destination[]>(["trip-destinations", tripId]);
+      const previousTripDestinations = queryClient.getQueryData<Destination[]>([`/api/trips/${tripId}/destinations`]);
+      
+      // Optimistically update by removing the deleted destination
+      if (previousDestinations && destinationToDelete) {
+        queryClient.setQueryData<Destination[]>(
+          ["trip-destinations", tripId], 
+          previousDestinations.filter(d => d.id !== destinationToDelete.id)
+        );
+      }
+      
+      if (previousTripDestinations && destinationToDelete) {
+        queryClient.setQueryData<Destination[]>(
+          [`/api/trips/${tripId}/destinations`],
+          previousTripDestinations.filter(d => d.id !== destinationToDelete.id)
+        );
+      }
+      
+      // Return context object with snapshots
+      return { 
+        previousDestinations, 
+        previousTripDestinations 
+      };
+    },
     onSuccess: () => {
       toast({
         title: "Destination deleted",
@@ -260,7 +290,15 @@ export function TripDestinations({ tripId }: { tripId: number }) {
       queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId] });
       queryClient.invalidateQueries({ queryKey: ["/api/trips"] });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _, context) => {
+      // Restore previous data if there was an error
+      if (context?.previousDestinations) {
+        queryClient.setQueryData(["trip-destinations", tripId], context.previousDestinations);
+      }
+      if (context?.previousTripDestinations) {
+        queryClient.setQueryData([`/api/trips/${tripId}/destinations`], context.previousTripDestinations);
+      }
+      
       toast({
         title: "Error",
         description: error.message,
