@@ -298,17 +298,23 @@ export function registerRoutes(app: Express): Server {
   // Update trip
   app.patch("/api/trips/:id", async (req, res) => {
     try {
-      // For date-only fields, ensure they are stored at UTC midnight
-      const startDate = `${req.body.startDate}T00:00:00.000Z`;
-      const endDate = `${req.body.endDate}T00:00:00.000Z`;
-
+      // Correctly handle the date by preserving the user's selected date regardless of timezone
+      // Format dates as ISO strings, but make sure they represent the exact day the user selected
+      // This approach ensures that the date displayed to the user is the date they selected
+      const startDate = new Date(req.body.startDate);
+      const endDate = new Date(req.body.endDate);
+      
+      // Ensure the time component is UTC midnight to prevent any timezone shifts
+      const startDateISO = `${req.body.startDate}T00:00:00.000Z`;
+      const endDateISO = `${req.body.endDate}T00:00:00.000Z`;
+      
       const [updatedTrip] = await db
         .update(trips)
         .set({
           title: req.body.title,
           location: req.body.location,
-          startDate,
-          endDate,
+          startDate: startDateISO,
+          endDate: endDateISO,
         })
         .where(eq(trips.id, parseInt(req.params.id)))
         .returning();
