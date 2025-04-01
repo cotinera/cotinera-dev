@@ -336,20 +336,26 @@ export function TripDestinations({ tripId }: { tripId: number }) {
       });
       setDestinationToDelete(null);
       
-      // First, reset the query cache completely for all destination lists to prevent stale data
+      // First, completely remove the cached queries to ensure no stale data remains
       queryClient.removeQueries({ queryKey: ["trip-destinations", tripId] });
       queryClient.removeQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
+      queryClient.removeQueries({ queryKey: ["/api/trips", tripId, "destinations"] });
       
-      // Then invalidate and force refetch to ensure fresh data
-      queryClient.invalidateQueries({ queryKey: ["trip-destinations"] });
+      // Also invalidate general trip data since we might have updated the trip end date
+      queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId] });
       queryClient.invalidateQueries({ queryKey: ["/api/trips"] });
       
-      // Force immediate refetching to ensure UI gets updated data
-      Promise.all([
-        queryClient.refetchQueries({ queryKey: ["trip-destinations", tripId] }),
-        queryClient.refetchQueries({ queryKey: [`/api/trips/${tripId}/destinations`] }),
-        queryClient.refetchQueries({ queryKey: ["/api/trips", tripId] })
-      ]);
+      // Invalidate all destination queries to be safe
+      queryClient.invalidateQueries({ queryKey: ["trip-destinations"] });
+      
+      // Force immediate refetching of critical queries to ensure UI gets updated data
+      setTimeout(() => {
+        Promise.all([
+          queryClient.refetchQueries({ queryKey: ["trip-destinations", tripId] }),
+          queryClient.refetchQueries({ queryKey: [`/api/trips/${tripId}/destinations`] }),
+          queryClient.refetchQueries({ queryKey: ["/api/trips", tripId] })
+        ]);
+      }, 100); // Small delay to ensure server has time to process the deletion
     },
     onError: (error: Error, _, context) => {
       // Restore previous data if there was an error
