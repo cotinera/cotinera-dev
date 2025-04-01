@@ -111,13 +111,13 @@ export function setupAuth(app: Express) {
           .send("Invalid input: " + result.error.issues.map(i => i.message).join(", "));
       }
 
-      const { email, password } = result.data;
+      const userData = result.data;
 
       // Check if user already exists
       const [existingUser] = await db
         .select()
         .from(users)
-        .where(eq(users.email, email))
+        .where(eq(users.email, userData.email))
         .limit(1);
 
       if (existingUser) {
@@ -125,17 +125,19 @@ export function setupAuth(app: Express) {
       }
 
       // Hash the password
-      const hashedPassword = await crypto.hash(password);
+      const hashedPassword = await crypto.hash(userData.password);
 
-      // Create the new user - only use fields from the validated schema
-      const userData = {
-        ...result.data,  // This includes any optional fields from the schema
-        password: hashedPassword,  // Override with hashed password
-      };
-      
+      // Create the new user with validated fields
       const [newUser] = await db
         .insert(users)
-        .values(userData)
+        .values({
+          email: userData.email,
+          password: hashedPassword,
+          name: userData.name,
+          username: userData.username,
+          provider: userData.provider,
+          providerId: userData.providerId
+        })
         .returning();
 
       // Log the user in after registration
