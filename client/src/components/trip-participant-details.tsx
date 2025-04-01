@@ -791,7 +791,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center space-x-2">
-                      <span>{participant.flightIn || "-"}</span>
+                      <span>{participant.flightIn || ""}</span>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -811,7 +811,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center space-x-2">
-                      <span>{participant.flightOut || "-"}</span>
+                      <span>{participant.flightOut || ""}</span>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -830,7 +830,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                     </div>
                   </TableCell>
                   <TableCell>
-                    {participant.accommodation?.name || "-"}
+                    {participant.accommodation?.name || ""}
                   </TableCell>
                   {customColumns.map(column => (
                     <TableCell key={column.id}>
