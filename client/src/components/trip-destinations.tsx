@@ -249,9 +249,12 @@ export function TripDestinations({ tripId }: { tripId: number }) {
       return { success: true };
     },
     onMutate: async () => {
+      if (!destinationToDelete) return { previousDestinations: null, previousTripDestinations: null };
+      
       // Cancel any outgoing refetches to prevent them overwriting our optimistic update
       await queryClient.cancelQueries({ queryKey: ["trip-destinations", tripId] });
       await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
+      await queryClient.cancelQueries({ queryKey: ["/api/trips", tripId, "destinations"] });
       
       // Snapshot the previous destinations
       const previousDestinations = queryClient.getQueryData<Destination[]>(["trip-destinations", tripId]);
@@ -259,16 +262,24 @@ export function TripDestinations({ tripId }: { tripId: number }) {
       
       // Optimistically update by removing the deleted destination
       if (previousDestinations && destinationToDelete) {
+        const filtered = previousDestinations.filter(d => d.id !== destinationToDelete.id);
         queryClient.setQueryData<Destination[]>(
           ["trip-destinations", tripId], 
-          previousDestinations.filter(d => d.id !== destinationToDelete.id)
+          filtered
         );
       }
       
       if (previousTripDestinations && destinationToDelete) {
+        const filtered = previousTripDestinations.filter(d => d.id !== destinationToDelete.id);
         queryClient.setQueryData<Destination[]>(
           [`/api/trips/${tripId}/destinations`],
-          previousTripDestinations.filter(d => d.id !== destinationToDelete.id)
+          filtered
+        );
+        
+        // Also update other cache keys that might be used
+        queryClient.setQueryData<Destination[]>(
+          ["/api/trips", tripId, "destinations"],
+          filtered
         );
       }
       
@@ -285,11 +296,20 @@ export function TripDestinations({ tripId }: { tripId: number }) {
       });
       setDestinationToDelete(null);
       
-      // Invalidate all relevant queries to update the UI in real-time
-      queryClient.invalidateQueries({ queryKey: ["trip-destinations", tripId] });
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId] });
+      // First, reset the query cache completely for all destination lists to prevent stale data
+      queryClient.removeQueries({ queryKey: ["trip-destinations", tripId] });
+      queryClient.removeQueries({ queryKey: [`/api/trips/${tripId}/destinations`] });
+      
+      // Then invalidate and force refetch to ensure fresh data
+      queryClient.invalidateQueries({ queryKey: ["trip-destinations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/trips"] });
+      
+      // Force immediate refetching to ensure UI gets updated data
+      Promise.all([
+        queryClient.refetchQueries({ queryKey: ["trip-destinations", tripId] }),
+        queryClient.refetchQueries({ queryKey: [`/api/trips/${tripId}/destinations`] }),
+        queryClient.refetchQueries({ queryKey: ["/api/trips", tripId] })
+      ]);
     },
     onError: (error: Error, _, context) => {
       // Restore previous data if there was an error
