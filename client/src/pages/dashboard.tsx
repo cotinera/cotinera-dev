@@ -4,8 +4,10 @@ import { useTutorial } from "@/hooks/use-tutorial";
 import { Button } from "@/components/ui/button";
 import { TripCard } from "@/components/trip-card";
 import { TravelGuide } from "@/components/travel-guide";
-import { Plus, LogOut, Trash2, Settings } from "lucide-react";
+import { Plus, LogOut, Trash2, Settings, DoorOpen, UserCircle } from "lucide-react";
 import { useState, useMemo } from "react";
+import { useAuth } from "@/hooks/use-auth";
+import { Link } from "wouter";
 import { z } from "zod";
 import {
   Dialog,
@@ -53,6 +55,7 @@ export default function Dashboard() {
   const { trips, createTrip } = useTrips();
   const { logout } = useUser();
   const { isFirstTime, completeTutorial } = useTutorial();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
@@ -238,9 +241,18 @@ export default function Dashboard() {
                 <TravelPreferencesForm onClose={() => setIsPreferencesOpen(false)} />
               </DialogContent>
             </Dialog>
-            <Button variant="ghost" size="icon" onClick={() => logout()}>
-              <LogOut className="h-5 w-5" />
-            </Button>
+            
+            {user ? (
+              <Button variant="ghost" size="icon" title="Logout" onClick={() => logout()}>
+                <LogOut className="h-5 w-5" />
+              </Button>
+            ) : (
+              <Button variant="ghost" size="icon" title="Login/Register" asChild>
+                <Link href="/auth">
+                  <DoorOpen className="h-5 w-5" />
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
       </header>

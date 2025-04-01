@@ -1,6 +1,5 @@
 import { Link } from "wouter";
 import { MapPin } from "lucide-react";
-import { AuthButton } from "@/components/auth";
 
 export function AppHeader() {
   return (
@@ -15,7 +14,7 @@ export function AppHeader() {
           </a>
         </Link>
         <div className="flex items-center gap-4">
-          <AuthButton />
+          {/* Auth functionality moved to door icon in preferences area */}
         </div>
       </div>
     </header>
