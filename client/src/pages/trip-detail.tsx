@@ -233,6 +233,7 @@ export default function TripDetail() {
                     location={currentDestination.coordinates || { lat: 0, lng: 0 }}
                     tripId={trip.id.toString()}
                     pinnedPlaces={pinnedPlaces || []}
+                    hideSearchAndFilters={true}
                   />
                 ) : destinations && destinations.length >= 2 ? (
                   <MapRouteView destinations={destinations} />
@@ -241,6 +242,7 @@ export default function TripDetail() {
                     location={trip.coordinates || { lat: 0, lng: 0 }}
                     tripId={trip.id.toString()}
                     pinnedPlaces={pinnedPlaces || []}
+                    hideSearchAndFilters={true}
                   />
                 )}
               </section>
