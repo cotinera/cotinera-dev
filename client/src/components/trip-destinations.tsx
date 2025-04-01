@@ -92,9 +92,9 @@ export function TripDestinations({ tripId }: { tripId: number }) {
       previousEndDate = new Date(lastDestination.endDate);
       sourceName = lastDestination.name;
     } else if (trip) {
-      // No destinations yet, use the trip start date (not end date)
-      // This is more logical for the first destination in a trip
-      previousEndDate = new Date(trip.startDate);
+      // No destinations yet, use the trip END date (not start date)
+      // This creates proper continuity for the first destination after the trip starting point
+      previousEndDate = new Date(trip.endDate);
       sourceName = trip.location || 'Starting Point';
     } else {
       // Fallback to today
@@ -375,9 +375,9 @@ export function TripDestinations({ tripId }: { tripId: number }) {
                       </div>
                     ) : trip ? (
                       <div>
-                        <p>Your trip starts at <span className="font-semibold">{trip.location || 'Starting Point'}</span></p>
-                        <p className="mt-1 text-xs text-muted-foreground">Trip begins on {format(new Date(trip.startDate), "MMM d, yyyy")}</p>
-                        <p className="mt-1">Your new destination will be automatically scheduled to start after this date</p>
+                        <p>Your trip is at <span className="font-semibold">{trip.location || 'Starting Point'}</span></p>
+                        <p className="mt-1 text-xs text-muted-foreground">Trip ends on {format(new Date(trip.endDate), "MMM d, yyyy")}</p>
+                        <p className="mt-1">Your new destination will start the day after this end date</p>
                       </div>
                     ) : (
                       <p>Please select dates for your new destination</p>
