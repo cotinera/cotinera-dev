@@ -319,18 +319,48 @@ export function MapView({
 
   const handlePlaceNameClick = useCallback((place: PinnedPlace) => {
     if (mapRef.current && place.coordinates) {
-      mapRef.current.panTo(place.coordinates);
-      mapRef.current.setZoom(17);
+      // Get current zoom and position
+      const currentZoom = mapRef.current.getZoom() || 12;
+      const currentCenter = mapRef.current.getCenter()?.toJSON() || coordinates;
+      
+      // First zoom out slightly
+      mapRef.current.panTo(currentCenter);
+      mapRef.current.setZoom(currentZoom > 8 ? 8 : currentZoom - 2);
+      
+      // Then after a short delay, zoom in to the destination
+      setTimeout(() => {
+        mapRef.current?.panTo(place.coordinates);
+        // Animate zoom in
+        setTimeout(() => {
+          mapRef.current?.setZoom(17);
+        }, 300);
+      }, 400);
     }
     if (place.placeId) {
       fetchDetails(place.placeId);
     }
-  }, [fetchDetails]);
+  }, [fetchDetails, coordinates]);
 
   const handleMarkerClick = useCallback((item: PinnedPlace | Accommodation | Activity) => {
     if (mapRef.current && 'coordinates' in item && item.coordinates) {
-      mapRef.current.panTo(item.coordinates);
-      mapRef.current.setZoom(17);
+      // Get current zoom and position
+      const currentZoom = mapRef.current.getZoom() || 12;
+      const currentCenter = mapRef.current.getCenter()?.toJSON() || coordinates;
+      
+      // First zoom out slightly
+      mapRef.current.panTo(currentCenter);
+      mapRef.current.setZoom(currentZoom > 8 ? 8 : currentZoom - 2);
+      
+      // Then after a short delay, zoom in to the destination
+      setTimeout(() => {
+        if (mapRef.current && item.coordinates) {
+          mapRef.current.panTo(item.coordinates);
+          // Animate zoom in
+          setTimeout(() => {
+            mapRef.current?.setZoom(17);
+          }, 300);
+        }
+      }, 400);
     }
 
     if ('placeId' in item && item.placeId) {
@@ -341,8 +371,8 @@ export function MapView({
         formatted_address: 'location' in item ? item.location : (item.address || ''),
         geometry: {
           location: new google.maps.LatLng(
-            item.coordinates.lat,
-            item.coordinates.lng
+            item.coordinates?.lat || 0,
+            item.coordinates?.lng || 0
           )
         },
         types: ['activity' in item ? 'event' : 'lodging'],
@@ -362,7 +392,7 @@ export function MapView({
     if ('placeId' in item) {
       onPinClick?.(item as PinnedPlace);
     }
-  }, [onPinClick, fetchDetails]);
+  }, [onPinClick, fetchDetails, coordinates]);
 
   const handleLocalPlaceNameClick = useCallback((place: PinnedPlace) => {
     handlePlaceNameClick(place);
@@ -484,8 +514,22 @@ export function MapView({
           setSearchedLocation({ lat, lng });
 
           if (mapRef.current) {
-            mapRef.current.panTo({ lat, lng });
-            mapRef.current.setZoom(17); // Increased zoom level
+            // Get current zoom and position
+            const currentZoom = mapRef.current.getZoom() || 12;
+            const currentCenter = mapRef.current.getCenter()?.toJSON() || coordinates;
+            
+            // First zoom out slightly
+            mapRef.current.panTo(currentCenter);
+            mapRef.current.setZoom(currentZoom > 8 ? 8 : currentZoom - 2);
+            
+            // Then after a short delay, zoom in to the destination
+            setTimeout(() => {
+              mapRef.current?.panTo({ lat, lng });
+              // Animate zoom in
+              setTimeout(() => {
+                mapRef.current?.setZoom(17); // Increased zoom level
+              }, 300);
+            }, 400);
           }
 
           fetchDetails(result.placeId);
@@ -586,8 +630,24 @@ export function MapView({
   useEffect(() => {
     if (selectedPlace) {
       if (mapRef.current && selectedPlace.coordinates) {
-        mapRef.current.panTo(selectedPlace.coordinates);
-        mapRef.current.setZoom(17);
+        // Get current zoom and position
+        const currentZoom = mapRef.current.getZoom() || 12;
+        const currentCenter = mapRef.current.getCenter()?.toJSON() || coordinates;
+        
+        // First zoom out slightly
+        mapRef.current.panTo(currentCenter);
+        mapRef.current.setZoom(currentZoom > 8 ? 8 : currentZoom - 2);
+        
+        // Then after a short delay, zoom in to the destination
+        setTimeout(() => {
+          if (mapRef.current && selectedPlace.coordinates) {
+            mapRef.current.panTo(selectedPlace.coordinates);
+            // Animate zoom in
+            setTimeout(() => {
+              mapRef.current?.setZoom(17);
+            }, 300);
+          }
+        }, 400);
       }
 
       if (selectedPlace.placeId) {
