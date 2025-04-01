@@ -261,7 +261,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
   };
 
   return (
-    <div className="relative z-50">
+    <div className="relative z-[2000]">
       <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-[250px]">
         <Card className="border shadow-sm">
           <CollapsibleTrigger asChild>
@@ -285,7 +285,7 @@ export function TripDestinations({ tripId }: { tripId: number }) {
           <CollapsibleContent className="overflow-visible">
             <CardContent className="p-2 pt-0 flex flex-col gap-2 relative">
               <div className="border rounded-md overflow-hidden">
-                <ScrollArea className="h-[200px]">
+                <ScrollArea className="h-[180px] max-h-[40vh]">
                   <div className="p-2 space-y-2">
                     {trip && (
                       <div className="flex items-center justify-between py-1 px-2 rounded-md bg-muted/50 text-sm hover:bg-muted/70 transition-colors">
