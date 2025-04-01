@@ -104,6 +104,144 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Flight API endpoints
+  // Lookup flight information by flight number and date
+  app.get("/api/flights/lookup", async (req, res) => {
+    try {
+      const { flightNumber, date } = req.query;
+      
+      if (!flightNumber || !date) {
+        return res.status(400).json({ error: "Flight number and date are required" });
+      }
+      
+      // Import the flight API utility
+      const { lookupFlightInfo } = await import('./utils/flightApi');
+      
+      // Get API key from environment variables
+      const apiKey = process.env.AVIATION_STACK_API_KEY;
+      
+      // Lookup flight information
+      const flightInfo = await lookupFlightInfo(
+        flightNumber as string, 
+        date as string,
+        apiKey
+      );
+      
+      // Check if there was an error
+      if ('error' in flightInfo) {
+        return res.status(404).json(flightInfo);
+      }
+      
+      res.json(flightInfo);
+    } catch (error) {
+      console.error('Error looking up flight information:', error);
+      res.status(500).json({ error: 'Failed to lookup flight information' });
+    }
+  });
+  
+  // Get all flights for a trip
+  app.get("/api/trips/:tripId/flights", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      if (isNaN(tripId)) {
+        return res.status(400).json({ error: "Invalid trip ID" });
+      }
+
+      const flightsList = await db.select()
+        .from(flights)
+        .where(eq(flights.tripId, tripId));
+
+      res.json(flightsList);
+    } catch (error) {
+      console.error('Error fetching flights:', error);
+      res.status(500).json({ error: 'Failed to fetch flights' });
+    }
+  });
+
+  // Create a new flight
+  app.post("/api/trips/:tripId/flights", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      if (isNaN(tripId)) {
+        return res.status(400).json({ error: "Invalid trip ID" });
+      }
+
+      // Validate the trip exists
+      const existingTrip = await db.select().from(trips).where(eq(trips.id, tripId)).limit(1);
+      if (existingTrip.length === 0) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+
+      const [flight] = await db.insert(flights)
+        .values({
+          ...req.body,
+          tripId
+        })
+        .returning();
+
+      res.status(201).json(flight);
+    } catch (error) {
+      console.error('Error creating flight:', error);
+      res.status(500).json({ error: 'Failed to create flight' });
+    }
+  });
+
+  // Update a flight
+  app.patch("/api/trips/:tripId/flights/:flightId", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const flightId = parseInt(req.params.flightId);
+      
+      if (isNaN(tripId) || isNaN(flightId)) {
+        return res.status(400).json({ error: "Invalid ID" });
+      }
+
+      const [flight] = await db.update(flights)
+        .set(req.body)
+        .where(and(
+          eq(flights.id, flightId),
+          eq(flights.tripId, tripId)
+        ))
+        .returning();
+
+      if (!flight) {
+        return res.status(404).json({ error: "Flight not found" });
+      }
+
+      res.json(flight);
+    } catch (error) {
+      console.error('Error updating flight:', error);
+      res.status(500).json({ error: 'Failed to update flight' });
+    }
+  });
+
+  // Delete a flight
+  app.delete("/api/trips/:tripId/flights/:flightId", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const flightId = parseInt(req.params.flightId);
+      
+      if (isNaN(tripId) || isNaN(flightId)) {
+        return res.status(400).json({ error: "Invalid ID" });
+      }
+
+      const deletedCount = await db.delete(flights)
+        .where(and(
+          eq(flights.id, flightId),
+          eq(flights.tripId, tripId)
+        ));
+
+      if (deletedCount === 0) {
+        return res.status(404).json({ error: "Flight not found" });
+      }
+
+      res.status(204).send();
+    } catch (error) {
+      console.error('Error deleting flight:', error);
+      res.status(500).json({ error: 'Failed to delete flight' });
+    }
+  });
+
   // Share Links
   app.post("/api/trips/:tripId/share", async (req, res) => {
     try {

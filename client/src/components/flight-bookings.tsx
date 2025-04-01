@@ -22,11 +22,14 @@ import {
   FormField,
   FormItem,
   FormLabel,
+  FormMessage,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { useForm } from "react-hook-form";
-import { format } from "date-fns";
-import { Plus, Plane, Clock } from "lucide-react";
+import { format, parse } from "date-fns";
+import { Plus, Plane, Clock, Search, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 
 interface FlightBookingsProps {
@@ -37,6 +40,8 @@ export function FlightBookings({ tripId }: FlightBookingsProps) {
   const { flights, createFlight, updateFlight, isLoading } = useFlights(tripId);
   const [isAddFlightOpen, setIsAddFlightOpen] = useState(false);
   const [editingFlight, setEditingFlight] = useState<Flight | null>(null);
+  const [isLookingUpFlight, setIsLookingUpFlight] = useState(false);
+  const { toast } = useToast();
 
   const form = useForm<Partial<Flight>>({
     defaultValues: editingFlight || {
@@ -55,6 +60,85 @@ export function FlightBookings({ tripId }: FlightBookingsProps) {
     },
   });
 
+  // Function to lookup flight details from the API
+  const lookupFlightDetails = async () => {
+    const flightNumber = form.getValues("flightNumber");
+    const departureDate = form.getValues("departureDate");
+    
+    if (!flightNumber) {
+      toast({
+        title: "Flight number required",
+        description: "Please enter a flight number to lookup flight details",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!departureDate) {
+      toast({
+        title: "Departure date required",
+        description: "Please select a departure date to lookup flight details",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsLookingUpFlight(true);
+      
+      // Call the flight lookup API
+      const response = await fetch(`/api/flights/lookup?flightNumber=${flightNumber}&date=${departureDate}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to lookup flight details");
+      }
+      
+      const data = await response.json();
+      
+      if (!data || !data.flight) {
+        throw new Error("No flight information found");
+      }
+      
+      // Parse date and time from ISO string
+      const departureDateObj = new Date(data.flight.scheduledDeparture);
+      const arrivalDateObj = new Date(data.flight.scheduledArrival);
+      
+      // Update form with flight details
+      form.setValue("airline", data.flight.airline);
+      form.setValue("departureAirport", data.flight.departureAirport.code);
+      form.setValue("arrivalAirport", data.flight.arrivalAirport.code);
+      
+      // Format dates and times for form fields
+      form.setValue("departureDate", format(departureDateObj, "yyyy-MM-dd"));
+      form.setValue("departureTime", format(departureDateObj, "HH:mm"));
+      form.setValue("arrivalDate", format(arrivalDateObj, "yyyy-MM-dd"));
+      form.setValue("arrivalTime", format(arrivalDateObj, "HH:mm"));
+      
+      // Set booking reference to flight number if not already set
+      if (!form.getValues("bookingReference")) {
+        form.setValue("bookingReference", flightNumber);
+      }
+      
+      // Set booking status based on API response
+      form.setValue("bookingStatus", data.flight.status.toLowerCase() || "confirmed");
+      
+      toast({
+        title: "Flight details found",
+        description: `Found details for ${data.flight.airline} flight ${flightNumber}`,
+      });
+    } catch (error) {
+      console.error("Error looking up flight:", error);
+      toast({
+        title: "Failed to find flight",
+        description: error instanceof Error ? error.message : "Could not retrieve flight details",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLookingUpFlight(false);
+    }
+  };
+
   async function onSubmit(data: Partial<Flight>) {
     try {
       if (editingFlight) {
@@ -67,6 +151,11 @@ export function FlightBookings({ tripId }: FlightBookingsProps) {
       form.reset();
     } catch (error) {
       console.error("Failed to save flight:", error);
+      toast({
+        title: "Error",
+        description: "Failed to save flight details",
+        variant: "destructive",
+      });
     }
   }
 
@@ -123,9 +212,33 @@ export function FlightBookings({ tripId }: FlightBookingsProps) {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Flight Number</FormLabel>
-                        <FormControl>
-                          <Input {...field} />
-                        </FormControl>
+                        <div className="flex gap-2">
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              placeholder="e.g. BA123" 
+                              className="flex-1"
+                            />
+                          </FormControl>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={lookupFlightDetails}
+                            disabled={isLookingUpFlight}
+                          >
+                            {isLookingUpFlight ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Search className="h-4 w-4 mr-1" />
+                            )}
+                            {isLookingUpFlight ? "Looking up..." : "Lookup"}
+                          </Button>
+                        </div>
+                        <FormDescription>
+                          Enter a flight number and select a departure date, then click "Lookup" to automatically fill flight details.
+                        </FormDescription>
+                        <FormMessage />
                       </FormItem>
                     )}
                   />
