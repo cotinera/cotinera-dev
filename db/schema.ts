@@ -295,6 +295,19 @@ export const pollVotes = pgTable("poll_votes", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const tripIdeas = pgTable("trip_ideas", {
+  id: serial("id").primaryKey(),
+  tripId: integer("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status").notNull().default("pending"), // pending, booked, unsure
+  ownerId: integer("owner_id").references(() => users.id), // optional owner
+  location: text("location"),
+  votes: integer("votes").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const travelRecommendations = pgTable("travel_recommendations", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
@@ -336,6 +349,17 @@ export const travelRecommendations = pgTable("travel_recommendations", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const tripIdeasRelations = relations(tripIdeas, ({ one }) => ({
+  trip: one(trips, {
+    fields: [tripIdeas.tripId],
+    references: [trips.id],
+  }),
+  owner: one(users, {
+    fields: [tripIdeas.ownerId],
+    references: [users.id],
+  }),
+}));
+
 export const tripsRelations = relations(trips, ({ one, many }) => ({
   owner: one(users, {
     fields: [trips.ownerId],
@@ -352,7 +376,7 @@ export const tripsRelations = relations(trips, ({ one, many }) => ({
   chatMessages: many(chatMessages),
   pinnedPlaces: many(pinnedPlaces),
   polls: many(polls),
-
+  ideas: many(tripIdeas),
 }));
 
 export const destinationsRelations = relations(destinations, ({ one }) => ({
@@ -544,6 +568,8 @@ export const insertPollVoteSchema = createInsertSchema(pollVotes);
 export const selectPollVoteSchema = createSelectSchema(pollVotes);
 export const insertTravelRecommendationSchema = createInsertSchema(travelRecommendations);
 export const selectTravelRecommendationSchema = createSelectSchema(travelRecommendations);
+export const insertTripIdeaSchema = createInsertSchema(tripIdeas);
+export const selectTripIdeaSchema = createSelectSchema(tripIdeas);
 
 export type User = typeof users.$inferSelect;
 export type Trip = typeof trips.$inferSelect;
@@ -565,3 +591,4 @@ export type PinnedPlace = typeof pinnedPlaces.$inferSelect;
 export type Poll = typeof polls.$inferSelect;
 export type PollVote = typeof pollVotes.$inferSelect;
 export type TravelRecommendation = typeof travelRecommendations.$inferSelect;
+export type TripIdea = typeof tripIdeas.$inferSelect;

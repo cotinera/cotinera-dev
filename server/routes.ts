@@ -7,8 +7,8 @@ import { crypto } from "./auth.js";
 import express from "express";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations, chatMessages, users, destinations, pinnedPlaces, polls, pollVotes, expenses, expenseSplits } from "@db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations, chatMessages, users, destinations, pinnedPlaces, polls, pollVotes, expenses, expenseSplits, tripIdeas } from "@db/schema";
+import { eq, and, sql, desc } from "drizzle-orm";
 import { addDays } from "date-fns";
 
 // Configure multer for handling file uploads
@@ -2528,6 +2528,284 @@ export function registerRoutes(app: Express): Server {
     }
   });
   
+  // Trip Ideas Endpoints
+  // GET all trip ideas
+  app.get("/api/trips/:tripId/ideas", async (req, res) => {
+    try {
+      const tripIdStr = req.params.tripId;
+      if (!tripIdStr || isNaN(parseInt(tripIdStr))) {
+        return res.status(400).json({ error: 'Invalid trip ID' });
+      }
+      
+      const tripId = parseInt(tripIdStr);
+      
+      // Get trip ideas with owner details
+      const ideas = await db
+        .select({
+          id: tripIdeas.id,
+          tripId: tripIdeas.tripId,
+          title: tripIdeas.title,
+          description: tripIdeas.description,
+          status: tripIdeas.status,
+          ownerId: tripIdeas.ownerId,
+          location: tripIdeas.location,
+          votes: tripIdeas.votes,
+          createdAt: tripIdeas.createdAt,
+          updatedAt: tripIdeas.updatedAt,
+          ownerName: users.name,
+          ownerAvatar: users.avatar,
+        })
+        .from(tripIdeas)
+        .leftJoin(users, eq(tripIdeas.ownerId, users.id))
+        .where(eq(tripIdeas.tripId, tripId))
+        .orderBy(desc(tripIdeas.votes), desc(tripIdeas.createdAt));
+        
+      res.json(ideas);
+    } catch (error) {
+      console.error("Error fetching trip ideas:", error);
+      res.status(500).json({ error: "Failed to fetch trip ideas" });
+    }
+  });
+
+  // POST new trip idea
+  app.post("/api/trips/:tripId/ideas", async (req, res) => {
+    try {
+      const tripIdStr = req.params.tripId;
+      if (!tripIdStr || isNaN(parseInt(tripIdStr))) {
+        return res.status(400).json({ error: 'Invalid trip ID' });
+      }
+      
+      const tripId = parseInt(tripIdStr);
+      const userId = req.user?.id || 1;
+      
+      const { title, description, status, location } = req.body;
+      
+      if (!title) {
+        return res.status(400).json({ error: "Title is required" });
+      }
+      
+      // Ensure valid status
+      const validStatuses = ["pending", "booked", "unsure"];
+      const ideaStatus = status && validStatuses.includes(status) ? status : "pending";
+      
+      // Insert new idea
+      const [idea] = await db.insert(tripIdeas)
+        .values({
+          tripId,
+          title,
+          description,
+          status: ideaStatus,
+          ownerId: userId,
+          location,
+          votes: 0,
+        })
+        .returning();
+        
+      // Get owner details
+      const [owner] = await db.select({
+        id: users.id,
+        name: users.name,
+        avatar: users.avatar,
+      })
+      .from(users)
+      .where(eq(users.id, userId));
+      
+      // Return idea with owner details
+      res.status(201).json({
+        ...idea,
+        ownerName: owner?.name,
+        ownerAvatar: owner?.avatar,
+      });
+    } catch (error) {
+      console.error("Error creating trip idea:", error);
+      res.status(500).json({ error: "Failed to create trip idea" });
+    }
+  });
+
+  // UPDATE trip idea
+  app.patch("/api/trips/:tripId/ideas/:ideaId", async (req, res) => {
+    try {
+      const tripIdStr = req.params.tripId;
+      const ideaIdStr = req.params.ideaId;
+      
+      if (!tripIdStr || isNaN(parseInt(tripIdStr)) || !ideaIdStr || isNaN(parseInt(ideaIdStr))) {
+        return res.status(400).json({ error: 'Invalid ID parameters' });
+      }
+      
+      const tripId = parseInt(tripIdStr);
+      const ideaId = parseInt(ideaIdStr);
+      const userId = req.user?.id || 1;
+      
+      // Find the idea first
+      const [existingIdea] = await db.select()
+        .from(tripIdeas)
+        .where(and(
+          eq(tripIdeas.id, ideaId),
+          eq(tripIdeas.tripId, tripId)
+        ));
+        
+      if (!existingIdea) {
+        return res.status(404).json({ error: "Trip idea not found" });
+      }
+      
+      // Check if user is a participant of this trip
+      const [participant] = await db.select()
+        .from(participants)
+        .where(and(
+          eq(participants.tripId, tripId),
+          eq(participants.userId, userId)
+        ));
+        
+      if (!participant) {
+        return res.status(403).json({ error: "You must be a participant in this trip to update ideas" });
+      }
+      
+      const { title, description, status, location, ownerId } = req.body;
+      
+      // Validate status if provided
+      const validStatuses = ["pending", "booked", "unsure"];
+      if (status && !validStatuses.includes(status)) {
+        return res.status(400).json({ error: "Invalid status. Must be 'pending', 'booked', or 'unsure'" });
+      }
+      
+      // Update idea
+      const [updatedIdea] = await db.update(tripIdeas)
+        .set({
+          title: title || existingIdea.title,
+          description: description !== undefined ? description : existingIdea.description,
+          status: status || existingIdea.status,
+          location: location !== undefined ? location : existingIdea.location,
+          ownerId: ownerId || existingIdea.ownerId,
+          updatedAt: new Date()
+        })
+        .where(eq(tripIdeas.id, ideaId))
+        .returning();
+        
+      // Get owner details
+      const ownerId2 = updatedIdea.ownerId;
+      const [owner] = ownerId2 ? await db.select({
+        id: users.id,
+        name: users.name,
+        avatar: users.avatar,
+      })
+      .from(users)
+      .where(eq(users.id, ownerId2)) : [null];
+      
+      // Return updated idea with owner details
+      res.json({
+        ...updatedIdea,
+        ownerName: owner?.name,
+        ownerAvatar: owner?.avatar,
+      });
+    } catch (error) {
+      console.error("Error updating trip idea:", error);
+      res.status(500).json({ error: "Failed to update trip idea" });
+    }
+  });
+
+  // DELETE trip idea
+  app.delete("/api/trips/:tripId/ideas/:ideaId", async (req, res) => {
+    try {
+      const tripIdStr = req.params.tripId;
+      const ideaIdStr = req.params.ideaId;
+      
+      if (!tripIdStr || isNaN(parseInt(tripIdStr)) || !ideaIdStr || isNaN(parseInt(ideaIdStr))) {
+        return res.status(400).json({ error: 'Invalid ID parameters' });
+      }
+      
+      const tripId = parseInt(tripIdStr);
+      const ideaId = parseInt(ideaIdStr);
+      const userId = req.user?.id || 1;
+      
+      // Find the idea first
+      const [existingIdea] = await db.select()
+        .from(tripIdeas)
+        .where(and(
+          eq(tripIdeas.id, ideaId),
+          eq(tripIdeas.tripId, tripId)
+        ));
+        
+      if (!existingIdea) {
+        return res.status(404).json({ error: "Trip idea not found" });
+      }
+      
+      // Check if user is a participant of this trip
+      const [participant] = await db.select()
+        .from(participants)
+        .where(and(
+          eq(participants.tripId, tripId),
+          eq(participants.userId, userId)
+        ));
+        
+      if (!participant) {
+        return res.status(403).json({ error: "You must be a participant in this trip to delete ideas" });
+      }
+      
+      // Delete the idea
+      await db.delete(tripIdeas)
+        .where(eq(tripIdeas.id, ideaId));
+        
+      res.json({ success: true, message: "Trip idea deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting trip idea:", error);
+      res.status(500).json({ error: "Failed to delete trip idea" });
+    }
+  });
+
+  // Vote on trip idea
+  app.post("/api/trips/:tripId/ideas/:ideaId/vote", async (req, res) => {
+    try {
+      const tripIdStr = req.params.tripId;
+      const ideaIdStr = req.params.ideaId;
+      
+      if (!tripIdStr || isNaN(parseInt(tripIdStr)) || !ideaIdStr || isNaN(parseInt(ideaIdStr))) {
+        return res.status(400).json({ error: 'Invalid ID parameters' });
+      }
+      
+      const tripId = parseInt(tripIdStr);
+      const ideaId = parseInt(ideaIdStr);
+      const userId = req.user?.id || 1;
+      
+      // Check if user is a participant of this trip
+      const [participant] = await db.select()
+        .from(participants)
+        .where(and(
+          eq(participants.tripId, tripId),
+          eq(participants.userId, userId)
+        ));
+        
+      if (!participant) {
+        return res.status(403).json({ error: "You must be a participant in this trip to vote on ideas" });
+      }
+      
+      // Find the idea
+      const [existingIdea] = await db.select()
+        .from(tripIdeas)
+        .where(and(
+          eq(tripIdeas.id, ideaId),
+          eq(tripIdeas.tripId, tripId)
+        ));
+        
+      if (!existingIdea) {
+        return res.status(404).json({ error: "Trip idea not found" });
+      }
+      
+      // Increment vote count
+      const [updatedIdea] = await db.update(tripIdeas)
+        .set({
+          votes: existingIdea.votes + 1,
+          updatedAt: new Date()
+        })
+        .where(eq(tripIdeas.id, ideaId))
+        .returning();
+        
+      res.json(updatedIdea);
+    } catch (error) {
+      console.error("Error voting on trip idea:", error);
+      res.status(500).json({ error: "Failed to vote on trip idea" });
+    }
+  });
+
   // Update expense split status (mark as paid)
   app.patch("/api/trips/:tripId/expenses/:expenseId/splits/:splitId", async (req, res) => {
     try {

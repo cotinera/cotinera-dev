@@ -18,6 +18,7 @@ import { BudgetTracker } from "@/components/budget-tracker";
 
 import { Loader2, ArrowLeft, Trash2 } from "lucide-react";
 import type { Destination } from "@db/schema";
+import { TripIdeas } from "@/components/trip-ideas";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,6 +81,16 @@ export default function TripDetail() {
       }
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch pinned places");
+      return res.json();
+    },
+    enabled: !!tripId,
+  });
+  
+  const { data: participants = [] } = useQuery({
+    queryKey: [`/api/trips/${tripId}/participants`],
+    queryFn: async () => {
+      const res = await fetch(`/api/trips/${tripId}/participants`);
+      if (!res.ok) throw new Error("Failed to fetch participants");
       return res.json();
     },
     enabled: !!tripId,
@@ -256,6 +267,13 @@ export default function TripDetail() {
                   defaultLocation={currentDestination?.name || trip.location || ""}
                   showMap={true}
                   tripCoordinates={currentDestination?.coordinates || undefined}
+                />
+              </section>
+              
+              <section>
+                <TripIdeas
+                  tripId={trip.id}
+                  participants={participants}
                 />
               </section>
             </div>
