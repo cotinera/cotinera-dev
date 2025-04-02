@@ -293,8 +293,14 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["expenses", tripId]);
-      queryClient.invalidateQueries(["expenses-summary", tripId]);
+      // Force refetch the expenses to update the UI
+      queryClient.invalidateQueries({ queryKey: ["expenses", tripId] });
+      queryClient.invalidateQueries({ queryKey: ["expenses-summary", tripId] });
+      
+      // Make sure the query is refetched immediately
+      queryClient.refetchQueries({ queryKey: ["expenses", tripId] });
+      queryClient.refetchQueries({ queryKey: ["expenses-summary", tripId] });
+      
       toast({
         title: "Expense added",
         description: "Your expense has been added successfully.",
@@ -332,8 +338,14 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["expenses", tripId]);
-      queryClient.invalidateQueries(["expenses-summary", tripId]);
+      // Force refetch the expenses to update the UI
+      queryClient.invalidateQueries({ queryKey: ["expenses", tripId] });
+      queryClient.invalidateQueries({ queryKey: ["expenses-summary", tripId] });
+      
+      // Make sure the query is refetched immediately
+      queryClient.refetchQueries({ queryKey: ["expenses", tripId] });
+      queryClient.refetchQueries({ queryKey: ["expenses-summary", tripId] });
+      
       toast({
         title: "Expense updated",
         description: "Your expense has been updated successfully.",
@@ -370,8 +382,14 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["expenses", tripId]);
-      queryClient.invalidateQueries(["expenses-summary", tripId]);
+      // Force refetch the expenses to update the UI
+      queryClient.invalidateQueries({ queryKey: ["expenses", tripId] });
+      queryClient.invalidateQueries({ queryKey: ["expenses-summary", tripId] });
+      
+      // Make sure the query is refetched immediately
+      queryClient.refetchQueries({ queryKey: ["expenses", tripId] });
+      queryClient.refetchQueries({ queryKey: ["expenses-summary", tripId] });
+      
       toast({
         title: "Expense deleted",
         description: "The expense has been deleted successfully.",
@@ -406,7 +424,12 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries(["expenses", tripId]);
+      // Force refetch the expenses to update the UI
+      queryClient.invalidateQueries({ queryKey: ["expenses", tripId] });
+      
+      // Make sure the query is refetched immediately
+      queryClient.refetchQueries({ queryKey: ["expenses", tripId] });
+      
       toast({
         title: "Status updated",
         description: "The payment status has been updated.",

@@ -1948,38 +1948,50 @@ export function registerRoutes(app: Express): Server {
           const [user] = await db.select({
             id: users.id,
             name: users.name,
-            email: users.email,
-            avatar: users.avatar
+            email: users.email
+            // avatar column may not exist in the users table
           })
           .from(users)
           .where(eq(users.id, expense.paidBy))
           .limit(1);
+          
+          // Add avatar field to user to prevent frontend errors
+          const userWithAvatar = user ? { 
+            ...user, 
+            avatar: null // Provide a default null value
+          } : null;
           
           const splits = await db.select().from(expenseSplits)
             .where(eq(expenseSplits.expenseId, expense.id));
             
           const splitsWithUsers = await Promise.all(
             splits.map(async (split) => {
-              const [user] = await db.select({
+              const [splitUser] = await db.select({
                 id: users.id,
                 name: users.name,
-                email: users.email,
-                avatar: users.avatar
+                email: users.email
+                // avatar column may not exist in the users table
               })
               .from(users)
               .where(eq(users.id, split.userId))
               .limit(1);
               
+              // Add avatar field to prevent frontend errors
+              const splitUserWithAvatar = splitUser ? {
+                ...splitUser,
+                avatar: null // Provide a default null value
+              } : null;
+              
               return {
                 ...split,
-                user
+                user: splitUserWithAvatar
               };
             })
           );
           
           return {
             ...expense,
-            user,
+            user: userWithAvatar, // Use the variable with the avatar field
             splits: splitsWithUsers
           };
         })
@@ -1995,21 +2007,57 @@ export function registerRoutes(app: Express): Server {
   // Create a new expense
   app.post("/api/trips/:tripId/expenses", async (req, res) => {
     try {
-      const tripId = parseInt(req.params.tripId);
+      const tripIdStr = req.params.tripId;
+      
+      if (!tripIdStr || isNaN(parseInt(tripIdStr))) {
+        return res.status(400).json({ 
+          error: 'Invalid trip ID',
+          details: 'Trip ID must be a valid number'
+        });
+      }
+      
+      const tripId = parseInt(tripIdStr);
       const userId = req.user?.id || 1; // Default to user 1 for testing
       const { title, amount, currency, category, date, splits } = req.body;
       
+      // Basic validation
+      if (!title) {
+        return res.status(400).json({ error: 'Title is required' });
+      }
+      
+      let amountValue;
+      try {
+        amountValue = parseFloat(amount?.toString() || '0');
+        if (isNaN(amountValue) || amountValue <= 0) {
+          return res.status(400).json({ error: 'Valid positive amount is required' });
+        }
+      } catch (e) {
+        return res.status(400).json({ error: 'Invalid amount format' });
+      }
+      
       // Start a transaction to ensure both expense and splits are created
       const result = await db.transaction(async (tx) => {
+        // Format the date properly, default to today if invalid
+        let formattedDate;
+        try {
+          formattedDate = date ? new Date(date) : new Date();
+          // Validate date is valid
+          if (isNaN(formattedDate.getTime())) {
+            formattedDate = new Date();
+          }
+        } catch (e) {
+          formattedDate = new Date();
+        }
+        
         // Create the expense
         const [newExpense] = await tx.insert(expenses).values({
           tripId,
           paidBy: userId,
           title,
-          amount: amount,
+          amount: amountValue.toString(), // Store as string to avoid float precision issues
           currency: currency || 'USD',
-          category,
-          date: new Date(date),
+          category: category || 'other',
+          date: formattedDate,
         }).returning();
         
         if (!newExpense?.id) {
@@ -2019,34 +2067,73 @@ export function registerRoutes(app: Express): Server {
         // Create the expense splits if provided
         let expenseSplitsData = [];
         if (Array.isArray(splits) && splits.length > 0) {
-          // Create splits based on provided data
-          const splitsToInsert = splits.map(split => ({
-            expenseId: newExpense.id,
-            userId: parseInt(split.userId),
-            amount: parseFloat(split.amount),
-            status: 'pending'
-          }));
+          // Filter out invalid user IDs (null or NaN)
+          const validSplits = splits.filter(split => 
+            split.userId && !isNaN(parseInt(split.userId.toString()))
+          );
           
-          expenseSplitsData = await tx.insert(expenseSplits)
-            .values(splitsToInsert)
-            .returning();
+          if (validSplits.length > 0) {
+            // Create splits based on provided data
+            const splitsToInsert = validSplits.map(split => {
+              const splitAmount = parseFloat(split.amount?.toString() || '0');
+              return {
+                expenseId: newExpense.id,
+                userId: parseInt(split.userId.toString()),
+                amount: (isNaN(splitAmount) ? 0 : splitAmount).toString(), // Store as string
+                status: 'pending'
+              };
+            });
+            
+            expenseSplitsData = await tx.insert(expenseSplits)
+              .values(splitsToInsert)
+              .returning();
+          } else {
+            // Fall back to default split if all provided splits were invalid
+            const defaultSplit = {
+              expenseId: newExpense.id,
+              userId: userId,
+              amount: amountValue.toString(),
+              status: 'paid'
+            };
+            
+            expenseSplitsData = await tx.insert(expenseSplits)
+              .values(defaultSplit)
+              .returning();
+          }
         } else {
-          // Default: split equally among all trip participants
+          // Default: split equally among all trip participants that have a valid userId
           const tripParticipants = await tx.select().from(participants)
             .where(eq(participants.tripId, tripId));
           
-          if (tripParticipants.length > 0) {
-            const equalAmount = parseFloat(amount) / tripParticipants.length;
+          // Filter participants to only include those with valid userId
+          const validParticipants = tripParticipants.filter(participant => 
+            participant.userId !== null && !isNaN(parseInt(participant.userId.toString()))
+          );
+          
+          if (validParticipants.length > 0) {
+            const equalAmount = amountValue / validParticipants.length;
             
-            const splitsToInsert = tripParticipants.map(participant => ({
+            const splitsToInsert = validParticipants.map(participant => ({
               expenseId: newExpense.id,
-              userId: participant.userId,
-              amount: equalAmount,
+              userId: parseInt(participant.userId.toString()),
+              amount: equalAmount.toString(), // Store as string
               status: participant.userId === userId ? 'paid' : 'pending'
             }));
             
             expenseSplitsData = await tx.insert(expenseSplits)
               .values(splitsToInsert)
+              .returning();
+          } else {
+            // If no valid participants, create a split for the expense creator
+            const defaultSplit = {
+              expenseId: newExpense.id,
+              userId: userId,
+              amount: amountValue.toString(),
+              status: 'paid'
+            };
+            
+            expenseSplitsData = await tx.insert(expenseSplits)
+              .values(defaultSplit)
               .returning();
           }
         }
@@ -2067,10 +2154,119 @@ export function registerRoutes(app: Express): Server {
     }
   });
   
+  // Get expense summary/breakdown by category for a trip
+  app.get("/api/trips/:tripId/expenses/summary", async (req, res) => {
+    try {
+      const tripIdStr = req.params.tripId;
+      
+      if (!tripIdStr || isNaN(parseInt(tripIdStr))) {
+        return res.status(400).json({ 
+          error: 'Invalid trip ID',
+          details: 'Trip ID must be a valid number'
+        });
+      }
+      
+      const tripId = parseInt(tripIdStr);
+      
+      // Get all expenses for the trip
+      const tripExpenses = await db.select().from(expenses)
+        .where(eq(expenses.tripId, tripId));
+      
+      if (tripExpenses.length === 0) {
+        return res.json({
+          totalExpenses: 0,
+          currency: 'USD',
+          categoryBreakdown: [],
+          dateBreakdown: []
+        });
+      }
+      
+      // Calculate total expenses with safety checks
+      const total = tripExpenses.reduce((sum, expense) => {
+        // Ensure amount is a valid number before adding
+        const amountStr = expense.amount?.toString() || '0';
+        const amount = parseFloat(amountStr);
+        return sum + (isNaN(amount) ? 0 : amount);
+      }, 0);
+      
+      // Group by category with safety checks
+      const byCategory: Record<string, number> = {};
+      tripExpenses.forEach(expense => {
+        const category = expense.category || 'other';
+        if (!byCategory[category]) {
+          byCategory[category] = 0;
+        }
+        
+        // Ensure amount is a valid number before adding
+        const amountStr = expense.amount?.toString() || '0';
+        const amount = parseFloat(amountStr);
+        byCategory[category] += isNaN(amount) ? 0 : amount;
+      });
+      
+      // Convert to percentage and array format for charts
+      const categoryBreakdown = Object.entries(byCategory).map(([category, amount]) => ({
+        category,
+        amount,
+        percentage: total > 0 ? ((amount as number) / total * 100).toFixed(1) : '0'
+      }));
+      
+      // Get expenses by date (for timeline/trends) with safety checks
+      const byDate: Record<string, number> = {};
+      tripExpenses.forEach(expense => {
+        // Handle date safely
+        let dateStr = '';
+        try {
+          if (typeof expense.date === 'string') {
+            dateStr = new Date(expense.date).toISOString().split('T')[0];
+          } else if (expense.date instanceof Date) {
+            dateStr = expense.date.toISOString().split('T')[0];
+          } else {
+            dateStr = new Date().toISOString().split('T')[0]; // Fallback to today
+          }
+        } catch (e) {
+          dateStr = new Date().toISOString().split('T')[0]; // Fallback to today
+        }
+        
+        if (!byDate[dateStr]) {
+          byDate[dateStr] = 0;
+        }
+        
+        // Ensure amount is a valid number before adding
+        const amountStr = expense.amount?.toString() || '0';
+        const amount = parseFloat(amountStr);
+        byDate[dateStr] += isNaN(amount) ? 0 : amount;
+      });
+      
+      // Convert to array format for charts
+      const dateBreakdown = Object.entries(byDate)
+        .map(([date, amount]) => ({ date, amount }))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      
+      res.json({
+        totalExpenses: total,
+        currency: tripExpenses[0]?.currency || 'USD',
+        categoryBreakdown,
+        dateBreakdown
+      });
+    } catch (error) {
+      console.error('Error generating expense summary:', error);
+      res.status(500).json({ error: 'Failed to generate expense summary' });
+    }
+  });
+
   // Get expense details
   app.get("/api/trips/:tripId/expenses/:expenseId", async (req, res) => {
     try {
-      const expenseId = parseInt(req.params.expenseId);
+      const expenseIdStr = req.params.expenseId;
+      
+      if (!expenseIdStr || isNaN(parseInt(expenseIdStr))) {
+        return res.status(400).json({ 
+          error: 'Invalid expense ID',
+          details: 'Expense ID must be a valid number'
+        });
+      }
+      
+      const expenseId = parseInt(expenseIdStr);
       
       const expense = await db.select().from(expenses)
         .where(eq(expenses.id, expenseId))
@@ -2083,38 +2279,50 @@ export function registerRoutes(app: Express): Server {
       const [paidByUser] = await db.select({
         id: users.id,
         name: users.name,
-        email: users.email,
-        avatar: users.avatar
+        email: users.email
+        // avatar column may not exist in the users table
       })
       .from(users)
       .where(eq(users.id, expense[0].paidBy))
       .limit(1);
+      
+      // Add avatar field to user to prevent frontend errors
+      const paidByUserWithAvatar = paidByUser ? { 
+        ...paidByUser, 
+        avatar: null // Provide a default null value
+      } : null;
       
       const splits = await db.select().from(expenseSplits)
         .where(eq(expenseSplits.expenseId, expenseId));
         
       const splitsWithUsers = await Promise.all(
         splits.map(async (split) => {
-          const [user] = await db.select({
+          const [splitUser] = await db.select({
             id: users.id,
             name: users.name,
-            email: users.email,
-            avatar: users.avatar
+            email: users.email
+            // avatar column may not exist in the users table
           })
           .from(users)
           .where(eq(users.id, split.userId))
           .limit(1);
           
+          // Add avatar field to prevent frontend errors
+          const splitUserWithAvatar = splitUser ? {
+            ...splitUser,
+            avatar: null // Provide a default null value
+          } : null;
+          
           return {
             ...split,
-            user
+            user: splitUserWithAvatar
           };
         })
       );
       
       res.json({
         ...expense[0],
-        user: paidByUser,
+        user: paidByUserWithAvatar,  // Use the variable with the avatar field
         splits: splitsWithUsers
       });
     } catch (error) {
@@ -2126,8 +2334,25 @@ export function registerRoutes(app: Express): Server {
   // Update an expense
   app.patch("/api/trips/:tripId/expenses/:expenseId", async (req, res) => {
     try {
-      const tripId = parseInt(req.params.tripId);
-      const expenseId = parseInt(req.params.expenseId);
+      const tripIdStr = req.params.tripId;
+      const expenseIdStr = req.params.expenseId;
+      
+      if (!tripIdStr || isNaN(parseInt(tripIdStr))) {
+        return res.status(400).json({ 
+          error: 'Invalid trip ID',
+          details: 'Trip ID must be a valid number'
+        });
+      }
+      
+      if (!expenseIdStr || isNaN(parseInt(expenseIdStr))) {
+        return res.status(400).json({ 
+          error: 'Invalid expense ID',
+          details: 'Expense ID must be a valid number'
+        });
+      }
+      
+      const tripId = parseInt(tripIdStr);
+      const expenseId = parseInt(expenseIdStr);
       const userId = req.user?.id || 1;
       const { title, amount, currency, category, date, splits } = req.body;
       
@@ -2150,40 +2375,73 @@ export function registerRoutes(app: Express): Server {
       
       // Start a transaction for updating expense and splits
       const result = await db.transaction(async (tx) => {
+        // Convert amount safely
+        let amountValue;
+        try {
+          amountValue = amount ? parseFloat(amount.toString()) : expense.amount;
+          if (isNaN(amountValue)) {
+            amountValue = expense.amount;
+          }
+        } catch (e) {
+          amountValue = expense.amount;
+        }
+        
+        // Format the date properly
+        let formattedDate;
+        try {
+          formattedDate = date ? new Date(date) : expense.date;
+          // Validate date is valid
+          if (isNaN(formattedDate.getTime())) {
+            formattedDate = expense.date;
+          }
+        } catch (e) {
+          formattedDate = expense.date;
+        }
+        
         // Update the expense
         const [updatedExpense] = await tx.update(expenses)
           .set({
             title: title || expense.title,
-            amount: amount ? parseFloat(amount) : expense.amount,
+            amount: amountValue.toString(), // Store as string
             currency: currency || expense.currency,
             category: category || expense.category,
-            date: date ? new Date(date) : expense.date,
+            date: formattedDate,
           })
           .where(eq(expenses.id, expenseId))
           .returning();
         
         // If splits were provided, update them
         if (Array.isArray(splits) && splits.length > 0) {
-          // First delete existing splits
-          await tx.delete(expenseSplits)
-            .where(eq(expenseSplits.expenseId, expenseId));
+          // Filter out invalid user IDs (null or NaN)
+          const validSplits = splits.filter(split => 
+            split.userId && !isNaN(parseInt(split.userId.toString()))
+          );
           
-          // Then insert new splits
-          const splitsToInsert = splits.map(split => ({
-            expenseId,
-            userId: parseInt(split.userId),
-            amount: parseFloat(split.amount),
-            status: split.status || 'pending'
-          }));
-          
-          const newSplits = await tx.insert(expenseSplits)
-            .values(splitsToInsert)
-            .returning();
-          
-          return {
-            expense: updatedExpense,
-            splits: newSplits
-          };
+          if (validSplits.length > 0) {
+            // First delete existing splits
+            await tx.delete(expenseSplits)
+              .where(eq(expenseSplits.expenseId, expenseId));
+            
+            // Then insert new splits
+            const splitsToInsert = validSplits.map(split => {
+              const splitAmount = parseFloat(split.amount?.toString() || '0');
+              return {
+                expenseId,
+                userId: parseInt(split.userId.toString()),
+                amount: (isNaN(splitAmount) ? 0 : splitAmount).toString(), // Store as string
+                status: split.status || 'pending'
+              };
+            });
+            
+            const newSplits = await tx.insert(expenseSplits)
+              .values(splitsToInsert)
+              .returning();
+            
+            return {
+              expense: updatedExpense,
+              splits: newSplits
+            };
+          }
         }
         
         // Otherwise just return the updated expense with existing splits
@@ -2206,8 +2464,25 @@ export function registerRoutes(app: Express): Server {
   // Delete an expense
   app.delete("/api/trips/:tripId/expenses/:expenseId", async (req, res) => {
     try {
-      const tripId = parseInt(req.params.tripId);
-      const expenseId = parseInt(req.params.expenseId);
+      const tripIdStr = req.params.tripId;
+      const expenseIdStr = req.params.expenseId;
+      
+      if (!tripIdStr || isNaN(parseInt(tripIdStr))) {
+        return res.status(400).json({ 
+          error: 'Invalid trip ID',
+          details: 'Trip ID must be a valid number'
+        });
+      }
+      
+      if (!expenseIdStr || isNaN(parseInt(expenseIdStr))) {
+        return res.status(400).json({ 
+          error: 'Invalid expense ID',
+          details: 'Expense ID must be a valid number'
+        });
+      }
+      
+      const tripId = parseInt(tripIdStr);
+      const expenseId = parseInt(expenseIdStr);
       const userId = req.user?.id || 1;
       
       // Verify the expense exists and belongs to the trip
@@ -2248,7 +2523,16 @@ export function registerRoutes(app: Express): Server {
   // Update expense split status (mark as paid)
   app.patch("/api/trips/:tripId/expenses/:expenseId/splits/:splitId", async (req, res) => {
     try {
-      const splitId = parseInt(req.params.splitId);
+      const splitIdStr = req.params.splitId;
+      
+      if (!splitIdStr || isNaN(parseInt(splitIdStr))) {
+        return res.status(400).json({ 
+          error: 'Invalid split ID',
+          details: 'Split ID must be a valid number'
+        });
+      }
+      
+      const splitId = parseInt(splitIdStr);
       const { status } = req.body;
       
       if (!status || !['pending', 'paid'].includes(status)) {
@@ -2271,73 +2555,6 @@ export function registerRoutes(app: Express): Server {
     }
   });
   
-  // Get expense summary/breakdown by category for a trip
-  app.get("/api/trips/:tripId/expenses/summary", async (req, res) => {
-    try {
-      const tripId = parseInt(req.params.tripId);
-      
-      // Get all expenses for the trip
-      const tripExpenses = await db.select().from(expenses)
-        .where(eq(expenses.tripId, tripId));
-      
-      if (tripExpenses.length === 0) {
-        return res.json({
-          totalExpenses: 0,
-          currency: 'USD',
-          categoryBreakdown: [],
-          dateBreakdown: []
-        });
-      }
-      
-      // Calculate total expenses
-      const total = tripExpenses.reduce((sum, expense) => {
-        return sum + parseFloat(expense.amount.toString());
-      }, 0);
-      
-      // Group by category
-      const byCategory = {};
-      tripExpenses.forEach(expense => {
-        const category = expense.category;
-        if (!byCategory[category]) {
-          byCategory[category] = 0;
-        }
-        byCategory[category] += parseFloat(expense.amount.toString());
-      });
-      
-      // Convert to percentage and array format for charts
-      const categoryBreakdown = Object.entries(byCategory).map(([category, amount]) => ({
-        category,
-        amount,
-        percentage: ((amount as number) / total * 100).toFixed(1)
-      }));
-      
-      // Get expenses by date (for timeline/trends)
-      const byDate = {};
-      tripExpenses.forEach(expense => {
-        const dateStr = expense.date.toISOString().split('T')[0];
-        if (!byDate[dateStr]) {
-          byDate[dateStr] = 0;
-        }
-        byDate[dateStr] += parseFloat(expense.amount.toString());
-      });
-      
-      // Convert to array format for charts
-      const dateBreakdown = Object.entries(byDate)
-        .map(([date, amount]) => ({ date, amount }))
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-      
-      res.json({
-        totalExpenses: total,
-        currency: tripExpenses[0]?.currency || 'USD',
-        categoryBreakdown,
-        dateBreakdown
-      });
-    } catch (error) {
-      console.error('Error generating expense summary:', error);
-      res.status(500).json({ error: 'Failed to generate expense summary' });
-    }
-  });
-
   const httpServer = createServer(app);
   return httpServer;
 }
