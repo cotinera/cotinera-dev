@@ -174,21 +174,11 @@ export function registerRoutes(app: Express): Server {
         console.error('Error stack:', error.stack);
       }
       
-      // Use fallback mock data in case of unexpected errors
-      try {
-        console.log('Attempting to generate mock flight data as fallback');
-        const { generateMockFlightData } = await import('./utils/flightApi');
-        const mockData = generateMockFlightData(req.query.flightNumber as string, req.query.date as string);
-        
-        console.log('Generated mock flight data due to error');
-        return res.json(mockData);
-      } catch (fallbackError) {
-        // If even the mock data generation fails, return an error
-        console.error('Failed to generate mock data:', fallbackError);
-        return res.status(500).json({ 
-          error: 'Failed to lookup flight information' 
-        });
-      }
+      // No mock data fallback - only return authentic data
+      console.log('Not providing mock flight data as fallback');
+      return res.status(404).json({ 
+        error: 'No flight information available for the requested flight number and date.' 
+      });
     }
   });
   

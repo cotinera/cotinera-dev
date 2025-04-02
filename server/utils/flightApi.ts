@@ -61,143 +61,8 @@ interface FlightLabsResponse {
   };
 }
 
-// For development/testing purposes when no API key is available
-export function generateMockFlightData(flightNumber: string, flightDate: string): FlightApiResponse {
-  console.log(`Generating mock flight data for ${flightNumber} on ${flightDate}`);
-  
-  // Clean and standardize flight number
-  const cleanFlightNumber = flightNumber.trim().toUpperCase().replace(/\s+/g, '');
-
-  // Parse the airline code and flight number
-  // Typically airline codes are 2 characters followed by numbers
-  const airlineCode = cleanFlightNumber.substring(0, 2);
-  const flightNumberOnly = cleanFlightNumber.substring(2);
-  
-  // Map of some common airline codes to names (expanded to include more airlines)
-  const airlines: {[key: string]: string} = {
-    'AA': 'American Airlines',
-    'DL': 'Delta Air Lines',
-    'UA': 'United Airlines',
-    'BA': 'British Airways',
-    'LH': 'Lufthansa',
-    'AF': 'Air France',
-    'KL': 'KLM Royal Dutch Airlines',
-    'EK': 'Emirates',
-    'QF': 'Qantas',
-    'SQ': 'Singapore Airlines',
-    'CX': 'Cathay Pacific',
-    'JL': 'Japan Airlines',
-    'NH': 'All Nippon Airways',
-    'QR': 'Qatar Airways',
-    'TK': 'Turkish Airlines',
-    'EY': 'Etihad Airways',
-    'AS': 'Alaska Airlines',
-    'B6': 'JetBlue Airways',
-    'WN': 'Southwest Airlines',
-    'AC': 'Air Canada',
-    'IB': 'Iberia',
-    'LA': 'LATAM Airlines',
-    'FR': 'Ryanair',
-    'U2': 'easyJet',
-    'LX': 'Swiss International Air Lines',
-    'MS': 'EgyptAir',
-    'SV': 'Saudia',
-    'OZ': 'Asiana Airlines',
-    'BR': 'EVA Air',
-    'CA': 'Air China',
-  };
-  
-  // Enhanced airport list
-  const airports = [
-    { code: 'JFK', name: 'John F. Kennedy International Airport', city: 'New York', country: 'United States' },
-    { code: 'LAX', name: 'Los Angeles International Airport', city: 'Los Angeles', country: 'United States' },
-    { code: 'SFO', name: 'San Francisco International Airport', city: 'San Francisco', country: 'United States' },
-    { code: 'LHR', name: 'Heathrow Airport', city: 'London', country: 'United Kingdom' },
-    { code: 'CDG', name: 'Charles de Gaulle Airport', city: 'Paris', country: 'France' },
-    { code: 'FRA', name: 'Frankfurt Airport', city: 'Frankfurt', country: 'Germany' },
-    { code: 'AMS', name: 'Amsterdam Airport Schiphol', city: 'Amsterdam', country: 'Netherlands' },
-    { code: 'HKG', name: 'Hong Kong International Airport', city: 'Hong Kong', country: 'China' },
-    { code: 'SYD', name: 'Sydney Airport', city: 'Sydney', country: 'Australia' },
-    { code: 'SIN', name: 'Singapore Changi Airport', city: 'Singapore', country: 'Singapore' },
-    { code: 'ORD', name: 'O\'Hare International Airport', city: 'Chicago', country: 'United States' },
-    { code: 'ATL', name: 'Hartsfield-Jackson Atlanta International Airport', city: 'Atlanta', country: 'United States' },
-    { code: 'DXB', name: 'Dubai International Airport', city: 'Dubai', country: 'United Arab Emirates' },
-    { code: 'ICN', name: 'Incheon International Airport', city: 'Seoul', country: 'South Korea' },
-    { code: 'NRT', name: 'Narita International Airport', city: 'Tokyo', country: 'Japan' },
-    { code: 'MAD', name: 'Adolfo Suárez Madrid–Barajas Airport', city: 'Madrid', country: 'Spain' },
-    { code: 'FCO', name: 'Leonardo da Vinci–Fiumicino Airport', city: 'Rome', country: 'Italy' },
-    { code: 'MEX', name: 'Mexico City International Airport', city: 'Mexico City', country: 'Mexico' },
-    { code: 'GRU', name: 'São Paulo/Guarulhos International Airport', city: 'São Paulo', country: 'Brazil' },
-    { code: 'BNE', name: 'Brisbane Airport', city: 'Brisbane', country: 'Australia' },
-  ];
-  
-  // Deterministically select airports based on flight number to ensure consistency
-  const flightNumSeed = parseInt(flightNumberOnly) || cleanFlightNumber.charCodeAt(0);
-  const depIndex = flightNumSeed % airports.length;
-  let arrIndex = (flightNumSeed + 3) % airports.length;
-  
-  // Make sure departure and arrival airports are different
-  if (depIndex === arrIndex) {
-    arrIndex = (arrIndex + 1) % airports.length;
-  }
-  
-  // Parse the flight date and generate scheduled times
-  const flightDateObj = new Date(flightDate);
-  const departureTime = new Date(flightDateObj);
-  departureTime.setHours(6 + (flightNumSeed % 16)); // Departure between 6am and 10pm
-  departureTime.setMinutes((flightNumSeed * 7) % 60); // Better distribution of minutes
-  
-  // Flight duration depends on airport distance (roughly simulated)
-  let flightDuration = 2; // Minimum 2 hours
-  const airportDistance = Math.abs(depIndex - arrIndex);
-  flightDuration += Math.min(airportDistance * 2, 10); // Maximum 12 hours
-  
-  const arrivalTime = new Date(departureTime);
-  arrivalTime.setHours(arrivalTime.getHours() + flightDuration);
-  
-  // Generate appropriate flight status based on date
-  let status = 'Scheduled';
-  const now = new Date();
-  
-  if (flightDateObj < now) {
-    // Past flights are either landed or cancelled
-    status = Math.random() > 0.05 ? 'Landed' : 'Cancelled';
-  } else if (
-    flightDateObj.getDate() === now.getDate() &&
-    flightDateObj.getMonth() === now.getMonth() &&
-    flightDateObj.getFullYear() === now.getFullYear()
-  ) {
-    // Today's flights have more status options
-    const timeUntilDeparture = departureTime.getTime() - now.getTime();
-    const hoursUntilDeparture = timeUntilDeparture / (1000 * 60 * 60);
-    
-    if (hoursUntilDeparture < 0) {
-      // Flight should have already departed
-      status = Math.random() > 0.8 ? 'Delayed' : 'In Air';
-    } else if (hoursUntilDeparture < 1) {
-      // Flight is departing soon
-      status = Math.random() > 0.7 ? 'Boarding' : 'Scheduled';
-    } else if (hoursUntilDeparture < 3) {
-      // Flight is in a few hours
-      status = Math.random() > 0.9 ? 'Delayed' : 'Scheduled';
-    }
-  }
-  
-  console.log(`Generated mock flight data for ${airlines[airlineCode] || `Airline ${airlineCode}`} ${cleanFlightNumber}`);
-  console.log(`From: ${airports[depIndex].city} (${airports[depIndex].code}) To: ${airports[arrIndex].city} (${airports[arrIndex].code})`);
-  
-  return {
-    flight: {
-      airline: airlines[airlineCode] || `Airline ${airlineCode}`,
-      flightNumber: cleanFlightNumber,
-      departureAirport: airports[depIndex],
-      arrivalAirport: airports[arrIndex],
-      scheduledDeparture: departureTime.toISOString(),
-      scheduledArrival: arrivalTime.toISOString(),
-      status: status,
-    }
-  };
-}
+// We now only use authenticated FlightLabs API data
+// Mock data generation has been removed to ensure data integrity
 
 // Function to lookup flight information using FlightLabs API
 export async function lookupFlightInfo(
@@ -221,11 +86,9 @@ export async function lookupFlightInfo(
   console.log(`Cleaned flight number: "${cleanFlightNumber}" from input: "${flightNumber}"`);
   
   if (!apiKey) {
-    console.warn('No API key provided for flight lookup. Using mock data.');
-    // For development, return mock data when no API key is available
-    const mockData = generateMockFlightData(cleanFlightNumber, flightDate);
-    console.log('Generated mock flight data successfully');
-    return mockData;
+    console.warn('No API key provided for flight lookup.');
+    // For data integrity, we should not use mock data when no API key is available
+    return { error: 'API key is required to fetch authentic flight data.' };
   }
 
   try {
@@ -387,8 +250,9 @@ export async function lookupFlightInfo(
       // Network or Axios specific errors
       if (error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') {
         console.error(`Network error (${error.code}): Could not connect to FlightLabs API`);
-        console.log('Using mock data due to network error');
-        return generateMockFlightData(cleanFlightNumber, flightDate);
+        return { 
+          error: 'Network error: Could not connect to flight data service. Please try again later.' 
+        };
       }
       
       // Check response errors
@@ -398,34 +262,44 @@ export async function lookupFlightInfo(
         
         // Check for authorization/authentication errors
         if (error.response.status === 401 || error.response.status === 403) {
-          console.warn('API key authorization failed (status ' + error.response.status + '). Using mock data instead.');
+          console.warn('API key authorization failed (status ' + error.response.status + ').');
           console.log('This may be due to an invalid API key or the free plan request limit being reached');
-          return generateMockFlightData(cleanFlightNumber, flightDate);
+          return { 
+            error: 'Authentication error: The flight data service could not validate our request. Please try again later.' 
+          };
         }
         
         // Handle rate limiting
         if (error.response.status === 429) {
-          console.warn('API rate limit exceeded. Using mock data instead.');
-          return generateMockFlightData(cleanFlightNumber, flightDate);
+          console.warn('API rate limit exceeded.');
+          return { 
+            error: 'Rate limit exceeded: Too many requests to the flight data service. Please try again later.' 
+          };
         }
         
         // Handle other API error responses
         if (error.response.data && error.response.data.error) {
           const apiErrorMsg = error.response.data.error?.message || 'Unknown API error';
           console.error('FlightLabs API error message:', apiErrorMsg);
-          console.log('Using mock data due to API error');
-          return generateMockFlightData(cleanFlightNumber, flightDate);
+          return { 
+            error: `Flight data service error: ${apiErrorMsg}` 
+          };
         }
       }
     }
     
-    // For any other errors, use mock data to provide a better user experience
-    console.log('Using mock data due to unexpected error');
+    // For any other errors, return an appropriate error message
     if (error instanceof Error) {
       console.error('Error message:', error.message);
       console.error('Error stack:', error.stack);
+      return { 
+        error: `Could not retrieve flight information: ${error.message}` 
+      };
     }
-    return generateMockFlightData(cleanFlightNumber, flightDate);
+    
+    return { 
+      error: 'An unexpected error occurred while retrieving flight information. Please try again later.' 
+    };
   }
 }
 
