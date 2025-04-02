@@ -28,43 +28,87 @@ interface ErrorResponse {
   error: string;
 }
 
-// FlightLabs API response interface - updated for actual response format
-interface FlightLabsResponse {
-  // Real-time flight tracking response format
-  data?: Array<{
-    hex: string;
-    reg_number: string;
-    flag: string;
-    lat: number;
-    lng: number;
-    alt: number;
-    dir: number;
-    speed: number;
-    v_speed: number;
-    flight_number: string;
-    flight_icao: string;
-    flight_iata: string;
-    dep_icao: string;
-    dep_iata: string;
-    arr_icao: string;
-    arr_iata: string;
-    airline_icao: string;
-    airline_iata: string;
-    aircraft_icao: string;
-    updated: number;
-    status: string;
-    type: string;
-  }>;
-  error?: {
-    message: string;
-    code: number;
+// AviationStack API response interface
+interface AviationStackResponse {
+  pagination: {
+    limit: number;
+    offset: number;
+    count: number;
+    total: number;
   };
+  data: Array<{
+    flight_date: string;
+    flight_status: string;
+    departure: {
+      airport: string;
+      timezone: string;
+      iata: string;
+      icao: string;
+      terminal?: string;
+      gate?: string;
+      delay?: number;
+      scheduled: string;
+      estimated: string;
+      actual?: string;
+      estimated_runway?: string;
+      actual_runway?: string;
+    };
+    arrival: {
+      airport: string;
+      timezone: string;
+      iata: string;
+      icao: string;
+      terminal?: string;
+      gate?: string;
+      baggage?: string;
+      delay?: number;
+      scheduled: string;
+      estimated: string;
+      actual?: string;
+      estimated_runway?: string;
+      actual_runway?: string;
+    };
+    airline: {
+      name: string;
+      iata: string;
+      icao: string;
+    };
+    flight: {
+      number: string;
+      iata: string;
+      icao: string;
+      codeshared?: {
+        airline_name: string;
+        airline_iata: string;
+        airline_icao: string;
+        flight_number: string;
+        flight_iata: string;
+        flight_icao: string;
+      };
+    };
+    aircraft?: {
+      registration: string;
+      iata: string;
+      icao: string;
+      icao24: string;
+    };
+    live?: {
+      updated: string;
+      latitude: number;
+      longitude: number;
+      altitude: number;
+      direction: number;
+      speed_horizontal: number;
+      speed_vertical: number;
+      is_ground: boolean;
+    };
+  }>;
 }
 
-// We now only use authenticated FlightLabs API data
-// Mock data generation has been removed to ensure data integrity
+// We now only use authenticated AviationStack API data
+// No mock data generation to ensure data integrity
 
-// Function to lookup flight information using FlightLabs API
+// Function to lookup flight information using AviationStack API
 export async function lookupFlightInfo(
   flightNumber: string, 
   flightDate: string,
@@ -92,7 +136,7 @@ export async function lookupFlightInfo(
   }
 
   try {
-    // Format date to YYYY-MM-DD as required by FlightLabs API
+    // Format date to YYYY-MM-DD as required by AviationStack API
     let formattedDate: string;
     
     try {
@@ -108,125 +152,77 @@ export async function lookupFlightInfo(
       return { error: 'Invalid date format. Please use YYYY-MM-DD format.' };
     }
     
-    console.log(`Looking up flight: ${cleanFlightNumber} on ${formattedDate} with FlightLabs API`);
+    console.log(`Looking up flight: ${cleanFlightNumber} on ${formattedDate} with AviationStack API`);
     
     try {
-      console.log('Making request to FlightLabs API...');
+      console.log('Making request to AviationStack API...');
       // Extract the airline code and flight number (e.g., AA123 -> AA and 123)
       const airlineCode = cleanFlightNumber.slice(0, 2);
       const flightNumberOnly = cleanFlightNumber.slice(2);
       
-      // Use the FlightLabs API to get flight information
-      const response = await axios.get('https://app.goflightlabs.com/flights', {
+      // Use the AviationStack API to get flight information
+      const response = await axios.get('http://api.aviationstack.com/v1/flights', {
         params: {
           access_key: apiKey,
           flight_iata: cleanFlightNumber,
-          airline_iata: airlineCode,
-          flight_number: flightNumberOnly,
-          date: formattedDate
+          flight_date: formattedDate
         },
         timeout: 15000 // 15 second timeout for better error handling
       });
       
-      console.log('FlightLabs API response received with status:', response.status);
+      console.log('AviationStack API response received with status:', response.status);
       
-      // Parse the response as FlightLabsResponse
-      const flightLabsResponse = response.data as FlightLabsResponse;
+      // Parse the response as AviationStackResponse
+      const aviationStackResponse = response.data as AviationStackResponse;
       
       // Validate API response
-      if (!flightLabsResponse) {
+      if (!aviationStackResponse) {
         console.error('API returned empty response');
-        throw new Error('Empty response from FlightLabs API');
+        throw new Error('Empty response from AviationStack API');
       }
       
-      // Check for API error messages
-      if (flightLabsResponse.error) {
-        console.error('API returned an error:', flightLabsResponse.error);
-        throw new Error(`FlightLabs API error: ${flightLabsResponse.error?.message || 'Unknown API error'}`);
+      // Check for API error responses
+      if (response.data.error) {
+        console.error('API returned an error:', response.data.error);
+        return { error: 'The flight data service returned an error. Please try again later.' };
       }
       
       // Check if the response contains flight data
-      if (!flightLabsResponse.data || !Array.isArray(flightLabsResponse.data) || flightLabsResponse.data.length === 0) {
+      if (!aviationStackResponse.data || !Array.isArray(aviationStackResponse.data) || aviationStackResponse.data.length === 0) {
         console.log('No flight data found in API response');
         return { error: 'No flight information found for the given flight number and date.' };
       }
       
-      // Extract relevant flight information
-      const flightData = flightLabsResponse.data[0];
+      // Extract the first matching flight (which should be the most relevant)
+      const flightData = aviationStackResponse.data[0];
       console.log('Flight data found:', JSON.stringify(flightData, null, 2).substring(0, 200) + '...');
       
-      // Validate required flight data for the new API format
-      if (!flightData.flight_iata || !flightData.dep_iata || !flightData.arr_iata) {
+      // Validate required flight data exists
+      if (!flightData.flight || !flightData.departure || !flightData.arrival) {
         console.error('Incomplete flight data received from API');
         return { error: 'Incomplete flight information received from the API.' };
       }
 
-      // Get airline name from code
-      const airlines: {[key: string]: string} = {
-        'AA': 'American Airlines',
-        'DL': 'Delta Air Lines',
-        'UA': 'United Airlines',
-        'BA': 'British Airways',
-        'LH': 'Lufthansa',
-        'AF': 'Air France',
-        'KL': 'KLM Royal Dutch Airlines',
-        'EK': 'Emirates',
-        'QF': 'Qantas',
-        'SQ': 'Singapore Airlines',
-        'CX': 'Cathay Pacific',
-        'JL': 'Japan Airlines',
-        'NH': 'All Nippon Airways',
-        'QR': 'Qatar Airways',
-        'TK': 'Turkish Airlines',
-        'EY': 'Etihad Airways',
-        'AS': 'Alaska Airlines',
-        'B6': 'JetBlue Airways',
-        'WN': 'Southwest Airlines',
-        'AC': 'Air Canada',
-        'IB': 'Iberia',
-        'LA': 'LATAM Airlines',
-        'FR': 'Ryanair',
-        'U2': 'easyJet',
-        'LX': 'Swiss International Air Lines',
-        'MS': 'EgyptAir',
-        'SV': 'Saudia',
-        'OZ': 'Asiana Airlines',
-        'BR': 'EVA Air',
-        'CA': 'Air China',
-      };
-      
-      // Generate flight schedule times based on the date
-      const flightDateObj = new Date(flightDate);
-      const departureHour = 6 + (parseInt(flightData.flight_number) % 16);
-      const departureTime = new Date(flightDateObj);
-      departureTime.setHours(departureHour);
-      departureTime.setMinutes((parseInt(flightData.flight_number) * 7) % 60);
-      
-      // Flight duration (estimated)
-      const flightDuration = 2 + (parseInt(flightData.flight_number) % 10);
-      const arrivalTime = new Date(departureTime);
-      arrivalTime.setHours(arrivalTime.getHours() + flightDuration);
-      
       // Format the response to match our application's data structure
       const formattedResponse: FlightApiResponse = {
         flight: {
-          airline: airlines[flightData.airline_iata] || `Airline ${flightData.airline_iata}`,
-          flightNumber: flightData.flight_iata,
+          airline: flightData.airline.name,
+          flightNumber: flightData.flight.iata,
           departureAirport: {
-            code: flightData.dep_iata,
-            name: `${flightData.dep_iata} International Airport`,
-            city: flightData.dep_iata,
-            country: 'Unknown'
+            code: flightData.departure.iata,
+            name: flightData.departure.airport,
+            city: getAirportCity(flightData.departure.airport),
+            country: getAirportCountry(flightData.departure.airport)
           },
           arrivalAirport: {
-            code: flightData.arr_iata,
-            name: `${flightData.arr_iata} International Airport`,
-            city: flightData.arr_iata,
-            country: 'Unknown'
+            code: flightData.arrival.iata,
+            name: flightData.arrival.airport,
+            city: getAirportCity(flightData.arrival.airport),
+            country: getAirportCountry(flightData.arrival.airport)
           },
-          scheduledDeparture: departureTime.toISOString(),
-          scheduledArrival: arrivalTime.toISOString(),
-          status: flightData.status || 'Scheduled'
+          scheduledDeparture: flightData.departure.scheduled,
+          scheduledArrival: flightData.arrival.scheduled,
+          status: flightData.flight_status
         }
       };
       
@@ -249,7 +245,7 @@ export async function lookupFlightInfo(
     if (axios.isAxiosError(error)) {
       // Network or Axios specific errors
       if (error.code === 'ECONNREFUSED' || error.code === 'ECONNRESET' || error.code === 'ETIMEDOUT') {
-        console.error(`Network error (${error.code}): Could not connect to FlightLabs API`);
+        console.error(`Network error (${error.code}): Could not connect to AviationStack API`);
         return { 
           error: 'Network error: Could not connect to flight data service. Please try again later.' 
         };
@@ -279,8 +275,11 @@ export async function lookupFlightInfo(
         
         // Handle other API error responses
         if (error.response.data && error.response.data.error) {
-          const apiErrorMsg = error.response.data.error?.message || 'Unknown API error';
-          console.error('FlightLabs API error message:', apiErrorMsg);
+          const apiErrorMsg = typeof error.response.data.error === 'string' 
+            ? error.response.data.error 
+            : JSON.stringify(error.response.data.error);
+            
+          console.error('AviationStack API error message:', apiErrorMsg);
           return { 
             error: `Flight data service error: ${apiErrorMsg}` 
           };

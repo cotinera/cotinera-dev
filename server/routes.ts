@@ -122,14 +122,15 @@ export function registerRoutes(app: Express): Server {
       // Import the flight API utility
       const { lookupFlightInfo } = await import('./utils/flightApi');
       
-      // Get API key from environment variables - now using FlightLabs API
-      const apiKey = process.env.FLIGHTLABS_API_KEY;
+      // Get API key from environment variables - now using AviationStack API
+      const apiKey = process.env.AVIATION_STACK_API_KEY;
       
       if (!apiKey) {
-        console.warn('FlightLabs API key is not set. Using mock data.');
+        console.warn('AviationStack API key is not set.');
+        return res.status(503).json({ error: "Flight information service is unavailable. Please try again later." });
       } else {
         // Don't log the actual API key, just confirm it exists
-        console.log('Using FlightLabs API with provided API key');
+        console.log('Using AviationStack API with provided API key');
       }
       
       // Lookup flight information
@@ -144,13 +145,12 @@ export function registerRoutes(app: Express): Server {
       console.log('Flight info response received:', 'error' in flightInfo ? 'Error response' : 'Success response');
       
       // Check if there was an error message in the response
-      // But we should still have flight data from mock generator if API failed
-      if ('error' in flightInfo && !flightInfo.flight) {
+      if ('error' in flightInfo) {
         console.log('Flight lookup error (no data available):', flightInfo.error);
         return res.status(404).json(flightInfo);
       }
       
-      // If we have flight data (either from API or mock generator), return it
+      // If we have flight data, return it
       if (flightInfo && 'flight' in flightInfo && flightInfo.flight) {
         console.log('Flight lookup successful:', flightInfo.flight.airline, flightInfo.flight.flightNumber);
         console.log('Flight details:', {
@@ -174,10 +174,9 @@ export function registerRoutes(app: Express): Server {
         console.error('Error stack:', error.stack);
       }
       
-      // No mock data fallback - only return authentic data
-      console.log('Not providing mock flight data as fallback');
-      return res.status(404).json({ 
-        error: 'No flight information available for the requested flight number and date.' 
+      // Return appropriate error message
+      return res.status(503).json({ 
+        error: 'Unable to connect to flight information service. Please try again later.' 
       });
     }
   });
