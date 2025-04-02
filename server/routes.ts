@@ -122,14 +122,14 @@ export function registerRoutes(app: Express): Server {
       // Import the flight API utility
       const { lookupFlightInfo } = await import('./utils/flightApi');
       
-      // Get API key from environment variables
-      const apiKey = process.env.AVIATION_STACK_API_KEY;
+      // Get API key from environment variables - now using FlightLabs API
+      const apiKey = process.env.FLIGHTLABS_API_KEY;
       
       if (!apiKey) {
-        console.warn('Aviation Stack API key is not set. Using mock data.');
+        console.warn('FlightLabs API key is not set. Using mock data.');
       } else {
         // Don't log the actual API key, just confirm it exists
-        console.log('Using Aviation Stack API with provided API key');
+        console.log('Using FlightLabs API with provided API key');
       }
       
       // Lookup flight information

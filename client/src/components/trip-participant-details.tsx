@@ -4,6 +4,7 @@ import type { Trip, Flight } from "@db/schema";
 import { format, parse } from "date-fns";
 import { useForm } from "react-hook-form";
 import { useFlights } from "@/hooks/use-flights";
+import { useFlightLookup } from "@/hooks/use-flight-lookup";
 import { z } from "zod";
 import { FlightInDialog, FlightOutDialog } from "./trip-participant-details-updated";
 import { Button } from "@/components/ui/button";
@@ -150,7 +151,6 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   const [isAddFlightInOpen, setIsAddFlightInOpen] = useState(false);
   const [isAddFlightOutOpen, setIsAddFlightOutOpen] = useState(false);
   const [currentParticipantId, setCurrentParticipantId] = useState<number | null>(null);
-  const [isLookingUpFlight, setIsLookingUpFlight] = useState(false);
   
   // Flight form
   const flightForm = useForm<Partial<Flight>>({
@@ -168,109 +168,13 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     },
   });
   
-  // State for tracking if flight details have been loaded successfully
-  const [flightDetails, setFlightDetails] = useState<{
-    airline: string;
-    flightNumber: string;
-    departureAirport: {
-      code: string;
-      name: string;
-      city: string;
-      country: string;
-    };
-    arrivalAirport: {
-      code: string;
-      name: string;
-      city: string;
-      country: string;
-    };
-    scheduledDeparture: string;
-    scheduledArrival: string;
-    status: string;
-  } | null>(null);
-  
-  // Function to lookup flight details from the API
-  const lookupFlightDetails = async () => {
-    const flightNumber = flightForm.getValues("flightNumber");
-    // Use current date if no departureDate is provided
-    let departureDate = flightForm.getValues("departureDate");
-    
-    // Reset flight details when looking up a new flight
-    setFlightDetails(null);
-    
-    if (!flightNumber) {
-      toast({
-        title: "Flight number required",
-        description: "Please enter a flight number to lookup flight details",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // If no departure date, use today's date
-    if (!departureDate) {
-      departureDate = format(new Date(), "yyyy-MM-dd");
-      flightForm.setValue("departureDate", departureDate);
-    }
-
-    try {
-      setIsLookingUpFlight(true);
-      
-      // Call the flight lookup API
-      const response = await fetch(`/api/flights/lookup?flightNumber=${flightNumber}&date=${departureDate}`);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to lookup flight details");
-      }
-      
-      const data = await response.json();
-      
-      if (!data || !data.flight) {
-        throw new Error("No flight information found");
-      }
-      
-      // Store the flight details for display
-      setFlightDetails(data.flight);
-      
-      // Parse date and time from ISO string
-      const departureDateObj = new Date(data.flight.scheduledDeparture);
-      const arrivalDateObj = new Date(data.flight.scheduledArrival);
-      
-      // Update form with flight details
-      flightForm.setValue("airline", data.flight.airline);
-      flightForm.setValue("departureAirport", data.flight.departureAirport.code);
-      flightForm.setValue("arrivalAirport", data.flight.arrivalAirport.code);
-      
-      // Format dates and times for form fields
-      flightForm.setValue("departureDate", format(departureDateObj, "yyyy-MM-dd"));
-      flightForm.setValue("departureTime", format(departureDateObj, "HH:mm"));
-      flightForm.setValue("arrivalDate", format(arrivalDateObj, "yyyy-MM-dd"));
-      flightForm.setValue("arrivalTime", format(arrivalDateObj, "HH:mm"));
-      
-      // Set booking reference to flight number if not already set
-      if (!flightForm.getValues("bookingReference")) {
-        flightForm.setValue("bookingReference", flightNumber);
-      }
-      
-      // Set booking status based on API response
-      flightForm.setValue("bookingStatus", data.flight.status.toLowerCase() || "confirmed");
-      
-      toast({
-        title: "Flight details found",
-        description: `Found details for ${data.flight.airline} flight ${flightNumber}`,
-      });
-    } catch (error) {
-      console.error("Error looking up flight:", error);
-      toast({
-        title: "Failed to find flight",
-        description: error instanceof Error ? error.message : "Could not retrieve flight details",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLookingUpFlight(false);
-    }
-  };
+  // Use our custom hook for flight lookup
+  const { 
+    isLookingUpFlight, 
+    flightDetails, 
+    setFlightDetails, 
+    lookupFlightDetails 
+  } = useFlightLookup(flightForm);
 
   const { data: trip } = useQuery<Trip>({
     queryKey: ["/api/trips", tripId],
