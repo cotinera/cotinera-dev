@@ -125,6 +125,15 @@ interface User {
   avatar?: string;
 }
 
+interface Participant {
+  id: number;
+  userId: number;
+  tripId: number;
+  role: string;
+  joinedAt?: string;
+  user?: User;
+}
+
 interface Expense {
   id: number;
   tripId: number;
@@ -173,6 +182,7 @@ const expenseSchema = z.object({
   currency: z.string().min(1, "Currency is required"),
   category: z.string().min(1, "Category is required"),
   date: z.string().min(1, "Date is required"),
+  paidBy: z.number().optional(), // Add paidBy field that's optional in the schema
   // Optional: Custom split amounts
   splits: z.array(
     z.object({
@@ -223,6 +233,18 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
   const [activeTab, setActiveTab] = useState("list");
+  
+  // Fetch trip participants for payer selection
+  const { data: participants = [] as Participant[] } = useQuery({
+    queryKey: ["participants", tripId],
+    queryFn: async () => {
+      const response = await fetch(`/api/trips/${tripId}/participants`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch participants");
+      }
+      return response.json();
+    },
+  });
 
   // Fetch all expenses for this trip
   const { data: expenses = [], isLoading: isLoadingExpenses } = useQuery({
@@ -259,6 +281,7 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
       currency: "USD",
       category: "other",
       date: format(new Date(), "yyyy-MM-dd"),
+      paidBy: participants[0]?.id, // Default to first participant if available
     },
   });
 
@@ -463,6 +486,7 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
       currency: expense.currency,
       category: expense.category,
       date: format(new Date(expense.date), "yyyy-MM-dd"),
+      paidBy: expense.paidBy, // Add the paidBy field
     });
     setIsEditExpenseOpen(true);
   };
@@ -525,6 +549,7 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
               currency: "USD",
               category: "other",
               date: format(new Date(), "yyyy-MM-dd"),
+              paidBy: participants[0]?.id, // Default to first participant if available
             });
             setIsAddExpenseOpen(true);
           }}
@@ -1084,6 +1109,39 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
                 />
               </div>
               
+              <FormField
+                control={form.control}
+                name="paidBy"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Paid By</FormLabel>
+                    <Select 
+                      onValueChange={(value) => field.onChange(parseInt(value))} 
+                      defaultValue={field.value?.toString()}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select who paid" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {participants.map((participant) => (
+                          <SelectItem key={participant.id} value={participant.id.toString()}>
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-6 w-6">
+                                <AvatarFallback>{participant.name.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <span>{participant.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
               <DialogFooter>
                 <Button 
                   type="button" 
@@ -1283,6 +1341,39 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
                   )}
                 />
               </div>
+              
+              <FormField
+                control={editForm.control}
+                name="paidBy"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Paid By</FormLabel>
+                    <Select 
+                      onValueChange={(value) => field.onChange(parseInt(value))} 
+                      defaultValue={field.value?.toString()}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select who paid" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {participants.map((participant) => (
+                          <SelectItem key={participant.id} value={participant.id.toString()}>
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-6 w-6">
+                                <AvatarFallback>{participant.name.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <span>{participant.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               
               <DialogFooter>
                 <Button 

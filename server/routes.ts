@@ -2497,9 +2497,17 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: 'Expense not found' });
       }
       
-      // Verify the user is the one who paid (or implement other permission logic)
-      if (expense.paidBy !== userId) {
-        return res.status(403).json({ error: 'You can only delete expenses you paid for' });
+      // We're allowing any trip participant to delete expenses now
+      // Check if user is a participant in this trip
+      const [participant] = await db.select().from(participants)
+        .where(and(
+          eq(participants.tripId, tripId),
+          eq(participants.userId, userId)
+        ))
+        .limit(1);
+      
+      if (!participant) {
+        return res.status(403).json({ error: 'You must be a participant in this trip to delete expenses' });
       }
       
       // Delete the expense and related splits in a transaction
