@@ -179,7 +179,7 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
             {format(new Date(trip.endDate), "MMM d, yyyy")}
           </span>
         </div>
-        <div className="mt-4">
+        <div className="mt-4 flex justify-center">
           <ViewToggle tripId={trip.id} />
         </div>
       </div>
@@ -285,7 +285,7 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
           </div>
         </form>
       </Form>
-      <div className="mt-4">
+      <div className="mt-4 flex justify-center">
         <ViewToggle tripId={trip.id} />
       </div>
     </div>
