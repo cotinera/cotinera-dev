@@ -134,70 +134,87 @@ export function ViewToggle({ tripId }: ViewToggleProps) {
     }
   };
 
+  // Calculate number of visible tabs to determine grid columns
+  const getVisibleTabCount = () => {
+    // Always show details + count enabled views
+    return 1 + 
+      (viewPreferences.showCalendar ? 1 : 0) + 
+      (viewPreferences.showSpending ? 1 : 0) + 
+      (viewPreferences.showMap ? 1 : 0);
+  };
+
+  // Dynamically generate the grid-cols class based on visible tabs
+  const getGridColsClass = () => {
+    const visibleTabs = getVisibleTabCount();
+    return `grid-cols-${visibleTabs}`;
+  };
+
   return (
-    <div className="relative inline-flex rounded-lg bg-muted p-1">
-      <ToggleGroup
-        type="single"
-        value={getCurrentView()}
-        onValueChange={handleViewChange}
-        className="relative z-0 grid grid-cols-4"
-      >
-        <ToggleGroupItem 
-          value="details" 
-          aria-label="View trip details"
-          className="rounded-md px-3 py-2 transition-colors duration-200 ease-in-out
-            hover:bg-background/80 hover:text-foreground
-            data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:font-medium
-            data-[state=off]:text-muted-foreground/60"
+    <div className="flex items-center">
+      <div className="relative rounded-lg bg-muted p-1">
+        <ToggleGroup
+          type="single"
+          value={getCurrentView()}
+          onValueChange={handleViewChange}
+          className={`relative z-0 grid ${getGridColsClass()}`}
         >
-          <LayoutDashboard className="h-4 w-4 mr-2" />
-          <span className="hidden sm:inline">Details</span>
-        </ToggleGroupItem>
-        {viewPreferences.showCalendar && (
           <ToggleGroupItem 
-            value="calendar" 
-            aria-label="View trip calendar"
+            value="details" 
+            aria-label="View trip details"
             className="rounded-md px-3 py-2 transition-colors duration-200 ease-in-out
               hover:bg-background/80 hover:text-foreground
               data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:font-medium
               data-[state=off]:text-muted-foreground/60"
           >
-            <CalendarDays className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Calendar</span>
+            <LayoutDashboard className="h-4 w-4 mr-2" />
+            <span className="hidden sm:inline">Details</span>
           </ToggleGroupItem>
-        )}
-        {viewPreferences.showSpending && (
-          <ToggleGroupItem 
-            value="spending" 
-            aria-label="View trip spending"
-            className="rounded-md px-3 py-2 transition-colors duration-200 ease-in-out
-              hover:bg-background/80 hover:text-foreground
-              data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:font-medium
-              data-[state=off]:text-muted-foreground/60"
-          >
-            <DollarSign className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Spending</span>
-          </ToggleGroupItem>
-        )}
-        {viewPreferences.showMap && (
-          <ToggleGroupItem 
-            value="map" 
-            aria-label="View trip map"
-            className="rounded-md px-3 py-2 transition-colors duration-200 ease-in-out
-              hover:bg-background/80 hover:text-foreground
-              data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:font-medium
-              data-[state=off]:text-muted-foreground/60"
-          >
-            <Map className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Map</span>
-          </ToggleGroupItem>
-        )}
-      </ToggleGroup>
+          {viewPreferences.showCalendar && (
+            <ToggleGroupItem 
+              value="calendar" 
+              aria-label="View trip calendar"
+              className="rounded-md px-3 py-2 transition-colors duration-200 ease-in-out
+                hover:bg-background/80 hover:text-foreground
+                data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:font-medium
+                data-[state=off]:text-muted-foreground/60"
+            >
+              <CalendarDays className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Calendar</span>
+            </ToggleGroupItem>
+          )}
+          {viewPreferences.showSpending && (
+            <ToggleGroupItem 
+              value="spending" 
+              aria-label="View trip spending"
+              className="rounded-md px-3 py-2 transition-colors duration-200 ease-in-out
+                hover:bg-background/80 hover:text-foreground
+                data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:font-medium
+                data-[state=off]:text-muted-foreground/60"
+            >
+              <DollarSign className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Spending</span>
+            </ToggleGroupItem>
+          )}
+          {viewPreferences.showMap && (
+            <ToggleGroupItem 
+              value="map" 
+              aria-label="View trip map"
+              className="rounded-md px-3 py-2 transition-colors duration-200 ease-in-out
+                hover:bg-background/80 hover:text-foreground
+                data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:font-medium
+                data-[state=off]:text-muted-foreground/60"
+            >
+              <Map className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Map</span>
+            </ToggleGroupItem>
+          )}
+        </ToggleGroup>
+      </div>
       
-      {/* Three dots menu to customize views */}
-      <div className="absolute right-0 top-0 p-1 z-10">
+      {/* Three dots menu as a separate bubble */}
+      <div className="ml-2">
         <DropdownMenu>
-          <DropdownMenuTrigger className="w-8 h-8 inline-flex items-center justify-center rounded-full text-muted-foreground hover:bg-background/50 hover:text-foreground focus:outline-none">
+          <DropdownMenuTrigger className="w-8 h-8 inline-flex items-center justify-center rounded-full bg-muted text-muted-foreground hover:bg-background hover:text-foreground focus:outline-none">
             <MoreVertical className="h-4 w-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -207,18 +224,21 @@ export function ViewToggle({ tripId }: ViewToggleProps) {
               checked={viewPreferences.showCalendar}
               onCheckedChange={() => toggleViewPreference('showCalendar')}
             >
+              <CalendarDays className="h-4 w-4 mr-2 inline" />
               Show Calendar
             </DropdownMenuCheckboxItem>
             <DropdownMenuCheckboxItem
               checked={viewPreferences.showSpending}
               onCheckedChange={() => toggleViewPreference('showSpending')}
             >
+              <DollarSign className="h-4 w-4 mr-2 inline" />
               Show Spending
             </DropdownMenuCheckboxItem>
             <DropdownMenuCheckboxItem
               checked={viewPreferences.showMap}
               onCheckedChange={() => toggleViewPreference('showMap')}
             >
+              <Map className="h-4 w-4 mr-2 inline" />
               Show Map
             </DropdownMenuCheckboxItem>
           </DropdownMenuContent>
