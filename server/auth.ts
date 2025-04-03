@@ -1,5 +1,6 @@
 import passport from "passport";
 import { IVerifyOptions, Strategy as LocalStrategy } from "passport-local";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { type Express } from "express";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -40,6 +41,42 @@ declare global {
 }
 
 export function setupAuth(app: Express) {
+  // Configure Google OAuth Strategy
+  passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID || '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+    callbackURL: "/api/auth/google/callback",
+    scope: ["profile", "email"]
+  }, async (accessToken, refreshToken, profile, done) => {
+    try {
+      // Check if user exists
+      const [existingUser] = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, profile.emails?.[0]?.value || ''))
+        .limit(1);
+
+      if (existingUser) {
+        return done(null, existingUser);
+      }
+
+      // Create new user if doesn't exist
+      const [newUser] = await db
+        .insert(users)
+        .values({
+          email: profile.emails?.[0]?.value || '',
+          name: profile.displayName,
+          provider: 'google',
+          providerId: profile.id,
+          password: await crypto.hash(crypto.randomUUID()) // Random password for Google users
+        })
+        .returning();
+
+      return done(null, newUser);
+    } catch (err) {
+      return done(err);
+    }
+  }));
   const MemoryStore = createMemoryStore(session);
   const sessionSettings: session.SessionOptions = {
     secret: process.env.REPL_ID || "porygon-supremacy",
@@ -181,6 +218,16 @@ export function setupAuth(app: Express) {
       });
     })(req, res, next);
   });
+
+  // Google OAuth routes
+  app.get("/api/auth/google", passport.authenticate("google"));
+
+  app.get("/api/auth/google/callback",
+    passport.authenticate("google", { 
+      failureRedirect: "/auth",
+      successRedirect: "/"
+    })
+  );
 
   app.post("/api/logout", (req, res) => {
     req.logout((err) => {
