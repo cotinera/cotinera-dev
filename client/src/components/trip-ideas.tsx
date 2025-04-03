@@ -325,14 +325,17 @@ export function TripIdeas({ tripId, participants }: TripIdeasProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {participants.map((participant) => (
-                            <SelectItem 
-                              key={participant.userId} 
-                              value={participant.userId.toString()}
-                            >
-                              {participant.name}
-                            </SelectItem>
-                          ))}
+                          {participants
+                            .filter(participant => participant.userId != null)
+                            .map(participant => (
+                              <SelectItem 
+                                key={participant.userId} 
+                                value={String(participant.userId)}
+                              >
+                                {participant.name}
+                              </SelectItem>
+                            ))
+                          }
                         </SelectContent>
                       </Select>
                       <FormDescription>
@@ -539,14 +542,17 @@ export function TripIdeas({ tripId, participants }: TripIdeasProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {participants.map((participant) => (
-                          <SelectItem 
-                            key={participant.userId} 
-                            value={participant.userId.toString()}
-                          >
-                            {participant.name}
-                          </SelectItem>
-                        ))}
+                        {participants
+                          .filter(participant => participant.userId != null)
+                          .map(participant => (
+                            <SelectItem 
+                              key={participant.userId} 
+                              value={String(participant.userId)}
+                            >
+                              {participant.name}
+                            </SelectItem>
+                          ))
+                        }
                       </SelectContent>
                     </Select>
                     <FormDescription>

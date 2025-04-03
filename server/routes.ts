@@ -2553,7 +2553,7 @@ export function registerRoutes(app: Express): Server {
           createdAt: tripIdeas.createdAt,
           updatedAt: tripIdeas.updatedAt,
           ownerName: users.name,
-          ownerAvatar: users.avatar,
+          // Don't select avatar in case it doesn't exist in the database yet
         })
         .from(tripIdeas)
         .leftJoin(users, eq(tripIdeas.ownerId, users.id))
@@ -2605,7 +2605,6 @@ export function registerRoutes(app: Express): Server {
       const [owner] = await db.select({
         id: users.id,
         name: users.name,
-        avatar: users.avatar,
       })
       .from(users)
       .where(eq(users.id, userId));
@@ -2614,7 +2613,6 @@ export function registerRoutes(app: Express): Server {
       res.status(201).json({
         ...idea,
         ownerName: owner?.name,
-        ownerAvatar: owner?.avatar,
       });
     } catch (error) {
       console.error("Error creating trip idea:", error);
@@ -2686,7 +2684,6 @@ export function registerRoutes(app: Express): Server {
       const [owner] = ownerId2 ? await db.select({
         id: users.id,
         name: users.name,
-        avatar: users.avatar,
       })
       .from(users)
       .where(eq(users.id, ownerId2)) : [null];
@@ -2695,7 +2692,6 @@ export function registerRoutes(app: Express): Server {
       res.json({
         ...updatedIdea,
         ownerName: owner?.name,
-        ownerAvatar: owner?.avatar,
       });
     } catch (error) {
       console.error("Error updating trip idea:", error);
