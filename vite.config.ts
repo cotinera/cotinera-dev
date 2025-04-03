@@ -20,4 +20,12 @@ export default defineConfig({
     outDir: path.resolve(__dirname, "dist/public"),
     emptyOutDir: true,
   },
+  server: {
+    host: true,
+    hmr: {
+      protocol: 'ws',
+      timeout: 5000,
+      overlay: false
+    },
+  },
 });
