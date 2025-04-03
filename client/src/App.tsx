@@ -14,6 +14,7 @@ import {
   TripDetail,
   TripCalendar,
   TripMap,
+  TripSpending,
   DestinationDetail,
   AuthPage,
   TravelPreferencesPage
@@ -29,6 +30,7 @@ function Router() {
       <ProtectedRoute path="/trips/:id" component={TripDetail} />
       <ProtectedRoute path="/trips/:id/calendar" component={TripCalendar} />
       <ProtectedRoute path="/trips/:id/map" component={TripMap} />
+      <ProtectedRoute path="/trips/:id/spending" component={TripSpending} />
       <ProtectedRoute path="/trips/:tripId/destinations/:destinationId" component={DestinationDetail} />
       <ProtectedRoute path="/preferences" component={TravelPreferencesPage} />
       <Route component={NotFound} />
