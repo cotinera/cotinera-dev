@@ -232,33 +232,15 @@ export default function TripDetail() {
             />
           </section>
 
+          <section className="mb-8">
+            <TripParticipantDetails 
+              tripId={trip.id}
+            />
+          </section>
+
           <div className="grid gap-8 md:grid-cols-[2fr,1fr]">
             <div className="space-y-8">
-              <section>
-                <TripParticipantDetails 
-                  tripId={trip.id}
-                />
-              </section>
-
-              <section>
-                {currentDestination ? (
-                  <MapViewComp 
-                    location={currentDestination.coordinates || { lat: 0, lng: 0 }}
-                    tripId={trip.id.toString()}
-                    pinnedPlaces={pinnedPlaces || []}
-                    hideSearchAndFilters={true}
-                  />
-                ) : destinations && destinations.length >= 2 ? (
-                  <MapRouteView destinations={destinations} />
-                ) : (
-                  <MapViewComp 
-                    location={trip.coordinates || { lat: 0, lng: 0 }}
-                    tripId={trip.id.toString()}
-                    pinnedPlaces={pinnedPlaces || []}
-                    hideSearchAndFilters={true}
-                  />
-                )}
-              </section>
+              {/* Map view removed to clear space on the Details page */}
 
               <section>
                 <PinnedPlaces
