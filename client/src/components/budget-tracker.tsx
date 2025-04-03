@@ -847,6 +847,7 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
                             fill="#8884d8"
                             dataKey="amount"
                             nameKey="category"
+                            isAnimationActive={false}
                             label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                           >
                             {summary.categoryBreakdown.map((entry, index) => (
@@ -900,6 +901,7 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
                               dataKey="amount" 
                               fill="#0088FE" 
                               radius={[4, 4, 0, 0]}
+                              isAnimationActive={false}
                             />
                           </BarChart>
                         </ResponsiveContainer>

@@ -80,6 +80,15 @@ export const trips = pgTable("trips", {
   ownerId: integer("owner_id").notNull().references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  viewPreferences: jsonb("view_preferences").$type<{
+    showCalendar: boolean;
+    showSpending: boolean;
+    showMap: boolean;
+  }>().default({
+    showCalendar: true,
+    showSpending: true,
+    showMap: true
+  }),
 });
 
 export const destinations = pgTable("destinations", {

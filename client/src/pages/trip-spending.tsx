@@ -91,16 +91,7 @@ export default function TripSpending() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-2xl font-bold">Trip Spending</h2>
-          <ViewToggle tripId={trip.id} />
-        </div>
-
-        <div className="space-y-8">
-          <section>
-            <BudgetTracker tripId={trip.id} />
-          </section>
-        </div>
+        <BudgetTracker tripId={trip.id} />
       </main>
     </div>
   );

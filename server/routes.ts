@@ -543,6 +543,49 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Update trip view preferences
+  app.put("/api/trips/:id/view-preferences", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.id);
+      
+      // Validate input
+      if (!req.body || typeof req.body !== 'object') {
+        return res.status(400).json({ error: "Invalid view preferences data" });
+      }
+      
+      // Create viewPreferences object with correct structure
+      const viewPreferences = {
+        showCalendar: req.body.showCalendar === true,
+        showSpending: req.body.showSpending === true,
+        showMap: req.body.showMap === true,
+      };
+      
+      // Update the trip with the new view preferences
+      const [updatedTrip] = await db
+        .update(trips)
+        .set({
+          viewPreferences: viewPreferences
+        })
+        .where(eq(trips.id, tripId))
+        .returning();
+
+      if (!updatedTrip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+
+      // Format dates back to YYYY-MM-DD before sending to client
+      const formattedTrip = {
+        ...updatedTrip,
+        startDate: updatedTrip.startDate.split('T')[0],
+        endDate: updatedTrip.endDate.split('T')[0],
+      };
+
+      res.json(formattedTrip);
+    } catch (error) {
+      console.error('Error updating trip view preferences:', error);
+      res.status(500).json({ error: 'Failed to update trip view preferences' });
+    }
+  });
 
   // Delete trip
   app.delete("/api/trips/:id", async (req, res) => {
