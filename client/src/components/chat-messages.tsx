@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useForm, useFieldArray } from "react-hook-form";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { formatDistance } from "date-fns";
-import { Send, ChevronDown, BarChart } from "lucide-react";
+import { Send, ChevronDown, BarChart, MessageSquare, ChevronUp } from "lucide-react";
 import type { ChatMessage, Poll, PollVote } from "@db/schema";
 import { useEffect, useRef, useState, useMemo } from "react";
 import {
@@ -19,7 +19,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -34,6 +33,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 interface ChatMessagesProps {
   tripId: number;
@@ -59,8 +59,22 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
   const queryClient = useQueryClient();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isPollDialogOpen, setIsPollDialogOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const { toast } = useToast();
-
+  
+  // Get the messages for the chat
+  const { data: messages = [], isLoading } = useQuery<ChatMessage[]>({
+    queryKey: ["/api/trips", tripId, "chat"],
+    queryFn: async () => {
+      const res = await fetch(`/api/trips/${tripId}/chat`);
+      if (!res.ok) throw new Error("Failed to fetch messages");
+      return res.json();
+    },
+    refetchInterval: 2000,
+  });
+  
+  const mostRecentMessage = messages.length > 0 ? messages[0] : null;
+  
   const chatForm = useForm<ChatFormData>({
     defaultValues: {
       message: "",
@@ -81,16 +95,6 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
     name: "options",
   });
 
-  const { data: messages = [], isLoading } = useQuery<ChatMessage[]>({
-    queryKey: ["/api/trips", tripId, "chat"],
-    queryFn: async () => {
-      const res = await fetch(`/api/trips/${tripId}/chat`);
-      if (!res.ok) throw new Error("Failed to fetch messages");
-      return res.json();
-    },
-    refetchInterval: 2000,
-  });
-
   const { mutate: sendMessage } = useMutation({
     mutationFn: async (data: ChatFormData | { message: string }) => {
       const res = await fetch(`/api/trips/${tripId}/chat`, {
@@ -105,6 +109,11 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "chat"] });
       chatForm.reset();
+      
+      // Auto expand when a user sends a message
+      if (!isExpanded) {
+        setIsExpanded(true);
+      }
     },
   });
 
@@ -147,6 +156,11 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
         title: "Success",
         description: "Poll created successfully",
       });
+      
+      // Auto expand when a poll is created
+      if (!isExpanded) {
+        setIsExpanded(true);
+      }
     },
     onError: (error: Error) => {
       console.error('Error creating poll:', error);
@@ -159,10 +173,10 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
   });
 
   useEffect(() => {
-    if (scrollRef.current) {
+    if (scrollRef.current && isExpanded) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isExpanded]);
 
   const onSubmitChat = (data: ChatFormData) => {
     if (!data.message.trim()) return;
@@ -188,284 +202,309 @@ export function ChatMessages({ tripId }: ChatMessagesProps) {
       console.error('Error creating poll:', error);
     }
   };
-
-  return (
-    <div className="flex flex-col h-[400px] border rounded-lg bg-background">
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-        <div className="space-y-4">
-          {[...messages].reverse().map((message) => (
-            <div key={message.id} className="flex items-start gap-2">
-              <Avatar className="h-8 w-8">
-                <AvatarFallback>
-                  {message.user?.name?.[0]?.toUpperCase() || 'U'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">
-                    {message.user?.name || message.user?.email?.split('@')[0] || 'Unknown User'}
-                  </span>
-                  <span className="text-xs text-muted-foreground">
-                    {message.createdAt ? formatDistance(new Date(message.createdAt), new Date(), {
-                      addSuffix: true,
-                    }) : ''}
-                  </span>
-                </div>
-                {(() => {
-                  try {
-                    const data = JSON.parse(message.message);
-                    if (data.type === 'poll') {
-                      return <PollMessage message={message} tripId={tripId} />;
-                    }
-                    return <p className="text-sm mt-1">{linkifyText(message.message)}</p>;
-                  } catch (error) {
-                    return <p className="text-sm mt-1">{linkifyText(message.message)}</p>;
-                  }
-                })()}
+  
+  // Function to get a preview of the message content
+  const getMessagePreview = (message: ChatMessage | null) => {
+    if (!message) return "No messages yet";
+    
+    try {
+      const data = JSON.parse(message.message);
+      if (data.type === 'poll') {
+        return `Poll: ${data.question}`;
+      }
+    } catch (error) {
+      // Not a JSON message, continue with normal preview
+    }
+    
+    // Truncate message if needed
+    const preview = message.message.length > 60 
+      ? message.message.substring(0, 60) + "..." 
+      : message.message;
+      
+    return preview;
+  };
+  
+  if (!isExpanded) {
+    // Collapsed view
+    return (
+      <Card className="mb-4">
+        <CardHeader className="py-3 px-4 flex flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-md font-medium flex items-center">
+            <MessageSquare className="h-4 w-4 mr-2" />
+            Group Chat
+          </CardTitle>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setIsExpanded(true)}
+            className="h-8 px-2"
+          >
+            <ChevronDown className="h-4 w-4 mr-1" /> 
+            Expand
+          </Button>
+        </CardHeader>
+        <CardContent className="px-4 py-2 flex justify-between items-center">
+          <div className="text-sm truncate text-muted-foreground">
+            {mostRecentMessage && (
+              <div className="flex items-center gap-2">
+                <Avatar className="h-6 w-6">
+                  <AvatarFallback>
+                    {'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="font-medium text-xs">
+                  User:
+                </span>
+                {getMessagePreview(mostRecentMessage)}
               </div>
-            </div>
-          ))}
-          {messages.length === 0 && !isLoading && (
-            <p className="text-center text-muted-foreground">
-              Share flight deals, accommodations, and travel ideas with your group here!
-            </p>
-          )}
-        </div>
-      </ScrollArea>
-      <div className="p-4 border-t">
-        <form
-          onSubmit={chatForm.handleSubmit(onSubmitChat)}
-          className="flex items-center gap-2"
-        >
-          <div className="flex-1 flex gap-2">
+            )}
+            {!mostRecentMessage && "No messages yet - click to start a conversation"}
+          </div>
+          <form
+            onSubmit={chatForm.handleSubmit(onSubmitChat)}
+            className="flex items-center gap-2"
+          >
             <Input
               {...chatForm.register("message")}
-              placeholder="Type a message..."
-              className="flex-1"
+              placeholder="Quick message..."
+              className="w-40 h-8 text-sm"
             />
-            <Dialog open={isPollDialogOpen} onOpenChange={setIsPollDialogOpen}>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon">
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => setIsPollDialogOpen(true)}>
-                    <BarChart className="h-4 w-4 mr-2" />
-                    Create Poll
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={chatForm.watch("message").length === 0}
+              className="h-8"
+            >
+              <Send className="h-3 w-3" />
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  // Expanded view
+  return (
+    <Card className="mb-4">
+      <CardHeader className="py-3 px-4 flex flex-row items-center justify-between space-y-0 border-b">
+        <CardTitle className="text-md font-medium flex items-center">
+          <MessageSquare className="h-4 w-4 mr-2" />
+          Group Chat
+        </CardTitle>
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => setIsExpanded(false)}
+          className="h-8 px-2"
+        >
+          <ChevronUp className="h-4 w-4 mr-1" /> 
+          Collapse
+        </Button>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="flex flex-col h-[350px]">
+          <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+            <div className="space-y-4">
+              {[...messages].reverse().map((message) => (
+                <div key={message.id} className="flex items-start gap-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback>
+                      {'U'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">
+                        {'User'}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {message.createdAt ? formatDistance(new Date(message.createdAt), new Date(), {
+                          addSuffix: true,
+                        }) : ''}
+                      </span>
+                    </div>
+                    {(() => {
+                      try {
+                        const data = JSON.parse(message.message);
+                        if (data.type === 'poll') {
+                          return <div className="bg-accent/20 rounded-lg p-4 mt-2">
+                            <h4 className="font-medium mb-2">{data.question || 'Poll question'}</h4>
+                            <div className="space-y-2">
+                              {(data.options || []).map((option: string, index: number) => (
+                                <div key={index} className="w-full text-left p-2 rounded bg-accent/30">
+                                  {option}
+                                </div>
+                              ))}
+                            </div>
+                          </div>;
+                        }
+                        return <p className="text-sm mt-1">{linkifyURLs(message.message)}</p>;
+                      } catch (error) {
+                        return <p className="text-sm mt-1">{linkifyURLs(message.message)}</p>;
+                      }
+                    })()}
+                  </div>
+                </div>
+              ))}
+              {messages.length === 0 && !isLoading && (
+                <p className="text-center text-muted-foreground">
+                  Share flight deals, accommodations, and travel ideas with your group here!
+                </p>
+              )}
+            </div>
+          </ScrollArea>
+          <div className="p-4 border-t">
+            <form
+              onSubmit={chatForm.handleSubmit(onSubmitChat)}
+              className="flex items-center gap-2"
+            >
+              <div className="flex-1 flex gap-2">
+                <Input
+                  {...chatForm.register("message")}
+                  placeholder="Type a message..."
+                  className="flex-1"
+                />
+                <Dialog open={isPollDialogOpen} onOpenChange={setIsPollDialogOpen}>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="icon">
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={() => setIsPollDialogOpen(true)}>
+                        <BarChart className="h-4 w-4 mr-2" />
+                        Create Poll
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
 
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create a Poll</DialogTitle>
-                </DialogHeader>
-                <Form {...pollForm}>
-                  <form onSubmit={pollForm.handleSubmit(onSubmitPoll)} className="space-y-4">
-                    <FormField
-                      control={pollForm.control}
-                      name="question"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Question</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="What's your question?" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <div className="space-y-2">
-                      <FormLabel>Options</FormLabel>
-                      {optionFields.map((field, index) => (
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create a Poll</DialogTitle>
+                    </DialogHeader>
+                    <Form {...pollForm}>
+                      <form onSubmit={pollForm.handleSubmit(onSubmitPoll)} className="space-y-4">
                         <FormField
-                          key={field.id}
                           control={pollForm.control}
-                          name={`options.${index}`}
+                          name="question"
                           render={({ field }) => (
                             <FormItem>
-                              <div className="flex gap-2">
-                                <FormControl>
-                                  <Input {...field} placeholder={`Option ${index + 1}`} />
-                                </FormControl>
-                                {index >= 2 && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => remove(index)}
-                                  >
-                                    ×
-                                  </Button>
-                                )}
-                              </div>
+                              <FormLabel>Question</FormLabel>
+                              <FormControl>
+                                <Input {...field} placeholder="What's your question?" />
+                              </FormControl>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-                      ))}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full"
-                        onClick={() => append("")}
-                      >
-                        Add Option
-                      </Button>
-                    </div>
 
-                    <FormField
-                      control={pollForm.control}
-                      name="endTime"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>End Time (Optional)</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="datetime-local"
-                              {...field}
+                        <div className="space-y-2">
+                          <FormLabel>Options</FormLabel>
+                          {optionFields.map((field, index) => (
+                            <FormField
+                              key={field.id}
+                              control={pollForm.control}
+                              name={`options.${index}`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <div className="flex gap-2">
+                                    <FormControl>
+                                      <Input {...field} placeholder={`Option ${index + 1}`} />
+                                    </FormControl>
+                                    {index >= 2 && (
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => remove(index)}
+                                      >
+                                        ×
+                                      </Button>
+                                    )}
+                                  </div>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
                             />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                          ))}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => append("")}
+                          >
+                            Add Option
+                          </Button>
+                        </div>
 
-                    <DialogFooter>
-                      <Button type="submit" disabled={isCreatingPoll}>
-                        Create Poll
-                      </Button>
-                    </DialogFooter>
-                  </form>
-                </Form>
-              </DialogContent>
-            </Dialog>
-          </div>
-          <Button
-            type="submit"
-            size="icon"
-            disabled={chatForm.watch("message").length === 0}
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </form>
-      </div>
-    </div>
-  );
-}
+                        <FormField
+                          control={pollForm.control}
+                          name="endTime"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>End Time (Optional)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="datetime-local"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
-function PollMessage({ message, tripId }: { message: ChatMessage; tripId: number }) {
-  const queryClient = useQueryClient();
-  const [selectedOption, setSelectedOption] = useState<number | null>(null);
-
-  // Parse poll data from message
-  const pollData = useMemo(() => {
-    try {
-      const data = JSON.parse(message.message);
-      return data.type === 'poll' ? data : null;
-    } catch (e) {
-      console.error('Error parsing poll data:', e);
-      return null;
-    }
-  }, [message.message]);
-
-  const { data: pollDetails } = useQuery({
-    queryKey: ["/api/trips", tripId, "polls", pollData?.pollId],
-    queryFn: async () => {
-      if (!pollData?.pollId) return null;
-      const res = await fetch(`/api/trips/${tripId}/polls/${pollData.pollId}`);
-      if (!res.ok) throw new Error("Failed to fetch poll details");
-      return res.json();
-    },
-    enabled: !!pollData?.pollId,
-  });
-
-  const { mutate: submitVote } = useMutation({
-    mutationFn: async (optionIndex: number) => {
-      if (!pollData?.pollId) return;
-      const res = await fetch(`/api/trips/${tripId}/polls/${pollData.pollId}/vote`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ optionIndex }),
-        credentials: 'include'
-      });
-      if (!res.ok) throw new Error("Failed to submit vote");
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["/api/trips", tripId, "polls", pollData?.pollId],
-      });
-    },
-  });
-
-  if (!pollData || !pollDetails) return null;
-
-  const { votes = [] } = pollDetails;
-  const optionVotes = pollData.options.map((_: string, index: number) =>
-    votes.filter((vote: any) => vote.optionIndex === index).length
-  );
-  const totalVotes = votes.length;
-
-  return (
-    <div className="bg-accent/20 rounded-lg p-4 mt-2">
-      <h4 className="font-medium mb-2">{pollData.question}</h4>
-      <div className="space-y-2">
-        {pollData.options.map((option: string, index: number) => {
-          const voteCount = optionVotes[index];
-          const percentage = totalVotes > 0 ? (voteCount / totalVotes) * 100 : 0;
-
-          return (
-            <button
-              key={index}
-              className={cn(
-                "w-full text-left p-2 rounded hover:bg-accent/30 relative",
-                selectedOption === index && "bg-accent/40"
-              )}
-              onClick={() => {
-                setSelectedOption(index);
-                submitVote(index);
-              }}
-              disabled={pollDetails?.isClosed}
-            >
-              <div className="flex justify-between items-center">
-                <span>{option}</span>
-                <span className="text-sm text-muted-foreground">
-                  {voteCount} ({percentage.toFixed(1)}%)
-                </span>
+                        <DialogFooter>
+                          <Button type="submit" disabled={isCreatingPoll}>
+                            Create Poll
+                          </Button>
+                        </DialogFooter>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
               </div>
-              <div
-                className="absolute inset-0 bg-accent/20 rounded"
-                style={{
-                  width: `${percentage}%`,
-                  zIndex: -1,
-                }}
-              />
-            </button>
-          );
-        })}
-      </div>
-      {pollDetails?.endTime && (
-        <p className="text-sm text-muted-foreground mt-2">
-          Ends {formatDistance(new Date(pollDetails.endTime), new Date(), { addSuffix: true })}
-        </p>
-      )}
-    </div>
+              <Button
+                type="submit"
+                size="icon"
+                disabled={chatForm.watch("message").length === 0}
+              >
+                <Send className="h-4 w-4" />
+              </Button>
+            </form>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
-function linkifyText(text: string) {
+// Helper function to wrap URLs in clickable links
+function linkifyURLs(text: string) {
+  // Regular expression to match URLs
   const urlRegex = /(https?:\/\/[^\s]+)/g;
+  
+  // If no URLs in the text, return the text as is
+  if (!urlRegex.test(text)) {
+    return text;
+  }
+  
+  // Split the text by URLs
   const parts = text.split(urlRegex);
-
-  return parts.map((part, index) => {
-    if (part.match(urlRegex)) {
-      return (
+  
+  // Create a new array to hold the result
+  const result = [];
+  
+  // For each part in the array, check if it's a URL
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    
+    // If the part matches the URL regex, it's a URL
+    if (part && part.match(urlRegex)) {
+      result.push(
         <a
-          key={index}
+          key={i}
           href={part}
           target="_blank"
           rel="noopener noreferrer"
@@ -474,7 +513,11 @@ function linkifyText(text: string) {
           {part}
         </a>
       );
+    } else if (part) {
+      // Otherwise, it's regular text
+      result.push(part);
     }
-    return part;
-  });
+  }
+  
+  return result;
 }
