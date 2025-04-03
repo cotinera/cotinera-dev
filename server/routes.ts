@@ -2513,12 +2513,22 @@ export function registerRoutes(app: Express): Server {
       // Delete the expense and related splits in a transaction
       await db.transaction(async (tx) => {
         // First delete the splits
-        await tx.delete(expenseSplits)
-          .where(eq(expenseSplits.expenseId, expenseId));
+        const splitResult = await tx.delete(expenseSplits)
+          .where(eq(expenseSplits.expenseId, expenseId))
+          .returning();
+        
+        console.log(`Deleted ${splitResult.length} expense splits for expense ${expenseId}`);
         
         // Then delete the expense
-        await tx.delete(expenses)
-          .where(eq(expenses.id, expenseId));
+        const expenseResult = await tx.delete(expenses)
+          .where(eq(expenses.id, expenseId))
+          .returning();
+        
+        console.log(`Deleted expense result:`, expenseResult);
+        
+        if (expenseResult.length === 0) {
+          throw new Error(`Failed to delete expense with ID ${expenseId}`);
+        }
       });
       
       res.json({ success: true, message: 'Expense deleted successfully' });

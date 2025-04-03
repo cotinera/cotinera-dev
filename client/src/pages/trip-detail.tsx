@@ -272,12 +272,6 @@ export default function TripDetail() {
                   tripId={trip.id}
                 />
               </section>
-              
-              <section className="mt-8">
-                <BudgetTracker
-                  tripId={trip.id}
-                />
-              </section>
             </div>
           </div>
         </div>
