@@ -81,16 +81,14 @@ export default function AuthPage() {
     }
   }
 
-  const handleSocialLogin = async (provider: 'google' | 'apple') => {
-    try {
-      const res = await fetch(`/api/auth/${provider}`);
-      const data = await res.json();
-      window.location.href = data.url;
-    } catch (error) {
+  const handleSocialLogin = (provider: 'google' | 'apple') => {
+    if (provider === 'google') {
+      window.location.href = '/api/auth/google';
+    } else {
       toast({
         variant: "destructive",
-        title: "Error",
-        description: "Failed to initialize social login",
+        title: "Error", 
+        description: "Apple login not implemented yet"
       });
     }
   };
