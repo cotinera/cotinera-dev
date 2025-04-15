@@ -313,6 +313,8 @@ export const tripIdeas = pgTable("trip_ideas", {
   ownerId: integer("owner_id").references(() => users.id), // optional owner
   location: text("location"),
   votes: integer("votes").default(0),
+  plannedDate: timestamp("planned_date"), // optional date/time for the idea
+  plannedEndDate: timestamp("planned_end_date"), // optional end date/time for the idea
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

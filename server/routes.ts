@@ -2631,7 +2631,7 @@ export function registerRoutes(app: Express): Server {
       const tripId = parseInt(tripIdStr);
       const userId = req.user?.id || 1;
       
-      const { title, description, status, location } = req.body;
+      const { title, description, status, location, plannedDate, plannedEndDate } = req.body;
       
       if (!title) {
         return res.status(400).json({ error: "Title is required" });
@@ -2651,6 +2651,8 @@ export function registerRoutes(app: Express): Server {
           ownerId: userId,
           location,
           votes: 0,
+          plannedDate: plannedDate ? new Date(plannedDate) : null,
+          plannedEndDate: plannedEndDate ? new Date(plannedEndDate) : null,
         })
         .returning();
         
@@ -2711,7 +2713,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).json({ error: "You must be a participant in this trip to update ideas" });
       }
       
-      const { title, description, status, location, ownerId } = req.body;
+      const { title, description, status, location, ownerId, plannedDate, plannedEndDate } = req.body;
       
       // Validate status if provided
       const validStatuses = ["pending", "booked", "unsure"];
@@ -2727,6 +2729,8 @@ export function registerRoutes(app: Express): Server {
           status: status || existingIdea.status,
           location: location !== undefined ? location : existingIdea.location,
           ownerId: ownerId || existingIdea.ownerId,
+          plannedDate: plannedDate !== undefined ? (plannedDate ? new Date(plannedDate) : null) : existingIdea.plannedDate,
+          plannedEndDate: plannedEndDate !== undefined ? (plannedEndDate ? new Date(plannedEndDate) : null) : existingIdea.plannedEndDate,
           updatedAt: new Date()
         })
         .where(eq(tripIdeas.id, ideaId))

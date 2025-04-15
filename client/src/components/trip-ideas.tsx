@@ -10,13 +10,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, ThumbsUp, Edit, Trash2, MapPin } from "lucide-react";
+import { PlusCircle, ThumbsUp, Edit, Trash2, MapPin, Calendar } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import axios from "axios";
 import { toast } from "@/hooks/use-toast";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { LocationSearchBar } from "./location-search-bar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { format, isValid, parseISO } from "date-fns";
 
 // Define the TripIdea schema for form validation
 const tripIdeaSchema = z.object({
@@ -25,6 +28,8 @@ const tripIdeaSchema = z.object({
   status: z.enum(["pending", "booked", "unsure"]).default("pending"),
   location: z.string().optional(),
   ownerId: z.number().optional(),
+  plannedDate: z.date().optional(),
+  plannedEndDate: z.date().optional(),
 });
 
 interface TripIdeasProps {
@@ -180,6 +185,8 @@ export function TripIdeas({ tripId, participants }: TripIdeasProps) {
       status: idea.status,
       location: idea.location || "",
       ownerId: idea.ownerId,
+      plannedDate: idea.plannedDate ? new Date(idea.plannedDate) : undefined,
+      plannedEndDate: idea.plannedEndDate ? new Date(idea.plannedEndDate) : undefined,
     });
     setIsEditDialogOpen(true);
   };
@@ -346,6 +353,84 @@ export function TripIdeas({ tripId, participants }: TripIdeasProps) {
                   )}
                 />
 
+                <FormField
+                  control={addForm.control}
+                  name="plannedDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Planned Date</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              className={`w-full pl-3 text-left font-normal ${!field.value ? "text-muted-foreground" : ""}`}
+                            >
+                              {field.value ? (
+                                format(field.value, "PPP")
+                              ) : (
+                                <span>Pick a date</span>
+                              )}
+                              <Calendar className="ml-auto h-4 w-4" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormDescription>
+                        When is this activity planned?
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={addForm.control}
+                  name="plannedEndDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>End Date (Optional)</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              className={`w-full pl-3 text-left font-normal ${!field.value ? "text-muted-foreground" : ""}`}
+                            >
+                              {field.value ? (
+                                format(field.value, "PPP")
+                              ) : (
+                                <span>Pick end date</span>
+                              )}
+                              <Calendar className="ml-auto h-4 w-4" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormDescription>
+                        For multi-day activities (optional)
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <DialogFooter>
                   <DialogClose asChild>
                     <Button variant="outline">Cancel</Button>
@@ -401,6 +486,15 @@ export function TripIdeas({ tripId, participants }: TripIdeasProps) {
                       <div className="flex items-center gap-1 mt-2 text-sm">
                         <MapPin className="h-4 w-4" />
                         <span>{idea.location}</span>
+                      </div>
+                    )}
+                    {idea.plannedDate && (
+                      <div className="flex items-center gap-1 mt-2 text-sm">
+                        <Calendar className="h-4 w-4" />
+                        <span>
+                          {format(new Date(idea.plannedDate), "PPP")}
+                          {idea.plannedEndDate && ` - ${format(new Date(idea.plannedEndDate), "PPP")}`}
+                        </span>
                       </div>
                     )}
                   </CardContent>
@@ -557,6 +651,84 @@ export function TripIdeas({ tripId, participants }: TripIdeasProps) {
                     </Select>
                     <FormDescription>
                       Optional: Assign this idea to a trip participant
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={editForm.control}
+                name="plannedDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Planned Date</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={`w-full pl-3 text-left font-normal ${!field.value ? "text-muted-foreground" : ""}`}
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP")
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                            <Calendar className="ml-auto h-4 w-4" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormDescription>
+                      When is this activity planned?
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={editForm.control}
+                name="plannedEndDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>End Date (Optional)</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={`w-full pl-3 text-left font-normal ${!field.value ? "text-muted-foreground" : ""}`}
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP")
+                            ) : (
+                              <span>Pick end date</span>
+                            )}
+                            <Calendar className="ml-auto h-4 w-4" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <CalendarComponent
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormDescription>
+                      For multi-day activities (optional)
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
