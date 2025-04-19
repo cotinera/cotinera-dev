@@ -22,7 +22,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   name: text("name"),
   username: text("username"),
-  avatar: text("avatar"),
+  avatar: text("avatar").default(null),
   provider: text("provider").default("email"),
   providerId: text("provider_id"),
   preferences: jsonb("preferences").$type<{
