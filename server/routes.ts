@@ -1345,13 +1345,273 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
+  // Invite a user to a trip
+  app.post("/api/trips/:tripId/invite", async (req, res) => {
+    try {
+      // Check if user is authenticated
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      const tripId = parseInt(req.params.tripId);
+      const { email, role } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+      
+      // Verify that the authenticated user is the owner of the trip or has admin rights
+      const trip = await db.query.trips.findFirst({
+        where: eq(trips.id, tripId)
+      });
+      
+      if (!trip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+      
+      const isOwner = trip.ownerId === req.user?.id;
+      
+      if (!isOwner) {
+        // Check if user is an admin for this trip
+        const userParticipant = await db.query.participants.findFirst({
+          where: and(
+            eq(participants.tripId, tripId),
+            eq(participants.userId, req.user?.id),
+            eq(participants.role, "admin")
+          )
+        });
+        
+        if (!userParticipant) {
+          return res.status(403).json({ error: "You don't have permission to invite users to this trip" });
+        }
+      }
+      
+      // Check if the user already exists by email
+      let invitedUser = await db.query.users.findFirst({
+        where: eq(users.email, email)
+      });
+      
+      // Check if the participant already exists in the trip
+      if (invitedUser) {
+        const existingParticipant = await db.query.participants.findFirst({
+          where: and(
+            eq(participants.tripId, tripId),
+            eq(participants.userId, invitedUser.id)
+          )
+        });
+        
+        if (existingParticipant) {
+          return res.status(400).json({ error: "User is already a participant in this trip" });
+        }
+      }
+      
+      // Create the participant with pending status
+      const [newParticipant] = await db.insert(participants).values({
+        tripId,
+        userId: invitedUser?.id || null,
+        name: invitedUser?.name || email.split('@')[0],
+        email: email,
+        status: 'pending',
+        role: role || 'viewer'
+      }).returning();
+      
+      // TODO: In a real application, we would send an email invitation here
+      // For now, we'll just return the created participant
+      
+      res.status(201).json({
+        ...newParticipant,
+        message: "Invitation sent successfully"
+      });
+    } catch (error) {
+      console.error('Error inviting user:', error);
+      res.status(500).json({ 
+        error: 'Failed to invite user',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+  
+  // Update a participant's role
+  app.patch("/api/trips/:tripId/participants/:participantId/role", async (req, res) => {
+    try {
+      // Check if user is authenticated
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const tripId = parseInt(req.params.tripId);
+      const participantId = parseInt(req.params.participantId);
+      const { role } = req.body;
+      
+      if (!role) {
+        return res.status(400).json({ error: "Role is required" });
+      }
+      
+      // Verify allowed roles
+      const allowedRoles = ["viewer", "editor", "admin"];
+      if (!allowedRoles.includes(role)) {
+        return res.status(400).json({ error: `Role must be one of: ${allowedRoles.join(', ')}` });
+      }
+      
+      // Verify that the authenticated user is the owner of the trip or has admin rights
+      const trip = await db.query.trips.findFirst({
+        where: eq(trips.id, tripId)
+      });
+      
+      if (!trip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+      
+      const isOwner = trip.ownerId === req.user?.id;
+      
+      if (!isOwner) {
+        // Check if user is an admin for this trip
+        const userParticipant = await db.query.participants.findFirst({
+          where: and(
+            eq(participants.tripId, tripId),
+            eq(participants.userId, req.user?.id),
+            eq(participants.role, "admin")
+          )
+        });
+        
+        if (!userParticipant) {
+          return res.status(403).json({ error: "You don't have permission to update participant roles" });
+        }
+      }
+      
+      // Update the participant's role
+      const [updatedParticipant] = await db.update(participants)
+        .set({ role })
+        .where(and(
+          eq(participants.id, participantId),
+          eq(participants.tripId, tripId)
+        ))
+        .returning();
+      
+      if (!updatedParticipant) {
+        return res.status(404).json({ error: "Participant not found" });
+      }
+      
+      res.json(updatedParticipant);
+    } catch (error) {
+      console.error('Error updating participant role:', error);
+      res.status(500).json({ error: 'Failed to update participant role' });
+    }
+  });
+  
+  // Resend invitation to a participant
+  app.post("/api/trips/:tripId/participants/:participantId/resend-invite", async (req, res) => {
+    try {
+      // Check if user is authenticated
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const tripId = parseInt(req.params.tripId);
+      const participantId = parseInt(req.params.participantId);
+      
+      // Verify that the authenticated user is the owner of the trip or has admin rights
+      const trip = await db.query.trips.findFirst({
+        where: eq(trips.id, tripId)
+      });
+      
+      if (!trip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+      
+      const isOwner = trip.ownerId === req.user?.id;
+      
+      if (!isOwner) {
+        // Check if user is an admin for this trip
+        const userParticipant = await db.query.participants.findFirst({
+          where: and(
+            eq(participants.tripId, tripId),
+            eq(participants.userId, req.user?.id),
+            eq(participants.role, "admin")
+          )
+        });
+        
+        if (!userParticipant) {
+          return res.status(403).json({ error: "You don't have permission to resend invitations" });
+        }
+      }
+      
+      // Get the participant
+      const participant = await db.query.participants.findFirst({
+        where: and(
+          eq(participants.id, participantId),
+          eq(participants.tripId, tripId)
+        )
+      });
+      
+      if (!participant) {
+        return res.status(404).json({ error: "Participant not found" });
+      }
+      
+      if (participant.status !== 'pending') {
+        return res.status(400).json({ error: "Invitation can only be resent for pending participants" });
+      }
+      
+      if (!participant.email) {
+        return res.status(400).json({ error: "Participant does not have an email address" });
+      }
+      
+      // TODO: In a real application, we would send an email invitation here
+      
+      // Update the joinedAt time to reflect the new invitation
+      const [updatedParticipant] = await db.update(participants)
+        .set({ joinedAt: new Date() })
+        .where(eq(participants.id, participantId))
+        .returning();
+      
+      res.json({
+        ...updatedParticipant,
+        message: "Invitation resent successfully"
+      });
+    } catch (error) {
+      console.error('Error resending invitation:', error);
+      res.status(500).json({ error: 'Failed to resend invitation' });
+    }
+  });
+
   // Delete participant endpoint
   app.delete("/api/trips/:tripId/participants/:participantId", async (req, res) => {
     try {
       const tripId = parseInt(req.params.tripId);
       const participantId = parseInt(req.params.participantId);
 
-      // Delete the participant first since it's the main entity
+      // Check if user is authenticated
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      // Verify that the authenticated user is the owner of the trip or has admin rights
+      const trip = await db.query.trips.findFirst({
+        where: eq(trips.id, tripId)
+      });
+      
+      if (!trip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+      
+      const isOwner = trip.ownerId === req.user?.id;
+      
+      if (!isOwner) {
+        // Check if user is an admin for this trip
+        const userParticipant = await db.query.participants.findFirst({
+          where: and(
+            eq(participants.tripId, tripId),
+            eq(participants.userId, req.user?.id),
+            eq(participants.role, "admin")
+          )
+        });
+        
+        if (!userParticipant) {
+          return res.status(403).json({ error: "You don't have permission to remove participants" });
+        }
+      }
+
+      // Delete the participant
       const [deletedParticipant] = await db.delete(participants)
         .where(and(eq(participants.id, participantId), eq(participants.tripId, tripId)))
         .returning();
