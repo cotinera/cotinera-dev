@@ -46,7 +46,8 @@ export function setupAuth(app: Express) {
     clientID: process.env.GOOGLE_CLIENT_ID || '',
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
     callbackURL: "/api/auth/google/callback",
-    scope: ["profile", "email"]
+    scope: ["profile", "email"],
+    proxy: true
   }, async (accessToken, refreshToken, profile, done) => {
     try {
       // Check if user exists
