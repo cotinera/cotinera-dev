@@ -17,7 +17,8 @@ import {
   TripSpending,
   DestinationDetail,
   AuthPage,
-  TravelPreferencesPage
+  TravelPreferencesPage,
+  MyTripsPage
 } from "@/pages";
 import { ProtectedRoute } from "@/lib";
 
