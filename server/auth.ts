@@ -69,7 +69,7 @@ export function setupAuth(app: Express) {
           name: profile.displayName || '',
           username: profile.emails?.[0]?.value.split('@')[0] || '',
           provider: 'google',
-          providerId: profile.id,
+          provider_id: profile.id,
           avatar: profile.photos?.[0]?.value || null,
           password: await crypto.hash(crypto.randomUUID()), // Random password for Google users
           preferences: {} // Initialize empty preferences object
@@ -181,7 +181,7 @@ export function setupAuth(app: Express) {
           name: userData.name,
           username: userData.username,
           provider: userData.provider,
-          providerId: userData.providerId
+          provider_id: userData.providerId
         })
         .returning();
 

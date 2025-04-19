@@ -24,7 +24,7 @@ export const users = pgTable("users", {
   username: text("username"),
   avatar: text("avatar").default(null),
   provider: text("provider").default("email"),
-  providerId: text("provider_id"),
+  provider_id: text("provider_id"),
   preferences: jsonb("preferences").$type<{
     notifications: boolean;
     frequentDestinations: string[];
@@ -552,7 +552,7 @@ export const insertUserSchema = createInsertSchema(users, {
   name: z.string().optional(),
   username: z.string().optional(),
   provider: z.enum(["email", "google", "apple"]).default("email"),
-  providerId: z.string().optional(),
+  provider_id: z.string().optional(),
 });
 export const selectUserSchema = createSelectSchema(users);
 export const insertTripSchema = createInsertSchema(trips);
