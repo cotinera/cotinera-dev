@@ -70,6 +70,7 @@ export function setupAuth(app: Express) {
           username: profile.emails?.[0]?.value.split('@')[0] || '',
           provider: 'google',
           providerId: profile.id,
+          avatar: profile.photos?.[0]?.value || null,
           password: await crypto.hash(crypto.randomUUID()), // Random password for Google users
           preferences: {} // Initialize empty preferences object
         })
@@ -228,7 +229,7 @@ export function setupAuth(app: Express) {
   app.get("/api/auth/google/callback",
     passport.authenticate("google", { 
       failureRedirect: "/auth",
-      successRedirect: "/"
+      successRedirect: "/my-trips"
     })
   );
 
