@@ -20,6 +20,8 @@ import { LocationSearchBar } from "./location-search-bar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { format, isValid, parseISO } from "date-fns";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { ExpandableTripIdeaForm } from "./expandable-trip-idea-form";
 
 // Define the TripIdea schema for form validation
 const tripIdeaSchema = z.object({
@@ -29,7 +31,7 @@ const tripIdeaSchema = z.object({
   location: z.string().optional(),
   ownerId: z.number().optional(),
   plannedDate: z.date().optional(),
-  plannedEndDate: z.date().optional(),
+  plannedTime: z.string().optional(), // Store time as HH:MM format
 });
 
 interface TripIdeasProps {
@@ -186,7 +188,7 @@ export function TripIdeas({ tripId, participants }: TripIdeasProps) {
       location: idea.location || "",
       ownerId: idea.ownerId,
       plannedDate: idea.plannedDate ? new Date(idea.plannedDate) : undefined,
-      plannedEndDate: idea.plannedEndDate ? new Date(idea.plannedEndDate) : undefined,
+      plannedTime: idea.plannedTime || "",
     });
     setIsEditDialogOpen(true);
   };
@@ -230,217 +232,18 @@ export function TripIdeas({ tripId, participants }: TripIdeasProps) {
               Add Idea
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Add New Trip Idea</DialogTitle>
-              <DialogDescription>
-                Share your idea for the trip. You can specify its status and assign an owner.
-              </DialogDescription>
+          <DialogContent className="sm:max-w-[600px] p-0 border-none shadow-lg">
+            <DialogHeader className="sr-only">
+              <DialogTitle>Add Trip Idea</DialogTitle>
+              <DialogDescription>Form to add a new trip idea</DialogDescription>
             </DialogHeader>
-
-            <Form {...addForm}>
-              <form onSubmit={addForm.handleSubmit(onAddSubmit)} className="space-y-4">
-                <FormField
-                  control={addForm.control}
-                  name="title"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Title</FormLabel>
-                      <FormControl>
-                        <Input placeholder="What's your idea?" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={addForm.control}
-                  name="description"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Description</FormLabel>
-                      <FormControl>
-                        <Textarea placeholder="Add more details about your idea..." {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={addForm.control}
-                  name="location"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Location</FormLabel>
-                      <FormControl>
-                        <LocationSearchBar
-                          value={field.value || ""}
-                          onChange={(address) => field.onChange(address)}
-                          placeholder="Search for a location..."
-                          className="w-full"
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={addForm.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Status</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="booked">Booked</SelectItem>
-                          <SelectItem value="unsure">Unsure</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>
-                        Set the current status of this idea
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={addForm.control}
-                  name="ownerId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Assign To</FormLabel>
-                      <Select
-                        onValueChange={(value) => field.onChange(parseInt(value))}
-                        defaultValue={field.value?.toString()}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Assign to someone" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {participants
-                            .filter(participant => participant.userId != null)
-                            .map(participant => (
-                              <SelectItem 
-                                key={participant.userId} 
-                                value={String(participant.userId)}
-                              >
-                                {participant.name}
-                              </SelectItem>
-                            ))
-                          }
-                        </SelectContent>
-                      </Select>
-                      <FormDescription>
-                        Optional: Assign this idea to a trip participant
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={addForm.control}
-                  name="plannedDate"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>Planned Date</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              className={`w-full pl-3 text-left font-normal ${!field.value ? "text-muted-foreground" : ""}`}
-                            >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick a date</span>
-                              )}
-                              <Calendar className="ml-auto h-4 w-4" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <CalendarComponent
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormDescription>
-                        When is this activity planned?
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={addForm.control}
-                  name="plannedEndDate"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-col">
-                      <FormLabel>End Date (Optional)</FormLabel>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <FormControl>
-                            <Button
-                              variant="outline"
-                              className={`w-full pl-3 text-left font-normal ${!field.value ? "text-muted-foreground" : ""}`}
-                            >
-                              {field.value ? (
-                                format(field.value, "PPP")
-                              ) : (
-                                <span>Pick end date</span>
-                              )}
-                              <Calendar className="ml-auto h-4 w-4" />
-                            </Button>
-                          </FormControl>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <CalendarComponent
-                            mode="single"
-                            selected={field.value}
-                            onSelect={field.onChange}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                      <FormDescription>
-                        For multi-day activities (optional)
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <DialogFooter>
-                  <DialogClose asChild>
-                    <Button variant="outline">Cancel</Button>
-                  </DialogClose>
-                  <Button type="submit" disabled={addIdeaMutation.isPending}>
-                    {addIdeaMutation.isPending ? "Adding..." : "Add Idea"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </Form>
+            <ExpandableTripIdeaForm
+              tripId={tripId}
+              participants={participants}
+              onSubmit={onAddSubmit}
+              onCancel={() => setIsAddDialogOpen(false)}
+              isPending={addIdeaMutation.isPending}
+            />
           </DialogContent>
         </Dialog>
       </div>
@@ -493,7 +296,7 @@ export function TripIdeas({ tripId, participants }: TripIdeasProps) {
                         <Calendar className="h-4 w-4" />
                         <span>
                           {format(new Date(idea.plannedDate), "PPP")}
-                          {idea.plannedEndDate && ` - ${format(new Date(idea.plannedEndDate), "PPP")}`}
+                          {idea.plannedTime && ` at ${idea.plannedTime}`}
                         </span>
                       </div>
                     )}
@@ -534,217 +337,27 @@ export function TripIdeas({ tripId, participants }: TripIdeasProps) {
       </Tabs>
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-[600px] p-0 border-none shadow-lg">
+          <DialogHeader className="sr-only">
             <DialogTitle>Edit Trip Idea</DialogTitle>
-            <DialogDescription>
-              Update your trip idea details.
-            </DialogDescription>
+            <DialogDescription>Form to edit an existing trip idea</DialogDescription>
           </DialogHeader>
-
-          <Form {...editForm}>
-            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
-              <FormField
-                control={editForm.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Title</FormLabel>
-                    <FormControl>
-                      <Input placeholder="What's your idea?" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={editForm.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Description</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Add more details about your idea..." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={editForm.control}
-                name="location"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Location</FormLabel>
-                    <FormControl>
-                      <LocationSearchBar
-                        value={field.value || ""}
-                        onChange={(address) => field.onChange(address)}
-                        placeholder="Search for a location..."
-                        className="w-full"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={editForm.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="booked">Booked</SelectItem>
-                        <SelectItem value="unsure">Unsure</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      Set the current status of this idea
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={editForm.control}
-                name="ownerId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Assign To</FormLabel>
-                    <Select
-                      onValueChange={(value) => field.onChange(parseInt(value))}
-                      defaultValue={field.value?.toString()}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Assign to someone" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {participants
-                          .filter(participant => participant.userId != null)
-                          .map(participant => (
-                            <SelectItem 
-                              key={participant.userId} 
-                              value={String(participant.userId)}
-                            >
-                              {participant.name}
-                            </SelectItem>
-                          ))
-                        }
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      Optional: Assign this idea to a trip participant
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              
-              <FormField
-                control={editForm.control}
-                name="plannedDate"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Planned Date</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            className={`w-full pl-3 text-left font-normal ${!field.value ? "text-muted-foreground" : ""}`}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                            <Calendar className="ml-auto h-4 w-4" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <CalendarComponent
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormDescription>
-                      When is this activity planned?
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={editForm.control}
-                name="plannedEndDate"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>End Date (Optional)</FormLabel>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            className={`w-full pl-3 text-left font-normal ${!field.value ? "text-muted-foreground" : ""}`}
-                          >
-                            {field.value ? (
-                              format(field.value, "PPP")
-                            ) : (
-                              <span>Pick end date</span>
-                            )}
-                            <Calendar className="ml-auto h-4 w-4" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <CalendarComponent
-                          mode="single"
-                          selected={field.value}
-                          onSelect={field.onChange}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <FormDescription>
-                      For multi-day activities (optional)
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button variant="outline">Cancel</Button>
-                </DialogClose>
-                <Button type="submit" disabled={editIdeaMutation.isPending}>
-                  {editIdeaMutation.isPending ? "Saving..." : "Save Changes"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
+          <ExpandableTripIdeaForm
+            tripId={tripId}
+            participants={participants}
+            onSubmit={onEditSubmit}
+            onCancel={() => setIsEditDialogOpen(false)}
+            isPending={editIdeaMutation.isPending}
+            initialValues={editingIdea ? {
+              title: editingIdea.title,
+              description: editingIdea.description || "",
+              status: editingIdea.status,
+              location: editingIdea.location || "",
+              ownerId: editingIdea.ownerId,
+              plannedDate: editingIdea.plannedDate ? new Date(editingIdea.plannedDate) : undefined,
+              plannedTime: editingIdea.plannedTime || "",
+            } : undefined}
+          />
         </DialogContent>
       </Dialog>
     </div>
