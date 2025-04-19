@@ -470,6 +470,64 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: 'Failed to fetch trips' });
     }
   });
+  
+  // Get my trips (requires authentication)
+  app.get("/api/my-trips", async (req, res) => {
+    try {
+      // Check if user is authenticated
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const userId = req.user?.id;
+      
+      // Get trips where user is owner
+      const ownedTrips = await db.query.trips.findMany({
+        where: eq(trips.ownerId, userId),
+        with: {
+          participants: true,
+          activities: true,
+          flights: true,
+          accommodations: true,
+        },
+        orderBy: [desc(trips.startDate)]
+      });
+
+      // Get trips where user is a participant
+      const participantTrips = await db.query.participants.findMany({
+        where: eq(participants.userId, userId),
+        with: {
+          trip: {
+            with: {
+              participants: true,
+              activities: true,
+              flights: true,
+              accommodations: true,
+            }
+          }
+        }
+      });
+
+      const participatedTrips = participantTrips.map(p => p.trip);
+      
+      // Combine, deduplicate by ID, and sort by date
+      const allTrips = [...ownedTrips];
+      
+      for (const trip of participatedTrips) {
+        if (!allTrips.some(t => t.id === trip.id)) {
+          allTrips.push(trip);
+        }
+      }
+      
+      // Sort by start date
+      allTrips.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+      
+      res.json(allTrips);
+    } catch (error) {
+      console.error('Error fetching my trips:', error);
+      res.status(500).json({ error: 'Failed to fetch my trips' });
+    }
+  });
 
   // Create trip
   app.post("/api/trips", async (req, res) => {

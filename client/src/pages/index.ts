@@ -8,3 +8,4 @@ export { default as TripCalendar } from "./trip-calendar";
 export { default as TripDetail } from "./trip-detail";
 export { default as TripMap } from "./trip-map";
 export { default as TripSpending } from "./trip-spending";
+export { default as MyTripsPage } from "./my-trips";
