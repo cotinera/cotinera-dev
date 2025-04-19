@@ -181,7 +181,7 @@ export function setupAuth(app: Express) {
           name: userData.name,
           username: userData.username,
           provider: userData.provider,
-          provider_id: userData.providerId
+          provider_id: userData.provider_id
         })
         .returning();
 
