@@ -67,7 +67,8 @@ export function setupAuth(app: Express) {
         .insert(users)
         .values({
           email: profile.emails?.[0]?.value || '',
-          name: profile.displayName,
+          name: profile.displayName || '',
+          username: profile.emails?.[0]?.value.split('@')[0] || '',
           provider: 'google',
           providerId: profile.id,
           password: await crypto.hash(crypto.randomUUID()) // Random password for Google users
