@@ -5,6 +5,7 @@ import { ViewToggle } from "@/components/view-toggle";
 import type { Trip } from "@db/schema";
 import { TripHeaderEdit } from "@/components/trip-header-edit";
 import { TripParticipantDetails } from "@/components/trip-participant-details";
+import { TripParticipantsList } from "@/components/trip-participants-list";
 import { TripDestinations } from "@/components/trip-destinations";
 import { TripTimeline } from "@/components/trip-timeline";
 import { MapRouteView } from "@/components/map-route-view";
@@ -31,6 +32,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
 
 interface PinnedPlace {
   id: number;
@@ -46,6 +48,7 @@ export default function TripDetail() {
   const tripId = params ? parseInt(params.id) : null;
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [currentDestinationId, setCurrentDestinationId] = useState<number | undefined>();
   const queryClient = useQueryClient();
@@ -231,12 +234,21 @@ export default function TripDetail() {
               onDestinationChange={setCurrentDestinationId}
             />
           </section>
-
-          <section className="mb-8">
-            <TripParticipantDetails 
-              tripId={trip.id}
-            />
-          </section>
+          
+          <div className="grid gap-8 md:grid-cols-2">
+            <section className="mb-8">
+              <TripParticipantDetails 
+                tripId={trip.id}
+              />
+            </section>
+            
+            <section className="mb-8">
+              <TripParticipantsList 
+                tripId={trip.id}
+                isOwner={user?.id === trip.ownerId}
+              />
+            </section>
+          </div>
 
           <div className="grid gap-8 md:grid-cols-[2fr,1fr]">
             <div className="space-y-8">
