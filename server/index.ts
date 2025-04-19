@@ -56,8 +56,8 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // For Cloud Run deployments, always use PORT from environment or default to 3000
-  const PORT = process.env.PORT || 3000;
+  // Use port 5000 for Replit web applications
+  const PORT = process.env.PORT || 5000;
   
   server.listen(PORT, "0.0.0.0", () => {
     log(`serving on port ${PORT}`);
