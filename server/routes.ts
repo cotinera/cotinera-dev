@@ -3241,6 +3241,167 @@ export function registerRoutes(app: Express): Server {
     }
   });
   
+  // Notification endpoints
+  
+  // Get all notifications for the current user
+  app.get('/api/notifications', async (req, res) => {
+    try {
+      // Check if user is authenticated
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const userId = req.user?.id;
+      
+      const userNotifications = await db.select()
+        .from(notifications)
+        .where(eq(notifications.userId, userId))
+        .orderBy(desc(notifications.createdAt));
+      
+      res.json(userNotifications);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+      res.status(500).json({ error: 'Failed to fetch notifications' });
+    }
+  });
+  
+  // Mark notification as read
+  app.patch('/api/notifications/:notificationId/read', async (req, res) => {
+    try {
+      // Check if user is authenticated
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const notificationId = parseInt(req.params.notificationId);
+      const userId = req.user?.id;
+      
+      // Verify notification belongs to user
+      const notification = await db.query.notifications.findFirst({
+        where: and(
+          eq(notifications.id, notificationId),
+          eq(notifications.userId, userId)
+        )
+      });
+      
+      if (!notification) {
+        return res.status(404).json({ error: "Notification not found" });
+      }
+      
+      // Update the notification
+      const [updatedNotification] = await db.update(notifications)
+        .set({ isRead: true })
+        .where(eq(notifications.id, notificationId))
+        .returning();
+      
+      res.json(updatedNotification);
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+      res.status(500).json({ error: 'Failed to update notification' });
+    }
+  });
+  
+  // Accept trip invitation from notification
+  app.post('/api/notifications/:notificationId/accept-invitation', async (req, res) => {
+    try {
+      // Check if user is authenticated
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const notificationId = parseInt(req.params.notificationId);
+      const userId = req.user?.id;
+      
+      // Verify notification belongs to user and is an invitation
+      const notification = await db.query.notifications.findFirst({
+        where: and(
+          eq(notifications.id, notificationId),
+          eq(notifications.userId, userId),
+          eq(notifications.type, 'invitation')
+        )
+      });
+      
+      if (!notification) {
+        return res.status(404).json({ error: "Invitation notification not found" });
+      }
+      
+      // Update the participant status
+      if (notification.participantId) {
+        const [updatedParticipant] = await db.update(participants)
+          .set({ status: 'accepted', userId })
+          .where(eq(participants.id, notification.participantId))
+          .returning();
+        
+        if (!updatedParticipant) {
+          return res.status(404).json({ error: "Participant not found" });
+        }
+        
+        // Mark notification as read
+        await db.update(notifications)
+          .set({ isRead: true })
+          .where(eq(notifications.id, notificationId));
+        
+        res.json({
+          success: true,
+          participant: updatedParticipant,
+          message: "Invitation accepted successfully"
+        });
+      } else {
+        return res.status(400).json({ error: "Invalid invitation: missing participant information" });
+      }
+    } catch (error) {
+      console.error('Error accepting invitation:', error);
+      res.status(500).json({ error: 'Failed to accept invitation' });
+    }
+  });
+  
+  // Decline trip invitation from notification
+  app.post('/api/notifications/:notificationId/decline-invitation', async (req, res) => {
+    try {
+      // Check if user is authenticated
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      
+      const notificationId = parseInt(req.params.notificationId);
+      const userId = req.user?.id;
+      
+      // Verify notification belongs to user and is an invitation
+      const notification = await db.query.notifications.findFirst({
+        where: and(
+          eq(notifications.id, notificationId),
+          eq(notifications.userId, userId),
+          eq(notifications.type, 'invitation')
+        )
+      });
+      
+      if (!notification) {
+        return res.status(404).json({ error: "Invitation notification not found" });
+      }
+      
+      // Delete the participant
+      if (notification.participantId) {
+        await db.delete(participants)
+          .where(eq(participants.id, notification.participantId));
+        
+        // Mark notification as read
+        await db.update(notifications)
+          .set({ isRead: true })
+          .where(eq(notifications.id, notificationId));
+        
+        res.json({
+          success: true,
+          message: "Invitation declined successfully"
+        });
+      } else {
+        return res.status(400).json({ error: "Invalid invitation: missing participant information" });
+      }
+    } catch (error) {
+      console.error('Error declining invitation:', error);
+      res.status(500).json({ error: 'Failed to decline invitation' });
+    }
+  });
+  
   const httpServer = createServer(app);
   return httpServer;
 }

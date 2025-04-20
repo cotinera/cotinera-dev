@@ -20,6 +20,7 @@ import {
   TravelPreferencesPage,
   MyTripsPage
 } from "@/pages";
+import { NotificationRespondPage } from "@/pages/notification-respond";
 import { ProtectedRoute } from "@/lib";
 
 function Router() {
@@ -35,6 +36,7 @@ function Router() {
       <ProtectedRoute path="/trips/:id/spending" component={TripSpending} />
       <ProtectedRoute path="/trips/:tripId/destinations/:destinationId" component={DestinationDetail} />
       <ProtectedRoute path="/preferences" component={TravelPreferencesPage} />
+      <ProtectedRoute path="/notifications/:notificationId/respond" component={NotificationRespondPage} />
       <Route component={NotFound} />
     </Switch>
   );
