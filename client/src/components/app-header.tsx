@@ -9,6 +9,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/hooks/use-auth";
 import { ChevronDown, LogOut, UserCircle, Luggage } from "lucide-react";
+import { UserNotifications } from "@/components/user-notifications";
 
 export function AppHeader() {
   const { user, logout } = useAuth();
@@ -39,6 +40,7 @@ export function AppHeader() {
                   My Trips
                 </div>
               </Link>
+              <UserNotifications />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="p-0 h-8">

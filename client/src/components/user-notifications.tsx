@@ -36,7 +36,7 @@ interface Notification {
 
 export function UserNotifications() {
   const { toast } = useToast();
-  const navigate = useNavigate();
+  const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   
   // Fetch notifications
@@ -46,11 +46,10 @@ export function UserNotifications() {
       const response = await axios.get<Notification[]>("/api/notifications");
       return response.data;
     },
-    onError: () => {
-      // Don't show errors for notifications if the user isn't logged in
-      // This component is used in the header and will be visible to non-logged in users
-      return [];
-    },
+    retry: false,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    refetchInterval: 1000 * 60 * 2, // 2 minutes
+    refetchOnWindowFocus: true,
   });
 
   // Count unread notifications
