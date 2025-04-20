@@ -29,7 +29,6 @@ function Router() {
       <Route path="/auth" component={AuthPage} />
       <Route path="/share/:token" component={SharedTrip} />
       <ProtectedRoute path="/" component={Dashboard} />
-      <ProtectedRoute path="/my-trips" component={MyTripsPage} />
       <ProtectedRoute path="/trips/:id" component={TripDetail} />
       <ProtectedRoute path="/trips/:id/calendar" component={TripCalendar} />
       <ProtectedRoute path="/trips/:id/map" component={TripMap} />

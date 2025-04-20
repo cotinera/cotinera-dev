@@ -119,7 +119,7 @@ export default function Dashboard() {
     },
     onSuccess: (deletedTripIds) => {
       queryClient.setQueryData(
-        ["/api/trips"],
+        ["/api/my-trips"],
         (old: any[]) => old.filter(trip => !deletedTripIds.includes(trip.id))
       );
 

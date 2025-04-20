@@ -35,11 +35,6 @@ export function AppHeader() {
         <nav className="flex items-center gap-4">
           {user ? (
             <>
-              <Link href="/my-trips">
-                <div className="text-sm font-medium transition-colors hover:text-primary cursor-pointer">
-                  My Trips
-                </div>
-              </Link>
               <UserNotifications />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

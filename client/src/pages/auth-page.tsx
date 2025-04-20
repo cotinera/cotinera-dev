@@ -40,7 +40,7 @@ export default function AuthPage() {
 
   useEffect(() => {
     if (user) {
-      window.location.href = "/my-trips";
+      window.location.href = "/";
     }
   }, [user]);
 
@@ -51,7 +51,7 @@ export default function AuthPage() {
       title: "Development Mode Activated",
       description: "Authentication has been bypassed for testing",
     });
-    window.location.href = "/my-trips";
+    window.location.href = "/";
   };
 
   const form = useForm<FormData>({
