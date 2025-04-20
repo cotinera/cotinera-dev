@@ -1389,6 +1389,11 @@ export function registerRoutes(app: Express): Server {
         }
       }
       
+      // Get the inviter's user information
+      const inviter = await db.query.users.findFirst({
+        where: eq(users.id, req.user?.id || 0)
+      });
+      
       // Check if the user already exists by email
       let invitedUser = await db.query.users.findFirst({
         where: eq(users.email, email)
@@ -1419,15 +1424,48 @@ export function registerRoutes(app: Express): Server {
       }).returning();
       
       // Create an in-app notification for the invited user (if they exist)
+      let notificationId;
       if (invitedUser) {
-        await db.insert(notifications).values({
+        const [notification] = await db.insert(notifications).values({
           userId: invitedUser.id,
           tripId,
           participantId: newParticipant.id,
           type: "invitation",
           title: "Trip Invitation",
           message: `You have been invited to join the trip "${trip.title}" as a ${role || 'viewer'}.`
+        }).returning();
+        
+        notificationId = notification.id;
+      }
+      
+      // Import email utility
+      const { sendTripInvitationEmail } = await import('./utils/email');
+      
+      // Send email invitation
+      try {
+        const baseUrl = process.env.BASE_URL || `https://${req.headers.host}`;
+        let inviteLink;
+        
+        // If user exists, link to the notification response page
+        if (invitedUser && notificationId) {
+          inviteLink = `${baseUrl}/notifications/${notificationId}/respond`;
+        } else {
+          // If user doesn't exist yet, link to the sign-up page
+          inviteLink = `${baseUrl}/auth?join=true&email=${encodeURIComponent(email)}&trip=${tripId}`;
+        }
+        
+        // Send the email
+        await sendTripInvitationEmail({
+          to: email,
+          inviterName: inviter?.name || 'Someone',
+          tripTitle: trip.title,
+          inviteLink
         });
+        
+        console.log(`Sent invitation email to ${email} for trip "${trip.title}"`);
+      } catch (emailError) {
+        console.error('Failed to send invitation email:', emailError);
+        // Continue with the process even if email sending fails
       }
       
       res.status(201).json({
@@ -1548,6 +1586,11 @@ export function registerRoutes(app: Express): Server {
         }
       }
       
+      // Get the inviter's user information
+      const inviter = await db.query.users.findFirst({
+        where: eq(users.id, req.user?.id || 0)
+      });
+      
       // Get the participant
       const participant = await db.query.participants.findFirst({
         where: and(
@@ -1573,7 +1616,8 @@ export function registerRoutes(app: Express): Server {
         .set({ joinedAt: new Date() })
         .where(eq(participants.id, participantId))
         .returning();
-        
+      
+      let notificationId;
       // Get the user ID from the participant's email
       if (participant.email) {
         const invitedUser = await db.query.users.findFirst({
@@ -1582,15 +1626,47 @@ export function registerRoutes(app: Express): Server {
         
         if (invitedUser) {
           // Create an in-app notification
-          await db.insert(notifications).values({
+          const [notification] = await db.insert(notifications).values({
             userId: invitedUser.id,
             tripId,
             participantId: participantId,
             type: "invitation_reminder",
             title: "Trip Invitation Reminder",
             message: `You've been invited to join the trip "${trip.title}" as a ${participant.role}. Click here to respond.`
-          });
+          }).returning();
+          
+          notificationId = notification.id;
         }
+      }
+      
+      // Import email utility
+      const { sendTripInvitationReminderEmail } = await import('./utils/email');
+      
+      // Send email reminder
+      try {
+        const baseUrl = process.env.BASE_URL || `https://${req.headers.host}`;
+        let inviteLink;
+        
+        if (notificationId) {
+          // If user exists, link to the notification response page
+          inviteLink = `${baseUrl}/notifications/${notificationId}/respond`;
+        } else {
+          // If user doesn't exist yet, link to the sign-up page
+          inviteLink = `${baseUrl}/auth?join=true&email=${encodeURIComponent(participant.email)}&trip=${tripId}`;
+        }
+        
+        // Send the email
+        await sendTripInvitationReminderEmail({
+          to: participant.email,
+          inviterName: inviter?.name || 'Someone',
+          tripTitle: trip.title,
+          inviteLink
+        });
+        
+        console.log(`Sent invitation reminder email to ${participant.email} for trip "${trip.title}"`);
+      } catch (emailError) {
+        console.error('Failed to send invitation reminder email:', emailError);
+        // Continue with the process even if email sending fails
       }
       
       res.json({

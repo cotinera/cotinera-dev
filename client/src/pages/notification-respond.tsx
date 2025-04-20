@@ -57,14 +57,8 @@ export function NotificationRespondPage() {
       return notificationData;
     },
     enabled: !!notificationId && !!user,
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to load invitation details",
-        variant: "destructive",
-      });
-      navigate("/");
-    },
+    retry: false,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
   
   // Fetch trip details if notification is related to a trip
