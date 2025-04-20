@@ -4,32 +4,38 @@ import type { Trip } from "@db/schema";
 export function useTrips() {
   const queryClient = useQueryClient();
 
+  // Check if in development bypass mode
+  const isDevelopmentBypass = localStorage.getItem("dev_bypass_auth") === "true";
+  
+  // Use different query key based on auth mode
+  const queryKey = isDevelopmentBypass ? ["/api/trips"] : ["/api/my-trips"];
+  
   const { data: trips = [], isLoading } = useQuery<Trip[]>({
-    queryKey: ["/api/my-trips"],
+    queryKey,
     queryFn: async () => {
       try {
-        const res = await fetch(`/api/my-trips`, {
-          credentials: "include",
-        });
-        
-        if (!res.ok) {
-          // Special handling for dev bypass mode
-          const isDevelopmentBypass = localStorage.getItem("dev_bypass_auth") === "true";
-          if (isDevelopmentBypass) {
-            // Fetch trips without auth in development mode
-            const devRes = await fetch(`/api/trips`, {
-              credentials: "include",
-            });
-            
-            if (devRes.ok) {
-              return devRes.json();
-            }
-          }
+        // In dev bypass mode, use the /api/trips endpoint directly
+        if (isDevelopmentBypass) {
+          console.log("Using development bypass mode for trips");
+          const devRes = await fetch(`/api/trips`, {
+            credentials: "include"
+          });
           
-          throw new Error("Failed to fetch trips");
+          if (devRes.ok) {
+            return devRes.json();
+          }
+        } else {
+          // Normal authenticated flow with /api/my-trips
+          const res = await fetch(`/api/my-trips`, {
+            credentials: "include",
+          });
+          
+          if (res.ok) {
+            return res.json();
+          }
         }
         
-        return res.json();
+        throw new Error("Failed to fetch trips");
       } catch (error) {
         console.error("Error fetching trips:", error);
         throw error;
@@ -55,7 +61,8 @@ export function useTrips() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/my-trips"] });
+      // Invalidate the correct query key based on auth mode
+      queryClient.invalidateQueries({ queryKey });
     },
   });
 

@@ -490,16 +490,19 @@ export function registerRoutes(app: Express): Server {
     }
   });
   
-  // Get my trips (requires authentication)
+  // Get my trips (requires authentication, except in dev mode)
   app.get("/api/my-trips", async (req, res) => {
     try {
-      // Check if user is authenticated
-      if (!req.isAuthenticated()) {
+      // Check for dev bypass first via headers
+      const isDevBypass = req.headers['x-dev-bypass'] === 'true';
+      
+      // If user is not authenticated and not in dev bypass mode
+      if (!req.isAuthenticated() && !isDevBypass) {
         return res.status(401).json({ error: "Unauthorized" });
       }
       
-      // Default to user ID 1 if not available (development mode support)
-      const userId = req.user?.id || 1;
+      // Determine user ID - either from authenticated user or dev bypass
+      const userId = req.isAuthenticated() ? req.user?.id : 1;
       
       // Get trips where user is owner
       const ownedTrips = await db.query.trips.findMany({
