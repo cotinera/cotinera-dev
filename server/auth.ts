@@ -229,7 +229,7 @@ export function setupAuth(app: Express) {
   app.get("/api/auth/google/callback",
     passport.authenticate("google", { 
       failureRedirect: "/auth",
-      successRedirect: "/my-trips"
+      successRedirect: "/"
     })
   );
 

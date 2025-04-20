@@ -17,8 +17,7 @@ import {
   TripSpending,
   DestinationDetail,
   AuthPage,
-  TravelPreferencesPage,
-  MyTripsPage
+  TravelPreferencesPage
 } from "@/pages";
 import { NotificationRespondPage } from "@/pages/notification-respond";
 import { ProtectedRoute } from "@/lib";
