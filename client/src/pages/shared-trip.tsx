@@ -112,7 +112,7 @@ export default function SharedTrip() {
   const { trip, accessLevel, isParticipant } = data;
   
   // Format dates for display
-  const formatDate = (dateString) => {
+  const formatDate = (dateString: string): string => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { 
       month: 'short', 

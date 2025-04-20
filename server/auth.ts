@@ -224,13 +224,28 @@ export function setupAuth(app: Express) {
   });
 
   // Google OAuth routes
-  app.get("/api/auth/google", passport.authenticate("google"));
+  app.get("/api/auth/google", (req, res, next) => {
+    // Pass the state parameter (if provided) to preserve the redirect URL
+    const state = req.query.state || '';
+    passport.authenticate("google", { state })(req, res, next);
+  });
 
   app.get("/api/auth/google/callback",
     passport.authenticate("google", { 
       failureRedirect: "/auth",
-      successRedirect: "/"
-    })
+    }),
+    (req, res) => {
+      // Check if there's a state parameter with redirect URL
+      const state = req.query.state as string;
+      
+      if (state && state.startsWith('/')) {
+        // If state is a valid redirect path, use that
+        return res.redirect(state);
+      }
+      
+      // Default redirect to dashboard
+      res.redirect("/");
+    }
   );
 
   app.post("/api/logout", (req, res) => {
