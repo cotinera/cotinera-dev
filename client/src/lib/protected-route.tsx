@@ -31,6 +31,11 @@ export function ProtectedRoute({
       </Route>
     );
   }
+  
+  // If no user but development bypass is active, set local storage flag
+  if (!user && isDevelopmentBypass) {
+    localStorage.setItem("dev_bypass_auth", "true");
+  }
 
   // If using development bypass, wrap the component with a warning banner
   if (isDevelopmentBypass) {

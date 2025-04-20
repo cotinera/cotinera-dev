@@ -7,15 +7,33 @@ export function useTrips() {
   const { data: trips = [], isLoading } = useQuery<Trip[]>({
     queryKey: ["/api/my-trips"],
     queryFn: async () => {
-      const res = await fetch(`/api/my-trips`, {
-        credentials: "include",
-      });
-      
-      if (!res.ok) {
-        throw new Error("Failed to fetch trips");
+      try {
+        const res = await fetch(`/api/my-trips`, {
+          credentials: "include",
+        });
+        
+        if (!res.ok) {
+          // Special handling for dev bypass mode
+          const isDevelopmentBypass = localStorage.getItem("dev_bypass_auth") === "true";
+          if (isDevelopmentBypass) {
+            // Fetch trips without auth in development mode
+            const devRes = await fetch(`/api/trips`, {
+              credentials: "include",
+            });
+            
+            if (devRes.ok) {
+              return devRes.json();
+            }
+          }
+          
+          throw new Error("Failed to fetch trips");
+        }
+        
+        return res.json();
+      } catch (error) {
+        console.error("Error fetching trips:", error);
+        throw error;
       }
-      
-      return res.json();
     },
   });
 

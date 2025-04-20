@@ -436,21 +436,27 @@ export function registerRoutes(app: Express): Server {
     }
   });
 
-  // Get trips
+  // Get trips (dev bypass mode compatible)
   app.get("/api/trips", async (req, res) => {
     try {
+      // For development bypass mode, default to user ID 1
+      const userId = req.user?.id || 1;
+      
+      // Get trips where user is owner
       const ownedTrips = await db.query.trips.findMany({
-        where: eq(trips.ownerId, req.user?.id || 1),
+        where: eq(trips.ownerId, userId),
         with: {
           participants: true,
           activities: true,
           flights: true,
           accommodations: true,
         },
+        orderBy: [desc(trips.startDate)]
       });
 
+      // Get trips where user is a participant
       const participantTrips = await db.query.participants.findMany({
-        where: eq(participants.userId, req.user?.id || 1),
+        where: eq(participants.userId, userId),
         with: {
           trip: {
             with: {
@@ -464,7 +470,20 @@ export function registerRoutes(app: Express): Server {
       });
 
       const participatedTrips = participantTrips.map(p => p.trip);
-      res.json([...ownedTrips, ...participatedTrips]);
+      
+      // Combine, deduplicate by ID, and sort by date
+      const allTrips = [...ownedTrips];
+      
+      for (const trip of participatedTrips) {
+        if (!allTrips.some(t => t.id === trip.id)) {
+          allTrips.push(trip);
+        }
+      }
+      
+      // Sort by start date
+      allTrips.sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime());
+      
+      res.json(allTrips);
     } catch (error) {
       console.error('Error fetching trips:', error);
       res.status(500).json({ error: 'Failed to fetch trips' });
@@ -479,7 +498,8 @@ export function registerRoutes(app: Express): Server {
         return res.status(401).json({ error: "Unauthorized" });
       }
       
-      const userId = req.user?.id;
+      // Default to user ID 1 if not available (development mode support)
+      const userId = req.user?.id || 1;
       
       // Get trips where user is owner
       const ownedTrips = await db.query.trips.findMany({
