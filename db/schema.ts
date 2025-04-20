@@ -633,3 +633,7 @@ export type Poll = typeof polls.$inferSelect;
 export type PollVote = typeof pollVotes.$inferSelect;
 export type TravelRecommendation = typeof travelRecommendations.$inferSelect;
 export type TripIdea = typeof tripIdeas.$inferSelect;
+export type Notification = typeof notifications.$inferSelect;
+
+export const insertNotificationSchema = createInsertSchema(notifications);
+export const selectNotificationSchema = createSelectSchema(notifications);

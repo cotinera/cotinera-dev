@@ -7,7 +7,7 @@ import { crypto } from "./auth.js";
 import express from "express";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations, chatMessages, users, destinations, pinnedPlaces, polls, pollVotes, expenses, expenseSplits, tripIdeas } from "@db/schema";
+import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations, chatMessages, users, destinations, pinnedPlaces, polls, pollVotes, expenses, expenseSplits, tripIdeas, notifications } from "@db/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { addDays } from "date-fns";
 
@@ -1418,8 +1418,17 @@ export function registerRoutes(app: Express): Server {
         role: role || 'viewer'
       }).returning();
       
-      // TODO: In a real application, we would send an email invitation here
-      // For now, we'll just return the created participant
+      // Create an in-app notification for the invited user (if they exist)
+      if (invitedUser) {
+        await db.insert(notifications).values({
+          userId: invitedUser.id,
+          tripId,
+          participantId: newParticipant.id,
+          type: "invitation",
+          title: "Trip Invitation",
+          message: `You have been invited to join the trip "${trip.title}" as a ${role || 'viewer'}.`
+        });
+      }
       
       res.status(201).json({
         ...newParticipant,
@@ -1559,13 +1568,30 @@ export function registerRoutes(app: Express): Server {
         return res.status(400).json({ error: "Participant does not have an email address" });
       }
       
-      // TODO: In a real application, we would send an email invitation here
-      
       // Update the joinedAt time to reflect the new invitation
       const [updatedParticipant] = await db.update(participants)
         .set({ joinedAt: new Date() })
         .where(eq(participants.id, participantId))
         .returning();
+        
+      // Get the user ID from the participant's email
+      if (participant.email) {
+        const invitedUser = await db.query.users.findFirst({
+          where: eq(users.email, participant.email)
+        });
+        
+        if (invitedUser) {
+          // Create an in-app notification
+          await db.insert(notifications).values({
+            userId: invitedUser.id,
+            tripId,
+            participantId: participantId,
+            type: "invitation_reminder",
+            title: "Trip Invitation Reminder",
+            message: `You've been invited to join the trip "${trip.title}" as a ${participant.role}. Click here to respond.`
+          });
+        }
+      }
       
       res.json({
         ...updatedParticipant,
