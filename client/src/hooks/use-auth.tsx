@@ -52,6 +52,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: ["/api/user"],
     queryFn: async () => {
       try {
+        // Check if dev bypass is enabled
+        const isDevelopmentBypass = localStorage.getItem("dev_bypass_auth") === "true";
+        
+        if (isDevelopmentBypass) {
+          console.log("Using development bypass for authentication");
+          // Return a mock dev user that matches the User type from db/schema
+          return {
+            id: 1,
+            email: "dev@example.com",
+            password: "", // Not used but required by type
+            name: "Development User",
+            username: null,
+            avatar: null,
+            provider: "development",
+            provider_id: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            preferences: null
+          };
+        }
+        
+        // Normal authentication flow
         const res = await fetch("/api/user", fetchConfig);
         if (res.status === 401) {
           return null;
@@ -122,6 +144,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
+      // Check if dev bypass is enabled
+      const isDevelopmentBypass = localStorage.getItem("dev_bypass_auth") === "true";
+      
+      if (isDevelopmentBypass) {
+        console.log("Using development bypass for logout");
+        // Remove the bypass flag to "log out"
+        localStorage.removeItem("dev_bypass_auth");
+        return;
+      }
+      
+      // Normal logout flow
       const res = await fetch("/api/logout", {
         ...fetchConfig,
         method: "POST",
@@ -132,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     onSuccess: () => {
       queryClient.setQueryData(["/api/user"], null);
+      queryClient.invalidateQueries(); // Invalidate all queries on logout
     },
     onError: (error: Error) => {
       toast({
