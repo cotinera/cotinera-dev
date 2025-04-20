@@ -10,6 +10,7 @@ import { db } from "@db";
 import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations, chatMessages, users, destinations, pinnedPlaces, polls, pollVotes, expenses, expenseSplits, tripIdeas, notifications } from "@db/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { addDays } from "date-fns";
+import { emitTripUpdate } from "./utils/socket";
 
 // Configure multer for handling file uploads
 const storage = multer.diskStorage({
@@ -1202,6 +1203,87 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error fetching participants:', error);
       res.status(500).json({ error: 'Failed to fetch participants' });
+    }
+  });
+
+  // Join a trip (for share links)
+  app.post("/api/trips/:tripId/join", async (req, res) => {
+    try {
+      // This endpoint must require authentication
+      if (!req.isAuthenticated()) {
+        return res.status(401).json({ error: "You must be logged in to join a trip" });
+      }
+
+      const tripId = parseInt(req.params.tripId);
+      if (isNaN(tripId)) {
+        return res.status(400).json({ error: "Invalid trip ID" });
+      }
+
+      // Verify the trip exists
+      const [trip] = await db.select().from(trips).where(eq(trips.id, tripId)).limit(1);
+      if (!trip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+
+      // Check if the user is already a participant
+      const [existingParticipant] = await db.select()
+        .from(participants)
+        .where(
+          and(
+            eq(participants.tripId, tripId),
+            eq(participants.userId, req.user.id)
+          )
+        )
+        .limit(1);
+
+      if (existingParticipant) {
+        return res.status(200).json({
+          message: "You are already a participant in this trip",
+          participant: existingParticipant,
+          tripId
+        });
+      }
+
+      // Add user as a participant
+      const [newParticipant] = await db
+        .insert(participants)
+        .values({
+          tripId,
+          userId: req.user.id,
+          name: req.user.name || req.user.username || 'User',
+          email: req.user.email,
+          role: 'participant',
+          status: 'confirmed',
+          joinedAt: new Date().toISOString()
+        })
+        .returning();
+
+      // Create notification for trip owner
+      if (trip.ownerId) {
+        await db.insert(notifications).values({
+          userId: trip.ownerId,
+          type: 'participant_joined',
+          content: `${req.user.name || req.user.username || 'A user'} joined your trip "${trip.title}"`,
+          tripId: trip.id,
+          isRead: false,
+          createdAt: new Date().toISOString()
+        });
+
+        // Emit socket notification if owner is online
+        emitTripUpdate(trip.id, 'participant_joined', {
+          tripId: trip.id,
+          participant: newParticipant
+        });
+      }
+
+      res.status(201).json({
+        message: "Successfully joined trip",
+        participant: newParticipant,
+        tripId
+      });
+    } catch (error) {
+      console.error('Error joining trip:', error);
+      res.status(500).json({ error: 'Failed to join trip' });
     }
   });
 
