@@ -1,12 +1,13 @@
 
-import { useQuery } from "@tanstack/react-query";
-import { useRoute } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useRoute, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { TripCard } from "@/components/trip-card";
 import { CalendarView } from "@/components/calendar-view";
 import { Checklist } from "@/components/checklist";
 import { Loader2, AlertCircle, MapPin, Calendar, Users } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 import {
   Card,
   CardContent,
@@ -19,6 +20,46 @@ export default function SharedTrip() {
   const [, params] = useRoute("/share/:token");
   const token = params?.token;
   const { user } = useAuth();
+  const { toast } = useToast();
+  const [, setLocation] = useLocation();
+
+  // Add function to join a trip
+  const joinTripMutation = useMutation({
+    mutationFn: async (tripId: number) => {
+      const res = await fetch(`/api/trips/${tripId}/join`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+      });
+      
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Success!",
+        description: "You have joined the trip successfully.",
+      });
+      // Redirect to the trip detail page
+      setLocation(`/trips/${data.tripId}`);
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to join trip",
+      });
+    }
+  });
+
+  const joinTrip = (tripId: number) => {
+    joinTripMutation.mutate(tripId);
+  };
 
   const { data, isLoading, error } = useQuery({
     queryKey: [`/api/share/${token}`],
@@ -96,9 +137,17 @@ export default function SharedTrip() {
                 {accessLevel === "edit" ? "Editor Access" : "Viewer Access"}
               </div>
             )}
+            {user && !isParticipant && (
+              <Button 
+                className="bg-green-600 hover:bg-green-700 text-white" 
+                onClick={() => joinTrip(trip.id)}
+              >
+                Join Trip
+              </Button>
+            )}
             {!user && (
               <Button className="bg-indigo-600 hover:bg-indigo-700" asChild>
-                <a href="/auth">Sign in to collaborate</a>
+                <a href={`/auth?redirectTo=/share/${token}&action=join`}>Sign in to join</a>
               </Button>
             )}
           </div>
