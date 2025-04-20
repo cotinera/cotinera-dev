@@ -363,6 +363,18 @@ export const travelRecommendations = pgTable("travel_recommendations", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  tripId: integer("trip_id").references(() => trips.id),
+  participantId: integer("participant_id").references(() => participants.id),
+  type: text("type").notNull().default("invitation"),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const tripIdeasRelations = relations(tripIdeas, ({ one }) => ({
   trip: one(trips, {
     fields: [tripIdeas.tripId],
@@ -545,6 +557,21 @@ export const travelRecommendationsRelations = relations(travelRecommendations, (
   trip: one(trips, {
     fields: [travelRecommendations.tripId],
     references: [trips.id],
+  }),
+}));
+
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, {
+    fields: [notifications.userId],
+    references: [users.id],
+  }),
+  trip: one(trips, {
+    fields: [notifications.tripId],
+    references: [trips.id],
+  }),
+  participant: one(participants, {
+    fields: [notifications.participantId],
+    references: [participants.id],
   }),
 }));
 
