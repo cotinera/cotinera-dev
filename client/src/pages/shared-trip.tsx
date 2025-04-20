@@ -147,7 +147,7 @@ export default function SharedTrip() {
             )}
             {!user && (
               <Button className="bg-indigo-600 hover:bg-indigo-700" asChild>
-                <a href={`/auth?redirectTo=/share/${token}&action=join`}>Sign in to join</a>
+                <a href={`/auth?redirect=/share/${token}`}>Sign in to join</a>
               </Button>
             )}
           </div>

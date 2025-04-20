@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { SiGoogle, SiApple } from "react-icons/si";
+import { useSearchParams } from "@/hooks/use-search-params";
 
 const authSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -37,12 +38,27 @@ export default function AuthPage() {
   const { toast } = useToast();
   const [isLogin, setIsLogin] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const { get } = useSearchParams();
+  const [redirectPath, setRedirectPath] = useState<string | null>(null);
+
+  // Check if there's a redirect URL in the query params
+  useEffect(() => {
+    const redirect = get('redirect');
+    if (redirect) {
+      setRedirectPath(redirect);
+    }
+  }, [get]);
 
   useEffect(() => {
     if (user) {
-      window.location.href = "/";
+      // If we have a redirect path from a shared link, go there
+      if (redirectPath) {
+        window.location.href = redirectPath;
+      } else {
+        window.location.href = "/";
+      }
     }
-  }, [user]);
+  }, [user, redirectPath]);
 
   // Add development bypass handler
   const handleDevBypass = () => {
@@ -51,7 +67,9 @@ export default function AuthPage() {
       title: "Development Mode Activated",
       description: "Authentication has been bypassed for testing",
     });
-    window.location.href = "/";
+    
+    // Honor redirect path if present
+    window.location.href = redirectPath || "/";
   };
 
   const form = useForm<FormData>({
@@ -83,7 +101,11 @@ export default function AuthPage() {
 
   const handleSocialLogin = (provider: 'google' | 'apple') => {
     if (provider === 'google') {
-      window.location.href = '/api/auth/google';
+      // If we have a redirect parameter, add it to the state to preserve it
+      const redirectUrl = redirectPath 
+        ? `/api/auth/google?state=${encodeURIComponent(redirectPath)}`
+        : '/api/auth/google';
+      window.location.href = redirectUrl;
     } else {
       toast({
         variant: "destructive",
