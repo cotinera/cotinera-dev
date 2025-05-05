@@ -922,19 +922,29 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
               <TableRow>
                 <TableHead className="w-[150px]">Name</TableHead>
                 <TableHead className="w-[100px] text-center">Status</TableHead>
-                <TableHead className="w-[120px]">Arrival</TableHead>
-                <TableHead className="w-[120px]">Departure</TableHead>
-                <TableHead className="w-[180px]">
-                  <div className="flex items-center">
-                    <span>Flight In</span>
-                  </div>
-                </TableHead>
-                <TableHead className="w-[180px]">
-                  <div className="flex items-center">
-                    <span>Flight Out</span>
-                  </div>
-                </TableHead>
-                <TableHead className="w-[180px]">Accommodation</TableHead>
+                {!hiddenDefaultColumns.includes('arrival') && (
+                  <TableHead className="w-[120px]">Arrival</TableHead>
+                )}
+                {!hiddenDefaultColumns.includes('departure') && (
+                  <TableHead className="w-[120px]">Departure</TableHead>
+                )}
+                {!hiddenDefaultColumns.includes('flightIn') && (
+                  <TableHead className="w-[180px]">
+                    <div className="flex items-center">
+                      <span>Flight In</span>
+                    </div>
+                  </TableHead>
+                )}
+                {!hiddenDefaultColumns.includes('flightOut') && (
+                  <TableHead className="w-[180px]">
+                    <div className="flex items-center">
+                      <span>Flight Out</span>
+                    </div>
+                  </TableHead>
+                )}
+                {!hiddenDefaultColumns.includes('accommodation') && (
+                  <TableHead className="w-[180px]">Accommodation</TableHead>
+                )}
                 {customColumns.map(column => (
                   <TableHead key={column.id} className="w-[120px]">
                     {column.name}
@@ -979,83 +989,93 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
-                  <TableCell>
-                    {participant.arrivalDate && format(new Date(participant.arrivalDate), "dd/MM/yyyy")}
-                  </TableCell>
-                  <TableCell>
-                    {participant.departureDate && format(new Date(participant.departureDate), "dd/MM/yyyy")}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-2">
-                      <span>{participant.flightIn || ""}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => {
-                          setCurrentParticipantId(participant.id);
-                          
-                          // Pre-populate the flight date with the participant's arrival date if available
-                          const arrivalDate = participant.arrivalDate || format(new Date(), "yyyy-MM-dd");
-                          
-                          flightForm.reset({
-                            flightNumber: "",
-                            airline: "",
-                            departureAirport: "",
-                            arrivalAirport: "",
-                            departureDate: arrivalDate,
-                            departureTime: "",
-                            arrivalDate: "",
-                            arrivalTime: "",
-                            bookingReference: "",
-                            bookingStatus: "confirmed",
-                          });
-                          
-                          setFlightDetails(null);
-                          setIsAddFlightInOpen(true);
-                        }}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-2">
-                      <span>{participant.flightOut || ""}</span>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6"
-                        onClick={() => {
-                          setCurrentParticipantId(participant.id);
-                          
-                          // Pre-populate the flight date with the participant's departure date if available
-                          const departureDate = participant.departureDate || format(new Date(), "yyyy-MM-dd");
-                          
-                          flightForm.reset({
-                            flightNumber: "",
-                            airline: "",
-                            departureAirport: "",
-                            arrivalAirport: "",
-                            departureDate: departureDate,
-                            departureTime: "",
-                            arrivalDate: "",
-                            arrivalTime: "",
-                            bookingReference: "",
-                            bookingStatus: "confirmed",
-                          });
-                          
-                          setFlightDetails(null);
-                          setIsAddFlightOutOpen(true);
-                        }}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {participant.accommodation?.name || ""}
-                  </TableCell>
+                  {!hiddenDefaultColumns.includes('arrival') && (
+                    <TableCell>
+                      {participant.arrivalDate && format(new Date(participant.arrivalDate), "dd/MM/yyyy")}
+                    </TableCell>
+                  )}
+                  {!hiddenDefaultColumns.includes('departure') && (
+                    <TableCell>
+                      {participant.departureDate && format(new Date(participant.departureDate), "dd/MM/yyyy")}
+                    </TableCell>
+                  )}
+                  {!hiddenDefaultColumns.includes('flightIn') && (
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
+                        <span>{participant.flightIn || ""}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => {
+                            setCurrentParticipantId(participant.id);
+                            
+                            // Pre-populate the flight date with the participant's arrival date if available
+                            const arrivalDate = participant.arrivalDate || format(new Date(), "yyyy-MM-dd");
+                            
+                            flightForm.reset({
+                              flightNumber: "",
+                              airline: "",
+                              departureAirport: "",
+                              arrivalAirport: "",
+                              departureDate: arrivalDate,
+                              departureTime: "",
+                              arrivalDate: "",
+                              arrivalTime: "",
+                              bookingReference: "",
+                              bookingStatus: "confirmed",
+                            });
+                            
+                            setFlightDetails(null);
+                            setIsAddFlightInOpen(true);
+                          }}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
+                  {!hiddenDefaultColumns.includes('flightOut') && (
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
+                        <span>{participant.flightOut || ""}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => {
+                            setCurrentParticipantId(participant.id);
+                            
+                            // Pre-populate the flight date with the participant's departure date if available
+                            const departureDate = participant.departureDate || format(new Date(), "yyyy-MM-dd");
+                            
+                            flightForm.reset({
+                              flightNumber: "",
+                              airline: "",
+                              departureAirport: "",
+                              arrivalAirport: "",
+                              departureDate: departureDate,
+                              departureTime: "",
+                              arrivalDate: "",
+                              arrivalTime: "",
+                              bookingReference: "",
+                              bookingStatus: "confirmed",
+                            });
+                            
+                            setFlightDetails(null);
+                            setIsAddFlightOutOpen(true);
+                          }}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  )}
+                  {!hiddenDefaultColumns.includes('accommodation') && (
+                    <TableCell>
+                      {participant.accommodation?.name || ""}
+                    </TableCell>
+                  )}
                   {customColumns.map(column => (
                     <TableCell key={column.id}>
                       {column.type === 'boolean' ? (
