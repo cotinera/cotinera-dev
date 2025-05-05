@@ -18,6 +18,8 @@ import {
   Settings2, 
   Search, 
   Loader2, 
+  Eye,
+  EyeOff,
   Plane 
 } from "lucide-react";
 import {
@@ -1388,6 +1390,30 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
               <Button type="submit">Add Column</Button>
             </form>
           </Form>
+
+          <div className="mt-4">
+            <h4 className="text-sm font-medium mb-2">Original Columns</h4>
+            <ul className="space-y-2">
+              {defaultColumns.map(column => (
+                <li key={column.id} className="flex items-center justify-between">
+                  <span>
+                    {column.name}
+                  </span>
+                  <Button
+                    variant={hiddenDefaultColumns.includes(column.id) ? "destructive" : "ghost"}
+                    size="sm"
+                    onClick={() => toggleDefaultColumn(column.id)}
+                  >
+                    {hiddenDefaultColumns.includes(column.id) ? (
+                      <Eye className="h-4 w-4" />
+                    ) : (
+                      <EyeOff className="h-4 w-4" />
+                    )}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
 
           <div className="mt-4">
             <h4 className="text-sm font-medium mb-2">Current Custom Columns</h4>
