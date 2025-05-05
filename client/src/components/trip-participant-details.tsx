@@ -566,7 +566,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       
       // First initialize empty structure
       customColumns.forEach((column: CustomColumn) => {
-        valuesByColumn[column.id] = {};
+        valuesByColumn[column.columnId] = {};
       });
       
       // Then populate with values from API
@@ -578,7 +578,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         }
         
         // Convert value based on column type
-        const column = customColumns.find(c => c.id === columnId);
+        const column = customColumns.find(c => c.columnId === columnId);
         if (column && column.type === 'boolean') {
           valuesByColumn[columnId][participantId] = rawValue === 'true' || rawValue === true;
         } else {
@@ -946,7 +946,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                   <TableHead className="w-[180px]">Accommodation</TableHead>
                 )}
                 {customColumns.map(column => (
-                  <TableHead key={column.id} className="w-[120px]">
+                  <TableHead key={column.columnId} className="w-[120px]">
                     {column.name}
                   </TableHead>
                 ))}
