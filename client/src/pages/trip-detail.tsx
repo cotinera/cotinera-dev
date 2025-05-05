@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ViewToggle } from "@/components/view-toggle";
 import type { Trip } from "@db/schema";
 import { TripHeaderEdit } from "@/components/trip-header-edit";
-import { TripParticipantDetails } from "@/components/trip-participant-details";
-import { TripParticipantsList } from "@/components/trip-participants-list";
+import { IntegratedTripParticipants } from "@/components/integrated-trip-participants";
 import { TripDestinations } from "@/components/trip-destinations";
 import { TripTimeline } from "@/components/trip-timeline";
 import { MapRouteView } from "@/components/map-route-view";
@@ -235,20 +234,12 @@ export default function TripDetail() {
             />
           </section>
           
-          <div className="grid gap-8 md:grid-cols-2">
-            <section className="mb-8">
-              <TripParticipantDetails 
-                tripId={trip.id}
-              />
-            </section>
-            
-            <section className="mb-8">
-              <TripParticipantsList 
-                tripId={trip.id}
-                isOwner={user?.id === trip.ownerId}
-              />
-            </section>
-          </div>
+          <section className="mb-8">
+            <IntegratedTripParticipants 
+              tripId={trip.id}
+              isOwner={user?.id === trip.ownerId}
+            />
+          </section>
 
           <div className="grid gap-8 md:grid-cols-[2fr,1fr]">
             <div className="space-y-8">
