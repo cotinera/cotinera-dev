@@ -375,6 +375,24 @@ export const notifications = pgTable("notifications", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const customColumns = pgTable("custom_columns", {
+  id: serial("id").primaryKey(),
+  tripId: integer("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  type: text("type").notNull(),
+  columnId: text("column_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const customValues = pgTable("custom_values", {
+  id: serial("id").primaryKey(),
+  columnId: text("column_id").notNull(),
+  participantId: integer("participant_id").notNull().references(() => participants.id, { onDelete: "cascade" }),
+  value: text("value").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 export const tripIdeasRelations = relations(tripIdeas, ({ one }) => ({
   trip: one(trips, {
     fields: [tripIdeas.tripId],
@@ -575,6 +593,20 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
   }),
 }));
 
+export const customColumnsRelations = relations(customColumns, ({ one }) => ({
+  trip: one(trips, {
+    fields: [customColumns.tripId],
+    references: [trips.id],
+  }),
+}));
+
+export const customValuesRelations = relations(customValues, ({ one }) => ({
+  participant: one(participants, {
+    fields: [customValues.participantId],
+    references: [participants.id],
+  }),
+}));
+
 
 export const insertUserSchema = createInsertSchema(users, {
   email: z.string().email("Invalid email address"),
@@ -634,6 +666,13 @@ export type PollVote = typeof pollVotes.$inferSelect;
 export type TravelRecommendation = typeof travelRecommendations.$inferSelect;
 export type TripIdea = typeof tripIdeas.$inferSelect;
 export type Notification = typeof notifications.$inferSelect;
+export type CustomColumn = typeof customColumns.$inferSelect;
+export type CustomValue = typeof customValues.$inferSelect;
 
 export const insertNotificationSchema = createInsertSchema(notifications);
 export const selectNotificationSchema = createSelectSchema(notifications);
+
+export const insertCustomColumnSchema = createInsertSchema(customColumns);
+export const selectCustomColumnSchema = createSelectSchema(customColumns);
+export const insertCustomValueSchema = createInsertSchema(customValues);
+export const selectCustomValueSchema = createSelectSchema(customValues);
