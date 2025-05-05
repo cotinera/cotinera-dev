@@ -128,7 +128,8 @@ const sortParticipants = (a: Participant, b: Participant) => {
 };
 
 interface CustomColumn {
-  id: string;
+  id: number;
+  columnId: string;
   name: string;
   type: 'boolean' | 'text';
 }
@@ -632,7 +633,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     deleteCustomColumnMutation.mutate(columnId);
     
     // Update local state immediately for better UX
-    setCustomColumns(prev => prev.filter(c => c.id !== columnId));
+    setCustomColumns(prev => prev.filter(c => c.columnId !== columnId));
     
     // Remove values for this column
     setCustomValues(prev => {
@@ -1077,13 +1078,13 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                     </TableCell>
                   )}
                   {customColumns.map(column => (
-                    <TableCell key={column.id}>
+                    <TableCell key={column.columnId}>
                       {column.type === 'boolean' ? (
                         <input
                           type="checkbox"
-                          checked={!!customValues[column.id]?.[participant.id]}
+                          checked={!!customValues[column.columnId]?.[participant.id]}
                           onChange={(e) => handleCustomValueChange(
-                            column.id,
+                            column.columnId,
                             participant.id,
                             e.target.checked
                           )}
@@ -1092,9 +1093,9 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                       ) : (
                         <input
                           type="text"
-                          value={customValues[column.id]?.[participant.id] as string || ""}
+                          value={customValues[column.columnId]?.[participant.id] as string || ""}
                           onChange={(e) => handleCustomValueChange(
-                            column.id,
+                            column.columnId,
                             participant.id,
                             e.target.value
                           )}
