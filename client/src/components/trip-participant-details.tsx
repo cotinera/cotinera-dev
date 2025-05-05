@@ -526,7 +526,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       
       // Initialize custom values structure
       const initialValuesByColumn: Record<string, Record<number, string | boolean>> = {};
-      customColumnsData.forEach(column => {
+      customColumnsData.forEach((column: CustomColumn) => {
         initialValuesByColumn[column.id] = {};
       });
       
@@ -540,12 +540,12 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       const valuesByColumn: Record<string, Record<number, string | boolean>> = {};
       
       // First initialize empty structure
-      customColumns.forEach(column => {
+      customColumns.forEach((column: CustomColumn) => {
         valuesByColumn[column.id] = {};
       });
       
       // Then populate with values from API
-      customValuesData.forEach(value => {
+      customValuesData.forEach((value: any) => {
         const { columnId, participantId, value: rawValue } = value;
         
         if (!valuesByColumn[columnId]) {
