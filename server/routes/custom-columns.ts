@@ -21,11 +21,14 @@ router.get("/trips/:tripId/custom-columns", async (req, res) => {
 router.post("/trips/:tripId/custom-columns", async (req, res) => {
   try {
     const tripId = parseInt(req.params.tripId);
-    const { name, type, columnId } = req.body;
+    const { name, type } = req.body;
     
-    if (!name || !type || !columnId) {
-      return res.status(400).json({ error: "Column name, type, and ID are required" });
+    if (!name || !type) {
+      return res.status(400).json({ error: "Column name and type are required" });
     }
+    
+    // Generate a unique ID for the column
+    const columnId = `col_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     
     const newColumn = await db.insert(customColumns).values({
       tripId,
