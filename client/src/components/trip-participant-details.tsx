@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Trip, Flight } from "@db/schema";
 import { format, parse } from "date-fns";
@@ -146,6 +146,30 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   const [customColumns, setCustomColumns] = useState<CustomColumn[]>([]);
   const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
   const [customValues, setCustomValues] = useState<Record<string, Record<number, string | boolean>>>({});
+  
+  // Fetch custom columns and values
+  const { data: customColumnsData } = useQuery({
+    queryKey: [`/api/trips/${tripId}/custom-columns`],
+    queryFn: async () => {
+      const res = await fetch(`/api/trips/${tripId}/custom-columns`);
+      if (!res.ok) {
+        throw new Error("Failed to fetch custom columns");
+      }
+      return res.json();
+    },
+  });
+  
+  const { data: customValuesData } = useQuery({
+    queryKey: [`/api/trips/${tripId}/custom-values`],
+    queryFn: async () => {
+      const res = await fetch(`/api/trips/${tripId}/custom-values`);
+      if (!res.ok) {
+        throw new Error("Failed to fetch custom values");
+      }
+      return res.json();
+    },
+    enabled: !!customColumnsData?.length,
+  });
   
   // Flight management states
   const [isAddFlightInOpen, setIsAddFlightInOpen] = useState(false);
@@ -495,18 +519,94 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     updateStatusMutation.mutate({ participantId, status: newStatus });
   };
 
-  const handleAddCustomColumn = (newColumn: z.infer<typeof customColumnSchema>) => {
-    const id = `custom-${Date.now()}`;
-    setCustomColumns(prev => [...prev, { ...newColumn, id }]);
+  // Sync data from API to local state
+  useEffect(() => {
+    if (customColumnsData) {
+      setCustomColumns(customColumnsData);
+      
+      // Initialize custom values structure
+      const initialValuesByColumn: Record<string, Record<number, string | boolean>> = {};
+      customColumnsData.forEach(column => {
+        initialValuesByColumn[column.id] = {};
+      });
+      
+      setCustomValues(initialValuesByColumn);
+    }
+  }, [customColumnsData]);
+  
+  // Sync custom values data
+  useEffect(() => {
+    if (customValuesData && customValuesData.length > 0) {
+      const valuesByColumn: Record<string, Record<number, string | boolean>> = {};
+      
+      // First initialize empty structure
+      customColumns.forEach(column => {
+        valuesByColumn[column.id] = {};
+      });
+      
+      // Then populate with values from API
+      customValuesData.forEach(value => {
+        const { columnId, participantId, value: rawValue } = value;
+        
+        if (!valuesByColumn[columnId]) {
+          valuesByColumn[columnId] = {};
+        }
+        
+        // Convert value based on column type
+        const column = customColumns.find(c => c.id === columnId);
+        if (column && column.type === 'boolean') {
+          valuesByColumn[columnId][participantId] = rawValue === 'true' || rawValue === true;
+        } else {
+          valuesByColumn[columnId][participantId] = rawValue;
+        }
+      });
+      
+      setCustomValues(valuesByColumn);
+    }
+  }, [customValuesData, customColumns]);
 
-    // Initialize custom values for this column
-    setCustomValues(prev => ({
-      ...prev,
-      [id]: {}
-    }));
+  const handleAddCustomColumn = (newColumn: z.infer<typeof customColumnSchema>) => {
+    // Save to server first, which will return the column with a proper ID
+    saveCustomColumnMutation.mutate({
+      ...newColumn,
+      id: `temp-${Date.now()}` // Temporary ID, will be replaced by server response
+    });
+    
+    // Form reset is handled in the form submit handler
   };
 
+  // Delete custom column mutation
+  const deleteCustomColumnMutation = useMutation({
+    mutationFn: async (columnId: string) => {
+      const res = await fetch(`/api/trips/${tripId}/custom-columns/${columnId}`, {
+        method: "DELETE",
+      });
+      
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to delete custom column");
+      }
+      
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/custom-columns`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/custom-values`] });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to delete custom column",
+      });
+    },
+  });
+
   const handleDeleteCustomColumn = (columnId: string) => {
+    // Delete from server
+    deleteCustomColumnMutation.mutate(columnId);
+    
+    // Update local state immediately for better UX
     setCustomColumns(prev => prev.filter(c => c.id !== columnId));
     
     // Remove values for this column
@@ -517,7 +617,33 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     });
   };
 
+  // Mutation for saving custom column values
+  const saveCustomValueMutation = useMutation({
+    mutationFn: async ({ columnId, participantId, value }: { columnId: string, participantId: number, value: string | boolean }) => {
+      const res = await fetch(`/api/trips/${tripId}/custom-values`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ columnId, participantId, value }),
+      });
+      
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to save custom value");
+      }
+      
+      return res.json();
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to save custom value",
+      });
+    },
+  });
+
   const handleCustomValueChange = (columnId: string, participantId: number, value: string | boolean) => {
+    // Update local state immediately for better UX
     setCustomValues(prev => ({
       ...prev,
       [columnId]: {
@@ -525,7 +651,38 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
         [participantId]: value
       }
     }));
+    
+    // Save to server
+    saveCustomValueMutation.mutate({ columnId, participantId, value });
   };
+  
+  // Save custom column to server
+  const saveCustomColumnMutation = useMutation({
+    mutationFn: async (column: CustomColumn) => {
+      const res = await fetch(`/api/trips/${tripId}/custom-columns`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: column.name, type: column.type }),
+      });
+      
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || "Failed to save custom column");
+      }
+      
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/custom-columns`] });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to save custom column",
+      });
+    },
+  });
 
   // Submit flight information for inbound flight
   const handleFlightInSubmit = async () => {
