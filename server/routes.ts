@@ -7,7 +7,7 @@ import { crypto } from "./auth.js";
 import express from "express";
 import { setupAuth } from "./auth";
 import { db } from "@db";
-import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations, chatMessages, users, destinations, pinnedPlaces, polls, pollVotes, expenses, expenseSplits, tripIdeas, notifications } from "@db/schema";
+import { trips, participants, activities, checklist, documents, shareLinks, flights, accommodations, chatMessages, users, destinations, pinnedPlaces, polls, pollVotes, expenses, expenseSplits, tripIdeas, notifications, customColumns, customValues } from "@db/schema";
 import { eq, and, sql, desc } from "drizzle-orm";
 import { addDays } from "date-fns";
 import { emitTripUpdate } from "./utils/socket";
@@ -41,6 +41,9 @@ const upload = multer({
     cb(null, true);
   }
 });
+
+// Import custom columns routes
+import customColumnsRouter from "./routes/custom-columns";
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -3582,6 +3585,9 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: 'Failed to decline invitation' });
     }
   });
+  
+  // Register custom columns routes
+  app.use("/api", customColumnsRouter);
   
   const httpServer = createServer(app);
   return httpServer;

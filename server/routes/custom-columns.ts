@@ -1,7 +1,7 @@
 import express from "express";
 import { db } from "@db";
 import { customColumns, customValues } from "@db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 const router = express.Router();
 
@@ -81,11 +81,15 @@ router.get("/trips/:tripId/custom-values", async (req, res) => {
       return res.json([]);
     }
     
-    // Then get all values for these column IDs
-    const values = await db
-      .select()
-      .from(customValues)
-      .where(customValues.columnId.in(columnIds));
+    // Then get all values for these column IDs - handle empty array case
+    let values: any[] = [];
+    if (columnIds.length > 0) {
+      values = await db
+        .select()
+        .from(customValues)
+        .where(sql`${customValues.columnId} IN (${columnIds.join(',')})`);    
+    }
+      
     
     res.json(values);
   } catch (error) {
