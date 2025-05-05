@@ -146,6 +146,16 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
   const [customColumns, setCustomColumns] = useState<CustomColumn[]>([]);
   const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
   const [customValues, setCustomValues] = useState<Record<string, Record<number, string | boolean>>>({});
+  const [hiddenDefaultColumns, setHiddenDefaultColumns] = useState<string[]>([]);
+  
+  // Define the list of default columns that can be hidden
+  const defaultColumns = [
+    { id: 'arrival', name: 'Arrival', type: 'text' as const },
+    { id: 'departure', name: 'Departure', type: 'text' as const },
+    { id: 'flightIn', name: 'Flight In', type: 'text' as const },
+    { id: 'flightOut', name: 'Flight Out', type: 'text' as const },
+    { id: 'accommodation', name: 'Accommodation', type: 'text' as const },
+  ];
   
   // Fetch custom columns and values
   const { data: customColumnsData } = useQuery({
@@ -519,6 +529,19 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
     updateStatusMutation.mutate({ participantId, status: newStatus });
   };
 
+  // Load hidden columns from localStorage
+  useEffect(() => {
+    const savedHiddenColumns = localStorage.getItem(`tripParticipants_${tripId}_hiddenColumns`);
+    if (savedHiddenColumns) {
+      try {
+        const parsed = JSON.parse(savedHiddenColumns);
+        setHiddenDefaultColumns(parsed);
+      } catch (error) {
+        console.error('Failed to parse hidden columns from localStorage', error);
+      }
+    }
+  }, [tripId]);
+
   // Sync data from API to local state
   useEffect(() => {
     if (customColumnsData) {
@@ -615,6 +638,28 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       delete newValues[columnId];
       return newValues;
     });
+  };
+  
+  // Function to toggle visibility of default columns
+  const toggleDefaultColumn = (columnId: string) => {
+    setHiddenDefaultColumns(prevHidden => {
+      if (prevHidden.includes(columnId)) {
+        // Remove from hidden list (show column)
+        return prevHidden.filter(id => id !== columnId);
+      } else {
+        // Add to hidden list (hide column)
+        return [...prevHidden, columnId];
+      }
+    });
+    
+    // Save to localStorage for persistence
+    localStorage.setItem(
+      `tripParticipants_${tripId}_hiddenColumns`, 
+      JSON.stringify(hiddenDefaultColumns.includes(columnId) 
+        ? hiddenDefaultColumns.filter(id => id !== columnId)
+        : [...hiddenDefaultColumns, columnId]
+      )
+    );
   };
 
   // Mutation for saving custom column values
