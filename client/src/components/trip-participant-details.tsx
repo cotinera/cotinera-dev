@@ -681,6 +681,10 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       
       return res.json();
     },
+    onSuccess: () => {
+      // Invalidate the query to reload the latest data
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/custom-values`] });
+    },
     onError: (error: Error) => {
       toast({
         variant: "destructive",
@@ -1094,11 +1098,28 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
                         <input
                           type="text"
                           value={customValues[column.columnId]?.[participant.id] as string || ""}
-                          onChange={(e) => handleCustomValueChange(
-                            column.columnId,
-                            participant.id,
-                            e.target.value
-                          )}
+                          onChange={(e) => {
+                            const newValue = e.target.value;
+                            console.log('Updating text value:', {
+                              columnId: column.columnId,
+                              participantId: participant.id,
+                              value: newValue
+                            });
+                            handleCustomValueChange(
+                              column.columnId,
+                              participant.id,
+                              newValue
+                            );
+                          }}
+                          onBlur={(e) => {
+                            // Save explicitly on blur
+                            const value = e.target.value;
+                            saveCustomValueMutation.mutate({ 
+                              columnId: column.columnId, 
+                              participantId: participant.id, 
+                              value 
+                            });
+                          }}
                           className="w-full p-1 text-sm border rounded"
                         />
                       )}
