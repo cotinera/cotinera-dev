@@ -553,7 +553,7 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
       // Initialize custom values structure
       const initialValuesByColumn: Record<string, Record<number, string | boolean>> = {};
       customColumnsData.forEach((column: CustomColumn) => {
-        initialValuesByColumn[column.id] = {};
+        initialValuesByColumn[column.columnId] = {};
       });
       
       setCustomValues(initialValuesByColumn);
