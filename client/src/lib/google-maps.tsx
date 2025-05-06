@@ -373,18 +373,42 @@ export const useMapCoordinates = (initialLocation: string | { lat: number; lng: 
 export const useGoogleMapsScript = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
+  // Listen for specific error messages from the console
+  useEffect(() => {
+    const originalConsoleError = console.error;
+    
+    console.error = (...args: any[]) => {
+      const errorString = args.join(' ');
+      if (errorString.includes('BillingNotEnabledMapError')) {
+        setErrorMessage("Google Maps billing is not enabled. Please contact the administrator.");
+      } else if (errorString.includes('RefererNotAllowedMapError')) {
+        setErrorMessage("This website is not authorized to use Google Maps API.");
+      } else if (errorString.includes('InvalidKeyMapError')) {
+        setErrorMessage("Invalid Google Maps API key.");
+      }
+      originalConsoleError(...args);
+    };
+    
+    return () => {
+      console.error = originalConsoleError;
+    };
+  }, []);
+  
   const scriptStatus = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     libraries: libraries,
-    onError: (error) => {
-      console.error("Google Maps script loading error:", error);
-      if (error.message?.includes("BillingNotEnabledMapError")) {
+  });
+  
+  // Set error message if script loading fails
+  useEffect(() => {
+    if (scriptStatus.loadError) {
+      if (scriptStatus.loadError.message?.includes("BillingNotEnabledMapError")) {
         setErrorMessage("Google Maps billing is not enabled. Please contact the administrator.");
       } else {
-        setErrorMessage("Error loading Google Maps. Please try again later.");
+        setErrorMessage(`Error loading Google Maps: ${scriptStatus.loadError.message || "Unknown error"}`);
       }
     }
-  });
+  }, [scriptStatus.loadError]);
   
   return {
     ...scriptStatus,
