@@ -245,9 +245,17 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
 
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, columnId) => {
+      // Immediately update the local state to remove the deleted column
+      setCustomColumns(prev => prev.filter(column => column.columnId !== columnId));
+      
+      // Update the UI to remove any hidden column references
+      setHiddenColumns(prev => prev.filter(id => id !== columnId));
+      
+      // Refresh data from the server
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/custom-columns`] });
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/custom-values`] });
+      
       toast({
         title: "Custom column deleted",
         description: "The custom column has been deleted successfully.",
@@ -592,10 +600,10 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
                   {!hiddenColumns.includes("flightIn") && (<TableHead>Flight In</TableHead>)}
                   {!hiddenColumns.includes("flightOut") && (<TableHead>Flight Out</TableHead>)}
                   {!hiddenColumns.includes("accommodation") && (<TableHead>Accommodation</TableHead>)}
-                  {customColumns.map((column) => (
-                    !hiddenColumns.includes(column.columnId) && (
+                  {customColumns
+                    .filter(column => !hiddenColumns.includes(column.columnId))
+                    .map((column) => (
                       <TableHead key={column.id}>{column.name}</TableHead>
-                    )
                   ))}
                   {isOwner && <TableHead>Actions</TableHead>}
                 </TableRow>
