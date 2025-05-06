@@ -652,10 +652,7 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
                               {updatingParticipants.includes(participant.id) ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />
                               ) : (
-                                <>
-                                  {STATUS_LABELS[participant.status as Status] || "Set status"}
-                                  <span className="ml-1.5 opacity-60">▼</span>
-                                </>
+                                STATUS_LABELS[participant.status as Status] || "Set status"
                               )}
                             </Button>
                           </DropdownMenuTrigger>
@@ -685,33 +682,33 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
                     
                     {!hiddenColumns.includes("arrivalDate") && (
                       <TableCell>
-                        {participant.arrivalDate || "Not set"}
+                        {participant.arrivalDate || "-"}
                       </TableCell>
                     )}
                     
                     {!hiddenColumns.includes("departureDate") && (
                       <TableCell>
-                        {participant.departureDate || "Not set"}
+                        {participant.departureDate || "-"}
                       </TableCell>
                     )}
                     
                     {!hiddenColumns.includes("flightIn") && (
                       <TableCell>
-                        {participant.flightIn || "Not set"}
+                        {participant.flightIn || "-"}
                       </TableCell>
                     )}
                     
                     {!hiddenColumns.includes("flightOut") && (
                       <TableCell>
-                        {participant.flightOut || "Not set"}
+                        {participant.flightOut || "-"}
                       </TableCell>
                     )}
                     
                     {!hiddenColumns.includes("accommodation") && (
                       <TableCell>
                         {typeof participant.accommodation === 'object' && participant.accommodation !== null
-                          ? participant.accommodation.name || "Not set"
-                          : participant.accommodation || "Not set"}
+                          ? participant.accommodation.name || "-"
+                          : participant.accommodation || "-"}
                       </TableCell>
                     )}
                     
