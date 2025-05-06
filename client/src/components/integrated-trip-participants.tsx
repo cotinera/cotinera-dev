@@ -429,21 +429,26 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
     });
   };
 
+  const updateParticipantStatus = (participantId: number, status: Status) => {
+    setUpdatingParticipants(prev => [...prev, participantId]);
+    
+    updateParticipantMutation.mutate(
+      { id: participantId, status },
+      {
+        onSettled: () => {
+          setUpdatingParticipants(prev => prev.filter(id => id !== participantId));
+        }
+      }
+    );
+  };
+  
+  // This function is kept for backward compatibility but can be removed later
   const handleStatusChange = (participant: Participant) => {
     const currentIndex = STATUS_CYCLE.indexOf(participant.status as Status);
     const nextIndex = (currentIndex + 1) % STATUS_CYCLE.length;
     const nextStatus = STATUS_CYCLE[nextIndex];
     
-    setUpdatingParticipants(prev => [...prev, participant.id]);
-    
-    updateParticipantMutation.mutate(
-      { id: participant.id, status: nextStatus },
-      {
-        onSettled: () => {
-          setUpdatingParticipants(prev => prev.filter(id => id !== participant.id));
-        }
-      }
-    );
+    updateParticipantStatus(participant.id, nextStatus);
   };
 
   const handleRoleChange = (participantId: number, newRole: string) => {
@@ -635,18 +640,46 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
                     
                     {!hiddenColumns.includes("status") && (
                       <TableCell>
-                        <Button
-                          variant="outline"
-                          className="h-8 px-2"
-                          onClick={() => handleStatusChange(participant)}
-                          disabled={updatingParticipants.includes(participant.id)}
-                        >
-                          {updatingParticipants.includes(participant.id) ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            STATUS_LABELS[participant.status as Status] || "Set status"
-                          )}
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className={`h-8 px-3 ${participant.status === 'yes' ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' : 
+                                             participant.status === 'no' ? 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100' : 
+                                                                      'bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-yellow-100'}`}
+                              disabled={updatingParticipants.includes(participant.id)}
+                            >
+                              {updatingParticipants.includes(participant.id) ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <>
+                                  {STATUS_LABELS[participant.status as Status] || "Set status"}
+                                  <span className="ml-1.5 opacity-60">▼</span>
+                                </>
+                              )}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            <DropdownMenuItem 
+                              className="text-yellow-700"
+                              onClick={() => updateParticipantStatus(participant.id, "pending")}
+                            >
+                              Pending
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="text-green-700"
+                              onClick={() => updateParticipantStatus(participant.id, "yes")}
+                            >
+                              Confirmed
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="text-red-700"
+                              onClick={() => updateParticipantStatus(participant.id, "no")}
+                            >
+                              Declined
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     )}
                     
