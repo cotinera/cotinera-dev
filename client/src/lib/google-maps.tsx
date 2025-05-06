@@ -371,10 +371,25 @@ export const useMapCoordinates = (initialLocation: string | { lat: number; lng: 
  * @returns Object containing loading state and error information
  */
 export const useGoogleMapsScript = () => {
-  return useLoadScript({
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  const scriptStatus = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     libraries: libraries,
+    onError: (error) => {
+      console.error("Google Maps script loading error:", error);
+      if (error.message?.includes("BillingNotEnabledMapError")) {
+        setErrorMessage("Google Maps billing is not enabled. Please contact the administrator.");
+      } else {
+        setErrorMessage("Error loading Google Maps. Please try again later.");
+      }
+    }
   });
+  
+  return {
+    ...scriptStatus,
+    errorMessage
+  };
 };
 
 // Export components from @react-google-maps/api

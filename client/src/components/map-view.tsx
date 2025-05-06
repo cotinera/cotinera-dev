@@ -351,7 +351,7 @@ export function MapView({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchedLocation, setSearchedLocation] = useState<{ lat: number; lng: number } | null>(null);
 
-  const { isLoaded, loadError } = useGoogleMapsScript();
+  const { isLoaded, loadError, errorMessage } = useGoogleMapsScript();
   
   // Handle both string locations and coordinate objects
   const locationObj = typeof location === 'string' 
