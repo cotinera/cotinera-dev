@@ -682,8 +682,9 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
                       </TableCell>
                     )}
                     
-                    {customColumns.map((column) => (
-                      !hiddenColumns.includes(column.columnId) && (
+                    {customColumns
+                      .filter(column => !hiddenColumns.includes(column.columnId))
+                      .map((column) => (
                         <TableCell key={column.id}>
                           {column.type === "boolean" ? (
                             <Checkbox
@@ -718,7 +719,7 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
                           )}
                         </TableCell>
                       )
-                    ))}
+                    )}
 
                     {isOwner && (
                       <TableCell>
