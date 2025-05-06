@@ -1,28 +1,17 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Trip, Flight } from "@db/schema";
-import { format, parse } from "date-fns";
-import { useForm } from "react-hook-form";
+import type { Trip } from "@db/schema";
 import { useFlights } from "@/hooks/use-flights";
-import { useFlightLookup } from "@/hooks/use-flight-lookup";
 import { z } from "zod";
-import { FlightInDialog, FlightOutDialog } from "./trip-participant-details-updated";
 import { Button } from "@/components/ui/button";
-import { 
-  Plus, 
-  X, 
-  Check, 
-  X as XIcon, 
+import {
+  Plus,
+  X,
   UserPlus,
-  Clock, 
-  Edit2, 
-  Settings2, 
-  Search, 
-  Loader2, 
+  Settings2,
+  Loader2,
   Eye,
   EyeOff,
-  Plane,
-  Mail,
   MoreHorizontal,
   PlusIcon,
 } from "lucide-react";
@@ -46,24 +35,10 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -72,12 +47,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -94,7 +65,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -122,7 +92,7 @@ interface Participant {
   departureDate?: string;
   flightIn?: string;
   flightOut?: string;
-  accommodation?: string;
+  accommodation?: any;
   user?: {
     id: number;
     name: string;
@@ -131,13 +101,11 @@ interface Participant {
   };
 }
 
-interface ParticipantForm {
+interface CustomColumn {
+  id: number;
+  columnId: string;
   name: string;
-  arrivalDate?: string;
-  departureDate?: string;
-  flightIn?: string;
-  flightOut?: string;
-  accommodation?: string;
+  type: 'boolean' | 'text';
 }
 
 const STATUS_CYCLE = ['pending', 'yes', 'no'] as const;
@@ -165,13 +133,6 @@ const sortParticipants = (a: Participant, b: Participant) => {
   return statusDiff;
 };
 
-interface CustomColumn {
-  id: number;
-  columnId: string;
-  name: string;
-  type: 'boolean' | 'text';
-}
-
 const customColumnSchema = z.object({
   name: z.string().min(1, "Column name is required"),
   type: z.enum(['boolean', 'text']),
@@ -181,11 +142,9 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user } = useAuth();
-  const { createFlight, updateFlight } = useFlights(tripId);
+  const { createFlight } = useFlights(tripId);
   
   // State for participant management
-  const [isAddParticipantOpen, setIsAddParticipantOpen] = useState(false);
-  const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
   const [updatingParticipants, setUpdatingParticipants] = useState<number[]>([]);
   
   // State for custom columns
@@ -196,45 +155,6 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
   // State for invite functionality
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [participantToRemove, setParticipantToRemove] = useState<Participant | null>(null);
-
-  // State for the active tab
-  const [activeTab, setActiveTab] = useState("participants");
-
-  // Forms
-  const addForm = useForm<ParticipantForm>();
-  const editForm = useForm<ParticipantForm>();
-  const flightForm = useForm({
-    defaultValues: {
-      airline: "",
-      flightNumber: "",
-      departureAirport: "",
-      arrivalAirport: "",
-      departureDate: "",
-      departureTime: "",
-      arrivalDate: "",
-      arrivalTime: "",
-      bookingReference: "",
-      bookingStatus: "confirmed",
-    },
-  });
-  
-  // Use custom hook for flight lookup
-  const { 
-    isLookingUpFlight, 
-    flightDetails, 
-    setFlightDetails, 
-    lookupFlightDetails 
-  } = useFlightLookup(flightForm);
-
-  // Fetch trip data
-  const { data: trip } = useQuery<Trip>({
-    queryKey: ["/api/trips", tripId],
-    queryFn: async () => {
-      const res = await fetch(`/api/trips/${tripId}`);
-      if (!res.ok) throw new Error("Failed to fetch trip");
-      return res.json();
-    },
-  });
 
   // Fetch participants
   const { data: participants = [], isLoading: isLoadingParticipants } = useQuery<Participant[]>({
@@ -644,254 +564,197 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
       </CardHeader>
 
       <CardContent>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-4">
-            <TabsTrigger value="participants">Participants</TabsTrigger>
-            <TabsTrigger value="details">Details</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="participants">
-            {isLoadingParticipants ? (
-              <div className="text-center p-4">Loading participants...</div>
-            ) : participants.length === 0 ? (
-              <div className="text-center p-4 text-muted-foreground">
-                <p>No participants yet</p>
-                {isOwner && (
-                  <Button 
-                    variant="outline" 
-                    className="mt-2"
-                    onClick={() => setInviteDialogOpen(true)}
-                  >
-                    <PlusIcon className="mr-2 h-4 w-4" />
-                    Add Participants
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {participants.map((participant: Participant) => (
-                  <div 
-                    key={participant.id} 
-                    className="flex items-center justify-between p-2 rounded-md hover:bg-muted"
-                  >
-                    <div className="flex items-center">
-                      <Avatar className="h-10 w-10 mr-3">
-                        {participant.user?.avatar ? (
-                          <AvatarImage src={participant.user.avatar} alt={participant.name} />
-                        ) : null}
-                        <AvatarFallback>{getInitials(participant.name)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="font-medium">{participant.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {participant.user?.email || "Invited participant"}
+        {isLoadingParticipants || isLoadingColumns || isLoadingValues ? (
+          <div className="text-center p-4">Loading participant details...</div>
+        ) : participants.length === 0 ? (
+          <div className="text-center p-4 text-muted-foreground">
+            <p>No participants yet</p>
+            {isOwner && (
+              <Button 
+                variant="outline" 
+                className="mt-2"
+                onClick={() => setInviteDialogOpen(true)}
+              >
+                <PlusIcon className="mr-2 h-4 w-4" />
+                Add Participants
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  {!hiddenColumns.includes("status") && (<TableHead>Status</TableHead>)}
+                  {!hiddenColumns.includes("arrivalDate") && (<TableHead>Arrival</TableHead>)}
+                  {!hiddenColumns.includes("departureDate") && (<TableHead>Departure</TableHead>)}
+                  {!hiddenColumns.includes("flightIn") && (<TableHead>Flight In</TableHead>)}
+                  {!hiddenColumns.includes("flightOut") && (<TableHead>Flight Out</TableHead>)}
+                  {!hiddenColumns.includes("accommodation") && (<TableHead>Accommodation</TableHead>)}
+                  {customColumns.map((column) => (
+                    !hiddenColumns.includes(column.columnId) && (
+                      <TableHead key={column.id}>{column.name}</TableHead>
+                    )
+                  ))}
+                  {isOwner && <TableHead>Actions</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {[...participants].sort(sortParticipants).map((participant) => (
+                  <TableRow key={participant.id}>
+                    <TableCell>
+                      <div className="flex items-center space-x-2">
+                        <Avatar className="h-8 w-8">
+                          {participant.user?.avatar ? (
+                            <AvatarImage src={participant.user.avatar} alt={participant.name} />
+                          ) : null}
+                          <AvatarFallback>{getInitials(participant.name)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="font-medium">{participant.name}</div>
+                          <Badge variant="secondary" className={`text-xs ${getRoleBadgeColor(participant.role)}`}>
+                            {getRoleDisplay(participant.role)}
+                          </Badge>
+                          {participant.user?.email && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {participant.user.email}
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </div>
+                    </TableCell>
                     
-                    <div className="flex items-center">
-                      <Badge variant="secondary" className={`mr-2 ${getRoleBadgeColor(participant.role)}`}>
-                        {getRoleDisplay(participant.role)}
-                      </Badge>
-                      
-                      {participant.status === "pending" && (
-                        <Badge variant="outline" className="mr-2">
-                          Pending
-                        </Badge>
-                      )}
-
-                      {isOwner && participant.userId !== user?.id && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleRoleChange(participant.id, "viewer")}>
-                              Make Viewer
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleRoleChange(participant.id, "editor")}>
-                              Make Editor
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleRoleChange(participant.id, "admin")}>
-                              Make Admin
-                            </DropdownMenuItem>
-                            
-                            {participant.status === "pending" && (
-                              <DropdownMenuItem onClick={() => handleResendInvite(participant.id)}>
-                                Resend Invitation
-                              </DropdownMenuItem>
-                            )}
-                            
-                            <DropdownMenuItem 
-                              className="text-red-500"
-                              onClick={() => setParticipantToRemove(participant)}
-                            >
-                              Remove
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="details">
-            {isLoadingParticipants || isLoadingColumns || isLoadingValues ? (
-              <div className="text-center p-4">Loading participant details...</div>
-            ) : participants.length === 0 ? (
-              <div className="text-center p-4 text-muted-foreground">
-                <p>No participants yet</p>
-                {isOwner && (
-                  <Button 
-                    variant="outline" 
-                    className="mt-2"
-                    onClick={() => setInviteDialogOpen(true)}
-                  >
-                    <PlusIcon className="mr-2 h-4 w-4" />
-                    Add Participants
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      {!hiddenColumns.includes("status") && (<TableHead>Status</TableHead>)}
-                      {!hiddenColumns.includes("arrivalDate") && (<TableHead>Arrival</TableHead>)}
-                      {!hiddenColumns.includes("departureDate") && (<TableHead>Departure</TableHead>)}
-                      {!hiddenColumns.includes("flightIn") && (<TableHead>Flight In</TableHead>)}
-                      {!hiddenColumns.includes("flightOut") && (<TableHead>Flight Out</TableHead>)}
-                      {!hiddenColumns.includes("accommodation") && (<TableHead>Accommodation</TableHead>)}
-                      {customColumns.map((column) => (
-                        !hiddenColumns.includes(column.columnId) && (
-                          <TableHead key={column.id}>{column.name}</TableHead>
-                        )
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {[...participants].sort(sortParticipants).map((participant) => (
-                      <TableRow key={participant.id}>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            <Avatar className="h-8 w-8">
-                              {participant.user?.avatar ? (
-                                <AvatarImage src={participant.user.avatar} alt={participant.name} />
-                              ) : null}
-                              <AvatarFallback>{getInitials(participant.name)}</AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <div className="font-medium">{participant.name}</div>
-                              {participant.role && (
-                                <Badge variant="secondary" className={`text-xs ${getRoleBadgeColor(participant.role)}`}>
-                                  {getRoleDisplay(participant.role)}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
+                    {!hiddenColumns.includes("status") && (
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          className="h-8 px-2"
+                          onClick={() => handleStatusChange(participant)}
+                          disabled={updatingParticipants.includes(participant.id)}
+                        >
+                          {updatingParticipants.includes(participant.id) ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            STATUS_LABELS[participant.status as Status] || "Set status"
+                          )}
+                        </Button>
+                      </TableCell>
+                    )}
+                    
+                    {!hiddenColumns.includes("arrivalDate") && (
+                      <TableCell>
+                        {participant.arrivalDate || "Not set"}
+                      </TableCell>
+                    )}
+                    
+                    {!hiddenColumns.includes("departureDate") && (
+                      <TableCell>
+                        {participant.departureDate || "Not set"}
+                      </TableCell>
+                    )}
+                    
+                    {!hiddenColumns.includes("flightIn") && (
+                      <TableCell>
+                        {participant.flightIn || "Not set"}
+                      </TableCell>
+                    )}
+                    
+                    {!hiddenColumns.includes("flightOut") && (
+                      <TableCell>
+                        {participant.flightOut || "Not set"}
+                      </TableCell>
+                    )}
+                    
+                    {!hiddenColumns.includes("accommodation") && (
+                      <TableCell>
+                        {typeof participant.accommodation === 'object' && participant.accommodation !== null
+                          ? participant.accommodation.name || "Not set"
+                          : participant.accommodation || "Not set"}
+                      </TableCell>
+                    )}
+                    
+                    {customColumns.map((column) => (
+                      !hiddenColumns.includes(column.columnId) && (
+                        <TableCell key={column.id}>
+                          {column.type === "boolean" ? (
+                            <Checkbox
+                              checked={getValue(participant.id, column.columnId) === true}
+                              onCheckedChange={(checked) =>
+                                handleCustomValueChange(
+                                  participant.id,
+                                  column.columnId,
+                                  checked
+                                )
+                              }
+                            />
+                          ) : (
+                            <Input
+                              value={getValue(participant.id, column.columnId) || ""}
+                              onChange={(e) =>
+                                handleCustomValueChange(
+                                  participant.id,
+                                  column.columnId,
+                                  e.target.value
+                                )
+                              }
+                              onBlur={(e) =>
+                                handleCustomValueChange(
+                                  participant.id,
+                                  column.columnId,
+                                  e.target.value
+                                )
+                              }
+                              className="h-8"
+                            />
+                          )}
                         </TableCell>
-                        
-                        {!hiddenColumns.includes("status") && (
-                          <TableCell>
-                            <Button
-                              variant="outline"
-                              className="h-8 px-2"
-                              onClick={() => handleStatusChange(participant)}
-                              disabled={updatingParticipants.includes(participant.id)}
-                            >
-                              {updatingParticipants.includes(participant.id) ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                STATUS_LABELS[participant.status as Status] || "Set status"
-                              )}
-                            </Button>
-                          </TableCell>
-                        )}
-                        
-                        {!hiddenColumns.includes("arrivalDate") && (
-                          <TableCell>
-                            {participant.arrivalDate || "Not set"}
-                          </TableCell>
-                        )}
-                        
-                        {!hiddenColumns.includes("departureDate") && (
-                          <TableCell>
-                            {participant.departureDate || "Not set"}
-                          </TableCell>
-                        )}
-                        
-                        {!hiddenColumns.includes("flightIn") && (
-                          <TableCell>
-                            {participant.flightIn || "Not set"}
-                          </TableCell>
-                        )}
-                        
-                        {!hiddenColumns.includes("flightOut") && (
-                          <TableCell>
-                            {participant.flightOut || "Not set"}
-                          </TableCell>
-                        )}
-                        
-                        {!hiddenColumns.includes("accommodation") && (
-                          <TableCell>
-                            {typeof participant.accommodation === 'object' 
-                              ? participant.accommodation?.name || "Not set"
-                              : participant.accommodation || "Not set"}
-                          </TableCell>
-                        )}
-                        
-                        {customColumns.map((column) => (
-                          !hiddenColumns.includes(column.columnId) && (
-                            <TableCell key={column.id}>
-                              {column.type === "boolean" ? (
-                                <Checkbox
-                                  checked={getValue(participant.id, column.columnId) === true}
-                                  onCheckedChange={(checked) =>
-                                    handleCustomValueChange(
-                                      participant.id,
-                                      column.columnId,
-                                      checked
-                                    )
-                                  }
-                                />
-                              ) : (
-                                <Input
-                                  value={getValue(participant.id, column.columnId) || ""}
-                                  onChange={(e) =>
-                                    handleCustomValueChange(
-                                      participant.id,
-                                      column.columnId,
-                                      e.target.value
-                                    )
-                                  }
-                                  onBlur={(e) =>
-                                    handleCustomValueChange(
-                                      participant.id,
-                                      column.columnId,
-                                      e.target.value
-                                    )
-                                  }
-                                  className="h-8"
-                                />
-                              )}
-                            </TableCell>
-                          )
-                        ))}
-                      </TableRow>
+                      )
                     ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+
+                    {isOwner && (
+                      <TableCell>
+                        {participant.userId !== user?.id && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleRoleChange(participant.id, "viewer")}>
+                                Make Viewer
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleRoleChange(participant.id, "editor")}>
+                                Make Editor
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleRoleChange(participant.id, "admin")}>
+                                Make Admin
+                              </DropdownMenuItem>
+                              
+                              {participant.status === "pending" && (
+                                <DropdownMenuItem onClick={() => handleResendInvite(participant.id)}>
+                                  Resend Invitation
+                                </DropdownMenuItem>
+                              )}
+                              
+                              <DropdownMenuItem 
+                                className="text-red-500"
+                                onClick={() => setParticipantToRemove(participant)}
+                              >
+                                Remove
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </CardContent>
 
       {/* Dialogs */}
