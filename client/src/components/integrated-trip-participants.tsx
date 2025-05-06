@@ -841,7 +841,9 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
                         
                         {!hiddenColumns.includes("accommodation") && (
                           <TableCell>
-                            {participant.accommodation || "Not set"}
+                            {typeof participant.accommodation === 'object' 
+                              ? participant.accommodation?.name || "Not set"
+                              : participant.accommodation || "Not set"}
                           </TableCell>
                         )}
                         
