@@ -432,9 +432,22 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
   const updateParticipantStatus = (participantId: number, status: Status) => {
     setUpdatingParticipants(prev => [...prev, participantId]);
     
+    // Optimistic update for immediate UI feedback
+    const previousParticipants = [...participants];
+    const updatedParticipants = previousParticipants.map(p => 
+      p.id === participantId ? { ...p, status } : p
+    );
+    
+    // Update the cache optimistically
+    queryClient.setQueryData([`/api/trips/${tripId}/participants`], updatedParticipants);
+    
     updateParticipantMutation.mutate(
       { id: participantId, status },
       {
+        onError: () => {
+          // Revert to previous data if there was an error
+          queryClient.setQueryData([`/api/trips/${tripId}/participants`], previousParticipants);
+        },
         onSettled: () => {
           setUpdatingParticipants(prev => prev.filter(id => id !== participantId));
         }
