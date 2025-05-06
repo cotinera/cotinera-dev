@@ -320,16 +320,8 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
 
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to update participant status",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
+    // We're handling onSuccess, onError and other callbacks in the updateParticipantStatus function
+    // to properly manage optimistic updates
   });
 
   const updateRoleMutation = useMutation({
@@ -429,27 +421,53 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
     });
   };
 
+  // Define the type for our mutation context
+  type MutationContext = {
+    previousParticipants: Participant[] | undefined;
+  };
+
   const updateParticipantStatus = (participantId: number, status: Status) => {
     setUpdatingParticipants(prev => [...prev, participantId]);
     
-    // Optimistic update for immediate UI feedback
-    const previousParticipants = [...participants];
-    const updatedParticipants = previousParticipants.map(p => 
-      p.id === participantId ? { ...p, status } : p
-    );
+    // Update the status directly in the UI first for immediate feedback
+    const previousParticipants = queryClient.getQueryData<Participant[]>([`/api/trips/${tripId}/participants`]);
     
-    // Update the cache optimistically
-    queryClient.setQueryData([`/api/trips/${tripId}/participants`], updatedParticipants);
+    if (previousParticipants) {
+      // Create a copy for the optimistic update
+      const updatedParticipants = previousParticipants.map(p => 
+        p.id === participantId ? { ...p, status } : p
+      );
+      
+      // Set the updated data in the cache
+      queryClient.setQueryData([`/api/trips/${tripId}/participants`], updatedParticipants);
+    }
     
+    // Then make the API call
     updateParticipantMutation.mutate(
       { id: participantId, status },
       {
         onError: () => {
-          // Revert to previous data if there was an error
-          queryClient.setQueryData([`/api/trips/${tripId}/participants`], previousParticipants);
+          // If there was an error, revert back to previous data
+          if (previousParticipants) {
+            queryClient.setQueryData(
+              [`/api/trips/${tripId}/participants`], 
+              previousParticipants
+            );
+          }
+          
+          toast({
+            title: "Status update failed",
+            description: "Failed to update participant status",
+            variant: "destructive"
+          });
         },
         onSettled: () => {
+          // Always clear the updating state
           setUpdatingParticipants(prev => prev.filter(id => id !== participantId));
+        },
+        onSuccess: () => {
+          // Refetch to ensure data consistency
+          queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
         }
       }
     );
