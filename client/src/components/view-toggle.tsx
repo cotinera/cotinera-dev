@@ -134,20 +134,7 @@ export function ViewToggle({ tripId }: ViewToggleProps) {
     }
   };
 
-  // Calculate number of visible tabs to determine grid columns
-  const getVisibleTabCount = () => {
-    // Always show details + count enabled views
-    return 1 + 
-      (viewPreferences.showCalendar ? 1 : 0) + 
-      (viewPreferences.showSpending ? 1 : 0) + 
-      (viewPreferences.showMap ? 1 : 0);
-  };
-
-  // Dynamically generate the grid-cols class based on visible tabs
-  const getGridColsClass = () => {
-    const visibleTabs = getVisibleTabCount();
-    return `grid-cols-${visibleTabs}`;
-  };
+  // No need for the grid columns calculation anymore since we're using flex
 
   return (
     <div className="flex items-center">
@@ -156,7 +143,7 @@ export function ViewToggle({ tripId }: ViewToggleProps) {
           type="single"
           value={getCurrentView()}
           onValueChange={handleViewChange}
-          className={`relative z-0 grid ${getGridColsClass()}`}
+          className="relative z-0 flex"
         >
           <ToggleGroupItem 
             value="details" 
