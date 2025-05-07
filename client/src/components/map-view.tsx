@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus, ChevronDown, ChevronUp, Image, Building2, Calendar, Utensils, Hotel, Camera, Building, DollarSign } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -232,7 +232,7 @@ interface Activity {
 
 // Accommodation interface
 interface Accommodation {
-  id: string;
+  id: string | number;
   name: string;
   coordinates: { lat: number; lng: number } | null;
   checkInTime?: string;
@@ -257,7 +257,7 @@ export function MapView({
   const [selectedPlaceDetails, setSelectedPlaceDetails] = useState<PlaceDetails | null>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [expandedReviews, setExpandedReviews] = useState(false);
-  const { accommodations = [] } = useAccommodations(tripId);
+  const { accommodations = [] } = useAccommodations(tripId ? Number(tripId) : undefined);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [placeResults, setPlaceResults] = useState<google.maps.places.PlaceResult[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
@@ -656,7 +656,7 @@ export function MapView({
   }, [selectedCategory, refreshPlaces]);
 
   // Effect for updating the search results when the user types
-  React.useEffect(() => {
+  useEffect(() => {
     if (!ready || !data.length) return;
 
     const placeResults: SearchResult[] = data.map(suggestion => ({
@@ -674,7 +674,7 @@ export function MapView({
   }, [data, ready]);
 
   // Effect to simulate a search based on a place name if provided
-  React.useEffect(() => {
+  useEffect(() => {
     if (selectedPlace && mapRef.current && placesServiceRef.current && isLoaded) {
       console.log("Selected place coordinates:", selectedPlace.coordinates);
       console.log("Trip coordinates:", coordinates);
@@ -702,7 +702,7 @@ export function MapView({
               // If place not found, just show basic info
               setSelectedPlaceDetails({
                 name: selectedPlace.name,
-                formatted_address: selectedPlace.address || '',
+                formatted_address: '',
                 geometry: {
                   location: new google.maps.LatLng(
                     selectedPlace.coordinates?.lat || 0,
@@ -1044,11 +1044,11 @@ export function MapView({
               ))}
 
               {/* Render accommodations */}
-              {accommodations.filter((accom: Accommodation) => accom.coordinates !== null).map((accom: Accommodation) => (
+              {accommodations.filter((accom: any) => accom.coordinates !== null).map((accom: any) => (
                 <MarkerF
                   key={`accom-${accom.id}`}
                   position={accom.coordinates as google.maps.LatLngLiteral}
-                  onClick={() => handleMarkerClick(accom)}
+                  onClick={() => handleMarkerClick(accom as Accommodation)}
                   icon={{
                     path: google.maps.SymbolPath.CIRCLE,
                     fillColor: '#f97316',
@@ -1099,11 +1099,9 @@ export function MapView({
                       <div className="flex items-start justify-between">
                         <div>
                           <h4 className="font-medium">{place.name}</h4>
-                          {place.address && (
-                            <p className="text-sm text-muted-foreground truncate">
-                              {place.address}
-                            </p>
-                          )}
+                          <p className="text-sm text-muted-foreground truncate">
+                            {place.name}
+                          </p>
                         </div>
                         <MapPin className={`h-4 w-4 flex-shrink-0 ${
                           selectedPlace?.id === place.id ? "text-primary" : "text-muted-foreground"
