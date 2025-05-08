@@ -205,6 +205,8 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
   // Mutations
   const createColumnMutation = useMutation({
     mutationFn: async (data: z.infer<typeof customColumnSchema>) => {
+      console.log("Creating new custom column:", data);
+      
       const res = await fetch(`/api/trips/${tripId}/custom-columns`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -218,14 +220,25 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
 
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (newColumn) => {
+      console.log("New column created successfully:", newColumn);
+      
+      // Immediately invalidate columns query
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/custom-columns`] });
+      
+      // Also invalidate custom values to refresh the whole table
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/custom-values`] });
+      
+      // Clear any custom form values and close the dialog
+      setIsCustomizeOpen(false);
+      
       toast({
         title: "Custom column added",
         description: "The custom column has been added successfully.",
       });
     },
     onError: (error: Error) => {
+      console.error("Failed to create column:", error);
       toast({
         title: "Failed to add custom column",
         description: error.message,
@@ -236,6 +249,8 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
 
   const deleteColumnMutation = useMutation({
     mutationFn: async (columnId: string) => {
+      console.log("Deleting custom column:", columnId);
+      
       const res = await fetch(`/api/trips/${tripId}/custom-columns/${columnId}`, {
         method: "DELETE",
       });
@@ -248,15 +263,33 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
       return res.json();
     },
     onSuccess: (_, columnId) => {
+      console.log("Successfully deleted column:", columnId);
+      
       // Immediately update the local state to remove the deleted column
       setCustomColumns(prev => prev.filter(column => column.columnId !== columnId));
       
       // Update the UI to remove any hidden column references
       setHiddenColumns(prev => prev.filter(id => id !== columnId));
       
+      // Clean up any cached values related to this column
+      const customValuesCache = queryClient.getQueryData<Record<string, any>>([`/api/trips/${tripId}/custom-values`]);
+      if (customValuesCache) {
+        const updatedValues = { ...customValuesCache };
+        // Remove all entries for this column
+        Object.keys(updatedValues).forEach(key => {
+          if (key.includes(`-${columnId}`)) {
+            delete updatedValues[key];
+          }
+        });
+        queryClient.setQueryData([`/api/trips/${tripId}/custom-values`], updatedValues);
+      }
+      
       // Refresh data from the server
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/custom-columns`] });
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/custom-values`] });
+      
+      // Close the customize dialog
+      setIsCustomizeOpen(false);
       
       toast({
         title: "Custom column deleted",
@@ -264,6 +297,7 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
       });
     },
     onError: (error: Error) => {
+      console.error("Failed to delete column:", error);
       toast({
         title: "Failed to delete custom column",
         description: error.message,

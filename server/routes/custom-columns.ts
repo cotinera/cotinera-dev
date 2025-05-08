@@ -50,18 +50,60 @@ router.delete("/trips/:tripId/custom-columns/:columnId", async (req, res) => {
     const tripId = parseInt(req.params.tripId);
     const columnId = req.params.columnId;
     
-    // Delete the custom column
-    await db.delete(customColumns).where(
-      and(
-        eq(customColumns.tripId, tripId),
-        eq(customColumns.columnId, columnId)
+    console.log(`Attempting to delete column ${columnId} for trip ${tripId}`);
+    
+    // Check if the column exists
+    const existingColumn = await db
+      .select()
+      .from(customColumns)
+      .where(
+        and(
+          eq(customColumns.tripId, tripId),
+          eq(customColumns.columnId, columnId)
+        )
+      );
+    
+    if (existingColumn.length === 0) {
+      console.log(`Column ${columnId} not found for trip ${tripId}`);
+      return res.status(404).json({ error: "Column not found" });
+    }
+    
+    console.log(`Found column to delete:`, existingColumn[0]);
+    
+    // First get all values for this column that will be deleted
+    const valuesToDelete = await db
+      .select()
+      .from(customValues)
+      .where(eq(customValues.columnId, columnId));
+    
+    console.log(`Found ${valuesToDelete.length} values to delete for column ${columnId}`);
+    
+    // Delete all values for this column
+    const deleteValuesResult = await db
+      .delete(customValues)
+      .where(eq(customValues.columnId, columnId))
+      .returning();
+    
+    console.log(`Deleted ${deleteValuesResult.length} custom values for column ${columnId}`);
+    
+    // Then delete the column
+    const deleteResult = await db
+      .delete(customColumns)
+      .where(
+        and(
+          eq(customColumns.tripId, tripId),
+          eq(customColumns.columnId, columnId)
+        )
       )
-    );
+      .returning();
     
-    // Also delete all values for this column
-    await db.delete(customValues).where(eq(customValues.columnId, columnId));
+    console.log(`Deleted custom column:`, deleteResult[0]);
     
-    res.status(200).json({ message: "Custom column deleted successfully" });
+    res.status(200).json({ 
+      message: "Custom column deleted successfully",
+      column: deleteResult[0],
+      deletedValues: deleteValuesResult
+    });
   } catch (error) {
     console.error("Error deleting custom column:", error);
     res.status(500).json({ error: "Failed to delete custom column" });
