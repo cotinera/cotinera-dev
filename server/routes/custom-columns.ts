@@ -74,39 +74,35 @@ router.get("/trips/:tripId/custom-values", async (req, res) => {
     // First get all column IDs for this trip
     const tripId = parseInt(req.params.tripId);
     const columns = await db
-      .select({ columnId: customColumns.columnId })
+      .select()
       .from(customColumns)
       .where(eq(customColumns.tripId, tripId));
     
-    const columnIds = columns.map(c => c.columnId);
-    
-    if (columnIds.length === 0) {
+    if (columns.length === 0) {
+      console.log(`No custom columns found for trip ${tripId}`);
       return res.json({});
     }
     
-    // Direct query to see all values (for debugging)
-    const allValues = await db.select().from(customValues);
-    console.log("All custom values in database:", allValues);
+    console.log(`Found ${columns.length} custom columns for trip ${tripId}:`, columns);
     
-    // Then get all values for these column IDs - handle the IN clause properly
-    let values: any[] = [];
-    try {
-      if (columnIds.length > 0) {
-        values = await db
-          .select()
-          .from(customValues)
-          .where(sql`${customValues.columnId} IN (${columnIds.join(',')})`);
-        
-        console.log(`Found ${values.length} values for columns:`, columnIds);
-      }
-    } catch (err) {
-      console.error("Error in SQL query:", err);
-    }
+    // Get all values from the database - we'll do filtering in memory 
+    // to avoid SQL issues
+    const allValues = await db.select().from(customValues);
+    console.log(`Found ${allValues.length} total custom values in database`);
+    
+    // Create a Set of column IDs for faster lookup
+    const columnIdSet = new Set(columns.map(col => col.columnId));
+    
+    // Filter values for this trip's column IDs
+    const filteredValues = allValues.filter(value => columnIdSet.has(value.columnId));
+    console.log(`Filtered to ${filteredValues.length} values for this trip:`, filteredValues);
     
     // Convert array to object with keys like '{participantId}-{columnId}'
     const valuesObject: Record<string, any> = {};
-    values.forEach(v => {
-      valuesObject[`${v.participantId}-${v.columnId}`] = v.value;
+    filteredValues.forEach(v => {
+      const key = `${v.participantId}-${v.columnId}`;
+      valuesObject[key] = v.value;
+      console.log(`Setting value for ${key} to "${v.value}"`);
     });
     
     console.log("Returning values object:", valuesObject);

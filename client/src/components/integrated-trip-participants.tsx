@@ -282,28 +282,42 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
       columnId: string;
       value: any;
     }) => {
-      const res = await fetch(`/api/trips/${tripId}/custom-values`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ participantId, columnId, value }),
-      });
+      console.log(`Sending API request to save value:`, { participantId, columnId, value });
+      
+      try {
+        const res = await fetch(`/api/trips/${tripId}/custom-values`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ participantId, columnId, value }),
+        });
 
-      if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to save value");
+        const responseData = await res.json();
+        console.log(`API response for saving value:`, responseData);
+        
+        if (!res.ok) {
+          throw new Error(responseData.error || "Failed to save value");
+        }
+
+        return responseData;
+      } catch (err) {
+        console.error("Error saving custom value:", err);
+        throw err;
       }
-
-      return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log("Custom value saved successfully:", data);
+      // Force refresh values
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/custom-values`] });
     },
     onError: (error: Error) => {
+      console.error("Mutation error saving value:", error);
       toast({
         title: "Failed to save value",
         description: error.message,
         variant: "destructive",
       });
+      // Force refresh to ensure we're in sync with the server
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/custom-values`] });
     },
   });
 
@@ -544,8 +558,30 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
       // Update the cache optimistically
       queryClient.setQueryData([`/api/trips/${tripId}/custom-values`], updatedValues);
       
-      // Then send to the server
-      saveCustomValueMutation.mutate({ participantId, columnId, value });
+      // Then send to the server with retry
+      saveCustomValueMutation.mutate(
+        { participantId, columnId, value },
+        { 
+          onSuccess: () => {
+            // Force another refresh to ensure latest data
+            queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/custom-values`] });
+            
+            console.log(`Successfully saved value for ${key}`);
+          },
+          onError: (error) => {
+            console.error(`Failed to save value for ${key}:`, error);
+            
+            // Revert optimistic update if failed
+            queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/custom-values`] });
+            
+            toast({
+              title: "Failed to save value",
+              description: "There was a problem saving your data. Please try again.",
+              variant: "destructive",
+            });
+          }
+        }
+      );
     }
   };
 
