@@ -81,7 +81,7 @@ router.get("/trips/:tripId/custom-values", async (req, res) => {
     const columnIds = columns.map(c => c.columnId);
     
     if (columnIds.length === 0) {
-      return res.json([]);
+      return res.json({});
     }
     
     // Then get all values for these column IDs - handle empty array case
@@ -92,9 +92,14 @@ router.get("/trips/:tripId/custom-values", async (req, res) => {
         .from(customValues)
         .where(sql`${customValues.columnId} IN (${columnIds.join(',')})`);    
     }
-      
     
-    res.json(values);
+    // Convert array to object with keys like '{participantId}-{columnId}'
+    const valuesObject: Record<string, any> = {};
+    values.forEach(v => {
+      valuesObject[`${v.participantId}-${v.columnId}`] = v.value;
+    });
+    
+    res.json(valuesObject);
   } catch (error) {
     console.error("Error fetching custom values:", error);
     res.status(500).json({ error: "Failed to fetch custom values" });

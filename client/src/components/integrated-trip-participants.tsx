@@ -191,6 +191,8 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
       }
       return res.json();
     },
+    // Add a refetch interval to ensure we get fresh data
+    refetchInterval: 5000,
   });
 
   // Update state when fetched columns change
@@ -528,7 +530,23 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
     columnId: string,
     value: any
   ) => {
-    saveCustomValueMutation.mutate({ participantId, columnId, value });
+    // Get the current value
+    const key = `${participantId}-${columnId}`;
+    const currentValue = customValues?.[key] || "";
+    
+    // Only update if the value actually changed
+    if (value !== currentValue) {
+      console.log(`Updating value for ${key} from "${currentValue}" to "${value}"`);
+      
+      // First update the local state for immediate feedback
+      const updatedValues = { ...customValues, [key]: value };
+      
+      // Update the cache optimistically
+      queryClient.setQueryData([`/api/trips/${tripId}/custom-values`], updatedValues);
+      
+      // Then send to the server
+      saveCustomValueMutation.mutate({ participantId, columnId, value });
+    }
   };
 
   const getInitials = (name: string): string => {
