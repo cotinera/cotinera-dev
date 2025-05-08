@@ -84,13 +84,23 @@ router.get("/trips/:tripId/custom-values", async (req, res) => {
       return res.json({});
     }
     
-    // Then get all values for these column IDs - handle empty array case
+    // Direct query to see all values (for debugging)
+    const allValues = await db.select().from(customValues);
+    console.log("All custom values in database:", allValues);
+    
+    // Then get all values for these column IDs - handle the IN clause properly
     let values: any[] = [];
-    if (columnIds.length > 0) {
-      values = await db
-        .select()
-        .from(customValues)
-        .where(sql`${customValues.columnId} IN (${columnIds.join(',')})`);    
+    try {
+      if (columnIds.length > 0) {
+        values = await db
+          .select()
+          .from(customValues)
+          .where(sql`${customValues.columnId} IN (${columnIds.join(',')})`);
+        
+        console.log(`Found ${values.length} values for columns:`, columnIds);
+      }
+    } catch (err) {
+      console.error("Error in SQL query:", err);
     }
     
     // Convert array to object with keys like '{participantId}-{columnId}'
@@ -99,6 +109,7 @@ router.get("/trips/:tripId/custom-values", async (req, res) => {
       valuesObject[`${v.participantId}-${v.columnId}`] = v.value;
     });
     
+    console.log("Returning values object:", valuesObject);
     res.json(valuesObject);
   } catch (error) {
     console.error("Error fetching custom values:", error);
@@ -109,6 +120,7 @@ router.get("/trips/:tripId/custom-values", async (req, res) => {
 // Set a custom value
 router.post("/trips/:tripId/custom-values", async (req, res) => {
   try {
+    console.log("Received custom value request:", req.body);
     const { columnId, participantId, value } = req.body;
     
     if (!columnId || !participantId || value === undefined) {
@@ -126,9 +138,12 @@ router.post("/trips/:tripId/custom-values", async (req, res) => {
         )
       );
     
+    console.log("Existing value check:", existingValue);
+    
     let result;
     
     if (existingValue.length > 0) {
+      console.log("Updating existing value:", existingValue[0]);
       // Update existing value
       result = await db
         .update(customValues)
@@ -141,6 +156,7 @@ router.post("/trips/:tripId/custom-values", async (req, res) => {
         )
         .returning();
     } else {
+      console.log("Inserting new value for", columnId, participantId);
       // Insert new value
       result = await db
         .insert(customValues)
@@ -151,6 +167,12 @@ router.post("/trips/:tripId/custom-values", async (req, res) => {
         })
         .returning();
     }
+    
+    console.log("Save result:", result);
+    
+    // Force refresh of the values
+    const values = await db.select().from(customValues);
+    console.log("All values after save:", values);
     
     res.json(result[0]);
   } catch (error) {
