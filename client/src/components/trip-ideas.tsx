@@ -50,6 +50,10 @@ export function TripIdeas({ tripId, participants }: TripIdeasProps) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingIdea, setEditingIdea] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<string>("all");
+  const [ideaToAddToCalendar, setIdeaToAddToCalendar] = useState<any>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [startTime, setStartTime] = useState("12:00");
+  const [endTime, setEndTime] = useState("13:00");
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
@@ -168,6 +172,70 @@ export function TripIdeas({ tripId, participants }: TripIdeasProps) {
         variant: "destructive",
       });
       console.error("Error voting for idea:", error);
+    },
+  });
+  
+  const addToCalendarMutation = useMutation({
+    mutationFn: async (data: { 
+      idea: any; 
+      date: Date; 
+      startTime: string; 
+      endTime: string; 
+    }) => {
+      if (!data.date) {
+        throw new Error("Please select a date");
+      }
+
+      // Create start and end date objects from the selected date and times
+      const [startHours, startMinutes] = data.startTime.split(':').map(Number);
+      const [endHours, endMinutes] = data.endTime.split(':').map(Number);
+      
+      const startDate = new Date(data.date);
+      startDate.setHours(startHours, startMinutes, 0);
+      
+      const endDate = new Date(data.date);
+      endDate.setHours(endHours, endMinutes, 0);
+
+      const res = await fetch(`/api/trips/${tripId}/activities`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: 'include',
+        body: JSON.stringify({
+          title: data.idea.title,
+          description: data.idea.description || '',
+          location: data.idea.location,
+          coordinates: data.idea.coordinates,
+          startTime: startDate.toISOString(),
+          endTime: endDate.toISOString()
+        }),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || "Failed to add to calendar");
+      }
+
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [`/api/trips/${tripId}/activities`]
+      });
+      
+      setIdeaToAddToCalendar(null);
+      setSelectedDate(undefined);
+      
+      toast({
+        title: "Success",
+        description: "Idea added to calendar",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to add to calendar",
+      });
     },
   });
 
