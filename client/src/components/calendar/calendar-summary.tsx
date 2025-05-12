@@ -305,6 +305,13 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
 
   return (
     <>
+      <div className="flex justify-end mb-4">
+        <Button onClick={openCreateDialog} className="gap-1">
+          <Plus className="h-4 w-4" />
+          Add Event
+        </Button>
+      </div>
+      
       <ScrollArea className="h-[calc(100vh-16rem)]">
         <div className="space-y-8 p-4">
           {sortedDates.map((date) => (
@@ -388,6 +395,109 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
         </div>
       </ScrollArea>
 
+      {/* Create Activity Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Add New Event</DialogTitle>
+            <DialogDescription>
+              Create a new event for your trip. Click save when you're done.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleCreateSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Title</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Event title" required />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Location (optional)" />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="startTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Time</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="datetime-local" required />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="endTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Time</FormLabel>
+                      <FormControl>
+                        <Input {...field} type="datetime-local" required />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        {...field}
+                        placeholder="Add a description (optional)"
+                        className="min-h-[100px]"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsCreateDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit"
+                  disabled={createActivityMutation.isPending}
+                >
+                  {createActivityMutation.isPending ? "Creating..." : "Create Event"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      
       {/* Edit Activity Dialog */}
       <Dialog open={!!activityToEdit} onOpenChange={(open) => !open && setActivityToEdit(null)}>
         <DialogContent className="sm:max-w-[600px]">
@@ -399,7 +509,7 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
           </DialogHeader>
           
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(handleEditSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
                 name="title"
