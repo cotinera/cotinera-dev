@@ -42,8 +42,9 @@ const upload = multer({
   }
 });
 
-// Import custom columns routes
+// Import custom routes
 import customColumnsRouter from "./routes/custom-columns";
+import nlpRouter from "./routes/nlp";
 
 export function registerRoutes(app: Express): Server {
   setupAuth(app);
@@ -3713,6 +3714,9 @@ export function registerRoutes(app: Express): Server {
   
   // Register custom columns routes
   app.use("/api", customColumnsRouter);
+  
+  // Register NLP routes
+  app.use("/api/nlp", nlpRouter);
   
   const httpServer = createServer(app);
   return httpServer;
