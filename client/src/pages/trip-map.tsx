@@ -122,7 +122,7 @@ export default function TripMap() {
           <section>
             <TripIdeasAndPlaces
               tripId={trip.id}
-              participants={[]}
+              participants={participantsData || []}
               tripCoordinates={trip.coordinates || undefined}
             />
           </section>
