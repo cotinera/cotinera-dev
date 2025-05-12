@@ -119,10 +119,18 @@ export default function Dashboard() {
       return results;
     },
     onSuccess: (deletedTripIds) => {
-      queryClient.setQueryData(
-        ["/api/my-trips"],
-        (old: any[]) => old.filter(trip => !deletedTripIds.includes(trip.id))
-      );
+      // Check if in development bypass mode - same logic as in useTrips hook
+      const isDevelopmentBypass = localStorage.getItem("dev_bypass_auth") === "true";
+      
+      // Use different query key based on auth mode
+      const tripsQueryKey = isDevelopmentBypass ? ["/api/trips"] : ["/api/my-trips"];
+      
+      // Log successful deletion
+      console.log(`Successfully deleted trip IDs:`, deletedTripIds);
+      
+      // Don't try to update cache directly, which may cause issues
+      // Just invalidate the query to force a refetch
+      queryClient.invalidateQueries({ queryKey: tripsQueryKey });
 
       toast({
         title: "Success",
