@@ -101,16 +101,21 @@ export default function TripCalendar() {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-2xl font-bold">Calendar</h2>
-          <ToggleGroup type="single" value={viewMode} onValueChange={(value: ViewMode) => value && setViewMode(value)}>
-            <ToggleGroupItem value="edit" size="sm">
-              Edit
-            </ToggleGroupItem>
-            <ToggleGroupItem value="summary" size="sm">
-              Summary
-            </ToggleGroupItem>
-          </ToggleGroup>
+        <div className="flex flex-col mb-8">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold">Calendar</h2>
+            <ToggleGroup type="single" value={viewMode} onValueChange={(value: ViewMode) => value && setViewMode(value)}>
+              <ToggleGroupItem value="edit" size="sm">
+                Edit
+              </ToggleGroupItem>
+              <ToggleGroupItem value="summary" size="sm">
+                Summary
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">
+            All times shown in {Intl.DateTimeFormat().resolvedOptions().timeZone} timezone
+          </p>
         </div>
 
         <div className="space-y-8">

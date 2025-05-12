@@ -1,40 +1,47 @@
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { format } from "date-fns";
-import { Clock, MapPin, Edit, Trash2, X } from "lucide-react";
+import { format, addHours } from "date-fns";
+import { Clock, MapPin, Edit, Trash2, X, Plus } from "lucide-react";
 import type { Trip, Activity } from "@db/schema";
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useForm } from "react-hook-form";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 interface CalendarSummaryProps {
   trip: Trip;
   activities: Activity[];
 }
 
-interface EditActivityForm {
-  title: string;
-  description?: string;
-  location?: string;
-  startTime: string;
-  endTime: string;
-}
+// Define the form schema for both editing and creating activities
+const activityFormSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
+  location: z.string().optional(),
+  startTime: z.string(),
+  endTime: z.string(),
+});
+
+type ActivityFormValues = z.infer<typeof activityFormSchema>;
 
 export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activityToEdit, setActivityToEdit] = useState<Activity | null>(null);
   const [activityToDelete, setActivityToDelete] = useState<Activity | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   // Setup form for editing activities
-  const form = useForm<EditActivityForm>({
+  const form = useForm<ActivityFormValues>({
+    resolver: zodResolver(activityFormSchema),
     defaultValues: {
       title: "",
       description: "",
@@ -57,12 +64,69 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
         startTime: format(startDate, "yyyy-MM-dd'T'HH:mm"),
         endTime: format(endDate, "yyyy-MM-dd'T'HH:mm")
       });
+    } else {
+      // Reset with default times for new activity (today at noon for 1 hour)
+      const now = new Date();
+      const startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0);
+      const endTime = addHours(startTime, 1);
+      
+      form.reset({
+        title: "",
+        description: "",
+        location: "",
+        startTime: format(startTime, "yyyy-MM-dd'T'HH:mm"),
+        endTime: format(endTime, "yyyy-MM-dd'T'HH:mm")
+      });
     }
   };
 
+  // Create activity mutation
+  const createActivityMutation = useMutation({
+    mutationFn: async (data: ActivityFormValues) => {
+      const response = await fetch(`/api/trips/${trip.id}/activities`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          title: data.title,
+          description: data.description || null,
+          location: data.location || null,
+          startTime: new Date(data.startTime).toISOString(),
+          endTime: new Date(data.endTime).toISOString()
+        })
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Create activity error:', errorText);
+        throw new Error(`Failed to create activity: ${errorText}`);
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
+      setIsCreateDialogOpen(false);
+      toast({
+        title: "Activity created",
+        description: "The activity has been added to your calendar."
+      });
+      form.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to create activity",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
   // Update activity mutation
   const updateActivityMutation = useMutation({
-    mutationFn: async (data: EditActivityForm) => {
+    mutationFn: async (data: ActivityFormValues) => {
       if (!activityToEdit) return null;
       
       const response = await fetch(`/api/trips/${trip.id}/activities/${activityToEdit.id}`, {
@@ -70,10 +134,11 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
         headers: {
           'Content-Type': 'application/json'
         },
+        credentials: 'include',
         body: JSON.stringify({
           title: data.title,
-          description: data.description,
-          location: data.location,
+          description: data.description || null,
+          location: data.location || null,
           startTime: new Date(data.startTime).toISOString(),
           endTime: new Date(data.endTime).toISOString()
         })
@@ -201,8 +266,13 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
     }
   });
 
-  // Handle form submission
-  const onSubmit = (data: EditActivityForm) => {
+  // Handle create form submission
+  const handleCreateSubmit = (data: ActivityFormValues) => {
+    createActivityMutation.mutate(data);
+  };
+
+  // Handle edit form submission
+  const handleEditSubmit = (data: ActivityFormValues) => {
     updateActivityMutation.mutate(data);
   };
 
@@ -211,6 +281,13 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
     if (!activityToDelete) return;
     console.log('Confirming delete for activity:', activityToDelete);
     deleteActivityMutation.mutate();
+  };
+  
+  // Open the create dialog with default times
+  const openCreateDialog = () => {
+    setActivityToEdit(null);
+    resetForm();
+    setIsCreateDialogOpen(true);
   };
 
   // Group activities by date
