@@ -9,16 +9,15 @@ import { TripDestinations } from "@/components/trip-destinations";
 import { TripTimeline } from "@/components/trip-timeline";
 import { MapRouteView } from "@/components/map-route-view";
 import { MapView } from "@/components/map-view";
-import { PinnedPlaces } from "@/components/pinned-places";
 import { Checklist } from "@/components/checklist";
 import { CalendarView } from "@/components/calendar-view";
 import { MapView as MapViewComp } from "@/components/map-view";
 import { ChatMessages } from "@/components/chat-messages";
 import { BudgetTracker } from "@/components/budget-tracker";
+import { TripIdeasAndPlaces } from "@/components/trip-ideas-and-places";
 
 import { Loader2, ArrowLeft, Trash2 } from "lucide-react";
 import type { Destination } from "@db/schema";
-import { TripIdeas } from "@/components/trip-ideas";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -246,19 +245,10 @@ export default function TripDetail() {
               {/* Map view removed to clear space on the Details page */}
 
               <section>
-                <PinnedPlaces
-                  tripId={trip.id}
-                  destinationId={currentDestinationId}
-                  defaultLocation={currentDestination?.name || trip.location || ""}
-                  showMap={true}
-                  tripCoordinates={currentDestination?.coordinates || undefined}
-                />
-              </section>
-              
-              <section>
-                <TripIdeas
+                <TripIdeasAndPlaces
                   tripId={trip.id}
                   participants={participants}
+                  tripCoordinates={currentDestination?.coordinates || trip.coordinates || undefined}
                 />
               </section>
             </div>
