@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -95,6 +96,9 @@ export function TripIdeasAndPlaces({
   participants,
   tripCoordinates
 }: TripIdeasAndPlacesProps) {
+  // Router
+  const [, navigate] = useLocation();
+  
   // State
   const [activeTab, setActiveTab] = useState<TabViews>("all");
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -507,7 +511,7 @@ export function TripIdeasAndPlaces({
 
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
         queryKey: [`/api/trips/${tripId}/activities`]
       });
@@ -519,6 +523,11 @@ export function TripIdeasAndPlaces({
         title: "Success",
         description: "Added to calendar",
       });
+
+      // If navigateToCalendar is true, navigate to the calendar page
+      if (variables.navigateToCalendar) {
+        navigate(`/trips/${tripId}/calendar`);
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -623,7 +632,8 @@ export function TripIdeasAndPlaces({
       date: selectedDate,
       startTime,
       endTime,
-      isIdea: isItemToAddIdeaNotPlace
+      isIdea: isItemToAddIdeaNotPlace,
+      navigateToCalendar: true // Always navigate to calendar after manual dialog submission
     });
   };
 
