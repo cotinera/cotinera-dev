@@ -709,15 +709,18 @@ export function registerRoutes(app: Express): Server {
           console.log(`Deleting expenses for trip ${tripId}`);
           await tx.delete(expenses).where(eq(expenses.tripId, tripId));
 
-          // Delete activity votes
+          // Note: Importing the tables directly since we're using custom SQL anyway
+          // Delete activity votes - using raw SQL since it's a nested query
           console.log(`Deleting activity votes for trip ${tripId}`);
           await tx.execute(
             sql`DELETE FROM activity_votes WHERE suggestion_id IN (SELECT id FROM activity_suggestions WHERE trip_id = ${tripId})`
           );
 
-          // Delete activity suggestions
+          // Delete activity suggestions - using raw SQL to avoid import errors
           console.log(`Deleting activity suggestions for trip ${tripId}`);
-          await tx.delete(activitySuggestions).where(eq(activitySuggestions.tripId, tripId));
+          await tx.execute(
+            sql`DELETE FROM activity_suggestions WHERE trip_id = ${tripId}`
+          );
 
           // Delete chat messages
           console.log(`Deleting chat messages for trip ${tripId}`);
@@ -725,7 +728,9 @@ export function registerRoutes(app: Express): Server {
 
           // Delete task assignments
           console.log(`Deleting task assignments for trip ${tripId}`);
-          await tx.delete(taskAssignments).where(eq(taskAssignments.tripId, tripId));
+          await tx.execute(
+            sql`DELETE FROM task_assignments WHERE trip_id = ${tripId}`
+          );
 
           // Delete activities
           console.log(`Deleting activities for trip ${tripId}`);
@@ -777,7 +782,9 @@ export function registerRoutes(app: Express): Server {
 
           // Delete travel recommendations
           console.log(`Deleting travel recommendations for trip ${tripId}`);
-          await tx.delete(travelRecommendations).where(eq(travelRecommendations.tripId, tripId));
+          await tx.execute(
+            sql`DELETE FROM travel_recommendations WHERE trip_id = ${tripId}`
+          );
           
           // Now it's safe to delete participants
           console.log(`Deleting participants for trip ${tripId}`);
