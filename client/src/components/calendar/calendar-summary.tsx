@@ -51,9 +51,14 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
     }
   });
 
-  // Reset form when selected activity changes
+  const openCreateDialog = () => {
+    setIsCreateDialogOpen(true);
+    resetForm();
+  };
+
   const resetForm = () => {
     if (activityToEdit) {
+      // Use activity data for editing
       const startDate = new Date(activityToEdit.startTime);
       const endDate = new Date(activityToEdit.endTime);
       
@@ -100,24 +105,22 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Create activity error:', errorText);
         throw new Error(`Failed to create activity: ${errorText}`);
       }
       
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
       setIsCreateDialogOpen(false);
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
       toast({
-        title: "Activity created",
-        description: "The activity has been added to your calendar."
+        title: "Success",
+        description: "Activity created successfully."
       });
-      form.reset();
     },
     onError: (error: Error) => {
       toast({
-        title: "Failed to create activity",
+        title: "Error",
         description: error.message,
         variant: "destructive"
       });
@@ -126,10 +129,8 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
 
   // Update activity mutation
   const updateActivityMutation = useMutation({
-    mutationFn: async (data: ActivityFormValues) => {
-      if (!activityToEdit) return null;
-      
-      const response = await fetch(`/api/trips/${trip.id}/activities/${activityToEdit.id}`, {
+    mutationFn: async (data: ActivityFormValues & { id: number }) => {
+      const response = await fetch(`/api/trips/${trip.id}/activities/${data.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -145,46 +146,41 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to update activity');
+        const errorText = await response.text();
+        throw new Error(`Failed to update activity: ${errorText}`);
       }
       
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
       setActivityToEdit(null);
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
       toast({
-        title: "Activity updated",
-        description: "The activity has been updated successfully."
+        title: "Success",
+        description: "Activity updated successfully."
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Failed to update activity",
+        title: "Error",
         description: error.message,
         variant: "destructive"
       });
     }
   });
 
-  // Delete activity mutation with proper optimistic updates
+  // Delete activity mutation
   const deleteActivityMutation = useMutation({
     mutationFn: async () => {
-      if (!activityToDelete) return null;
-      
-      console.log(`Deleting activity: ${activityToDelete.id} from trip: ${trip.id}`);
+      if (!activityToDelete) throw new Error("No activity to delete");
       
       const response = await fetch(`/api/trips/${trip.id}/activities/${activityToDelete.id}`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        credentials: 'include' // Add credentials to ensure cookies are sent
+        credentials: 'include'
       });
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Delete activity error:', errorText);
         throw new Error(`Failed to delete activity: ${errorText}`);
       }
       
@@ -232,62 +228,36 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
         );
       }
       
-      console.error('Delete activity mutation error:', error);
       toast({
-        title: "Failed to delete activity",
+        title: "Error",
         description: error.message,
         variant: "destructive"
       });
     },
-    onSuccess: (data) => {
-      console.log('Successfully deleted activity:', data);
-      
-      // Update the cache directly to ensure the deleted item is removed
-      queryClient.setQueryData<Activity[]>(
-        [`/api/trips/${trip.id}/activities`],
-        (old) => {
-          if (!old || !activityToDelete) return old;
-          // Filter out the deleted activity
-          return old.filter(activity => activity.id !== activityToDelete.id);
-        }
-      );
-      
-      // Clear the dialog state
+    onSuccess: () => {
       setActivityToDelete(null);
-      
       toast({
-        title: "Activity deleted",
-        description: "The activity has been permanently deleted."
+        title: "Success",
+        description: "Activity deleted successfully."
       });
     },
     onSettled: () => {
-      // Always force refresh the data from the server
+      // Always refetch after error or success to make sure our local data is in sync with the server
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
     }
   });
 
-  // Handle create form submission
   const handleCreateSubmit = (data: ActivityFormValues) => {
     createActivityMutation.mutate(data);
   };
 
-  // Handle edit form submission
   const handleEditSubmit = (data: ActivityFormValues) => {
-    updateActivityMutation.mutate(data);
+    if (!activityToEdit) return;
+    updateActivityMutation.mutate({ ...data, id: activityToEdit.id });
   };
 
-  // Handle delete confirmation - now simplified since optimistic updates are handled in the mutation
-  const handleDelete = () => {
-    if (!activityToDelete) return;
-    console.log('Confirming delete for activity:', activityToDelete);
+  const handleDeleteConfirm = () => {
     deleteActivityMutation.mutate();
-  };
-  
-  // Open the create dialog with default times
-  const openCreateDialog = () => {
-    setActivityToEdit(null);
-    resetForm();
-    setIsCreateDialogOpen(true);
   };
 
   // Group activities by date
@@ -305,89 +275,91 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
 
   return (
     <>
-      <div className="flex justify-end mb-4">
-        <Button onClick={openCreateDialog} className="gap-1">
-          <Plus className="h-4 w-4" />
-          Add Event
-        </Button>
-      </div>
-      
       <ScrollArea className="h-[calc(100vh-16rem)]">
         <div className="space-y-8 p-4">
-          {sortedDates.map((date) => (
-            <div key={date} className="space-y-4">
-              <h3 className="text-lg font-semibold sticky top-0 bg-background py-2">
-                {format(new Date(date), 'EEEE, MMMM d, yyyy')}
-              </h3>
-              <div className="space-y-4">
-                {groupedActivities[date]
-                  .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-                  .map((activity) => (
-                    <Card 
-                      key={activity.id} 
-                      className="p-4 cursor-pointer hover:bg-accent/10 transition-colors"
-                      onClick={() => {
-                        setActivityToEdit(activity);
-                        setTimeout(resetForm, 0);
-                      }}
+          {sortedDates.length > 0 ? (
+            sortedDates.map((date, index) => (
+              <div key={date} className="space-y-4">
+                <div className="flex justify-between items-center sticky top-0 bg-background py-2">
+                  <h3 className="text-lg font-semibold">
+                    {format(new Date(date), 'EEEE, MMMM d, yyyy')}
+                  </h3>
+                  {index === 0 && (
+                    <Button 
+                      onClick={openCreateDialog} 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-muted-foreground gap-1 bg-transparent hover:bg-accent/10"
                     >
-                      <div className="flex justify-between">
-                        <div className="space-y-2 flex-1">
-                          <h4 className="font-medium">{activity.title}</h4>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <div className="flex items-center gap-1">
-                              <Clock className="h-4 w-4" />
-                              <span>
-                                {format(new Date(activity.startTime), 'h:mm a')} -{' '}
-                                {format(new Date(activity.endTime), 'h:mm a')}
-                              </span>
-                            </div>
-                            {activity.location && (
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Event
+                    </Button>
+                  )}
+                </div>
+                <div className="space-y-4">
+                  {groupedActivities[date]
+                    .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+                    .map((activity) => (
+                      <Card 
+                        key={activity.id} 
+                        className="p-4 cursor-pointer hover:bg-accent/10 transition-colors"
+                        onClick={() => {
+                          setActivityToEdit(activity);
+                          setTimeout(resetForm, 0);
+                        }}
+                      >
+                        <div className="flex justify-between">
+                          <div className="space-y-2 flex-1">
+                            <h4 className="font-medium">{activity.title}</h4>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
                               <div className="flex items-center gap-1">
-                                <MapPin className="h-4 w-4" />
-                                <span>{activity.location}</span>
+                                <Clock className="h-4 w-4" />
+                                <span>
+                                  {format(new Date(activity.startTime), 'h:mm a')} -{' '}
+                                  {format(new Date(activity.endTime), 'h:mm a')}
+                                </span>
                               </div>
-                            )}
+                              {activity.location && (
+                                <div className="flex items-center gap-1">
+                                  <MapPin className="h-4 w-4" />
+                                  <span>{activity.location}</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          {activity.description && (
-                            <p className="text-sm text-muted-foreground mt-2">
-                              {activity.description}
-                            </p>
-                          )}
+                          
+                          <div className="flex space-x-2 items-start">
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation(); // Prevent triggering the card's click event
+                                setActivityToEdit(activity);
+                                setTimeout(resetForm, 0);
+                              }}
+                            >
+                              <Edit className="h-4 w-4" />
+                              <span className="sr-only">Edit</span>
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation(); // Prevent triggering the card's click event
+                                setActivityToDelete(activity);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                              <span className="sr-only">Delete</span>
+                            </Button>
+                          </div>
                         </div>
-                        
-                        <div className="flex space-x-2 items-start">
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation(); // Prevent triggering the card's click event
-                              setActivityToEdit(activity);
-                              setTimeout(resetForm, 0);
-                            }}
-                          >
-                            <Edit className="h-4 w-4" />
-                            <span className="sr-only">Edit</span>
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation(); // Prevent triggering the card's click event
-                              setActivityToDelete(activity);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                            <span className="sr-only">Delete</span>
-                          </Button>
-                        </div>
-                      </div>
-                    </Card>
-                  ))}
+                      </Card>
+                    ))}
+                </div>
               </div>
-            </div>
-          ))}
-          {sortedDates.length === 0 && (
+            ))
+          ) : (
             <div className="text-center text-muted-foreground py-8">
               No activities scheduled yet
             </div>
@@ -414,25 +386,12 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
                   <FormItem>
                     <FormLabel>Title</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Event title" required />
+                      <Input placeholder="Event title" {...field} />
                     </FormControl>
                   </FormItem>
                 )}
               />
               
-              <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Location</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Location (optional)" />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -441,7 +400,7 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
                     <FormItem>
                       <FormLabel>Start Time</FormLabel>
                       <FormControl>
-                        <Input {...field} type="datetime-local" required />
+                        <Input type="datetime-local" {...field} />
                       </FormControl>
                     </FormItem>
                   )}
@@ -454,12 +413,25 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
                     <FormItem>
                       <FormLabel>End Time</FormLabel>
                       <FormControl>
-                        <Input {...field} type="datetime-local" required />
+                        <Input type="datetime-local" {...field} />
                       </FormControl>
                     </FormItem>
                   )}
                 />
               </div>
+              
+              <FormField
+                control={form.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Event location (optional)" {...field} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
               
               <FormField
                 control={form.control}
@@ -469,9 +441,9 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
                     <FormLabel>Description</FormLabel>
                     <FormControl>
                       <Textarea 
-                        {...field}
-                        placeholder="Add a description (optional)"
+                        placeholder="Event description (optional)" 
                         className="min-h-[100px]"
+                        {...field} 
                       />
                     </FormControl>
                   </FormItem>
@@ -479,18 +451,8 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
               />
               
               <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsCreateDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  type="submit"
-                  disabled={createActivityMutation.isPending}
-                >
-                  {createActivityMutation.isPending ? "Creating..." : "Create Event"}
+                <Button type="submit" disabled={createActivityMutation.isPending}>
+                  {createActivityMutation.isPending ? 'Creating...' : 'Create Event'}
                 </Button>
               </DialogFooter>
             </form>
@@ -502,9 +464,9 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
       <Dialog open={!!activityToEdit} onOpenChange={(open) => !open && setActivityToEdit(null)}>
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
-            <DialogTitle>Edit Activity</DialogTitle>
+            <DialogTitle>Edit Event</DialogTitle>
             <DialogDescription>
-              Update the details for this activity. Click save when you're done.
+              Make changes to this event. Click save when you're done.
             </DialogDescription>
           </DialogHeader>
           
@@ -517,25 +479,12 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
                   <FormItem>
                     <FormLabel>Title</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="Activity title" required />
+                      <Input placeholder="Event title" {...field} />
                     </FormControl>
                   </FormItem>
                 )}
               />
               
-              <FormField
-                control={form.control}
-                name="location"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Location</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Location (optional)" />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -544,7 +493,7 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
                     <FormItem>
                       <FormLabel>Start Time</FormLabel>
                       <FormControl>
-                        <Input {...field} type="datetime-local" required />
+                        <Input type="datetime-local" {...field} />
                       </FormControl>
                     </FormItem>
                   )}
@@ -557,12 +506,25 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
                     <FormItem>
                       <FormLabel>End Time</FormLabel>
                       <FormControl>
-                        <Input {...field} type="datetime-local" required />
+                        <Input type="datetime-local" {...field} />
                       </FormControl>
                     </FormItem>
                   )}
                 />
               </div>
+              
+              <FormField
+                control={form.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Event location (optional)" {...field} />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
               
               <FormField
                 control={form.control}
@@ -572,9 +534,9 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
                     <FormLabel>Description</FormLabel>
                     <FormControl>
                       <Textarea 
-                        {...field}
-                        placeholder="Add a description (optional)"
+                        placeholder="Event description (optional)" 
                         className="min-h-[100px]"
+                        {...field} 
                       />
                     </FormControl>
                   </FormItem>
@@ -582,42 +544,40 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
               />
               
               <DialogFooter>
-                <Button
-                  type="button"
+                <Button 
                   variant="outline"
+                  type="button"
                   onClick={() => setActivityToEdit(null)}
+                  className="mr-2"
                 >
                   Cancel
                 </Button>
-                <Button 
-                  type="submit"
-                  disabled={updateActivityMutation.isPending}
-                >
-                  {updateActivityMutation.isPending ? "Saving..." : "Save Changes"}
+                <Button type="submit" disabled={updateActivityMutation.isPending}>
+                  {updateActivityMutation.isPending ? 'Saving...' : 'Save Changes'}
                 </Button>
               </DialogFooter>
             </form>
           </Form>
         </DialogContent>
       </Dialog>
-
-      {/* Delete Activity Confirmation */}
+      
+      {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!activityToDelete} onOpenChange={(open) => !open && setActivityToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Activity</AlertDialogTitle>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this activity? This action cannot be undone.
+              This will permanently delete the event "{activityToDelete?.title}". This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel onClick={() => setActivityToDelete(null)}>Cancel</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={handleDeleteConfirm}
               disabled={deleteActivityMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleteActivityMutation.isPending ? "Deleting..." : "Delete"}
+              {deleteActivityMutation.isPending ? 'Deleting...' : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
