@@ -113,7 +113,8 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json'
-        }
+        },
+        credentials: 'include' // Add credentials to ensure cookies are sent
       });
       
       if (!response.ok) {
@@ -181,18 +182,21 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
         [`/api/trips/${trip.id}/activities`],
         (old) => {
           if (!old || !activityToDelete) return old;
+          // Filter out the deleted activity
           return old.filter(activity => activity.id !== activityToDelete.id);
         }
       );
       
+      // Clear the dialog state
       setActivityToDelete(null);
+      
       toast({
         title: "Activity deleted",
-        description: "The activity has been deleted successfully."
+        description: "The activity has been permanently deleted."
       });
     },
     onSettled: () => {
-      // Always ensure a clean state by invalidating after any mutation
+      // Always force refresh the data from the server
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
     }
   });

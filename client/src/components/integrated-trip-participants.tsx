@@ -357,15 +357,29 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
 
   const updateParticipantMutation = useMutation({
     mutationFn: async ({ id, status }: { id: number; status?: string }) => {
-      const res = await fetch(`/api/trips/${tripId}/participants/${id}`, {
+      console.log(`Updating participant ${id} status to ${status}`);
+      
+      // Use the dedicated status update endpoint instead of the general update endpoint
+      const res = await fetch(`/api/trips/${tripId}/participants/${id}/status`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
+        credentials: 'include', // Include cookies with the request
         body: JSON.stringify({ status }),
       });
 
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.message || "Failed to update participant");
+        const errorText = await res.text();
+        console.error('Update participant status error:', errorText);
+        let errorMessage;
+        try {
+          // Try to parse as JSON
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || "Failed to update participant status";
+        } catch {
+          // If it's not valid JSON, use the raw text
+          errorMessage = errorText || "Failed to update participant status";
+        }
+        throw new Error(errorMessage);
       }
 
       return res.json();
@@ -477,6 +491,7 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
   };
 
   const updateParticipantStatus = (participantId: number, status: Status) => {
+    console.log(`updateParticipantStatus called for participant ${participantId} with status ${status}`);
     setUpdatingParticipants(prev => [...prev, participantId]);
     
     // Update the status directly in the UI first for immediate feedback
@@ -488,6 +503,12 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
         p.id === participantId ? { ...p, status } : p
       );
       
+      console.log('Applying optimistic update for status change', { 
+        participantId, 
+        status, 
+        updatedCount: updatedParticipants.length 
+      });
+      
       // Set the updated data in the cache
       queryClient.setQueryData([`/api/trips/${tripId}/participants`], updatedParticipants);
     }
@@ -496,7 +517,9 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
     updateParticipantMutation.mutate(
       { id: participantId, status },
       {
-        onError: () => {
+        onError: (error) => {
+          console.error('Status update error:', error);
+          
           // If there was an error, revert back to previous data
           if (previousParticipants) {
             queryClient.setQueryData(
@@ -507,7 +530,7 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
           
           toast({
             title: "Status update failed",
-            description: "Failed to update participant status",
+            description: error.message || "Failed to update participant status",
             variant: "destructive"
           });
         },
@@ -515,9 +538,21 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
           // Always clear the updating state
           setUpdatingParticipants(prev => prev.filter(id => id !== participantId));
         },
-        onSuccess: () => {
-          // Refetch to ensure data consistency
-          queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+        onSuccess: (data) => {
+          console.log('Status update success:', data);
+          // Update the cache directly with the server response
+          queryClient.setQueryData<Participant[]>(
+            [`/api/trips/${tripId}/participants`],
+            (old) => {
+              if (!old) return old;
+              return old.map(p => p.id === participantId ? { ...p, status: data.status } : p);
+            }
+          );
+          
+          toast({
+            title: "Status updated",
+            description: `Participant status changed to ${STATUS_LABELS[status as Status]}`,
+          });
         }
       }
     );
