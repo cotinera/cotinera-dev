@@ -239,7 +239,14 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
                 {groupedActivities[date]
                   .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
                   .map((activity) => (
-                    <Card key={activity.id} className="p-4">
+                    <Card 
+                      key={activity.id} 
+                      className="p-4 cursor-pointer hover:bg-accent/10 transition-colors"
+                      onClick={() => {
+                        setActivityToEdit(activity);
+                        setTimeout(resetForm, 0);
+                      }}
+                    >
                       <div className="flex justify-between">
                         <div className="space-y-2 flex-1">
                           <h4 className="font-medium">{activity.title}</h4>
@@ -269,9 +276,9 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
                           <Button 
                             variant="ghost" 
                             size="icon"
-                            onClick={() => {
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent triggering the card's click event
                               setActivityToEdit(activity);
-                              // Set timeout to ensure dialog is open before setting form values
                               setTimeout(resetForm, 0);
                             }}
                           >
@@ -281,7 +288,10 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
                           <Button 
                             variant="ghost" 
                             size="icon"
-                            onClick={() => setActivityToDelete(activity)}
+                            onClick={(e) => {
+                              e.stopPropagation(); // Prevent triggering the card's click event
+                              setActivityToDelete(activity);
+                            }}
                           >
                             <Trash2 className="h-4 w-4 text-destructive" />
                             <span className="sr-only">Delete</span>

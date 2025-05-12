@@ -684,14 +684,15 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: "Trip not found" });
       }
 
-      // Delete all related data in the correct order to respect foreign key constraints
+      // Use a try-catch in a transaction to handle cascading deletes 
+      // with proper error handling in SQL - more reliable than ORM object deletion
       await db.transaction(async (tx) => {
         try {
           // First, clear all foreign key references from participants to accommodations
           console.log(`Clearing accommodation references from participants for trip ${tripId}`);
-          await tx.update(participants)
-            .set({ accommodationId: null })
-            .where(eq(participants.tripId, tripId));
+          await tx.execute(
+            sql`UPDATE participants SET accommodation_id = NULL WHERE trip_id = ${tripId}`
+          );
 
           // Delete custom values for participants
           console.log(`Deleting custom values for trip ${tripId}`);
@@ -707,16 +708,17 @@ export function registerRoutes(app: Express): Server {
 
           // Delete expenses
           console.log(`Deleting expenses for trip ${tripId}`);
-          await tx.delete(expenses).where(eq(expenses.tripId, tripId));
+          await tx.execute(
+            sql`DELETE FROM expenses WHERE trip_id = ${tripId}`
+          );
 
-          // Note: Importing the tables directly since we're using custom SQL anyway
           // Delete activity votes - using raw SQL since it's a nested query
           console.log(`Deleting activity votes for trip ${tripId}`);
           await tx.execute(
             sql`DELETE FROM activity_votes WHERE suggestion_id IN (SELECT id FROM activity_suggestions WHERE trip_id = ${tripId})`
           );
 
-          // Delete activity suggestions - using raw SQL to avoid import errors
+          // Delete activity suggestions 
           console.log(`Deleting activity suggestions for trip ${tripId}`);
           await tx.execute(
             sql`DELETE FROM activity_suggestions WHERE trip_id = ${tripId}`
@@ -724,7 +726,9 @@ export function registerRoutes(app: Express): Server {
 
           // Delete chat messages
           console.log(`Deleting chat messages for trip ${tripId}`);
-          await tx.delete(chatMessages).where(eq(chatMessages.tripId, tripId));
+          await tx.execute(
+            sql`DELETE FROM chat_messages WHERE trip_id = ${tripId}`
+          );
 
           // Delete task assignments
           console.log(`Deleting task assignments for trip ${tripId}`);
