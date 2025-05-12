@@ -838,6 +838,7 @@ export function TripIdeasAndPlaces({
                       onSubmit={onAddIdeaSubmit}
                       onCancel={() => setIsAddDialogOpen(false)}
                       isPending={addIdeaMutation.isPending}
+                      defaultMapLocation={tripCoordinates}
                     />
                   </DialogContent>
                 </Dialog>
@@ -1161,7 +1162,9 @@ export function TripIdeasAndPlaces({
                 ownerId: editingIdea.ownerId,
                 plannedDate: editingIdea.plannedDate ? new Date(editingIdea.plannedDate) : undefined,
                 plannedTime: editingIdea.plannedTime || "",
+                coordinates: editingIdea.coordinates
               } : undefined}
+              defaultMapLocation={tripCoordinates}
             />
           </DialogContent>
         </Dialog>

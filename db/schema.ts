@@ -315,6 +315,7 @@ export const tripIdeas = pgTable("trip_ideas", {
   status: text("status").notNull().default("pending"), // pending, booked, unsure
   ownerId: integer("owner_id").references(() => users.id), // optional owner
   location: text("location"),
+  coordinates: jsonb("coordinates").default('{}'),
   votes: integer("votes").default(0),
   plannedDate: timestamp("planned_date"), // optional date for the idea
   plannedTime: text("planned_time"), // optional time for the idea (stored as string in format HH:MM)
