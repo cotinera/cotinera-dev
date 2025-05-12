@@ -3,8 +3,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { format, addHours } from "date-fns";
 import { Clock, MapPin, Edit, Trash2, X, Plus } from "lucide-react";
 import type { Trip, Activity } from "@db/schema";
-import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { MapPicker } from "@/components/map-picker";
 
 interface CalendarSummaryProps {
   trip: Trip;
@@ -38,6 +39,24 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
   const [activityToEdit, setActivityToEdit] = useState<Activity | null>(null);
   const [activityToDelete, setActivityToDelete] = useState<Activity | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+  
+  // Extract trip coordinates from the trip's location or coordinates
+  const tripCoordinates = trip.coordinates || null;
+  
+  // Get pinned places for this trip to show on the map
+  const { data: pinnedPlacesData } = useQuery({
+    queryKey: [`/api/trips/${trip.id}/pinned-places`],
+    queryFn: async () => {
+      const res = await fetch(`/api/trips/${trip.id}/pinned-places`);
+      if (!res.ok) throw new Error("Failed to fetch pinned places");
+      return res.json();
+    },
+    enabled: !!trip.id,
+  });
+  
+  // Extract the pinned places for use in the map
+  const pinnedPlaces = pinnedPlacesData?.places || [];
 
   // Setup form for editing activities
   const form = useForm<ActivityFormValues>({
@@ -50,9 +69,28 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
       endTime: ""
     }
   });
+  
+  // Helper functions for coordinates
+  const logCoordinates = () => {
+    console.log("No location coordinates available");
+    console.log("Effective location being used:", selectedCoordinates);
+    console.log("Trip coordinates:", tripCoordinates);
+    console.log("Selected coordinates:", selectedCoordinates);
+  };
+  
+  useEffect(() => {
+    // When dialog opens, log coordinates info for debugging
+    if (isCreateDialogOpen) {
+      logCoordinates();
+    }
+  }, [isCreateDialogOpen]);
 
   const openCreateDialog = () => {
     setIsCreateDialogOpen(true);
+    // Initialize selectedCoordinates with trip coordinates when creating a new event
+    if (tripCoordinates) {
+      setSelectedCoordinates(tripCoordinates);
+    }
     resetForm();
   };
 
@@ -61,6 +99,11 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
       // Use activity data for editing
       const startDate = new Date(activityToEdit.startTime);
       const endDate = new Date(activityToEdit.endTime);
+      
+      // If editing, use the activity's coordinates if available
+      if (activityToEdit.coordinates) {
+        setSelectedCoordinates(activityToEdit.coordinates);
+      }
       
       form.reset({
         title: activityToEdit.title,
@@ -74,6 +117,11 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
       const now = new Date();
       const startTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0);
       const endTime = addHours(startTime, 1);
+      
+      // For new activities, use trip coordinates if available
+      if (tripCoordinates && !selectedCoordinates) {
+        setSelectedCoordinates(tripCoordinates);
+      }
       
       form.reset({
         title: "",
@@ -98,6 +146,7 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
           title: data.title,
           description: data.description || null,
           location: data.location || null,
+          coordinates: selectedCoordinates,
           startTime: new Date(data.startTime).toISOString(),
           endTime: new Date(data.endTime).toISOString()
         })
@@ -112,6 +161,7 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
     },
     onSuccess: () => {
       setIsCreateDialogOpen(false);
+      setSelectedCoordinates(null);
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
       toast({
         title: "Success",
@@ -140,6 +190,7 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
           title: data.title,
           description: data.description || null,
           location: data.location || null,
+          coordinates: selectedCoordinates,
           startTime: new Date(data.startTime).toISOString(),
           endTime: new Date(data.endTime).toISOString()
         })
@@ -154,6 +205,7 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
     },
     onSuccess: () => {
       setActivityToEdit(null);
+      setSelectedCoordinates(null);
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
       toast({
         title: "Success",
