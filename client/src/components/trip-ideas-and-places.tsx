@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PlusCircle, ThumbsUp, Edit, Trash2, MapPin, Calendar as CalendarIcon, Map, Compass } from "lucide-react";
+import { PlusCircle, ThumbsUp, Edit, Trash2, MapPin, Calendar as CalendarIcon, Map, Compass, Plus } from "lucide-react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import axios from "axios";
@@ -455,8 +455,17 @@ export function TripIdeasAndPlaces({
       const endDate = new Date(data.date);
       endDate.setHours(endHours, endMinutes, 0);
 
+      // Type guard functions
+      const isIdea = (item: TripIdea | PinnedPlace): item is TripIdea => {
+        return 'title' in item && 'status' in item;
+      };
+      
+      const isPlace = (item: TripIdea | PinnedPlace): item is PinnedPlace => {
+        return 'name' in item && 'address' in item;
+      };
+      
       // Prepare payload based on whether it's an idea or a place
-      const payload = data.isIdea 
+      const payload = data.isIdea && isIdea(data.item)
         ? {
             title: data.item.title,
             description: data.item.description || '',
@@ -465,14 +474,23 @@ export function TripIdeasAndPlaces({
             startTime: startDate.toISOString(),
             endTime: endDate.toISOString()
           }
-        : {
-            title: data.item.name,
-            description: data.item.notes || '',
-            location: data.item.address,
-            coordinates: data.item.coordinates,
-            startTime: startDate.toISOString(),
-            endTime: endDate.toISOString()
-          };
+        : !data.isIdea && isPlace(data.item)
+          ? {
+              title: data.item.name,
+              description: data.item.notes || '',
+              location: data.item.address,
+              coordinates: data.item.coordinates,
+              startTime: startDate.toISOString(),
+              endTime: endDate.toISOString()
+            }
+          : {
+              title: 'Event',
+              description: '',
+              location: '',
+              coordinates: null,
+              startTime: startDate.toISOString(),
+              endTime: endDate.toISOString()
+            };
 
       const res = await fetch(`/api/trips/${tripId}/activities`, {
         method: "POST",

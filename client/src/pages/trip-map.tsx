@@ -5,7 +5,7 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import type { Trip } from "@db/schema";
 import { TripHeaderEdit } from "@/components/trip-header-edit";
 import { MapView } from "@/components/map-view";
-import { PinnedPlaces } from "@/components/pinned-places";
+import { TripIdeasAndPlaces } from "@/components/trip-ideas-and-places";
 import { TripDestinations } from "@/components/trip-destinations";
 import { useState } from "react";
 import type { PinnedPlace } from "@/lib/google-maps";
@@ -31,6 +31,16 @@ export default function TripMap() {
     queryFn: async () => {
       const res = await fetch(`/api/trips/${tripId}/pinned-places`);
       if (!res.ok) throw new Error("Failed to fetch pinned places");
+      return res.json();
+    },
+    enabled: !!tripId,
+  });
+  
+  const { data: participantsData } = useQuery({
+    queryKey: [`/api/trips/${tripId}/participants`],
+    queryFn: async () => {
+      const res = await fetch(`/api/trips/${tripId}/participants`);
+      if (!res.ok) throw new Error("Failed to fetch participants");
       return res.json();
     },
     enabled: !!tripId,
@@ -110,11 +120,10 @@ export default function TripMap() {
           </section>
 
           <section>
-            <PinnedPlaces
+            <TripIdeasAndPlaces
               tripId={trip.id}
-              defaultLocation={trip.location || ""}
-              showMap={false}
-              onPinClick={handlePinClick}
+              participants={[]}
+              tripCoordinates={trip.coordinates || undefined}
             />
           </section>
         </div>
