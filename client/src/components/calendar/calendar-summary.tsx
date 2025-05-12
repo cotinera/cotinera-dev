@@ -479,7 +479,19 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
                   <FormItem>
                     <FormLabel>Location</FormLabel>
                     <FormControl>
-                      <Input placeholder="Event location (optional)" {...field} />
+                      <div className="h-[400px]">
+                        <MapPicker
+                          value={field.value}
+                          onChange={(address, coordinates) => {
+                            field.onChange(address);
+                            setSelectedCoordinates(coordinates);
+                          }}
+                          placeholder="Search for a location or click on the map"
+                          initialCenter={selectedCoordinates || tripCoordinates}
+                          existingPins={pinnedPlaces}
+                          searchBias={tripCoordinates}
+                        />
+                      </div>
                     </FormControl>
                   </FormItem>
                 )}
@@ -572,7 +584,19 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
                   <FormItem>
                     <FormLabel>Location</FormLabel>
                     <FormControl>
-                      <Input placeholder="Event location (optional)" {...field} />
+                      <div className="h-[400px]">
+                        <MapPicker
+                          value={field.value}
+                          onChange={(address, coordinates) => {
+                            field.onChange(address);
+                            setSelectedCoordinates(coordinates);
+                          }}
+                          placeholder="Search for a location or click on the map"
+                          initialCenter={selectedCoordinates || tripCoordinates}
+                          existingPins={pinnedPlaces}
+                          searchBias={tripCoordinates}
+                        />
+                      </div>
                     </FormControl>
                   </FormItem>
                 )}
