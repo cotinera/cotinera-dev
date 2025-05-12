@@ -10,7 +10,8 @@ import {
   UserIcon, 
   TagIcon,
   ChevronDownIcon,
-  XIcon
+  XIcon,
+  MapIcon
 } from "lucide-react";
 
 // Helper function to safely display date
@@ -45,6 +46,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LocationSearchBar } from "./location-search-bar";
+import { MapPicker } from "./map-picker";
 import { cn } from "@/lib/utils";
 
 // Define the TripIdea schema for form validation
@@ -111,7 +113,8 @@ export function ExpandableTripIdeaForm({
       location: initialValues?.location || "",
       ownerId: initialValues?.ownerId,
       plannedDate: initialValues?.plannedDate,
-      plannedTime: initialValues?.plannedTime || ""
+      plannedTime: initialValues?.plannedTime || "",
+      coordinates: initialValues?.coordinates || defaultMapLocation
     },
   });
 
@@ -319,14 +322,22 @@ export function ExpandableTripIdeaForm({
               {expandedSections.location && (
                 <div className="px-4 pb-3 pt-0">
                   <div className="ml-7">
-                    <LocationSearchBar
+                    <MapPicker
                       value={form.watch("location") || ""}
-                      onChange={(address) => {
+                      onChange={(address, coordinates, name) => {
                         form.setValue("location", address || "");
+                        if (coordinates) {
+                          form.setValue("coordinates", coordinates);
+                        }
                       }}
                       placeholder="Search for a location..."
-                      className="w-full"
+                      initialCenter={form.watch("coordinates") || defaultMapLocation}
+                      searchBias={defaultMapLocation}
                     />
+                    <div className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                      <MapIcon className="h-3 w-3" />
+                      <span>Search or click on the map to select a location</span>
+                    </div>
                   </div>
                 </div>
               )}
