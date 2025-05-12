@@ -116,7 +116,7 @@ export function NLPEventCreator({ trip }: NLPEventCreatorProps) {
         <Input
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="Create event... e.g. 'Film at 7pm on Friday'"
+          placeholder="e.g. 'Film at 7pm on Friday'"
           className="flex-1"
           disabled={isProcessing}
         />

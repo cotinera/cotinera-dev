@@ -119,7 +119,7 @@ export default function TripCalendar() {
           </p>
           
           <div className="mt-4">
-            <h3 className="text-sm font-medium mb-2">Create Quick Event</h3>
+            <h3 className="text-sm font-medium mb-2">Create Event</h3>
             <NLPEventCreator trip={trip} />
           </div>
         </div>
