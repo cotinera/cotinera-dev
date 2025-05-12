@@ -425,6 +425,8 @@ function EventForm({
                       }
                     }}
                     placeholder="Search for a location..."
+                    initialCenter={form.getValues('coordinates') || trip.coordinates}
+                    searchBias={trip.coordinates}
                   />
                 </div>
               </FormControl>
