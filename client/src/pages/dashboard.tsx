@@ -4,7 +4,8 @@ import { useTutorial } from "@/hooks/use-tutorial";
 import { Button } from "@/components/ui/button";
 import { TripCard } from "@/components/trip-card";
 import { TravelGuide } from "@/components/travel-guide";
-import { Plus, LogOut, Trash2, Settings, DoorOpen, UserCircle } from "lucide-react";
+import { Plus, LogOut, Trash2, Settings, UserCircle } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Link } from "wouter";
@@ -227,7 +228,7 @@ export default function Dashboard() {
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">Personal Group Coordinator</h1>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Dialog open={isPreferencesOpen} onOpenChange={setIsPreferencesOpen}>
               <DialogTrigger asChild>
                 <Button variant="ghost" size="icon" title="Travel Preferences">
@@ -243,15 +244,24 @@ export default function Dashboard() {
             </Dialog>
             
             {user ? (
-              <Button variant="ghost" size="icon" title="Logout" onClick={() => logout()}>
-                <LogOut className="h-5 w-5" />
-              </Button>
+              <div className="flex items-center gap-3">
+                <div className="hidden md:flex items-center gap-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user.avatar || ""} alt={user.name || user.email} />
+                    <AvatarFallback>
+                      {user.name ? user.name.charAt(0).toUpperCase() : "U"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="text-sm font-medium">{user.name || user.email}</span>
+                </div>
+                <Button variant="ghost" size="icon" title="Logout" onClick={() => logout()}>
+                  <LogOut className="h-5 w-5" />
+                </Button>
+              </div>
             ) : (
-              <Button variant="ghost" size="icon" title="Login/Register" asChild>
-                <Link href="/auth">
-                  <DoorOpen className="h-5 w-5" />
-                </Link>
-              </Button>
+              <Link href="/auth">
+                <Button>Login</Button>
+              </Link>
             )}
           </div>
         </div>

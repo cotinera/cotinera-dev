@@ -47,7 +47,6 @@ function App() {
         <AuthProvider>
           <TutorialProvider>
             <div className="flex flex-col min-h-screen">
-              <AppHeader />
               <main className="flex-1">
                 <Router />
               </main>
