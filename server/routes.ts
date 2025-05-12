@@ -676,47 +676,98 @@ export function registerRoutes(app: Express): Server {
   app.delete("/api/trips/:id", async (req, res) => {
     try {
       const tripId = parseInt(req.params.id);
+      console.log(`Starting deletion process for trip ${tripId}`);
 
-      // Delete all related data in the correct order
+      // Delete all related data in the correct order to respect foreign key constraints
       await db.transaction(async (tx) => {
+        // First, check if the trip exists
+        const [tripCheck] = await tx.select().from(trips).where(eq(trips.id, tripId)).limit(1);
+        if (!tripCheck) {
+          throw new Error("Trip not found");
+        }
+
+        // Delete expense splits first (they reference expenses)
+        console.log(`Deleting expense splits for trip ${tripId}`);
+        await tx.delete(expenseSplits)
+          .where(
+            eq(expenseSplits.expenseId, 
+              sql`ANY(SELECT id FROM ${expenses} WHERE trip_id = ${tripId})`
+            )
+          );
+
+        // Delete expenses
+        console.log(`Deleting expenses for trip ${tripId}`);
+        await tx.delete(expenses).where(eq(expenses.tripId, tripId));
+
         // Delete chat messages
+        console.log(`Deleting chat messages for trip ${tripId}`);
         await tx.delete(chatMessages).where(eq(chatMessages.tripId, tripId));
 
         // Delete activities
+        console.log(`Deleting activities for trip ${tripId}`);
         await tx.delete(activities).where(eq(activities.tripId, tripId));
 
         // Delete checklist items
+        console.log(`Deleting checklist items for trip ${tripId}`);
         await tx.delete(checklist).where(eq(checklist.tripId, tripId));
 
-        // Delete flights
-        await tx.delete(flights).where(eq(flights.tripId, tripId));
-
-        // Delete accommodations
-        await tx.delete(accommodations).where(eq(accommodations.tripId, tripId));
-
-        // Delete participants
-        await tx.delete(participants).where(eq(participants.tripId, tripId));
-
-        // Delete destinations
-        await tx.delete(destinations).where(eq(destinations.tripId, tripId));
-
-        // Delete share links
-        await tx.delete(shareLinks).where(eq(shareLinks.tripId, tripId));
-
-        // Delete pinned places
-        await tx.delete(pinnedPlaces).where(eq(pinnedPlaces.tripId, tripId));
+        // Delete poll votes before polls
+        console.log(`Deleting poll votes for trip ${tripId}`);
+        await tx.delete(pollVotes)
+          .where(
+            eq(pollVotes.pollId, 
+              sql`ANY(SELECT id FROM ${polls} WHERE trip_id = ${tripId})`
+            )
+          );
 
         // Delete polls
+        console.log(`Deleting polls for trip ${tripId}`);
         await tx.delete(polls).where(eq(polls.tripId, tripId));
 
+        // Delete trip ideas
+        console.log(`Deleting trip ideas for trip ${tripId}`);
+        await tx.delete(tripIdeas).where(eq(tripIdeas.tripId, tripId));
+
+        // Delete flights
+        console.log(`Deleting flights for trip ${tripId}`);
+        await tx.delete(flights).where(eq(flights.tripId, tripId));
+
+        // Delete pinned places
+        console.log(`Deleting pinned places for trip ${tripId}`);
+        await tx.delete(pinnedPlaces).where(eq(pinnedPlaces.tripId, tripId));
+
+        // Delete share links
+        console.log(`Deleting share links for trip ${tripId}`);
+        await tx.delete(shareLinks).where(eq(shareLinks.tripId, tripId));
+
+        // Delete custom values
+        console.log(`Deleting custom values for trip ${tripId}`);
+        await tx.delete(customValues).where(eq(customValues.tripId, tripId));
+
+        // Delete custom columns
+        console.log(`Deleting custom columns for trip ${tripId}`);
+        await tx.delete(customColumns).where(eq(customColumns.tripId, tripId));
+
+        // Important fix - delete participants before accommodations
+        // since participants reference accommodations via participants_accommodation_id_fkey
+        console.log(`Deleting participants for trip ${tripId}`);
+        await tx.delete(participants).where(eq(participants.tripId, tripId));
+
+        // Now it's safe to delete accommodations
+        console.log(`Deleting accommodations for trip ${tripId}`);
+        await tx.delete(accommodations).where(eq(accommodations.tripId, tripId));
+
+        // Delete destinations
+        console.log(`Deleting destinations for trip ${tripId}`);
+        await tx.delete(destinations).where(eq(destinations.tripId, tripId));
+
         // Finally, delete the trip
+        console.log(`Deleting the trip ${tripId} itself`);
         const [deletedTrip] = await tx.delete(trips)
           .where(eq(trips.id, tripId))
           .returning();
 
-        if (!deletedTrip) {
-          throw new Error("Trip not found");
-        }
+        console.log(`Trip ${tripId} deleted successfully`);
       });
 
       res.json({ success: true, message: "Trip and all related data deleted successfully" });
