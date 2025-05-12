@@ -268,6 +268,24 @@ export function TripIdeas({ tripId, participants }: TripIdeasProps) {
       deleteIdeaMutation.mutate(ideaId);
     }
   };
+  
+  const handleAddToCalendar = () => {
+    if (!ideaToAddToCalendar || !selectedDate) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select a date",
+      });
+      return;
+    }
+
+    addToCalendarMutation.mutate({
+      idea: ideaToAddToCalendar,
+      date: selectedDate,
+      startTime,
+      endTime
+    });
+  };
 
   const filteredIdeas = Array.isArray(ideas) ? ideas.filter((idea: any) => {
     if (activeTab === "all") return true;
@@ -401,6 +419,15 @@ export function TripIdeas({ tripId, participants }: TripIdeasProps) {
                           <Button 
                             variant="ghost" 
                             size="sm"
+                            className="h-7 px-2 text-xs flex items-center gap-1"
+                            onClick={() => setIdeaToAddToCalendar(idea)}
+                          >
+                            <Calendar className="h-3 w-3" />
+                            <span className="font-normal">Add to Calendar</span>
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
                             className="h-7 w-7 p-0"
                             onClick={() => handleEditClick(idea)}
                           >
@@ -473,6 +500,56 @@ export function TripIdeas({ tripId, participants }: TripIdeasProps) {
                 plannedTime: editingIdea.plannedTime || "",
               } : undefined}
             />
+          </DialogContent>
+        </Dialog>
+        
+        {/* Add to Calendar Dialog */}
+        <Dialog open={!!ideaToAddToCalendar} onOpenChange={(open) => !open && setIdeaToAddToCalendar(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add to Calendar</DialogTitle>
+              <DialogDescription>
+                Select a date and time to add {ideaToAddToCalendar?.title} to your trip calendar.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <h4 className="font-medium">Select Date</h4>
+                <CalendarComponent
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  className="border rounded-md mx-auto"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <h4 className="font-medium">Start Time</h4>
+                  <Input
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <h4 className="font-medium">End Time</h4>
+                  <Input
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                onClick={handleAddToCalendar}
+                disabled={!selectedDate || addToCalendarMutation.isPending}
+              >
+                {addToCalendarMutation.isPending ? "Adding..." : "Add to Calendar"}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </CardContent>
