@@ -437,42 +437,94 @@ export function TripParticipantDetails({ tripId }: TripParticipantDetailsProps) 
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ participantId, status }: { participantId: number; status: Status }) => {
-      setUpdatingParticipants(prev => [...prev, participantId]);
       try {
+        console.log(`Updating participant ${participantId} status to ${status}`);
         const res = await fetch(`/api/trips/${tripId}/participants/${participantId}/status`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status }),
+          credentials: "include",
         });
 
+        // Log the entire response for debugging
+        console.log(`Status update response status: ${res.status}`);
+        
+        // Handle non-OK responses properly
         if (!res.ok) {
-          const error = await res.json();
-          throw new Error(error.message || "Failed to update status");
+          let errorMessage = `Failed to update status (${res.status})`;
+          try {
+            const errorData = await res.json();
+            errorMessage = errorData.message || errorData.error || errorMessage;
+          } catch (e) {
+            // If we can't parse JSON, try to get text
+            const text = await res.text();
+            if (text) errorMessage = text;
+          }
+          throw new Error(errorMessage);
         }
 
         const updatedParticipant = await res.json();
+        console.log("Status updated successfully:", updatedParticipant);
         return { participantId, status: updatedParticipant.status };
-      } finally {
-        setUpdatingParticipants(prev => prev.filter(id => id !== participantId));
+      } catch (error) {
+        console.error("Error updating status:", error);
+        throw error;
       }
     },
+    // Use optimistic updates for a better user experience
+    onMutate: async ({ participantId, status }) => {
+      // Cancel any outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+      
+      // Save the previous value
+      const previousParticipants = queryClient.getQueryData<Participant[]>([`/api/trips/${tripId}/participants`]);
+      
+      // Add participant to updating list for UI indicator
+      setUpdatingParticipants(prev => [...prev, participantId]);
+      
+      // Optimistically update to the new value
+      queryClient.setQueryData<Participant[]>(
+        [`/api/trips/${tripId}/participants`],
+        (old) => old?.map(p => (p.id === participantId ? { ...p, status } : p)) ?? []
+      );
+      
+      // Return the previous participants value in case we need to rollback
+      return { previousParticipants };
+    },
     onSuccess: (data) => {
+      // Update the cache with the confirmed result from the server
       queryClient.setQueryData<Participant[]>(
         [`/api/trips/${tripId}/participants`],
         (old) => old?.map(p => (p.id === data.participantId ? { ...p, status: data.status } : p)) ?? []
       );
+      
       toast({
         title: "Success",
         description: "Status updated successfully",
       });
     },
-    onError: (error: Error) => {
+    onError: (error, variables, context) => {
+      // If there's an error, roll back to the previous value
+      if (context?.previousParticipants) {
+        queryClient.setQueryData(
+          [`/api/trips/${tripId}/participants`],
+          context.previousParticipants
+        );
+      }
+      
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "Failed to update status",
+        description: error instanceof Error ? error.message : "Failed to update status",
       });
     },
+    onSettled: (_, __, { participantId }) => {
+      // Remove from updating list regardless of success or failure
+      setUpdatingParticipants(prev => prev.filter(id => id !== participantId));
+      
+      // Refetch to ensure our data is in sync with the server
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/participants`] });
+    }
   });
 
   const deleteParticipantMutation = useMutation({
