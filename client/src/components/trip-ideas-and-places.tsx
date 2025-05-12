@@ -440,6 +440,7 @@ export function TripIdeasAndPlaces({
       startTime: string; 
       endTime: string;
       isIdea: boolean;
+      navigateToCalendar?: boolean;
     }) => {
       if (!data.date) {
         throw new Error("Please select a date");
@@ -707,18 +708,32 @@ export function TripIdeasAndPlaces({
   };
 
   const handleIdeaAddToCalendarClick = (idea: TripIdea) => {
-    setItemToAddToCalendar(idea);
-    setIsItemToAddIdeaNotPlace(true);
-    // If the idea has a planned date, use it
+    // If the idea has a planned date and time, use them directly
     if (idea.plannedDate) {
-      setSelectedDate(new Date(idea.plannedDate));
-      if (idea.plannedTime) {
-        setStartTime(idea.plannedTime);
-        // Set end time one hour after start time
-        const [hours, minutes] = idea.plannedTime.split(':').map(Number);
-        const endHour = (hours + 1) % 24;
-        setEndTime(`${endHour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`);
-      }
+      const date = new Date(idea.plannedDate);
+      const startTimeValue = idea.plannedTime || "09:00"; // Default to 9 AM if no time specified
+      
+      // Set end time one hour after start time
+      const [hours, minutes] = startTimeValue.split(':').map(Number);
+      const endHour = (hours + 1) % 24;
+      const endTimeValue = `${endHour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      
+      // Add to calendar directly without showing dialog
+      addToCalendarMutation.mutate({
+        item: idea,
+        date: date,
+        startTime: startTimeValue,
+        endTime: endTimeValue,
+        isIdea: true,
+        navigateToCalendar: true // Add flag to navigate to calendar on success
+      });
+    } else {
+      // Fall back to dialog for ideas without planned date
+      setItemToAddToCalendar(idea);
+      setIsItemToAddIdeaNotPlace(true);
+      setStartTime("09:00"); // Default to 9 AM
+      setEndTime("10:00");   // Default to 10 AM
+      setSelectedDate(new Date()); // Default to today
     }
   };
 
