@@ -56,6 +56,10 @@ const tripIdeaSchema = z.object({
   ownerId: z.number().optional(),
   plannedDate: z.date().optional(),
   plannedTime: z.string().optional(), // Store time as HH:MM format
+  coordinates: z.object({
+    lat: z.number(),
+    lng: z.number()
+  }).optional(),
 });
 
 type ExpandableTripIdeaFormProps = {
@@ -70,6 +74,7 @@ type ExpandableTripIdeaFormProps = {
   onCancel: () => void;
   isPending: boolean;
   initialValues?: Partial<z.infer<typeof tripIdeaSchema>>;
+  defaultMapLocation?: { lat: number; lng: number };
 };
 
 export function ExpandableTripIdeaForm({
@@ -78,7 +83,8 @@ export function ExpandableTripIdeaForm({
   onSubmit,
   onCancel,
   isPending,
-  initialValues
+  initialValues,
+  defaultMapLocation
 }: ExpandableTripIdeaFormProps) {
   const [expandedSections, setExpandedSections] = useState<{
     datetime: boolean;
