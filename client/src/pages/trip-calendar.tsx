@@ -9,6 +9,7 @@ import { format } from "date-fns";
 import { TripHeaderEdit } from "@/components/trip-header-edit";
 import { TripDestinations } from "@/components/trip-destinations";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { NLPEventCreator } from "@/components/calendar/nlp-event-creator";
 import { useState } from "react";
 
 type ViewMode = "edit" | "summary";
@@ -116,6 +117,11 @@ export default function TripCalendar() {
           <p className="text-sm text-muted-foreground mt-1">
             All times shown in {Intl.DateTimeFormat().resolvedOptions().timeZone} timezone
           </p>
+          
+          <div className="mt-4">
+            <h3 className="text-sm font-medium mb-2">Create Quick Event</h3>
+            <NLPEventCreator trip={trip} />
+          </div>
         </div>
 
         <div className="space-y-8">
