@@ -738,11 +738,15 @@ export function registerRoutes(app: Express): Server {
 
           // Delete activities
           console.log(`Deleting activities for trip ${tripId}`);
-          await tx.delete(activities).where(eq(activities.tripId, tripId));
+          await tx.execute(
+            sql`DELETE FROM activities WHERE trip_id = ${tripId}`
+          );
 
           // Delete checklist items
           console.log(`Deleting checklist items for trip ${tripId}`);
-          await tx.delete(checklist).where(eq(checklist.tripId, tripId));
+          await tx.execute(
+            sql`DELETE FROM checklist WHERE trip_id = ${tripId}`
+          );
 
           // Delete poll votes
           console.log(`Deleting poll votes for trip ${tripId}`);
@@ -752,27 +756,39 @@ export function registerRoutes(app: Express): Server {
 
           // Delete polls
           console.log(`Deleting polls for trip ${tripId}`);
-          await tx.delete(polls).where(eq(polls.tripId, tripId));
+          await tx.execute(
+            sql`DELETE FROM polls WHERE trip_id = ${tripId}`
+          );
 
           // Delete trip ideas
           console.log(`Deleting trip ideas for trip ${tripId}`);
-          await tx.delete(tripIdeas).where(eq(tripIdeas.tripId, tripId));
+          await tx.execute(
+            sql`DELETE FROM trip_ideas WHERE trip_id = ${tripId}`
+          );
 
           // Delete flights
           console.log(`Deleting flights for trip ${tripId}`);
-          await tx.delete(flights).where(eq(flights.tripId, tripId));
+          await tx.execute(
+            sql`DELETE FROM flights WHERE trip_id = ${tripId}`
+          );
 
           // Delete pinned places
           console.log(`Deleting pinned places for trip ${tripId}`);
-          await tx.delete(pinnedPlaces).where(eq(pinnedPlaces.tripId, tripId));
+          await tx.execute(
+            sql`DELETE FROM pinned_places WHERE trip_id = ${tripId}`
+          );
 
           // Delete share links
           console.log(`Deleting share links for trip ${tripId}`);
-          await tx.delete(shareLinks).where(eq(shareLinks.tripId, tripId));
+          await tx.execute(
+            sql`DELETE FROM share_links WHERE trip_id = ${tripId}`
+          );
 
           // Delete documents
           console.log(`Deleting documents for trip ${tripId}`);
-          await tx.delete(documents).where(eq(documents.tripId, tripId));
+          await tx.execute(
+            sql`DELETE FROM documents WHERE trip_id = ${tripId}`
+          );
           
           // Delete notifications
           console.log(`Deleting notifications for trip ${tripId}`);
@@ -782,7 +798,9 @@ export function registerRoutes(app: Express): Server {
 
           // Delete custom columns
           console.log(`Deleting custom columns for trip ${tripId}`);
-          await tx.delete(customColumns).where(eq(customColumns.tripId, tripId));
+          await tx.execute(
+            sql`DELETE FROM custom_columns WHERE trip_id = ${tripId}`
+          );
 
           // Delete travel recommendations
           console.log(`Deleting travel recommendations for trip ${tripId}`);
@@ -792,23 +810,34 @@ export function registerRoutes(app: Express): Server {
           
           // Now it's safe to delete participants
           console.log(`Deleting participants for trip ${tripId}`);
-          await tx.delete(participants).where(eq(participants.tripId, tripId));
+          await tx.execute(
+            sql`DELETE FROM participants WHERE trip_id = ${tripId}`
+          );
 
           // Delete accommodations
           console.log(`Deleting accommodations for trip ${tripId}`);
-          await tx.delete(accommodations).where(eq(accommodations.tripId, tripId));
+          await tx.execute(
+            sql`DELETE FROM accommodations WHERE trip_id = ${tripId}`
+          );
 
           // Delete destinations
           console.log(`Deleting destinations for trip ${tripId}`);
-          await tx.delete(destinations).where(eq(destinations.tripId, tripId));
+          await tx.execute(
+            sql`DELETE FROM destinations WHERE trip_id = ${tripId}`
+          );
 
           // Finally, delete the trip
           console.log(`Deleting the trip ${tripId} itself`);
-          await tx.delete(trips).where(eq(trips.id, tripId));
+          await tx.execute(
+            sql`DELETE FROM trips WHERE id = ${tripId}`
+          );
 
           console.log(`Trip ${tripId} deleted successfully`);
         } catch (txError) {
           console.error(`Transaction error deleting trip ${tripId}:`, txError);
+          if (txError instanceof Error) {
+            console.error(`Error details: ${txError.message}`);
+          }
           throw txError;
         }
       });
@@ -816,7 +845,9 @@ export function registerRoutes(app: Express): Server {
       res.json({ success: true, message: "Trip and all related data deleted successfully" });
     } catch (error) {
       console.error('Error deleting trip:', error);
-      res.status(500).json({ error: 'Failed to delete trip' });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Error details:', errorMessage);
+      res.status(500).json({ error: 'Failed to delete trip', details: errorMessage });
     }
   });
 
