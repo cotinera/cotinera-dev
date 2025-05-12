@@ -213,14 +213,43 @@ function DraggableEvent({
     elementRef.current = el;
   };
 
+  // Store the initial click position to determine if it's a click or drag
+  const clickRef = useRef<{ x: number; y: number } | null>(null);
+  const [mouseDown, setMouseDown] = useState(false);
+  
+  // Handle mousedown to detect the start of a potential click or drag
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (isResizing) return;
+    clickRef.current = { x: e.clientX, y: e.clientY };
+    setMouseDown(true);
+  };
+  
+  // Handle mouseup to detect if it was a click (not much movement) or a drag
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (!clickRef.current || isResizing) return;
+    
+    const deltaX = Math.abs(e.clientX - clickRef.current.x);
+    const deltaY = Math.abs(e.clientY - clickRef.current.y);
+    
+    // If minimal movement (less than 5px), treat as a click and open edit
+    if (deltaX < 5 && deltaY < 5 && mouseDown) {
+      onEdit();
+    }
+    
+    setMouseDown(false);
+    clickRef.current = null;
+  };
+
   return (
     <div
       ref={combinedRef}
       {...(!isResizing ? { ...attributes, ...listeners } : {})}
       style={style}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
       className={`bg-primary/20 hover:bg-primary/30 rounded-md px-2 py-1 group/event ${
         isDragging ? 'ring-1 ring-primary/50' : ''
-      }`}
+      } ${!isResizing && !isDragging ? 'cursor-pointer' : ''}`}
     >
       <div
         className="absolute top-0 left-0 w-full h-1 cursor-ns-resize hover:bg-primary/50 rounded-t-md"
