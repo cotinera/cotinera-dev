@@ -718,17 +718,25 @@ export function TripIdeasAndPlaces({
   };
 
   const handleIdeaAddToCalendarClick = (idea: TripIdea) => {
+    console.log("Adding idea to calendar:", idea);
+    console.log("Idea planned date:", idea.plannedDate);
+    
     // If the idea has a planned date and time, use them directly
     if (idea.plannedDate) {
+      console.log("Using planned date:", idea.plannedDate);
       const date = new Date(idea.plannedDate);
+      console.log("Converted date object:", date);
       const startTimeValue = idea.plannedTime || "09:00"; // Default to 9 AM if no time specified
+      console.log("Using start time:", startTimeValue);
       
       // Set end time one hour after start time
       const [hours, minutes] = startTimeValue.split(':').map(Number);
       const endHour = (hours + 1) % 24;
       const endTimeValue = `${endHour.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      console.log("Calculated end time:", endTimeValue);
       
       // Add to calendar directly without showing dialog
+      console.log("Calling mutation directly with date:", date);
       addToCalendarMutation.mutate({
         item: idea,
         date: date,
@@ -738,6 +746,7 @@ export function TripIdeasAndPlaces({
         navigateToCalendar: true // Add flag to navigate to calendar on success
       });
     } else {
+      console.log("No planned date, showing dialog");
       // Fall back to dialog for ideas without planned date
       setItemToAddToCalendar(idea);
       setIsItemToAddIdeaNotPlace(true);
