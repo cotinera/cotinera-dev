@@ -3259,6 +3259,7 @@ export function registerRoutes(app: Express): Server {
           status: tripIdeas.status,
           ownerId: tripIdeas.ownerId,
           location: tripIdeas.location,
+          coordinates: tripIdeas.coordinates,
           votes: tripIdeas.votes,
           createdAt: tripIdeas.createdAt,
           updatedAt: tripIdeas.updatedAt,
@@ -3288,7 +3289,7 @@ export function registerRoutes(app: Express): Server {
       const tripId = parseInt(tripIdStr);
       const userId = req.user?.id || 1;
       
-      const { title, description, status, location, plannedDate, plannedEndDate } = req.body;
+      const { title, description, status, location, plannedDate, plannedEndDate, coordinates } = req.body;
       
       if (!title) {
         return res.status(400).json({ error: "Title is required" });
@@ -3304,6 +3305,7 @@ export function registerRoutes(app: Express): Server {
           tripId,
           title,
           description,
+          coordinates,
           status: ideaStatus,
           ownerId: userId,
           location,
@@ -3370,7 +3372,7 @@ export function registerRoutes(app: Express): Server {
         return res.status(403).json({ error: "You must be a participant in this trip to update ideas" });
       }
       
-      const { title, description, status, location, ownerId, plannedDate, plannedEndDate } = req.body;
+      const { title, description, status, location, coordinates, ownerId, plannedDate, plannedEndDate } = req.body;
       
       // Validate status if provided
       const validStatuses = ["pending", "booked", "unsure"];
@@ -3384,6 +3386,7 @@ export function registerRoutes(app: Express): Server {
           title: title || existingIdea.title,
           description: description !== undefined ? description : existingIdea.description,
           status: status || existingIdea.status,
+          coordinates: coordinates !== undefined ? coordinates : existingIdea.coordinates,
           location: location !== undefined ? location : existingIdea.location,
           ownerId: ownerId || existingIdea.ownerId,
           plannedDate: plannedDate !== undefined ? (plannedDate ? new Date(plannedDate) : null) : existingIdea.plannedDate,
