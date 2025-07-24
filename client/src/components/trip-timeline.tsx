@@ -303,12 +303,31 @@ export function TripTimeline({
 
               <CardHeader className="py-2">
                 <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-2">
+                  <div className="space-y-0.5">
+                    <CardTitle className="text-sm">
+                      {stop.name}
+                    </CardTitle>
+                    <div 
+                      className="flex items-center text-xs text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                      onClick={(e) => {
+                        if (stop.id === 'main') {
+                          e.stopPropagation();
+                          setIsDateEditOpen(true);
+                        }
+                      }}
+                      title={stop.id === 'main' ? "Click to edit trip dates" : undefined}
+                    >
+                      <CalendarDays className="h-3 w-3 mr-1" />
+                      {format(new Date(stop.startDate), "MMM d")} -{" "}
+                      {format(new Date(stop.endDate), "MMM d")}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
                     {stop.id !== 'main' && (
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity mt-[-2px]"
+                        className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={(e) => {
                           e.stopPropagation();
                           setDestinationToDelete(stop as Destination);
@@ -317,29 +336,8 @@ export function TripTimeline({
                         <Trash2 className="h-3 w-3 text-destructive" />
                       </Button>
                     )}
-                    <div className="space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <CardTitle className="text-sm">
-                          {stop.name}
-                        </CardTitle>
-                        <div className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs">
-                          {`Stop ${index + 1}`}
-                        </div>
-                      </div>
-                      <div 
-                        className="flex items-center text-xs text-muted-foreground hover:text-primary transition-colors cursor-pointer"
-                        onClick={(e) => {
-                          if (stop.id === 'main') {
-                            e.stopPropagation();
-                            setIsDateEditOpen(true);
-                          }
-                        }}
-                        title={stop.id === 'main' ? "Click to edit trip dates" : undefined}
-                      >
-                        <CalendarDays className="h-3 w-3 mr-1" />
-                        {format(new Date(stop.startDate), "MMM d")} -{" "}
-                        {format(new Date(stop.endDate), "MMM d")}
-                      </div>
+                    <div className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-xs">
+                      {`Stop ${index + 1}`}
                     </div>
                   </div>
                 </div>
