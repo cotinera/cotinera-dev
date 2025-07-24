@@ -206,7 +206,7 @@ function DraggableEvent({
     top: '0',
     backgroundColor: isDragging ? 'hsl(var(--primary)/0.2)' : undefined,
     boxShadow: isDragging ? 'var(--shadow-md)' : undefined,
-    opacity: isDragging ? 0.9 : 1,
+    opacity: isDragging ? 0 : 1,
     zIndex: isDragging || isResizing ? 50 : 1,
     cursor: isResizing ? 'ns-resize' : 'move',
     transition: isResizing ? 'none' : undefined,
