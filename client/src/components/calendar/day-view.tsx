@@ -198,10 +198,10 @@ function DraggableEvent({
 
   const style: React.CSSProperties = {
     transform: !isResizing && transform ? CSS.Transform.toString(transform) : undefined,
-    width: 'calc(100% - 1px)',
+    width: '90%',
     height: `${heightInPixels}px`,
     position: 'absolute',
-    left: '0',
+    left: '5%',
     top: '0',
     backgroundColor: isDragging ? 'hsl(var(--primary)/0.2)' : undefined,
     boxShadow: isDragging ? 'var(--shadow-md)' : undefined,
@@ -250,7 +250,7 @@ function DraggableEvent({
       style={style}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
-      className={`bg-blue-500/90 hover:bg-blue-600/90 group/event ${
+      className={`bg-blue-500/90 hover:bg-blue-600/90 rounded-md group/event ${
         isDragging ? 'ring-1 ring-primary/50' : ''
       } ${!isResizing && !isDragging ? 'cursor-pointer' : ''}`}
     >
