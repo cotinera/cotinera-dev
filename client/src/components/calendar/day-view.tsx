@@ -1163,7 +1163,7 @@ export function DayView({ trip }: { trip: Trip }) {
               return (
                 <div
                   key={`allday-${date.toISOString()}`}
-                  className="w-[300px] border-l first:border-l-0 p-2 min-h-[60px] relative bg-background"
+                  className="w-[300px] border-l first:border-l-0 p-2 min-h-[30px] relative bg-background"
                 >
                   <div className="space-y-1">
                     {allDayEvents.map((event) => (
