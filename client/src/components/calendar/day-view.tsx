@@ -1155,7 +1155,7 @@ export function DayView({ trip }: { trip: Trip }) {
 
             {/* All-day events section */}
             <div className="flex border-b bg-background">
-              <div className="w-24 flex-none border-r sticky left-0 z-40 bg-background p-2 text-sm text-muted-foreground">
+              <div className="w-16 flex-none border-r sticky left-0 z-40 bg-background p-2 text-sm text-muted-foreground text-right">
                 All day
               </div>
             {dates.map((date) => {
@@ -1197,7 +1197,7 @@ export function DayView({ trip }: { trip: Trip }) {
           </div>
 
           <div className="flex">
-            <div className="w-24 flex-none border-r sticky left-0 z-20 bg-background relative">
+            <div className="w-16 flex-none border-r sticky left-0 z-20 bg-background relative">
               {hours.map((hour, index) => (
                 <div
                   key={hour}
