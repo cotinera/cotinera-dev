@@ -813,7 +813,7 @@ export function DayView({ trip }: { trip: Trip }) {
           
         const segmentEnd = currentDate.toDateString() === eventEnd.toDateString() 
           ? new Date(eventEnd) 
-          : new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 23, 59, 59, 999);
+          : new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate() + 1, 0, 0, 0, 0);
         
         // Only create segment if it has valid duration
         if (segmentStart < segmentEnd) {
@@ -859,15 +859,8 @@ export function DayView({ trip }: { trip: Trip }) {
       
       if (eventDate !== targetDate) return false;
       
-      // Check if event spans this hour
-      const hourStart = new Date(date);
-      hourStart.setHours(hour, 0, 0, 0);
-      
-      const hourEnd = new Date(date);
-      hourEnd.setHours(hour, 59, 59, 999);
-      
-      // Event overlaps with this hour if it starts before hour ends and ends after hour starts
-      return eventStart <= hourEnd && eventEnd > hourStart;
+      // Only show event at its start hour (not every hour it spans)
+      return eventStart.getHours() === hour;
     });
   };
   
