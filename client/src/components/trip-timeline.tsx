@@ -7,7 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { format } from "date-fns";
-import { MapPin, CalendarDays, ArrowRight, Trash2 } from "lucide-react";
+import { MapPin, CalendarDays, ArrowRight, Trash2, Calendar } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,14 +20,42 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useState } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { Loader2 } from "lucide-react";
 
 interface TripTimelineProps {
   tripId: number;
   currentDestinationId?: number;
   onDestinationChange: (destinationId?: number) => void;
 }
+
+const dateEditSchema = z.object({
+  startDate: z.string().min(1, "Start date is required"),
+  endDate: z.string().min(1, "End date is required"),
+}).refine((data) => new Date(data.startDate) <= new Date(data.endDate), {
+  message: "End date must be after start date",
+  path: ["endDate"],
+});
 
 export function TripTimeline({ 
   tripId, 
@@ -37,6 +65,7 @@ export function TripTimeline({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [destinationToDelete, setDestinationToDelete] = useState<Destination | null>(null);
+  const [isDateEditOpen, setIsDateEditOpen] = useState(false);
 
   const { data: tripData } = useQuery({
     queryKey: ["/api/trips", tripId],
@@ -46,6 +75,59 @@ export function TripTimeline({
       return res.json();
     },
   });
+
+  const form = useForm({
+    resolver: zodResolver(dateEditSchema),
+    defaultValues: {
+      startDate: tripData?.startDate?.split('T')[0] || '',
+      endDate: tripData?.endDate?.split('T')[0] || '',
+    },
+  });
+
+  const updateTripDatesMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof dateEditSchema>) => {
+      const res = await fetch(`/api/trips/${tripId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to update trip dates");
+      }
+
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/trips"] });
+      setIsDateEditOpen(false);
+      toast({
+        title: "Success",
+        description: "Trip dates updated successfully",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to update trip dates",
+      });
+    },
+  });
+
+  // Update form values when tripData changes
+  useEffect(() => {
+    if (tripData) {
+      form.reset({
+        startDate: tripData.startDate.split('T')[0],
+        endDate: tripData.endDate.split('T')[0],
+      });
+    }
+  }, [tripData, form]);
 
   const { data: destinations } = useQuery<Destination[]>({
     queryKey: [`/api/trips/${tripId}/destinations`],
@@ -225,7 +307,16 @@ export function TripTimeline({
                     <CardTitle className="text-sm">
                       {stop.name}
                     </CardTitle>
-                    <div className="flex items-center text-xs text-muted-foreground">
+                    <div 
+                      className="flex items-center text-xs text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                      onClick={(e) => {
+                        if (stop.id === 'main') {
+                          e.stopPropagation();
+                          setIsDateEditOpen(true);
+                        }
+                      }}
+                      title={stop.id === 'main' ? "Click to edit trip dates" : undefined}
+                    >
                       <CalendarDays className="h-3 w-3 mr-1" />
                       {format(new Date(stop.startDate), "MMM d")} -{" "}
                       {format(new Date(stop.endDate), "MMM d")}
@@ -282,6 +373,66 @@ export function TripTimeline({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={isDateEditOpen} onOpenChange={setIsDateEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Trip Dates</DialogTitle>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit((data) => updateTripDatesMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="startDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Start Date</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="endDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>End Date</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="date"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsDateEditOpen(false)}
+                  disabled={updateTripDatesMutation.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateTripDatesMutation.isPending}>
+                  {updateTripDatesMutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Update Dates
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
