@@ -1205,7 +1205,7 @@ export function DayView({ trip }: { trip: Trip }) {
                 >
                   {/* Time label positioned on the divider line at the top - skip label for hour 0 (12 AM) */}
                   {hour > 0 && (
-                    <div className="absolute top-0 left-2 transform -translate-y-1/2 bg-background px-1 text-sm text-muted-foreground z-10">
+                    <div className="absolute top-0 right-2 transform -translate-y-1/2 bg-background px-1 text-sm text-muted-foreground text-right z-10">
                       {format(new Date().setHours(hour, 0), "h a")}
                     </div>
                   )}
