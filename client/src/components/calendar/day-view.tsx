@@ -791,6 +791,13 @@ export function DayView({ trip }: { trip: Trip }) {
 
       const data = await res.json();
       await queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
+      
+      // Sync to Google Calendar if enabled
+      const googleCalendarSync = (window as any)[`googleCalendarSync_${trip.id}`];
+      if (googleCalendarSync && data) {
+        googleCalendarSync(data);
+      }
+      
       toast({ title: "Event created successfully" });
       setIsCreateDialogOpen(false);
     } catch (error) {
@@ -1031,7 +1038,15 @@ export function DayView({ trip }: { trip: Trip }) {
 
                   if (!res.ok) throw new Error("Failed to update activity");
 
+                  const updatedActivity = await res.json();
                   await queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
+                  
+                  // Sync to Google Calendar if enabled
+                  const googleCalendarSync = (window as any)[`googleCalendarSync_${trip.id}`];
+                  if (googleCalendarSync && updatedActivity) {
+                    googleCalendarSync(updatedActivity);
+                  }
+                  
                   toast({ title: "Event updated successfully" });
                   setIsEditDialogOpen(false);
                 } catch (error) {

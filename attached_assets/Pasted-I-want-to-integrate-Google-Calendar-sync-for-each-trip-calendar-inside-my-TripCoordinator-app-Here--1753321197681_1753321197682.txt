@@ -1,0 +1,48 @@
+I want to integrate Google Calendar sync for each trip calendar inside my TripCoordinator app. Here’s exactly what I need:
+
+🧠 CONTEXT:
+- Each trip in the app has its own calendar (with events stored in state or database).
+- I want users to be able to connect their Google account and sync all events for that trip to their Google Calendar.
+- We’re using React and Tailwind, and I want the UI to use `shadcn/ui` components.
+
+🌐 FUNCTIONALITY TO BUILD:
+
+1. **OAuth Integration** (Google Sign-In):
+   - Add a “Connect Google Calendar” button to each trip’s calendar page using `shadcn/ui` `Button`.
+   - Use **Google OAuth 2.0** to authenticate the user and get permission for:
+     - `https://www.googleapis.com/auth/calendar.events`
+   - After login, store the user’s access token securely (e.g., in auth context, session, or localStorage for now).
+
+2. **Let User Select Their Calendar**:
+   - After authentication, fetch the list of calendars (`GET https://www.googleapis.com/calendar/v3/users/me/calendarList`)
+   - Display these in a dropdown using `shadcn/ui` `Select`
+   - Let the user choose which calendar to sync to (e.g., “My Trips Calendar”)
+
+3. **Sync Events to Google Calendar**:
+   - When a user creates or updates an event in the trip calendar, give them the option to also push that event to their selected Google Calendar
+   - Use the `events.insert` endpoint:
+     `POST https://www.googleapis.com/calendar/v3/calendars/{calendarId}/events`
+     - Include: summary (title), description, start, end, timezone, and location
+   - After successful sync, show a toast or alert (shadcn `Toast` or simple alert)
+
+4. **UI DESIGN**:
+   - Add a `Calendar Sync` section at the top or bottom of each trip calendar page.
+   - Include:
+     - “Connect Google Calendar” button
+     - Dropdown to select which calendar
+     - Toggle switch (optional) to auto-sync new events
+
+5. **Security Notes**:
+   - Make sure token is handled securely
+   - Refresh token logic can be skipped for now unless needed
+   - Warn user if token is expired or invalid
+
+📦 DEPENDENCIES TO INSTALL:
+- `googleapis` (Node.js SDK for Google Calendar API)
+- `react-oauth/google` or another OAuth package (or use `gapi` directly if preferred)
+
+🛠️ OPTIONAL (Can do later):
+- Import events from Google Calendar back into the trip calendar (two-way sync)
+- Store calendar ID in the backend so we don’t have to ask every time
+
+Please implement this step-by-step in a modular way. Start with Google OAuth, then calendar selection, then syncing an individual trip’s events. You can create a `GoogleCalendarSync.tsx` component if helpful.

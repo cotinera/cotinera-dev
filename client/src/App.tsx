@@ -1,6 +1,7 @@
 import { Switch, Route } from "wouter";
 import { queryClient } from "@/lib";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { GoogleOAuthProvider } from "@react-oauth/google";
 import { Toaster } from "@/components/ui";
 import { AuthProvider, TutorialProvider } from "@/hooks";
 // Import ThemeProvider and ThemeToggle directly to avoid module resolution issues
@@ -42,21 +43,23 @@ function Router() {
 
 function App() {
   return (
-    <ThemeProvider defaultTheme="light" storageKey="ui-theme">
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <TutorialProvider>
-            <div className="flex flex-col min-h-screen">
-              <main className="flex-1">
-                <Router />
-              </main>
-              <ThemeToggle />
-            </div>
-            <Toaster />
-          </TutorialProvider>
-        </AuthProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
+    <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || ""}>
+      <ThemeProvider defaultTheme="light" storageKey="ui-theme">
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <TutorialProvider>
+              <div className="flex flex-col min-h-screen">
+                <main className="flex-1">
+                  <Router />
+                </main>
+                <ThemeToggle />
+              </div>
+              <Toaster />
+            </TutorialProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
+    </GoogleOAuthProvider>
   );
 }
 

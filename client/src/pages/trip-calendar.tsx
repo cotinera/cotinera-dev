@@ -3,6 +3,7 @@ import { useRoute, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { DayView } from "@/components/calendar/day-view";
 import { CalendarSummary } from "@/components/calendar/calendar-summary";
+import { GoogleCalendarSync } from "@/components/calendar/google-calendar-sync";
 import { Loader2, ArrowLeft, Calendar } from "lucide-react";
 import type { Trip, Activity } from "@db/schema";
 import { format } from "date-fns";
@@ -103,7 +104,7 @@ export default function TripCalendar() {
 
       <main className="container mx-auto px-4 py-8">
         <div className="flex flex-col mb-8">
-          <div className="flex justify-between items-center">
+          <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-bold">Calendar</h2>
             <ToggleGroup type="single" value={viewMode} onValueChange={(value: ViewMode) => value && setViewMode(value)}>
               <ToggleGroupItem value="edit" size="sm">
@@ -114,9 +115,15 @@ export default function TripCalendar() {
               </ToggleGroupItem>
             </ToggleGroup>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-sm text-muted-foreground">
             All times shown in {Intl.DateTimeFormat().resolvedOptions().timeZone} timezone
           </p>
+          
+          {import.meta.env.VITE_GOOGLE_CLIENT_ID && (
+            <div className="mt-6">
+              <GoogleCalendarSync trip={trip} activities={activities} />
+            </div>
+          )}
           
           <div className="mt-4">
             <h3 className="text-sm font-medium mb-2">Create Event</h3>

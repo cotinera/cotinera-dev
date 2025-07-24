@@ -76,6 +76,7 @@ The PostgreSQL database includes comprehensive schemas for:
 
 ### Required APIs and Services
 - **Google Maps API**: For interactive mapping, place search, and geocoding
+- **Google OAuth & Calendar API**: For Google Calendar sync functionality
 - **SendGrid**: For email notifications and trip invitations
 - **OpenAI API**: For travel recommendations and natural language processing
 
@@ -98,6 +99,7 @@ The application is configured for Replit deployment with:
 ### Environment Variables Required
 - `DATABASE_URL`: PostgreSQL connection string
 - `GOOGLE_CLIENT_ID` & `GOOGLE_CLIENT_SECRET`: OAuth configuration
+- `VITE_GOOGLE_CLIENT_ID`: Frontend Google OAuth client ID for Calendar sync
 - `VITE_GOOGLE_MAPS_API_KEY`: Frontend Google Maps integration
 - `SENDGRID_API_KEY`: Email service configuration
 - `OPENAI_API_KEY`: AI recommendations (optional)
