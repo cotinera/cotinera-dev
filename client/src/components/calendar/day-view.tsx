@@ -524,6 +524,9 @@ export function DayView({ trip }: { trip: Trip }) {
   const [dragStartSlot, setDragStartSlot] = useState<{ date: Date; hour: number } | null>(null);
   const [dragEndSlot, setDragEndSlot] = useState<{ date: Date; hour: number } | null>(null);
   const [dragSelectedSlots, setDragSelectedSlots] = useState<Set<string>>(new Set());
+  
+  // Store the drag selection range for the create dialog
+  const [dragSelectionRange, setDragSelectionRange] = useState<{ startHour: number; endHour: number; date: Date } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -599,10 +602,12 @@ export function DayView({ trip }: { trip: Trip }) {
         hour: startHour
       });
       
-      // Set default values for the form
-      const defaultDate = format(dragStartSlot.date, 'yyyy-MM-dd');
-      const defaultStartTime = `${startHour.toString().padStart(2, '0')}:00`;
-      const defaultEndTime = `${endHour.toString().padStart(2, '0')}:00`;
+      // Store the drag selection range for the dialog
+      setDragSelectionRange({
+        startHour,
+        endHour,
+        date: dragStartSlot.date
+      });
       
       // We'll need to pass these to the create dialog
       setIsCreateDialogOpen(true);
@@ -1046,7 +1051,16 @@ export function DayView({ trip }: { trip: Trip }) {
       </Dialog>
 
       {/* Create dialog for drag-to-create and regular creation */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+      <Dialog 
+        open={isCreateDialogOpen} 
+        onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          // Clear drag selection range when dialog closes
+          if (!open) {
+            setDragSelectionRange(null);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New Event</DialogTitle>
@@ -1054,12 +1068,12 @@ export function DayView({ trip }: { trip: Trip }) {
           {selectedTimeSlot && (
             <EventForm
               defaultValues={
-                dragStartSlot && dragEndSlot && dragStartSlot.date.toDateString() === selectedTimeSlot.date.toDateString()
+                dragSelectionRange && dragSelectionRange.date.toDateString() === selectedTimeSlot.date.toDateString()
                   ? {
                       title: "",
                       date: format(selectedTimeSlot.date, 'yyyy-MM-dd'),
-                      startTime: `${Math.min(dragStartSlot.hour, dragEndSlot.hour).toString().padStart(2, '0')}:00`,
-                      endTime: `${(Math.max(dragStartSlot.hour, dragEndSlot.hour) + 1).toString().padStart(2, '0')}:00`,
+                      startTime: `${dragSelectionRange.startHour.toString().padStart(2, '0')}:00`,
+                      endTime: `${dragSelectionRange.endHour.toString().padStart(2, '0')}:00`,
                       location: "",
                       description: "",
                       participants: [],
