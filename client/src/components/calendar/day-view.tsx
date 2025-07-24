@@ -921,7 +921,7 @@ export function DayView({ trip }: { trip: Trip }) {
             {dates.map((date) => (
               <div
                 key={date.toISOString()}
-                className="w-[300px] p-4 border-l first:border-l-0 font-semibold"
+                className="w-[300px] p-4 border-l first:border-l-0 font-semibold text-center"
               >
                 {format(date, "EEEE, MMMM d")}
               </div>
