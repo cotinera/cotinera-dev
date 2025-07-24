@@ -198,10 +198,10 @@ function DraggableEvent({
 
   const style: React.CSSProperties = {
     transform: !isResizing && transform ? CSS.Transform.toString(transform) : undefined,
-    width: '280px',
+    width: 'calc(100% - 1px)',
     height: `${heightInPixels}px`,
     position: 'absolute',
-    left: '8px',
+    left: '0',
     top: '0',
     backgroundColor: isDragging ? 'hsl(var(--primary)/0.2)' : undefined,
     boxShadow: isDragging ? 'var(--shadow-md)' : undefined,
@@ -250,22 +250,22 @@ function DraggableEvent({
       style={style}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
-      className={`bg-primary/20 hover:bg-primary/30 rounded-md px-2 py-1 group/event ${
+      className={`bg-blue-500/90 hover:bg-blue-600/90 group/event ${
         isDragging ? 'ring-1 ring-primary/50' : ''
       } ${!isResizing && !isDragging ? 'cursor-pointer' : ''}`}
     >
       <div
-        className="absolute top-0 left-0 w-full h-1 cursor-ns-resize hover:bg-primary/50 rounded-t-md"
+        className="absolute top-0 left-0 w-full h-1 cursor-ns-resize hover:bg-black/20"
         onMouseDown={(e) => handleResizeStart(e, 'top')}
       />
 
-      <div className="flex items-center justify-between h-[18px]">
-        <span className="font-medium text-sm truncate max-w-[180px]">{event.title}</span>
+      <div className="flex items-center justify-between h-[18px] px-2 mt-1">
+        <span className="font-medium text-sm text-white truncate max-w-[180px]">{event.title}</span>
         <div className="hidden group-hover/event:flex items-center gap-1">
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6"
+            className="h-6 w-6 text-white hover:bg-white/20"
             onClick={(e) => {
               e.stopPropagation();
               onEdit();
@@ -276,7 +276,7 @@ function DraggableEvent({
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 text-destructive hover:text-destructive"
+            className="h-6 w-6 text-white hover:bg-white/20 hover:text-red-300"
             onClick={(e) => {
               e.stopPropagation();
               onDelete();
@@ -286,12 +286,12 @@ function DraggableEvent({
           </Button>
         </div>
       </div>
-      <span className="text-xs text-muted-foreground block">
+      <span className="text-xs text-white/80 block px-2">
         {format(eventStart, "h:mm a")} - {format(eventEnd, "h:mm a")}
       </span>
 
       <div
-        className="absolute bottom-0 left-0 w-full h-1 cursor-ns-resize hover:bg-primary/50 rounded-b-md"
+        className="absolute bottom-0 left-0 w-full h-1 cursor-ns-resize hover:bg-black/20"
         onMouseDown={(e) => handleResizeStart(e, 'bottom')}
       />
     </div>
