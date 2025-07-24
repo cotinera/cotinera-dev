@@ -1052,12 +1052,12 @@ export function DayView({ trip }: { trip: Trip }) {
         onDragOver={handleDragOver}
       >
         <div className="min-w-fit relative">
-          <div className="flex border-b bg-muted/5">
-            <div className="w-24 flex-none border-r sticky left-0 z-20 bg-background" />
+          <div className="flex border-b bg-muted/5 sticky top-0 z-30">
+            <div className="w-24 flex-none border-r sticky left-0 z-40 bg-background" />
             {dates.map((date) => (
               <div
                 key={date.toISOString()}
-                className="w-[300px] p-4 border-l first:border-l-0 font-semibold text-center"
+                className="w-[300px] p-4 border-l first:border-l-0 font-semibold text-center bg-muted/5"
               >
                 {format(date, "EEEE, MMMM d")}
               </div>
@@ -1065,8 +1065,8 @@ export function DayView({ trip }: { trip: Trip }) {
           </div>
 
           {/* All-day events section */}
-          <div className="flex border-b">
-            <div className="w-24 flex-none border-r sticky left-0 z-20 bg-background p-2 text-sm text-muted-foreground">
+          <div className="flex border-b sticky top-[73px] z-30 bg-background">
+            <div className="w-24 flex-none border-r sticky left-0 z-40 bg-background p-2 text-sm text-muted-foreground">
               All day
             </div>
             {dates.map((date) => {
@@ -1074,7 +1074,7 @@ export function DayView({ trip }: { trip: Trip }) {
               return (
                 <div
                   key={`allday-${date.toISOString()}`}
-                  className="w-[300px] border-l first:border-l-0 p-2 min-h-[60px] relative"
+                  className="w-[300px] border-l first:border-l-0 p-2 min-h-[60px] relative bg-background"
                 >
                   <div className="space-y-1">
                     {allDayEvents.map((event) => (
