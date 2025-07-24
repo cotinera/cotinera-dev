@@ -322,8 +322,8 @@ function DroppableTimeSlot({
       className={`h-12 relative border-t transition-colors ${
         isOver ? 'bg-primary/20' : ''
       } ${
-        isSelected ? 'bg-violet-200/50 dark:bg-violet-700/30' : ''
-      } hover:bg-gray-50 dark:hover:bg-gray-800/50`}
+        isSelected ? 'bg-blue-100 dark:bg-blue-900/30' : ''
+      } hover:bg-blue-50 dark:hover:bg-blue-900/20`}
       onMouseDown={onMouseDown}
       onMouseEnter={onMouseEnter}
       style={{ userSelect: 'none', cursor: 'pointer' }}
@@ -906,7 +906,7 @@ export function DayView({ trip }: { trip: Trip }) {
     <ScrollArea className="border rounded-md max-w-full">
       {/* Hint for drag-to-create functionality */}
       <div className="m-4 text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
-        💡 Tip: Click and drag vertically across time blocks to create events spanning multiple hours
+        💡 Tip: Click and drag vertically across time slots to create multi-hour events
       </div>
       
       <DndContext
@@ -975,21 +975,20 @@ export function DayView({ trip }: { trip: Trip }) {
                         ))}
                         {/* Show selection overlay during drag */}
                         {dragSelectedSlots.has(timeSlotId) && isDragSelecting && (
-                          <div className="absolute inset-0 bg-violet-400/30 dark:bg-violet-600/30 pointer-events-none rounded-md border-2 border-violet-400 dark:border-violet-600" />
+                          <div className="absolute inset-0 bg-blue-100 dark:bg-blue-900/30 pointer-events-none" />
                         )}
                         
                         {/* Original add event button (hidden during drag selection) */}
                         {timeSlotEvents.length === 0 && !isDragging && !isDragSelecting && (
-                          <Button
-                            variant="ghost"
-                            className="w-full h-12 opacity-0 hover:opacity-100 transition-opacity"
+                          <div 
+                            className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity cursor-pointer bg-blue-100 dark:bg-blue-900/30"
                             onClick={() => {
                               setSelectedTimeSlot({ date, hour });
                               setIsCreateDialogOpen(true);
                             }}
                           >
-                            + Add Event
-                          </Button>
+                            <span className="text-sm text-blue-700 dark:text-blue-300">+ Add Event</span>
+                          </div>
                         )}
                       </DroppableTimeSlot>
                     );
