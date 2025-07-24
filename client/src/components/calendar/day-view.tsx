@@ -1130,10 +1130,6 @@ export function DayView({ trip }: { trip: Trip }) {
 
   return (
     <ScrollArea className="border rounded-md max-w-full h-[calc(100vh-120px)]">
-      {/* Hint for drag-to-create functionality */}
-      <div className="m-4 text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
-        💡 Tip: Click and drag vertically across time slots to create multi-hour events
-      </div>
       
       <DndContext
         sensors={sensors}
