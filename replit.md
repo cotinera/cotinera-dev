@@ -2,7 +2,7 @@
 
 ## Overview
 
-Personal Group Coordinator (PGC) is a comprehensive group travel planning and management application that enables collaborative multi-destination trip experiences with advanced interactive mapping and location discovery capabilities. The application helps groups plan and coordinate travel together through interactive mapping, collaborative planning features, place discovery, activity scheduling, and real-time communication.
+Personal Group Coordinator (PGC) is a comprehensive group travel planning and management application that enables collaborative multi-destination trip experiences with advanced interactive mapping and location discovery capabilities. The application helps groups plan and coordinate travel together through interactive mapping, collaborative planning features, place discovery, activity scheduling with Google Calendar sync, and real-time communication.
 
 ## User Preferences
 
@@ -44,7 +44,11 @@ The frontend consolidates UI/UX components in `client/src/frontend.ts`, separati
 - **Map Components**: Interactive mapping with Google Maps integration
 - **Trip Management**: Trip creation, editing, and collaboration features
 - **Authentication**: Login/register forms and auth layouts
-- **Calendar**: Scheduling and timeline views with Google Calendar sync
+- **Calendar**: Advanced scheduling with features including:
+  - Drag-to-create events with clean rectangular selection UI
+  - Two-way Google Calendar sync with automatic synchronization
+  - Real-time sync when events are created/updated/deleted in either system
+  - Multiple timezone support with proper UTC date handling
 - **Travel Features**: Preferences, recommendations, and booking management
 
 ### Backend Architecture

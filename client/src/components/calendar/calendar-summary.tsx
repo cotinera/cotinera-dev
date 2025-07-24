@@ -159,7 +159,7 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
       
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (newActivity) => {
       setIsCreateDialogOpen(false);
       setSelectedCoordinates(null);
       queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
@@ -167,6 +167,12 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
         title: "Success",
         description: "Activity created successfully."
       });
+      
+      // Sync to Google Calendar if enabled
+      const googleCalendarSync = (window as any)[`googleCalendarSync_${trip.id}`];
+      if (googleCalendarSync && newActivity) {
+        googleCalendarSync(newActivity);
+      }
     },
     onError: (error: Error) => {
       toast({

@@ -3709,6 +3709,118 @@ export function registerRoutes(app: Express): Server {
     }
   });
   
+  // Google Calendar sync endpoints
+  app.post("/api/google/calendar/sync", async (req, res) => {
+    try {
+      const { tripId, accessToken, calendarId } = req.body;
+
+      if (!tripId || !accessToken || !calendarId) {
+        return res.status(400).json({ error: 'Missing required parameters' });
+      }
+
+      // Import sync function
+      const { syncFromGoogleCalendar, setupGoogleCalendarWebhook } = await import('./google-calendar-sync');
+
+      // Perform initial sync
+      const syncResult = await syncFromGoogleCalendar(tripId, accessToken, calendarId);
+
+      // Set up webhook for real-time updates
+      try {
+        await setupGoogleCalendarWebhook(tripId, accessToken, calendarId);
+      } catch (webhookError) {
+        console.error('Failed to setup webhook:', webhookError);
+        // Continue even if webhook setup fails
+      }
+
+      res.json({ 
+        success: true, 
+        synced: syncResult.synced,
+        message: 'Calendar sync completed successfully' 
+      });
+    } catch (error) {
+      console.error('Error syncing Google Calendar:', error);
+      res.status(500).json({ error: 'Failed to sync calendar' });
+    }
+  });
+
+  // Google Calendar webhook endpoint
+  app.post("/api/google/calendar/webhook", async (req, res) => {
+    try {
+      const channelToken = req.headers['x-goog-channel-token'] as string;
+      const resourceState = req.headers['x-goog-resource-state'] as string;
+
+      // Extract trip ID from token
+      const tripId = channelToken ? parseInt(channelToken.replace('trip-', '')) : null;
+
+      if (!tripId || isNaN(tripId)) {
+        return res.status(400).send('Invalid channel token');
+      }
+
+      // Only process 'sync' state (indicates changes)
+      if (resourceState === 'sync') {
+        // Get sync record
+        const [syncRecord] = await db
+          .select()
+          .from(googleCalendarSync)
+          .where(eq(googleCalendarSync.tripId, tripId))
+          .limit(1);
+
+        if (syncRecord) {
+          // Get access token from frontend storage (in real app, store encrypted in DB)
+          // For now, we'll require the frontend to periodically sync
+          console.log(`Google Calendar change detected for trip ${tripId}`);
+        }
+      }
+
+      res.status(200).send('OK');
+    } catch (error) {
+      console.error('Error processing Google Calendar webhook:', error);
+      res.status(500).send('Internal server error');
+    }
+  });
+
+  // Sync activity to Google Calendar when created/updated
+  app.post("/api/trips/:tripId/activities/sync/:activityId", async (req, res) => {
+    try {
+      const tripId = parseInt(req.params.tripId);
+      const activityId = parseInt(req.params.activityId);
+      const { accessToken, calendarId } = req.body;
+
+      if (!accessToken || !calendarId) {
+        return res.status(400).json({ error: 'Missing access token or calendar ID' });
+      }
+
+      // Get activity
+      const [activity] = await db
+        .select()
+        .from(activities)
+        .where(and(
+          eq(activities.id, activityId),
+          eq(activities.tripId, tripId)
+        ))
+        .limit(1);
+
+      if (!activity) {
+        return res.status(404).json({ error: 'Activity not found' });
+      }
+
+      // Import sync function
+      const { syncActivityToGoogle } = await import('./google-calendar-sync');
+
+      // Sync to Google Calendar
+      const googleEvent = await syncActivityToGoogle(activity, accessToken, calendarId);
+
+      res.json({ 
+        success: true, 
+        googleEventId: googleEvent.id,
+        message: 'Activity synced to Google Calendar' 
+      });
+    } catch (error) {
+      console.error('Error syncing activity to Google:', error);
+      res.status(500).json({ error: 'Failed to sync activity' });
+    }
+  });
+
   // Register custom columns routes
   app.use("/api", customColumnsRouter);
   

@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast";
 import { Calendar, LogOut, Loader2, CheckCircle } from "lucide-react";
 import type { Activity, Trip } from "@db/schema";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface GoogleCalendarSyncProps {
   trip: Trip;
@@ -28,6 +29,7 @@ interface GoogleCalendar {
 
 export function GoogleCalendarSync({ trip, activities }: GoogleCalendarSyncProps) {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isConnected, setIsConnected] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [calendars, setCalendars] = useState<GoogleCalendar[]>([]);
@@ -35,12 +37,14 @@ export function GoogleCalendarSync({ trip, activities }: GoogleCalendarSyncProps
   const [autoSync, setAutoSync] = useState(false);
   const [isLoadingCalendars, setIsLoadingCalendars] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
   // Check if we have a stored token and calendar preference
   useEffect(() => {
     const storedToken = localStorage.getItem(`google_calendar_token_${trip.id}`);
     const storedCalendarId = localStorage.getItem(`google_calendar_id_${trip.id}`);
     const storedAutoSync = localStorage.getItem(`google_calendar_autosync_${trip.id}`);
+    const storedLastSync = localStorage.getItem(`google_calendar_last_sync_${trip.id}`);
     
     if (storedToken) {
       setAccessToken(storedToken);
@@ -50,6 +54,14 @@ export function GoogleCalendarSync({ trip, activities }: GoogleCalendarSyncProps
       }
       if (storedAutoSync === 'true') {
         setAutoSync(true);
+      }
+      if (storedLastSync) {
+        setLastSyncTime(new Date(storedLastSync));
+      }
+      
+      // If auto-sync is enabled and we have a calendar selected, sync immediately
+      if (storedAutoSync === 'true' && storedCalendarId) {
+        performTwoWaySync(storedToken, storedCalendarId);
       }
     }
   }, [trip.id]);
@@ -147,6 +159,75 @@ export function GoogleCalendarSync({ trip, activities }: GoogleCalendarSyncProps
   const handleAutoSyncChange = (checked: boolean) => {
     setAutoSync(checked);
     localStorage.setItem(`google_calendar_autosync_${trip.id}`, checked.toString());
+    
+    if (checked && accessToken && selectedCalendarId) {
+      // Start automatic sync
+      performTwoWaySync(accessToken, selectedCalendarId);
+      // Set up periodic sync every 5 minutes
+      const intervalId = setInterval(() => {
+        performTwoWaySync(accessToken, selectedCalendarId);
+      }, 5 * 60 * 1000);
+      
+      // Store interval ID for cleanup
+      (window as any)[`googleCalendarSyncInterval_${trip.id}`] = intervalId;
+    } else {
+      // Clear interval if exists
+      const intervalId = (window as any)[`googleCalendarSyncInterval_${trip.id}`];
+      if (intervalId) {
+        clearInterval(intervalId);
+        delete (window as any)[`googleCalendarSyncInterval_${trip.id}`];
+      }
+    }
+  };
+
+  // Two-way sync function
+  const performTwoWaySync = async (token: string, calendarId: string) => {
+    try {
+      setIsSyncing(true);
+      
+      // Call backend to perform two-way sync
+      const response = await fetch("/api/google/calendar/sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          tripId: trip.id,
+          accessToken: token,
+          calendarId: calendarId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to sync with Google Calendar");
+      }
+
+      const result = await response.json();
+      
+      // Update last sync time
+      const now = new Date();
+      setLastSyncTime(now);
+      localStorage.setItem(`google_calendar_last_sync_${trip.id}`, now.toISOString());
+      
+      // Refresh activities
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
+      
+      if (result.synced > 0) {
+        toast({
+          title: "Calendar synced",
+          description: `Synced ${result.synced} event${result.synced > 1 ? 's' : ''} from Google Calendar.`,
+        });
+      }
+    } catch (error) {
+      console.error("Failed to perform two-way sync:", error);
+      toast({
+        title: "Sync failed",
+        description: "Could not sync with Google Calendar. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const syncAllEvents = async () => {
@@ -231,10 +312,25 @@ export function GoogleCalendarSync({ trip, activities }: GoogleCalendarSyncProps
     }
 
     try {
-      await syncEventToGoogle(activity, accessToken, selectedCalendarId);
+      // Call backend to sync this specific activity
+      const response = await fetch(`/api/trips/${trip.id}/activities/sync/${activity.id}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          accessToken,
+          calendarId: selectedCalendarId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to sync activity");
+      }
+
       toast({
         title: "Event synced",
-        description: `"${activity.title}" has been added to your Google Calendar.`,
+        description: `"${activity.title}" has been synced with Google Calendar.`,
       });
     } catch (error) {
       console.error("Failed to sync event:", error);
@@ -251,12 +347,21 @@ export function GoogleCalendarSync({ trip, activities }: GoogleCalendarSyncProps
     // Store sync function in window for access by other components
     if (autoSync && accessToken && selectedCalendarId) {
       (window as any)[`googleCalendarSync_${trip.id}`] = syncSingleEvent;
+      (window as any)[`googleCalendarTwoWaySync_${trip.id}`] = () => performTwoWaySync(accessToken, selectedCalendarId);
     } else {
       delete (window as any)[`googleCalendarSync_${trip.id}`];
+      delete (window as any)[`googleCalendarTwoWaySync_${trip.id}`];
     }
 
     return () => {
       delete (window as any)[`googleCalendarSync_${trip.id}`];
+      delete (window as any)[`googleCalendarTwoWaySync_${trip.id}`];
+      // Clear interval on unmount
+      const intervalId = (window as any)[`googleCalendarSyncInterval_${trip.id}`];
+      if (intervalId) {
+        clearInterval(intervalId);
+        delete (window as any)[`googleCalendarSyncInterval_${trip.id}`];
+      }
     };
   }, [autoSync, accessToken, selectedCalendarId, trip.id]);
 
@@ -337,9 +442,9 @@ export function GoogleCalendarSync({ trip, activities }: GoogleCalendarSyncProps
               </div>
 
               {activities.length > 0 && (
-                <div className="pt-2">
+                <div className="pt-2 space-y-2">
                   <Button
-                    onClick={syncAllEvents}
+                    onClick={() => performTwoWaySync(accessToken!, selectedCalendarId)}
                     disabled={!selectedCalendarId || isSyncing}
                     className="w-full"
                     size="sm"
@@ -352,10 +457,15 @@ export function GoogleCalendarSync({ trip, activities }: GoogleCalendarSyncProps
                     ) : (
                       <>
                         <Calendar className="h-4 w-4 mr-2" />
-                        Sync All Events ({activities.length})
+                        Sync Now
                       </>
                     )}
                   </Button>
+                  {lastSyncTime && (
+                    <p className="text-xs text-muted-foreground text-center">
+                      Last synced: {lastSyncTime.toLocaleTimeString()}
+                    </p>
+                  )}
                 </div>
               )}
             </div>

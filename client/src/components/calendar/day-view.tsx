@@ -729,6 +729,16 @@ export function DayView({ trip }: { trip: Trip }) {
       if (!res.ok) throw new Error("Failed to update activity");
 
       await queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
+      
+      // Sync updated activity to Google Calendar
+      const googleCalendarSync = (window as any)[`googleCalendarSync_${trip.id}`];
+      if (googleCalendarSync && activityToUpdate) {
+        googleCalendarSync({
+          ...activityToUpdate,
+          startTime: newStartTime.toISOString(),
+          endTime: newEndTime.toISOString(),
+        });
+      }
     } catch (error) {
       toast({
         variant: "destructive",
@@ -819,6 +829,13 @@ export function DayView({ trip }: { trip: Trip }) {
       if (!res.ok) throw new Error("Failed to delete activity");
 
       await queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
+      
+      // Trigger two-way sync to remove from Google Calendar
+      const twoWaySync = (window as any)[`googleCalendarTwoWaySync_${trip.id}`];
+      if (twoWaySync) {
+        twoWaySync();
+      }
+      
       toast({ title: "Event deleted successfully" });
       setIsEditDialogOpen(false);
     } catch (error) {
@@ -858,6 +875,12 @@ export function DayView({ trip }: { trip: Trip }) {
       );
 
       await queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
+      
+      // Sync resized activity to Google Calendar
+      const googleCalendarSync = (window as any)[`googleCalendarSync_${trip.id}`];
+      if (googleCalendarSync && updatedActivity) {
+        googleCalendarSync(updatedActivity);
+      }
     } catch (error) {
       toast({
         variant: "destructive",

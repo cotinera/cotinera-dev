@@ -252,6 +252,7 @@ export const activities = pgTable("activities", {
   }>(),
   startTime: timestamp("start_time").notNull(),
   endTime: timestamp("end_time").notNull(),
+  googleEventId: text("google_event_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -392,6 +393,18 @@ export const customValues = pgTable("custom_values", {
   value: text("value").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const googleCalendarSync = pgTable("google_calendar_sync", {
+  id: serial("id").primaryKey(),
+  tripId: integer("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
+  calendarId: text("calendar_id").notNull(),
+  syncToken: text("sync_token"),
+  webhookChannelId: text("webhook_channel_id"),
+  webhookResourceId: text("webhook_resource_id"),
+  webhookExpiration: timestamp("webhook_expiration"),
+  lastSyncedAt: timestamp("last_synced_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 export const tripIdeasRelations = relations(tripIdeas, ({ one }) => ({
