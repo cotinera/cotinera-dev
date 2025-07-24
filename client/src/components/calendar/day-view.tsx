@@ -1142,7 +1142,7 @@ export function DayView({ trip }: { trip: Trip }) {
           <div className="sticky top-0 z-30 bg-background">
             {/* Date headers */}
             <div className="flex border-b bg-background">
-              <div className="w-24 flex-none border-r sticky left-0 z-40 bg-background p-4" />
+              <div className="w-16 flex-none border-r sticky left-0 z-40 bg-background p-4" />
               {dates.map((date) => (
                 <div
                   key={date.toISOString()}
