@@ -201,7 +201,7 @@ function DraggableEvent({
     width: '90%',
     height: `${heightInPixels}px`,
     position: 'absolute',
-    left: '5%',
+    left: '8px',
     top: '0',
     backgroundColor: isDragging ? 'hsl(var(--primary)/0.2)' : undefined,
     boxShadow: isDragging ? 'var(--shadow-md)' : undefined,
@@ -250,7 +250,7 @@ function DraggableEvent({
       style={style}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
-      className={`bg-blue-500/90 hover:bg-blue-600/90 rounded-md group/event ${
+      className={`bg-blue-500/90 hover:bg-blue-600/90 rounded-sm group/event ${
         isDragging ? 'ring-1 ring-primary/50' : ''
       } ${!isResizing && !isDragging ? 'cursor-pointer' : ''}`}
     >
