@@ -56,6 +56,7 @@ import {
   useDroppable,
   DragStartEvent,
   DragOverEvent,
+  DragOverlay,
 } from "@dnd-kit/core";
 import type { Trip, Activity, User } from "@db/schema";
 import { Pencil, Trash2, Loader2, Users } from "lucide-react";
@@ -542,6 +543,7 @@ export function DayView({ trip }: { trip: Trip }) {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [activeDropId, setActiveDropId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [draggedEvent, setDraggedEvent] = useState<Activity | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -667,9 +669,17 @@ export function DayView({ trip }: { trip: Trip }) {
     },
   });
 
-  const handleDragStart = () => {
+  const handleDragStart = (event: DragStartEvent) => {
     setIsDragging(true);
     document.body.classList.add('select-none');
+    
+    // Find the dragged event
+    const draggedId = event.active.id as string;
+    const splitEvent = splitActivities.find((a) => a.id.toString() === draggedId);
+    if (splitEvent) {
+      const originalEvent = splitEvent.originalEvent || splitEvent;
+      setDraggedEvent(originalEvent);
+    }
   };
 
   const handleDragOver = (event: DragOverEvent) => {
@@ -714,6 +724,7 @@ export function DayView({ trip }: { trip: Trip }) {
     setIsDragging(false);
     document.body.classList.remove('select-none');
     setActiveDropId(null);
+    setDraggedEvent(null);
 
     if (!event.over) return;
 
@@ -1259,6 +1270,31 @@ export function DayView({ trip }: { trip: Trip }) {
             </div>
           </div>
         </div>
+        
+        <DragOverlay>
+          {draggedEvent && (
+            <div 
+              className="bg-primary text-primary-foreground rounded-sm p-2 text-sm font-medium shadow-lg border"
+              style={{
+                width: '270px', // Match the calendar column width minus padding
+                height: `${Math.max((differenceInMinutes(new Date(draggedEvent.endTime), new Date(draggedEvent.startTime)) / 60) * 48, 48)}px`,
+                opacity: 0.95
+              }}
+            >
+              <div className="truncate font-medium">
+                {draggedEvent.title}
+              </div>
+              <div className="text-xs opacity-90 mt-1">
+                {format(new Date(draggedEvent.startTime), "h:mm a")} - {format(new Date(draggedEvent.endTime), "h:mm a")}
+              </div>
+              {draggedEvent.location && (
+                <div className="text-xs opacity-75 mt-1 truncate">
+                  📍 {draggedEvent.location}
+                </div>
+              )}
+            </div>
+          )}
+        </DragOverlay>
       </DndContext>
       <ScrollBar orientation="horizontal" />
 
