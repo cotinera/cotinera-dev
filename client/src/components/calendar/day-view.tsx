@@ -1203,8 +1203,8 @@ export function DayView({ trip }: { trip: Trip }) {
                   key={hour}
                   className="h-12 relative"
                 >
-                  {/* Time label positioned on the divider line at the bottom */}
-                  <div className="absolute bottom-0 left-2 transform -translate-y-1/2 bg-background px-1 text-sm text-muted-foreground">
+                  {/* Time label positioned on the divider line at the top */}
+                  <div className="absolute top-0 left-2 transform -translate-y-1/2 bg-background px-1 text-sm text-muted-foreground z-10">
                     {format(new Date().setHours(hour, 0), "h a")}
                   </div>
                 </div>
