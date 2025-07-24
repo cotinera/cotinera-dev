@@ -589,14 +589,20 @@ export function registerRoutes(app: Express): Server {
       if (req.body.coordinates !== undefined) updateData.coordinates = req.body.coordinates;
       if (req.body.description !== undefined) updateData.description = req.body.description;
       
-      // Store dates directly as ISO strings with time at 12:00:00 UTC to prevent any timezone issues
-      // This ensures the date stays exactly as the user selected it
+      // Store dates as ISO strings at the start of the day in UTC
+      // This prevents timezone shifts when displaying dates
       if (req.body.startDate) {
-        updateData.startDate = `${req.body.startDate}T12:00:00.000Z`;
+        // Ensure the date is stored at the beginning of the day UTC
+        const startDate = new Date(req.body.startDate);
+        startDate.setUTCHours(0, 0, 0, 0);
+        updateData.startDate = startDate.toISOString();
       }
       
       if (req.body.endDate) {
-        updateData.endDate = `${req.body.endDate}T12:00:00.000Z`;
+        // Ensure the date is stored at the beginning of the day UTC
+        const endDate = new Date(req.body.endDate);
+        endDate.setUTCHours(0, 0, 0, 0);
+        updateData.endDate = endDate.toISOString();
       }
       
       // If there are no fields to update, return early
@@ -615,14 +621,8 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: "Trip not found" });
       }
 
-      // Format dates back to YYYY-MM-DD before sending to client
-      const formattedTrip = {
-        ...updatedTrip,
-        startDate: updatedTrip.startDate.split('T')[0],
-        endDate: updatedTrip.endDate.split('T')[0],
-      };
-
-      res.json(formattedTrip);
+      // Return the trip as-is since dates are already in ISO format
+      res.json(updatedTrip);
     } catch (error) {
       console.error('Error updating trip:', error);
       res.status(500).json({ error: 'Failed to update trip' });
@@ -659,14 +659,8 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: "Trip not found" });
       }
 
-      // Format dates back to YYYY-MM-DD before sending to client
-      const formattedTrip = {
-        ...updatedTrip,
-        startDate: updatedTrip.startDate.split('T')[0],
-        endDate: updatedTrip.endDate.split('T')[0],
-      };
-
-      res.json(formattedTrip);
+      // Return the trip as-is since dates are already in ISO format
+      res.json(updatedTrip);
     } catch (error) {
       console.error('Error updating trip view preferences:', error);
       res.status(500).json({ error: 'Failed to update trip view preferences' });
