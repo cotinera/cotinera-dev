@@ -260,8 +260,9 @@ function DraggableEvent({
         onMouseDown={(e) => handleResizeStart(e, 'top')}
       />
 
-      <div className="flex items-center justify-between h-[18px] px-2 mt-1">
-        <div className="hidden group-hover/event:flex items-center gap-1">
+      <div className="relative h-[18px] px-2 mt-1">
+        <span className="font-medium text-sm text-white truncate max-w-[180px] block">{event.title}</span>
+        <div className="absolute right-2 top-0 hidden group-hover/event:flex items-center gap-1">
           <Button
             variant="ghost"
             size="icon"
@@ -285,7 +286,6 @@ function DraggableEvent({
             <Trash2 className="h-3 w-3" />
           </Button>
         </div>
-        <span className="font-medium text-sm text-white truncate max-w-[180px]">{event.title}</span>
       </div>
       <span className="text-xs text-white/80 block px-2">
         {format(eventStart, "h:mm a")} - {format(eventEnd, "h:mm a")}
