@@ -299,11 +299,17 @@ function DroppableTimeSlot({
   id,
   isOver,
   isDragging,
+  isSelected,
+  onMouseDown,
+  onMouseEnter,
   children,
 }: {
   id: string;
   isOver: boolean;
   isDragging: boolean;
+  isSelected: boolean;
+  onMouseDown: (e: React.MouseEvent) => void;
+  onMouseEnter: (e: React.MouseEvent) => void;
   children: React.ReactNode;
 }) {
   const { setNodeRef } = useDroppable({
@@ -313,9 +319,14 @@ function DroppableTimeSlot({
   return (
     <div
       ref={setNodeRef}
-      className={`h-12 relative border-t ${
-        isOver ? 'bg-primary/20 transition-colors duration-75' : ''
-      }`}
+      className={`h-12 relative border-t transition-colors ${
+        isOver ? 'bg-primary/20' : ''
+      } ${
+        isSelected ? 'bg-violet-200/50 dark:bg-violet-700/30' : ''
+      } hover:bg-gray-50 dark:hover:bg-gray-800/50`}
+      onMouseDown={onMouseDown}
+      onMouseEnter={onMouseEnter}
+      style={{ userSelect: 'none', cursor: 'pointer' }}
     >
       {children}
     </div>
@@ -507,6 +518,12 @@ export function DayView({ trip }: { trip: Trip }) {
   const [isDragging, setIsDragging] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  
+  // Drag selection state
+  const [isDragSelecting, setIsDragSelecting] = useState(false);
+  const [dragStartSlot, setDragStartSlot] = useState<{ date: Date; hour: number } | null>(null);
+  const [dragEndSlot, setDragEndSlot] = useState<{ date: Date; hour: number } | null>(null);
+  const [dragSelectedSlots, setDragSelectedSlots] = useState<Set<string>>(new Set());
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -521,6 +538,94 @@ export function DayView({ trip }: { trip: Trip }) {
   const numberOfDays = differenceInDays(tripEndDate, tripStartDate) + 1;
   const dates = Array.from({ length: numberOfDays }, (_, i) => addDays(tripStartDate, i));
   const hours = Array.from({ length: 24 }, (_, i) => i);
+  
+  // Helper functions for drag selection
+  const getSlotFromCoordinates = (element: HTMLElement): { date: Date; hour: number } | null => {
+    const dateStr = element.getAttribute('data-date');
+    const hourStr = element.getAttribute('data-hour');
+    if (!dateStr || !hourStr) return null;
+    
+    return {
+      date: new Date(dateStr),
+      hour: parseInt(hourStr, 10),
+    };
+  };
+  
+  const updateDragSelection = (start: { date: Date; hour: number }, end: { date: Date; hour: number }) => {
+    const newSelectedSlots = new Set<string>();
+    const startHour = Math.min(start.hour, end.hour);
+    const endHour = Math.max(start.hour, end.hour);
+    
+    // Only support single day selection for now
+    if (start.date.toDateString() === end.date.toDateString()) {
+      for (let hour = startHour; hour <= endHour; hour++) {
+        newSelectedSlots.add(`${start.date.toISOString()}|${hour}`);
+      }
+    }
+    
+    setDragSelectedSlots(newSelectedSlots);
+  };
+  
+  // Mouse event handlers for drag selection
+  const handleTimeSlotMouseDown = (e: React.MouseEvent, date: Date, hour: number) => {
+    // Don't start drag if clicking on an event
+    if ((e.target as HTMLElement).closest('.group\\/event')) return;
+    
+    e.preventDefault();
+    setIsDragSelecting(true);
+    setDragStartSlot({ date, hour });
+    setDragEndSlot({ date, hour });
+    setDragSelectedSlots(new Set([`${date.toISOString()}|${hour}`]));
+  };
+  
+  const handleTimeSlotMouseEnter = (e: React.MouseEvent, date: Date, hour: number) => {
+    if (!isDragSelecting || !dragStartSlot) return;
+    
+    setDragEndSlot({ date, hour });
+    updateDragSelection(dragStartSlot, { date, hour });
+  };
+  
+  const handleTimeSlotMouseUp = () => {
+    if (!isDragSelecting || !dragStartSlot || !dragEndSlot) return;
+    
+    // If we have a valid selection, open the create dialog
+    if (dragSelectedSlots.size > 0) {
+      // Calculate start and end times based on the selection
+      const startHour = Math.min(dragStartSlot.hour, dragEndSlot.hour);
+      const endHour = Math.max(dragStartSlot.hour, dragEndSlot.hour) + 1; // Add 1 to include the last hour
+      
+      setSelectedTimeSlot({
+        date: dragStartSlot.date,
+        hour: startHour
+      });
+      
+      // Set default values for the form
+      const defaultDate = format(dragStartSlot.date, 'yyyy-MM-dd');
+      const defaultStartTime = `${startHour.toString().padStart(2, '0')}:00`;
+      const defaultEndTime = `${endHour.toString().padStart(2, '0')}:00`;
+      
+      // We'll need to pass these to the create dialog
+      setIsCreateDialogOpen(true);
+    }
+    
+    // Reset drag state
+    setIsDragSelecting(false);
+    setDragStartSlot(null);
+    setDragEndSlot(null);
+    setDragSelectedSlots(new Set());
+  };
+  
+  // Add global mouse up handler to handle mouse up outside of time slots
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isDragSelecting) {
+        handleTimeSlotMouseUp();
+      }
+    };
+    
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, [isDragSelecting, dragStartSlot, dragEndSlot, dragSelectedSlots]);
 
   const { data: activities = [], isLoading } = useQuery<Activity[]>({
     queryKey: [`/api/trips/${trip.id}/activities`],
@@ -794,6 +899,11 @@ export function DayView({ trip }: { trip: Trip }) {
 
   return (
     <ScrollArea className="border rounded-md max-w-full">
+      {/* Hint for drag-to-create functionality */}
+      <div className="m-4 text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
+        💡 Tip: Click and drag vertically across time blocks to create events spanning multiple hours
+      </div>
+      
       <DndContext
         sensors={sensors}
         onDragStart={handleDragStart}
@@ -837,7 +947,15 @@ export function DayView({ trip }: { trip: Trip }) {
                     const isOver = activeDropId === timeSlotId;
 
                     return (
-                      <DroppableTimeSlot key={timeSlotId} id={timeSlotId} isOver={isOver} isDragging={isDragging}>
+                      <DroppableTimeSlot 
+                        key={timeSlotId} 
+                        id={timeSlotId} 
+                        isOver={isOver} 
+                        isDragging={isDragging}
+                        isSelected={dragSelectedSlots.has(timeSlotId)}
+                        onMouseDown={(e) => handleTimeSlotMouseDown(e, date, hour)}
+                        onMouseEnter={(e) => handleTimeSlotMouseEnter(e, date, hour)}
+                      >
                         {timeSlotEvents.map((event) => (
                           <DraggableEvent
                             key={event.id}
@@ -850,39 +968,23 @@ export function DayView({ trip }: { trip: Trip }) {
                             onResize={(edge, newTime) => handleResize(event.id, edge, newTime)}
                           />
                         ))}
-                        {timeSlotEvents.length === 0 && !isDragging && (
-                          <Dialog
-                            open={
-                              isCreateDialogOpen &&
-                              selectedTimeSlot?.date.toDateString() ===
-                                date.toDateString() &&
-                              selectedTimeSlot?.hour === hour
-                            }
-                            onOpenChange={setIsCreateDialogOpen}
+                        {/* Show selection overlay during drag */}
+                        {dragSelectedSlots.has(timeSlotId) && isDragSelecting && (
+                          <div className="absolute inset-0 bg-violet-400/30 dark:bg-violet-600/30 pointer-events-none rounded-md border-2 border-violet-400 dark:border-violet-600" />
+                        )}
+                        
+                        {/* Original add event button (hidden during drag selection) */}
+                        {timeSlotEvents.length === 0 && !isDragging && !isDragSelecting && (
+                          <Button
+                            variant="ghost"
+                            className="w-full h-12 opacity-0 hover:opacity-100 transition-opacity"
+                            onClick={() => {
+                              setSelectedTimeSlot({ date, hour });
+                              setIsCreateDialogOpen(true);
+                            }}
                           >
-                            <DialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                className="w-full h-12 opacity-0 hover:opacity-100 transition-opacity"
-                                onClick={() => setSelectedTimeSlot({ date, hour })}
-                              >
-                                + Add Event
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Create New Event</DialogTitle>
-                              </DialogHeader>
-                              {selectedTimeSlot && (
-                                <EventForm
-                                  defaultValues={getCreateFormDefaults(selectedTimeSlot.date, selectedTimeSlot.hour)}
-                                  onSubmit={createEvent}
-                                  submitLabel="Create Event"
-                                  trip={trip}
-                                />
-                              )}
-                            </DialogContent>
-                          </Dialog>
+                            + Add Event
+                          </Button>
                         )}
                       </DroppableTimeSlot>
                     );
@@ -937,6 +1039,36 @@ export function DayView({ trip }: { trip: Trip }) {
                 }
               }}
               submitLabel="Update Event"
+              trip={trip}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Create dialog for drag-to-create and regular creation */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Event</DialogTitle>
+          </DialogHeader>
+          {selectedTimeSlot && (
+            <EventForm
+              defaultValues={
+                dragStartSlot && dragEndSlot && dragStartSlot.date.toDateString() === selectedTimeSlot.date.toDateString()
+                  ? {
+                      title: "",
+                      date: format(selectedTimeSlot.date, 'yyyy-MM-dd'),
+                      startTime: `${Math.min(dragStartSlot.hour, dragEndSlot.hour).toString().padStart(2, '0')}:00`,
+                      endTime: `${(Math.max(dragStartSlot.hour, dragEndSlot.hour) + 1).toString().padStart(2, '0')}:00`,
+                      location: "",
+                      description: "",
+                      participants: [],
+                      coordinates: null,
+                    }
+                  : getCreateFormDefaults(selectedTimeSlot.date, selectedTimeSlot.hour)
+              }
+              onSubmit={createEvent}
+              submitLabel="Create Event"
               trip={trip}
             />
           )}

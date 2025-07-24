@@ -1,0 +1,39 @@
+I want to upgrade my calendar view in the TripCoordinator app to support creating events by dragging across time blocks, similar to how it works in Notion or Google Calendar.
+
+🧠 CONTEXT:
+- The calendar currently shows hourly rows for each day of the trip.
+- Right now, the only way to create an event is by clicking a single time block and entering details. I want to change that.
+- I’m using Tailwind and `shadcn/ui` components in the rest of the app, so make sure the UI stays clean and consistent.
+
+🧲 NEW FUNCTIONALITY TO ADD:
+1. **User Interaction**:
+   - User should be able to click and drag vertically across time blocks within a day to select a range (e.g., 3PM–5PM).
+   - On mouse release, show an event creation modal or inline form (whichever is simpler) with the selected start/end times pre-filled.
+   - The user should then be able to name the event and save it.
+
+2. **Visual Feedback**:
+   - While dragging, highlight the selected time range with a translucent block (like Google/Notion).
+   - Use a soft blue or violet background and rounded corners for the selection area using Tailwind styles.
+
+3. **Design System**:
+   - Use `shadcn/ui` components for the event creation modal or inline form:
+     - Use `Dialog`, `Input`, `Textarea`, and `Button` from shadcn/ui.
+     - Make sure the modal feels native to the design already in place.
+
+4. **Event Saving**:
+   - After saving, render the new event block inside the calendar grid (same visual style as existing ones if any).
+   - The event block should show the event title and time range.
+   - Make the event blocks styled cleanly with Tailwind (rounded, drop shadow, hover effect).
+
+🧠 TECHNICAL:
+- Make sure drag events don’t interfere with scroll.
+- Ensure it works on both desktop and mobile (basic responsive layout is fine).
+- Use React state to track startTime and endTime while dragging.
+- Store events in local state for now or wherever we currently store them.
+- Bonus if you can snap to nearest 30-min or 1-hour intervals while dragging.
+
+📦 KEEP:
+- The calendar only needs to support this for one day column at a time for now.
+- Keep using the existing scrollable grid of hours/day — just inject this behavior on top of it.
+
+Please implement this logic directly into the calendar component. Refactor into smaller components if necessary.
