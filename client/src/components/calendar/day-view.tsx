@@ -201,7 +201,7 @@ function DraggableEvent({
     width: '90%',
     height: `${heightInPixels}px`,
     position: 'absolute',
-    left: '8px',
+    left: '0',
     top: '0',
     backgroundColor: isDragging ? 'hsl(var(--primary)/0.2)' : undefined,
     boxShadow: isDragging ? 'var(--shadow-md)' : undefined,
