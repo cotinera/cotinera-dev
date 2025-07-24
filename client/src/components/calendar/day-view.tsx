@@ -1197,13 +1197,16 @@ export function DayView({ trip }: { trip: Trip }) {
           </div>
 
           <div className="flex">
-            <div className="w-24 flex-none border-r sticky left-0 z-20 bg-background">
-              {hours.map((hour) => (
+            <div className="w-24 flex-none border-r sticky left-0 z-20 bg-background relative">
+              {hours.map((hour, index) => (
                 <div
                   key={hour}
-                  className="h-12 flex items-start px-2 pt-1 text-sm text-muted-foreground border-t first:border-t-0"
+                  className="h-12 relative"
                 >
-                  {format(new Date().setHours(hour, 0), "h a")}
+                  {/* Time label positioned on the divider line at the bottom */}
+                  <div className="absolute bottom-0 left-2 transform -translate-y-1/2 bg-background px-1 text-sm text-muted-foreground">
+                    {format(new Date().setHours(hour, 0), "h a")}
+                  </div>
                 </div>
               ))}
             </div>
