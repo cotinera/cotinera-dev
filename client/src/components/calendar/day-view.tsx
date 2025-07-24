@@ -1180,7 +1180,7 @@ export function DayView({ trip }: { trip: Trip }) {
       <ScrollBar orientation="horizontal" />
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-h-[70vh] overflow-y-auto rounded-xl sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Edit Event</DialogTitle>
           </DialogHeader>
@@ -1258,7 +1258,7 @@ export function DayView({ trip }: { trip: Trip }) {
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-h-[70vh] overflow-y-auto rounded-xl sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Create New Event</DialogTitle>
           </DialogHeader>

@@ -427,7 +427,7 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
 
       {/* Create Activity Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="max-h-[70vh] overflow-y-auto rounded-xl sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Add New Event</DialogTitle>
             <DialogDescription>
