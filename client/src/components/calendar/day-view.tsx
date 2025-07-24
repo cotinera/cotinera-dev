@@ -676,29 +676,33 @@ export function DayView({ trip }: { trip: Trip }) {
     const { active, over } = event;
     if (!over) return;
 
-    const eventId = parseInt(active.id as string);
+    const draggedId = active.id as string;
     const [dateStr, hourStr] = (over.id as string).split("|");
     const newDate = new Date(dateStr);
     const newHour = parseInt(hourStr);
 
-    const activityToUpdate = activities.find((a) => a.id === eventId);
-    if (!activityToUpdate) return;
+    // Find the dragged event (could be original or split segment)
+    const splitEvent = splitActivities.find((a) => a.id.toString() === draggedId);
+    if (!splitEvent) return;
 
-    const startDate = new Date(activityToUpdate.startTime);
-    const endDate = new Date(activityToUpdate.endTime);
-    const durationInMinutes = differenceInMinutes(endDate, startDate);
+    // Get the original event and its duration
+    const originalEvent = splitEvent.originalEvent || splitEvent;
+    const originalStart = new Date(originalEvent.startTime);
+    const originalEnd = new Date(originalEvent.endTime);
+    const fullDurationInMinutes = differenceInMinutes(originalEnd, originalStart);
 
     const newStartTime = snapToQuarterHour(new Date(newDate.setHours(newHour, 0, 0)));
     const newEndTime = new Date(newStartTime);
-    newEndTime.setMinutes(newStartTime.getMinutes() + durationInMinutes);
+    newEndTime.setMinutes(newStartTime.getMinutes() + fullDurationInMinutes);
 
     if (over) {
       setActiveDropId(over.id as string);
 
+      // Update the original event in the activities array
       queryClient.setQueryData(
         [`/api/trips/${trip.id}/activities`],
         activities.map(activity =>
-          activity.id === eventId
+          activity.id === originalEvent.id
             ? { ...activity, startTime: newStartTime.toISOString(), endTime: newEndTime.toISOString() }
             : activity
         )
@@ -713,21 +717,24 @@ export function DayView({ trip }: { trip: Trip }) {
 
     if (!event.over) return;
 
-    const eventId = parseInt(event.active.id as string);
+    const draggedId = event.active.id as string;
     const [dateStr, hourStr] = (event.over.id as string).split("|");
     const newDate = new Date(dateStr);
     const newHour = parseInt(hourStr);
 
-    const activityToUpdate = activities.find((a) => a.id === eventId);
-    if (!activityToUpdate) return;
+    // Find the dragged event (could be original or split segment)
+    const splitEvent = splitActivities.find((a) => a.id.toString() === draggedId);
+    if (!splitEvent) return;
 
-    const startDate = new Date(activityToUpdate.startTime);
-    const endDate = new Date(activityToUpdate.endTime);
-    const durationInMinutes = differenceInMinutes(endDate, startDate);
+    // Get the original event and its duration
+    const originalEvent = splitEvent.originalEvent || splitEvent;
+    const originalStart = new Date(originalEvent.startTime);
+    const originalEnd = new Date(originalEvent.endTime);
+    const fullDurationInMinutes = differenceInMinutes(originalEnd, originalStart);
 
     const newStartTime = snapToQuarterHour(new Date(newDate.setHours(newHour, 0, 0)));
     const newEndTime = new Date(newStartTime);
-    newEndTime.setMinutes(newStartTime.getMinutes() + durationInMinutes);
+    newEndTime.setMinutes(newStartTime.getMinutes() + fullDurationInMinutes);
 
     const tripStart = startOfDay(new Date(trip.startDate));
     const tripEnd = endOfDay(new Date(trip.endDate));
@@ -742,11 +749,11 @@ export function DayView({ trip }: { trip: Trip }) {
     }
 
     try {
-      const res = await fetch(`/api/trips/${trip.id}/activities/${activityToUpdate.id}`, {
+      const res = await fetch(`/api/trips/${trip.id}/activities/${originalEvent.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...activityToUpdate,
+          ...originalEvent,
           startTime: newStartTime.toISOString(),
           endTime: newEndTime.toISOString(),
         }),
@@ -758,9 +765,9 @@ export function DayView({ trip }: { trip: Trip }) {
       
       // Sync updated activity to Google Calendar
       const googleCalendarSync = (window as any)[`googleCalendarSync_${trip.id}`];
-      if (googleCalendarSync && activityToUpdate) {
+      if (googleCalendarSync && originalEvent) {
         googleCalendarSync({
-          ...activityToUpdate,
+          ...originalEvent,
           startTime: newStartTime.toISOString(),
           endTime: newEndTime.toISOString(),
         });
@@ -989,11 +996,15 @@ export function DayView({ trip }: { trip: Trip }) {
     }
   };
 
-  const handleResize = async (eventId: number, edge: 'top' | 'bottom', newTime: Date) => {
-    const activityToUpdate = activities.find((a) => a.id === eventId);
-    if (!activityToUpdate) return;
+  const handleResize = async (eventId: string | number, edge: 'top' | 'bottom', newTime: Date) => {
+    // Find the event (could be original or split segment)
+    const splitEvent = splitActivities.find((a) => a.id.toString() === eventId.toString());
+    if (!splitEvent) return;
 
-    const updatedActivity = { ...activityToUpdate };
+    // Get the original event
+    const originalEvent = splitEvent.originalEvent || splitEvent;
+
+    const updatedActivity = { ...originalEvent };
     if (edge === 'top') {
       updatedActivity.startTime = newTime.toISOString();
     } else {
@@ -1001,7 +1012,7 @@ export function DayView({ trip }: { trip: Trip }) {
     }
 
     try {
-      const res = await fetch(`/api/trips/${trip.id}/activities/${eventId}`, {
+      const res = await fetch(`/api/trips/${trip.id}/activities/${originalEvent.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedActivity),
@@ -1012,7 +1023,7 @@ export function DayView({ trip }: { trip: Trip }) {
       queryClient.setQueryData(
         [`/api/trips/${trip.id}/activities`],
         activities.map(activity =>
-          activity.id === eventId ? updatedActivity : activity
+          activity.id === originalEvent.id ? updatedActivity : activity
         )
       );
 
@@ -1107,7 +1118,7 @@ export function DayView({ trip }: { trip: Trip }) {
   }
 
   return (
-    <ScrollArea className="border rounded-md max-w-full">
+    <ScrollArea className="border rounded-md max-w-full h-[calc(100vh-200px)]">
       {/* Hint for drag-to-create functionality */}
       <div className="m-4 text-sm text-muted-foreground bg-muted/50 p-3 rounded-md">
         💡 Tip: Click and drag vertically across time slots to create multi-hour events
