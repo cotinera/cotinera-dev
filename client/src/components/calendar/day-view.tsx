@@ -25,11 +25,13 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Switch } from "@/components/ui/switch";
 import {
   format,
   addHours,
@@ -75,6 +77,7 @@ const eventFormSchema = z.object({
     lat: z.number(),
     lng: z.number()
   }).optional().nullable(),
+  isAllDay: z.boolean().optional().default(false),
 });
 
 type EventFormValues = z.infer<typeof eventFormSchema>;
@@ -375,35 +378,58 @@ function EventForm({
           )}
         />
 
-        <div className="grid grid-cols-2 gap-4">
-          <FormField
-            control={form.control}
-            name="startTime"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Start Time</FormLabel>
-                <FormControl>
-                  <Input {...field} type="time" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+        <FormField
+          control={form.control}
+          name="isAllDay"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+              <div className="space-y-0.5">
+                <FormLabel>All day event</FormLabel>
+                <FormDescription>
+                  This event lasts the entire day
+                </FormDescription>
+              </div>
+              <FormControl>
+                <Switch
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </FormControl>
+            </FormItem>
+          )}
+        />
 
-          <FormField
-            control={form.control}
-            name="endTime"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>End Time</FormLabel>
-                <FormControl>
-                  <Input {...field} type="time" />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        </div>
+        {!form.watch('isAllDay') && (
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="startTime"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Start Time</FormLabel>
+                  <FormControl>
+                    <Input {...field} type="time" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="endTime"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>End Time</FormLabel>
+                  <FormControl>
+                    <Input {...field} type="time" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        )}
 
         <FormField
           control={form.control}
@@ -751,22 +777,70 @@ export function DayView({ trip }: { trip: Trip }) {
   const getTimeSlotEvents = (date: Date, hour: number) => {
     return activities.filter((event) => {
       const eventStart = new Date(event.startTime);
+      const eventEnd = new Date(event.endTime);
+      
+      // Check if it's an all-day event (midnight to midnight or 24 hours duration)
+      const isAllDay = (
+        eventStart.getHours() === 0 && 
+        eventStart.getMinutes() === 0 &&
+        eventEnd.getHours() === 0 &&
+        eventEnd.getMinutes() === 0 &&
+        eventEnd.getTime() - eventStart.getTime() >= 24 * 60 * 60 * 1000
+      );
+      
       return (
+        !isAllDay &&
         eventStart.getHours() === hour &&
         eventStart.toDateString() === date.toDateString()
       );
     });
   };
+  
+  const getAllDayEvents = (date: Date) => {
+    return activities.filter((event) => {
+      const eventStart = new Date(event.startTime);
+      const eventEnd = new Date(event.endTime);
+      
+      // Check if it's an all-day event
+      const isAllDay = (
+        eventStart.getHours() === 0 && 
+        eventStart.getMinutes() === 0 &&
+        eventEnd.getHours() === 0 &&
+        eventEnd.getMinutes() === 0 &&
+        eventEnd.getTime() - eventStart.getTime() >= 24 * 60 * 60 * 1000
+      );
+      
+      // Check if the event occurs on this date
+      const eventDate = new Date(eventStart);
+      eventDate.setHours(0, 0, 0, 0);
+      const targetDate = new Date(date);
+      targetDate.setHours(0, 0, 0, 0);
+      
+      return isAllDay && eventDate.getTime() === targetDate.getTime();
+    });
+  };
 
   const createEvent = async (values: EventFormValues) => {
     try {
-      const startTime = new Date(`${values.date}T${values.startTime}:00`);
-      const endTime = new Date(`${values.date}T${values.endTime}:00`);
+      let startTime: Date;
+      let endTime: Date;
+
+      if (values.isAllDay) {
+        // For all-day events, set times to midnight
+        startTime = new Date(values.date);
+        startTime.setHours(0, 0, 0, 0);
+        endTime = new Date(values.date);
+        endTime.setDate(endTime.getDate() + 1);
+        endTime.setHours(0, 0, 0, 0);
+      } else {
+        startTime = new Date(`${values.date}T${values.startTime}:00`);
+        endTime = new Date(`${values.date}T${values.endTime}:00`);
+      }
 
       const tripStart = startOfDay(new Date(trip.startDate));
       const tripEnd = endOfDay(new Date(trip.endDate));
 
-      if (startTime < tripStart || endTime > tripEnd) {
+      if (startTime < tripStart || (values.isAllDay ? endTime > addDays(tripEnd, 1) : endTime > tripEnd)) {
         toast({
           variant: "destructive",
           title: "Invalid dates",
@@ -891,6 +965,27 @@ export function DayView({ trip }: { trip: Trip }) {
   };
 
   const getCreateFormDefaults = (date: Date, hour: number): EventFormValues => {
+    if (hour === -1) {
+      // All-day event
+      const startTime = new Date(date);
+      startTime.setHours(0, 0, 0, 0);
+      const endTime = new Date(date);
+      endTime.setDate(endTime.getDate() + 1);
+      endTime.setHours(0, 0, 0, 0);
+
+      return {
+        title: "",
+        startTime: "00:00",
+        endTime: "00:00",
+        date: format(date, "yyyy-MM-dd"),
+        location: "",
+        description: "",
+        participants: [],
+        coordinates: null,
+        isAllDay: true
+      };
+    }
+
     const startTime = new Date(date);
     startTime.setHours(hour, 0, 0, 0);
     const endTime = addHours(startTime, 1);
@@ -903,13 +998,23 @@ export function DayView({ trip }: { trip: Trip }) {
       location: "",
       description: "",
       participants: [],
-      coordinates: null
+      coordinates: null,
+      isAllDay: false
     };
   };
 
   const getEditFormDefaults = (event: Activity): EventFormValues => {
     const startTime = new Date(event.startTime);
     const endTime = new Date(event.endTime);
+    
+    // Check if it's an all-day event
+    const isAllDay = (
+      startTime.getHours() === 0 && 
+      startTime.getMinutes() === 0 &&
+      endTime.getHours() === 0 &&
+      endTime.getMinutes() === 0 &&
+      endTime.getTime() - startTime.getTime() >= 24 * 60 * 60 * 1000
+    );
 
     return {
       title: event.title,
@@ -919,7 +1024,8 @@ export function DayView({ trip }: { trip: Trip }) {
       location: event.location || "",
       description: event.description || "",
       participants: event.participants?.map(p => p.userId) || [],
-      coordinates: event.coordinates || null
+      coordinates: event.coordinates || null,
+      isAllDay
     };
   };
 
@@ -956,6 +1062,48 @@ export function DayView({ trip }: { trip: Trip }) {
                 {format(date, "EEEE, MMMM d")}
               </div>
             ))}
+          </div>
+
+          {/* All-day events section */}
+          <div className="flex border-b">
+            <div className="w-24 flex-none border-r sticky left-0 z-20 bg-background p-2 text-sm text-muted-foreground">
+              All day
+            </div>
+            {dates.map((date) => {
+              const allDayEvents = getAllDayEvents(date);
+              return (
+                <div
+                  key={`allday-${date.toISOString()}`}
+                  className="w-[300px] border-l first:border-l-0 p-2 min-h-[60px] relative"
+                >
+                  <div className="space-y-1">
+                    {allDayEvents.map((event) => (
+                      <div
+                        key={event.id}
+                        className="bg-primary text-primary-foreground rounded px-2 py-1 text-sm font-medium cursor-pointer hover:opacity-90"
+                        onClick={() => {
+                          setSelectedEvent(event);
+                          setIsEditDialogOpen(true);
+                        }}
+                      >
+                        {event.title}
+                      </div>
+                    ))}
+                  </div>
+                  {allDayEvents.length === 0 && (
+                    <div 
+                      className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity cursor-pointer bg-blue-100 dark:bg-blue-900/30"
+                      onClick={() => {
+                        setSelectedTimeSlot({ date, hour: -1 }); // Use -1 to indicate all-day
+                        setIsCreateDialogOpen(true);
+                      }}
+                    >
+                      <span className="text-sm text-blue-700 dark:text-blue-300">+ Add All-Day Event</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
           <div className="flex">
@@ -1041,8 +1189,20 @@ export function DayView({ trip }: { trip: Trip }) {
               defaultValues={getEditFormDefaults(selectedEvent)}
               onSubmit={async (values) => {
                 try {
-                  const startTime = new Date(`${values.date}T${values.startTime}:00`);
-                  const endTime = new Date(`${values.date}T${values.endTime}:00`);
+                  let startTime: Date;
+                  let endTime: Date;
+
+                  if (values.isAllDay) {
+                    // For all-day events, set times to midnight
+                    startTime = new Date(values.date);
+                    startTime.setHours(0, 0, 0, 0);
+                    endTime = new Date(values.date);
+                    endTime.setDate(endTime.getDate() + 1);
+                    endTime.setHours(0, 0, 0, 0);
+                  } else {
+                    startTime = new Date(`${values.date}T${values.startTime}:00`);
+                    endTime = new Date(`${values.date}T${values.endTime}:00`);
+                  }
 
                   const res = await fetch(`/api/trips/${trip.id}/activities/${selectedEvent.id}`, {
                     method: "PATCH",
@@ -1115,6 +1275,7 @@ export function DayView({ trip }: { trip: Trip }) {
                       description: "",
                       participants: [],
                       coordinates: null,
+                      isAllDay: false,
                     }
                   : getCreateFormDefaults(selectedTimeSlot.date, selectedTimeSlot.hour)
               }

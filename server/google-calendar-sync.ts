@@ -16,32 +16,75 @@ function getOAuth2Client() {
 
 // Convert Google Calendar event to our activity format
 function googleEventToActivity(event: any, tripId: number): Partial<typeof activities.$inferInsert> {
+  let startTime: Date;
+  let endTime: Date;
+  
+  if (event.start.date && !event.start.dateTime) {
+    // All-day event - use date at midnight UTC
+    startTime = new Date(event.start.date);
+    startTime.setUTCHours(0, 0, 0, 0);
+    endTime = new Date(event.end.date);
+    endTime.setUTCHours(0, 0, 0, 0);
+  } else {
+    // Timed event
+    startTime = new Date(event.start.dateTime || event.start.date);
+    endTime = new Date(event.end.dateTime || event.end.date);
+  }
+  
   return {
     tripId,
     title: event.summary || 'Untitled Event',
     description: event.description || null,
     location: event.location || null,
-    startTime: new Date(event.start.dateTime || event.start.date),
-    endTime: new Date(event.end.dateTime || event.end.date),
+    startTime,
+    endTime,
     googleEventId: event.id,
   };
 }
 
 // Convert our activity to Google Calendar event format
 function activityToGoogleEvent(activity: any) {
-  return {
-    summary: activity.title,
-    description: activity.description || `Activity from trip`,
-    location: activity.location || '',
-    start: {
-      dateTime: activity.startTime,
-      timeZone: 'UTC',
-    },
-    end: {
-      dateTime: activity.endTime,
-      timeZone: 'UTC',
-    },
-  };
+  const startTime = new Date(activity.startTime);
+  const endTime = new Date(activity.endTime);
+  
+  // Check if it's an all-day event
+  const isAllDay = (
+    startTime.getHours() === 0 && 
+    startTime.getMinutes() === 0 &&
+    endTime.getHours() === 0 &&
+    endTime.getMinutes() === 0 &&
+    endTime.getTime() - startTime.getTime() >= 24 * 60 * 60 * 1000
+  );
+
+  if (isAllDay) {
+    // For all-day events, use date format (YYYY-MM-DD)
+    return {
+      summary: activity.title,
+      description: activity.description || `Activity from trip`,
+      location: activity.location || '',
+      start: {
+        date: startTime.toISOString().split('T')[0],
+      },
+      end: {
+        date: endTime.toISOString().split('T')[0],
+      },
+    };
+  } else {
+    // For timed events, use dateTime format
+    return {
+      summary: activity.title,
+      description: activity.description || `Activity from trip`,
+      location: activity.location || '',
+      start: {
+        dateTime: activity.startTime,
+        timeZone: 'UTC',
+      },
+      end: {
+        dateTime: activity.endTime,
+        timeZone: 'UTC',
+      },
+    };
+  }
 }
 
 // Sync events from Google Calendar to our database
