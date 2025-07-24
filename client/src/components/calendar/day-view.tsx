@@ -1052,23 +1052,26 @@ export function DayView({ trip }: { trip: Trip }) {
         onDragOver={handleDragOver}
       >
         <div className="min-w-fit relative">
-          <div className="flex bg-background sticky top-0 z-30 border-b">
-            <div className="w-24 flex-none border-r sticky left-0 z-40 bg-background p-4" />
-            {dates.map((date) => (
-              <div
-                key={date.toISOString()}
-                className="w-[300px] p-4 border-l first:border-l-0 font-semibold text-center bg-background"
-              >
-                {format(date, "EEEE, MMMM d")}
-              </div>
-            ))}
-          </div>
-
-          {/* All-day events section */}
-          <div className="flex border-b sticky top-[89px] z-30 bg-background">
-            <div className="w-24 flex-none border-r sticky left-0 z-40 bg-background p-2 text-sm text-muted-foreground">
-              All day
+          {/* Combined sticky header with dates and all-day section */}
+          <div className="sticky top-0 z-30 bg-background">
+            {/* Date headers */}
+            <div className="flex border-b bg-background">
+              <div className="w-24 flex-none border-r sticky left-0 z-40 bg-background p-4" />
+              {dates.map((date) => (
+                <div
+                  key={date.toISOString()}
+                  className="w-[300px] p-4 border-l first:border-l-0 font-semibold text-center bg-background"
+                >
+                  {format(date, "EEEE, MMMM d")}
+                </div>
+              ))}
             </div>
+
+            {/* All-day events section */}
+            <div className="flex border-b bg-background">
+              <div className="w-24 flex-none border-r sticky left-0 z-40 bg-background p-2 text-sm text-muted-foreground">
+                All day
+              </div>
             {dates.map((date) => {
               const allDayEvents = getAllDayEvents(date);
               return (
@@ -1104,6 +1107,7 @@ export function DayView({ trip }: { trip: Trip }) {
                 </div>
               );
             })}
+            </div>
           </div>
 
           <div className="flex">
