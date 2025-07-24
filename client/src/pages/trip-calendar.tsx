@@ -22,7 +22,7 @@ export default function TripCalendar() {
   const [viewMode, setViewMode] = useState<ViewMode>("edit");
 
   const { data: trip, isLoading: tripLoading } = useQuery<Trip>({
-    queryKey: [`/api/trips/${tripId}`],
+    queryKey: ["/api/trips", tripId],
     queryFn: async () => {
       const res = await fetch(`/api/trips/${tripId}`);
       if (!res.ok) {

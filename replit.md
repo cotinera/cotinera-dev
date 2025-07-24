@@ -44,7 +44,7 @@ The frontend consolidates UI/UX components in `client/src/frontend.ts`, separati
 - **Map Components**: Interactive mapping with Google Maps integration
 - **Trip Management**: Trip creation, editing, and collaboration features
 - **Authentication**: Login/register forms and auth layouts
-- **Calendar**: Scheduling and timeline views
+- **Calendar**: Scheduling and timeline views with Google Calendar sync
 - **Travel Features**: Preferences, recommendations, and booking management
 
 ### Backend Architecture
