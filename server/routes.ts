@@ -589,19 +589,19 @@ export function registerRoutes(app: Express): Server {
       if (req.body.coordinates !== undefined) updateData.coordinates = req.body.coordinates;
       if (req.body.description !== undefined) updateData.description = req.body.description;
       
-      // Store dates as ISO strings at the start of the day in UTC
-      // This prevents timezone shifts when displaying dates
+      // Store dates exactly as provided by the client to prevent timezone shifts
+      // The client sends YYYY-MM-DD format, we'll store it with a fixed time component
       if (req.body.startDate) {
-        // Ensure the date is stored at the beginning of the day UTC
-        const startDate = new Date(req.body.startDate);
-        startDate.setUTCHours(0, 0, 0, 0);
+        // Parse the date string and set time to noon UTC to avoid timezone boundary issues
+        const [year, month, day] = req.body.startDate.split('-').map(Number);
+        const startDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
         updateData.startDate = startDate.toISOString();
       }
       
       if (req.body.endDate) {
-        // Ensure the date is stored at the beginning of the day UTC
-        const endDate = new Date(req.body.endDate);
-        endDate.setUTCHours(0, 0, 0, 0);
+        // Parse the date string and set time to noon UTC to avoid timezone boundary issues
+        const [year, month, day] = req.body.endDate.split('-').map(Number);
+        const endDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
         updateData.endDate = endDate.toISOString();
       }
       
