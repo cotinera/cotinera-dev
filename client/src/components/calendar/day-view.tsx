@@ -568,7 +568,7 @@ export function DayView({ trip }: { trip: Trip }) {
   const tripEndDate = new Date(trip.endDate);
   const numberOfDays = differenceInDays(tripEndDate, tripStartDate) + 1;
   const dates = Array.from({ length: numberOfDays }, (_, i) => addDays(tripStartDate, i));
-  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const hours = Array.from({ length: 23 }, (_, i) => i + 1); // 1 AM to 11 PM
   
   // Helper functions for drag selection
   const getSlotFromCoordinates = (element: HTMLElement): { date: Date; hour: number } | null => {
@@ -1201,9 +1201,9 @@ export function DayView({ trip }: { trip: Trip }) {
               {hours.map((hour) => (
                 <div
                   key={hour}
-                  className="h-12 flex items-center px-2 text-sm text-muted-foreground border-t first:border-t-0"
+                  className="h-12 flex items-start px-2 pt-1 text-sm text-muted-foreground border-t first:border-t-0"
                 >
-                  {format(new Date().setHours(hour, 0), "h:mm a")}
+                  {format(new Date().setHours(hour, 0), "h a")}
                 </div>
               ))}
             </div>
