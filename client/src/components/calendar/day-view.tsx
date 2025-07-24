@@ -774,12 +774,15 @@ export function DayView({ trip }: { trip: Trip }) {
     }
   };
 
-  const getTimeSlotEvents = (date: Date, hour: number) => {
-    return activities.filter((event) => {
+  // Split multi-day events into daily segments
+  const splitMultiDayEvents = (activities: Activity[]) => {
+    const splitEvents: (Activity & { isSegment?: boolean; originalEvent?: Activity })[] = [];
+    
+    activities.forEach((event) => {
       const eventStart = new Date(event.startTime);
       const eventEnd = new Date(event.endTime);
       
-      // Check if it's an all-day event (midnight to midnight or 24 hours duration)
+      // Check if it's an all-day event
       const isAllDay = (
         eventStart.getHours() === 0 && 
         eventStart.getMinutes() === 0 &&
@@ -788,16 +791,88 @@ export function DayView({ trip }: { trip: Trip }) {
         eventEnd.getTime() - eventStart.getTime() >= 24 * 60 * 60 * 1000
       );
       
-      return (
-        !isAllDay &&
-        eventStart.getHours() === hour &&
-        eventStart.toDateString() === date.toDateString()
+      // If it's an all-day event or doesn't span multiple days, keep as is
+      if (isAllDay || eventStart.toDateString() === eventEnd.toDateString()) {
+        splitEvents.push(event);
+        return;
+      }
+      
+      // Split multi-day event into daily segments
+      const currentDate = new Date(eventStart);
+      currentDate.setHours(0, 0, 0, 0); // Start of the day
+      
+      while (currentDate < eventEnd) {
+        const dayStart = new Date(currentDate);
+        const dayEnd = new Date(currentDate);
+        dayEnd.setHours(23, 59, 59, 999); // End of the day
+        
+        // Determine segment start and end times
+        const segmentStart = currentDate.toDateString() === eventStart.toDateString() 
+          ? new Date(eventStart) 
+          : new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 0, 0, 0, 0);
+          
+        const segmentEnd = currentDate.toDateString() === eventEnd.toDateString() 
+          ? new Date(eventEnd) 
+          : new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 23, 59, 59, 999);
+        
+        // Only create segment if it has valid duration
+        if (segmentStart < segmentEnd) {
+          splitEvents.push({
+            ...event,
+            id: event.id + '_' + currentDate.toISOString().split('T')[0], // Unique ID for segment
+            startTime: segmentStart.toISOString(),
+            endTime: segmentEnd.toISOString(),
+            isSegment: true,
+            originalEvent: event
+          });
+        }
+        
+        // Move to next day
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+    });
+    
+    return splitEvents;
+  };
+
+  const splitActivities = splitMultiDayEvents(activities);
+
+  const getTimeSlotEvents = (date: Date, hour: number) => {
+    return splitActivities.filter((event) => {
+      const eventStart = new Date(event.startTime);
+      const eventEnd = new Date(event.endTime);
+      
+      // Check if it's an all-day event
+      const isAllDay = (
+        eventStart.getHours() === 0 && 
+        eventStart.getMinutes() === 0 &&
+        eventEnd.getHours() === 0 &&
+        eventEnd.getMinutes() === 0 &&
+        eventEnd.getTime() - eventStart.getTime() >= 24 * 60 * 60 * 1000
       );
+      
+      if (isAllDay) return false;
+      
+      // Check if event is on this date
+      const eventDate = eventStart.toDateString();
+      const targetDate = date.toDateString();
+      
+      if (eventDate !== targetDate) return false;
+      
+      // Check if event spans this hour
+      const hourStart = new Date(date);
+      hourStart.setHours(hour, 0, 0, 0);
+      
+      const hourEnd = new Date(date);
+      hourEnd.setHours(hour, 59, 59, 999);
+      
+      // Event overlaps with this hour if it starts before hour ends and ends after hour starts
+      return eventStart <= hourEnd && eventEnd > hourStart;
     });
   };
   
   const getAllDayEvents = (date: Date) => {
-    return activities.filter((event) => {
+    return splitActivities.filter((event) => {
       const eventStart = new Date(event.startTime);
       const eventEnd = new Date(event.endTime);
       
