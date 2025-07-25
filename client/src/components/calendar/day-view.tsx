@@ -1031,22 +1031,36 @@ export function DayView({ trip }: { trip: Trip }) {
     const event = activities.find((a) => a.id.toString() === eventId.toString());
     if (!event) return;
 
-    const updatedActivity = { ...event };
-    if (edge === 'top') {
-      updatedActivity.startTime = newTime.toISOString();
-    } else {
-      updatedActivity.endTime = newTime.toISOString();
-    }
+    // Prepare the update data with only the fields the server expects
+    const updateData = {
+      title: event.title,
+      description: event.description,
+      location: event.location,  
+      startTime: edge === 'top' ? newTime.toISOString() : event.startTime,
+      endTime: edge === 'bottom' ? newTime.toISOString() : event.endTime,
+      participants: event.participants || [],
+      coordinates: event.coordinates || null,
+    };
 
     try {
+      console.log('Resizing event:', { eventId: event.id, edge, newTime, updateData });
+      
       const res = await fetch(`/api/trips/${trip.id}/activities/${event.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedActivity),
+        body: JSON.stringify(updateData),
       });
 
-      if (!res.ok) throw new Error("Failed to update activity");
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Resize API error:', errorText);
+        throw new Error("Failed to update activity");
+      }
 
+      const updatedActivity = await res.json();
+      console.log('Server response:', updatedActivity);
+
+      // Update the cache with the server response
       queryClient.setQueryData(
         [`/api/trips/${trip.id}/activities`],
         activities.map(activity =>
