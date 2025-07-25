@@ -154,7 +154,10 @@ function DraggableEvent({
       newStartTime.setMinutes(newStartTime.getMinutes() + deltaMinutes);
       
       // Ensure minimum 15-minute duration and doesn't go past end time
-      if (newStartTime < new Date(initialEventRef.current.endTime.getTime() - 15 * 60 * 1000)) {
+      const originalEndTime = new Date(initialEventRef.current.endTime);
+      const maxStartTime = new Date(originalEndTime.getTime() - 15 * 60 * 1000);
+      
+      if (newStartTime <= maxStartTime) {
         const newDurationMinutes = differenceInMinutes(eventEnd, newStartTime);
         const newHeight = Math.max((newDurationMinutes / 60) * 48, 12); // 12px minimum (15 minutes)
         
@@ -167,7 +170,10 @@ function DraggableEvent({
       newEndTime.setMinutes(newEndTime.getMinutes() + deltaMinutes);
       
       // Ensure minimum 15-minute duration and doesn't go before start time
-      if (newEndTime > new Date(initialEventRef.current.startTime.getTime() + 15 * 60 * 1000)) {
+      const originalStartTime = new Date(initialEventRef.current.startTime);
+      const minEndTime = new Date(originalStartTime.getTime() + 15 * 60 * 1000);
+      
+      if (newEndTime >= minEndTime) {
         const newDurationMinutes = differenceInMinutes(newEndTime, eventStart);
         const newHeight = Math.max((newDurationMinutes / 60) * 48, 12); // 12px minimum (15 minutes)
         
