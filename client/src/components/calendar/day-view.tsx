@@ -116,8 +116,12 @@ function DraggableEvent({
 
   const [isResizing, setIsResizing] = useState(false);
   const [resizeEdge, setResizeEdge] = useState<'top' | 'bottom' | null>(null);
+  const [previewHeight, setPreviewHeight] = useState<number | null>(null);
+  const [previewStart, setPreviewStart] = useState<Date | null>(null);
+  const [previewEnd, setPreviewEnd] = useState<Date | null>(null);
+  
   const elementRef = useRef<HTMLDivElement>(null);
-  const initialHeightRef = useRef<number | null>(null);
+  const initialMouseYRef = useRef<number>(0);
   const initialEventRef = useRef<Activity>(event);
 
   const eventStart = new Date(event.startTime);
@@ -128,62 +132,67 @@ function DraggableEvent({
   const handleResizeStart = (e: React.MouseEvent, edge: 'top' | 'bottom') => {
     e.preventDefault();
     e.stopPropagation();
-    if (!elementRef.current) return;
 
     setIsResizing(true);
     setResizeEdge(edge);
-    initialHeightRef.current = elementRef.current.offsetHeight;
+    initialMouseYRef.current = e.clientY;
     initialEventRef.current = event;
+    setPreviewHeight(heightInPixels);
+    setPreviewStart(eventStart);
+    setPreviewEnd(eventEnd);
   };
 
   const handleResizeMove = (e: MouseEvent) => {
-    if (!isResizing || !resizeEdge || !elementRef.current || !initialHeightRef.current) return;
+    if (!isResizing || !resizeEdge) return;
 
     e.preventDefault();
-    const rect = elementRef.current.getBoundingClientRect();
-    const mouseY = e.clientY;
+    const deltaY = e.clientY - initialMouseYRef.current;
+    const deltaMinutes = Math.round((deltaY / 48) * 60 / 15) * 15; // Snap to 15-minute increments
 
     if (resizeEdge === 'top') {
-      const maxDelta = rect.bottom - rect.top - 48;
-      const delta = Math.min(Math.max(mouseY - rect.top, -maxDelta), maxDelta);
-      const newHeight = initialHeightRef.current - delta;
-
-      if (newHeight >= 48) {
-        const minutesDelta = pixelsToMinutes(delta);
-        const newStartTime = new Date(initialEventRef.current.startTime);
-        newStartTime.setMinutes(newStartTime.getMinutes() + minutesDelta);
-        const snappedStartTime = snapToQuarterHour(newStartTime);
-
-        if (snappedStartTime < eventEnd) {
-          const newHeightAfterSnap = (differenceInMinutes(eventEnd, snappedStartTime) / 60) * 48;
-          elementRef.current.style.height = `${newHeightAfterSnap}px`;
-          onResize('top', snappedStartTime);
-        }
+      const newStartTime = new Date(initialEventRef.current.startTime);
+      newStartTime.setMinutes(newStartTime.getMinutes() + deltaMinutes);
+      
+      // Ensure minimum 15-minute duration and doesn't go past end time
+      if (newStartTime < new Date(initialEventRef.current.endTime.getTime() - 15 * 60 * 1000)) {
+        const newDurationMinutes = differenceInMinutes(eventEnd, newStartTime);
+        const newHeight = Math.max((newDurationMinutes / 60) * 48, 12); // 12px minimum (15 minutes)
+        
+        setPreviewHeight(newHeight);
+        setPreviewStart(newStartTime);
+        setPreviewEnd(eventEnd);
       }
     } else {
-      const maxDelta = (24 * 48) - (rect.bottom - rect.top);
-      const delta = Math.min(Math.max(mouseY - rect.bottom, -initialHeightRef.current + 48), maxDelta);
-      const newHeight = initialHeightRef.current + delta;
-
-      if (newHeight >= 48) {
-        const minutesDelta = pixelsToMinutes(delta);
-        const newEndTime = new Date(initialEventRef.current.endTime);
-        newEndTime.setMinutes(newEndTime.getMinutes() + minutesDelta);
-        const snappedEndTime = snapToQuarterHour(newEndTime);
-
-        if (snappedEndTime > eventStart) {
-          const newHeightAfterSnap = (differenceInMinutes(snappedEndTime, eventStart) / 60) * 48;
-          elementRef.current.style.height = `${newHeightAfterSnap}px`;
-          onResize('bottom', snappedEndTime);
-        }
+      const newEndTime = new Date(initialEventRef.current.endTime);
+      newEndTime.setMinutes(newEndTime.getMinutes() + deltaMinutes);
+      
+      // Ensure minimum 15-minute duration and doesn't go before start time
+      if (newEndTime > new Date(initialEventRef.current.startTime.getTime() + 15 * 60 * 1000)) {
+        const newDurationMinutes = differenceInMinutes(newEndTime, eventStart);
+        const newHeight = Math.max((newDurationMinutes / 60) * 48, 12); // 12px minimum (15 minutes)
+        
+        setPreviewHeight(newHeight);
+        setPreviewStart(eventStart);
+        setPreviewEnd(newEndTime);
       }
     }
   };
 
   const handleResizeEnd = () => {
+    if (isResizing && resizeEdge && previewStart && previewEnd) {
+      // Only call onResize when we're done, with the final time
+      if (resizeEdge === 'top' && previewStart.getTime() !== eventStart.getTime()) {
+        onResize('top', previewStart);
+      } else if (resizeEdge === 'bottom' && previewEnd.getTime() !== eventEnd.getTime()) {
+        onResize('bottom', previewEnd);
+      }
+    }
+    
     setIsResizing(false);
     setResizeEdge(null);
-    initialHeightRef.current = null;
+    setPreviewHeight(null);
+    setPreviewStart(null);
+    setPreviewEnd(null);
   };
 
   useEffect(() => {
@@ -197,16 +206,20 @@ function DraggableEvent({
     }
   }, [isResizing, resizeEdge]);
 
+  const displayHeight = previewHeight ?? heightInPixels;
+  const displayStart = previewStart ?? eventStart;
+  const displayEnd = previewEnd ?? eventEnd;
+
   const style: React.CSSProperties = {
     transform: !isResizing && transform ? CSS.Transform.toString(transform) : undefined,
     width: '90%',
-    height: `${heightInPixels}px`,
+    height: `${displayHeight}px`,
     position: 'absolute',
     left: '0',
     top: '0',
-    backgroundColor: isDragging ? 'hsl(var(--primary)/0.2)' : undefined,
-    boxShadow: isDragging ? 'var(--shadow-md)' : undefined,
-    opacity: isDragging ? 0 : 1,
+    backgroundColor: isResizing ? 'hsl(var(--primary)/0.8)' : isDragging ? 'hsl(var(--primary)/0.2)' : undefined,
+    boxShadow: isDragging || isResizing ? 'var(--shadow-md)' : undefined,
+    opacity: 1, // Always keep visible
     zIndex: isDragging || isResizing ? 50 : 1,
     cursor: isResizing ? 'ns-resize' : 'move',
     transition: isResizing ? 'none' : undefined,
@@ -256,7 +269,7 @@ function DraggableEvent({
       } ${!isResizing && !isDragging ? 'cursor-pointer' : ''}`}
     >
       <div
-        className="absolute top-0 left-0 w-full h-1 cursor-ns-resize hover:bg-black/20"
+        className="absolute top-0 left-0 w-full h-2 cursor-ns-resize hover:bg-black/30 transition-colors"
         onMouseDown={(e) => handleResizeStart(e, 'top')}
       />
 
@@ -288,11 +301,11 @@ function DraggableEvent({
         </div>
       </div>
       <span className="text-xs text-white/80 block px-2">
-        {format(eventStart, "h:mm a")} - {format(eventEnd, "h:mm a")}
+        {format(displayStart, "h:mm a")} - {format(displayEnd, "h:mm a")}
       </span>
 
       <div
-        className="absolute bottom-0 left-0 w-full h-1 cursor-ns-resize hover:bg-black/20"
+        className="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize hover:bg-black/30 transition-colors"
         onMouseDown={(e) => handleResizeStart(e, 'bottom')}
       />
     </div>
