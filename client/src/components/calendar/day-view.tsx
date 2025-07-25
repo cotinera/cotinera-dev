@@ -1027,14 +1027,11 @@ export function DayView({ trip }: { trip: Trip }) {
   };
 
   const handleResize = async (eventId: string | number, edge: 'top' | 'bottom', newTime: Date) => {
-    // Find the event (could be original or split segment)
-    const splitEvent = splitActivities.find((a) => a.id.toString() === eventId.toString());
-    if (!splitEvent) return;
+    // Find the event in the activities array
+    const event = activities.find((a) => a.id.toString() === eventId.toString());
+    if (!event) return;
 
-    // Get the original event
-    const originalEvent = splitEvent.originalEvent || splitEvent;
-
-    const updatedActivity = { ...originalEvent };
+    const updatedActivity = { ...event };
     if (edge === 'top') {
       updatedActivity.startTime = newTime.toISOString();
     } else {
@@ -1042,7 +1039,7 @@ export function DayView({ trip }: { trip: Trip }) {
     }
 
     try {
-      const res = await fetch(`/api/trips/${trip.id}/activities/${originalEvent.id}`, {
+      const res = await fetch(`/api/trips/${trip.id}/activities/${event.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updatedActivity),
@@ -1053,7 +1050,7 @@ export function DayView({ trip }: { trip: Trip }) {
       queryClient.setQueryData(
         [`/api/trips/${trip.id}/activities`],
         activities.map(activity =>
-          activity.id === originalEvent.id ? updatedActivity : activity
+          activity.id === event.id ? updatedActivity : activity
         )
       );
 
@@ -1064,10 +1061,12 @@ export function DayView({ trip }: { trip: Trip }) {
       if (googleCalendarSync && updatedActivity) {
         googleCalendarSync(updatedActivity);
       }
+      
+      toast({ title: "Event resized successfully" });
     } catch (error) {
       toast({
         variant: "destructive",
-        title: "Failed to update event",
+        title: "Failed to resize event",
         description: error instanceof Error ? error.message : "An error occurred",
       });
     }
