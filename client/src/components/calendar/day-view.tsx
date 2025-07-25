@@ -186,10 +186,10 @@ function DraggableEvent({
 
   const handleResizeEnd = () => {
     if (isResizing && resizeEdge && previewStart && previewEnd) {
-      // Only call onResize when we're done, with the final time
-      if (resizeEdge === 'top' && previewStart.getTime() !== eventStart.getTime()) {
+      // Always call onResize with the final preview time
+      if (resizeEdge === 'top') {
         onResize('top', previewStart);
-      } else if (resizeEdge === 'bottom' && previewEnd.getTime() !== eventEnd.getTime()) {
+      } else if (resizeEdge === 'bottom') {
         onResize('bottom', previewEnd);
       }
     }
