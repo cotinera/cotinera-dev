@@ -1060,19 +1060,11 @@ export function DayView({ trip }: { trip: Trip }) {
       const updatedActivity = await res.json();
       console.log('Server response:', updatedActivity);
 
-      // Update the cache with the server response  
-      queryClient.setQueryData(
-        [`/api/trips/${trip.id}/activities`],
-        (currentActivities: Activity[] | undefined) => {
-          if (!currentActivities) return [updatedActivity];
-          return currentActivities.map(activity =>
-            activity.id === event.id ? updatedActivity : activity
-          );
-        }
-      );
-
-      const currentCache = queryClient.getQueryData([`/api/trips/${trip.id}/activities`]) as Activity[];
-      console.log('Updated cache entry:', currentCache?.find(a => a.id === event.id));
+      // Force a complete refetch to get fresh data from server
+      await queryClient.refetchQueries({ 
+        queryKey: [`/api/trips/${trip.id}/activities`],
+        type: 'active'
+      });
       
       // Sync resized activity to Google Calendar
       const googleCalendarSync = (window as any)[`googleCalendarSync_${trip.id}`];
