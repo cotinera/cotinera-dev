@@ -1031,13 +1031,31 @@ export function DayView({ trip }: { trip: Trip }) {
     const event = activities.find((a) => a.id.toString() === eventId.toString());
     if (!event) return;
 
-    // Prepare the update data with only the fields the server expects
+    // Create optimistic update immediately
+    const optimisticUpdate = {
+      ...event,
+      startTime: edge === 'top' ? newTime.toISOString() : event.startTime,
+      endTime: edge === 'bottom' ? newTime.toISOString() : event.endTime,
+    };
+
+    // Apply optimistic update to cache immediately
+    queryClient.setQueryData(
+      [`/api/trips/${trip.id}/activities`],
+      (old: Activity[] | undefined) => {
+        if (!old) return [optimisticUpdate];
+        return old.map(activity => 
+          activity.id === event.id ? optimisticUpdate : activity
+        );
+      }
+    );
+
+    // Prepare the server update data
     const updateData = {
       title: event.title,
       description: event.description,
       location: event.location,  
-      startTime: edge === 'top' ? newTime.toISOString() : event.startTime,
-      endTime: edge === 'bottom' ? newTime.toISOString() : event.endTime,
+      startTime: optimisticUpdate.startTime,
+      endTime: optimisticUpdate.endTime,
       participants: event.participants || [],
       coordinates: event.coordinates || null,
     };
@@ -1050,14 +1068,22 @@ export function DayView({ trip }: { trip: Trip }) {
       });
 
       if (!res.ok) {
-        const errorText = await res.text();
-        console.error('Resize API error:', errorText);
+        // Revert optimistic update on error
+        queryClient.setQueryData(
+          [`/api/trips/${trip.id}/activities`],
+          (old: Activity[] | undefined) => {
+            if (!old) return [event];
+            return old.map(activity => 
+              activity.id === event.id ? event : activity
+            );
+          }
+        );
         throw new Error("Failed to update activity");
       }
 
       const updatedActivity = await res.json();
       
-      // Update the local cache immediately with the server response
+      // Update cache with server response (in case server modified the data)
       queryClient.setQueryData(
         [`/api/trips/${trip.id}/activities`],
         (old: Activity[] | undefined) => {
