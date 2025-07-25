@@ -1043,8 +1043,6 @@ export function DayView({ trip }: { trip: Trip }) {
     };
 
     try {
-      console.log('Resizing event:', { eventId: event.id, edge, newTime, updateData });
-      
       const res = await fetch(`/api/trips/${trip.id}/activities/${event.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -1058,13 +1056,17 @@ export function DayView({ trip }: { trip: Trip }) {
       }
 
       const updatedActivity = await res.json();
-      console.log('Server response:', updatedActivity);
-
-      // Force a complete refetch to get fresh data from server
-      await queryClient.refetchQueries({ 
-        queryKey: [`/api/trips/${trip.id}/activities`],
-        type: 'active'
-      });
+      
+      // Update the local cache immediately with the server response
+      queryClient.setQueryData(
+        [`/api/trips/${trip.id}/activities`],
+        (old: Activity[] | undefined) => {
+          if (!old) return [updatedActivity];
+          return old.map(activity => 
+            activity.id === updatedActivity.id ? updatedActivity : activity
+          );
+        }
+      );
       
       // Sync resized activity to Google Calendar
       const googleCalendarSync = (window as any)[`googleCalendarSync_${trip.id}`];
