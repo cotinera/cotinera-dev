@@ -318,8 +318,18 @@ export function CalendarSummary({ trip, activities }: CalendarSummaryProps) {
     deleteActivityMutation.mutate();
   };
 
-  // Group activities by date
-  const groupedActivities = activities.reduce((acc, activity) => {
+  // Filter activities to only include those within trip dates
+  const tripStartDate = new Date(trip.startDate);
+  const tripEndDate = new Date(trip.endDate);
+  
+  const activitiesInTripRange = activities.filter(activity => {
+    const activityDate = new Date(activity.startTime);
+    // Check if activity falls within trip date range (inclusive)
+    return activityDate >= tripStartDate && activityDate <= tripEndDate;
+  });
+
+  // Group filtered activities by date
+  const groupedActivities = activitiesInTripRange.reduce((acc, activity) => {
     const date = format(new Date(activity.startTime), 'yyyy-MM-dd');
     if (!acc[date]) {
       acc[date] = [];
