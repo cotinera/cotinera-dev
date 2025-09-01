@@ -220,7 +220,7 @@ export function TripParticipantsList({ tripId, isOwner }: TripParticipantsListPr
             className="ml-auto"
           >
             <UserPlusIcon className="mr-2 h-4 w-4" />
-            Invite
+            Add Participants
           </Button>
         )}
       </CardHeader>
@@ -310,6 +310,19 @@ export function TripParticipantsList({ tripId, isOwner }: TripParticipantsListPr
                 </div>
               </div>
             ))}
+            
+            {isOwner && (
+              <div className="pt-3 border-t">
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => setInviteDialogOpen(true)}
+                >
+                  <PlusIcon className="mr-2 h-4 w-4" />
+                  Add More Participants
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
