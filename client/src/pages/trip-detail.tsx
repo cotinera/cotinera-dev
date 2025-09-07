@@ -5,7 +5,6 @@ import { ViewToggle } from "@/components/view-toggle";
 import type { Trip } from "@db/schema";
 import { TripHeaderEdit } from "@/components/trip-header-edit";
 import { IntegratedTripParticipants } from "@/components/integrated-trip-participants";
-import { TripDestinations } from "@/components/trip-destinations";
 import { TripTimeline } from "@/components/trip-timeline";
 import { MapRouteView } from "@/components/map-route-view";
 import { MapView } from "@/components/map-view";
@@ -210,9 +209,6 @@ export default function TripDetail() {
               </Button>
             </div>
 
-            <div className="absolute right-4 top-0 z-[1000]">
-              <TripDestinations tripId={trip.id} />
-            </div>
 
             <TripHeaderEdit 
               trip={trip} 

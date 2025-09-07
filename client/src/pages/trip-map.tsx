@@ -6,7 +6,6 @@ import type { Trip } from "@db/schema";
 import { TripHeaderEdit } from "@/components/trip-header-edit";
 import { MapView } from "@/components/map-view";
 import { TripIdeasAndPlaces } from "@/components/trip-ideas-and-places";
-import { TripDestinations } from "@/components/trip-destinations";
 import { useState } from "react";
 import type { PinnedPlace } from "@/lib/google-maps";
 
@@ -97,9 +96,6 @@ export default function TripMap() {
               Back
             </Button>
             
-            <div className="absolute right-4 top-0 z-[1000]">
-              <TripDestinations tripId={trip.id} />
-            </div>
 
             <TripHeaderEdit trip={trip} onBack={() => setLocation("/")} />
           </div>
