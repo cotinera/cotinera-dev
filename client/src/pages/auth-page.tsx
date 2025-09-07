@@ -23,7 +23,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
-import { SiGoogle, SiApple } from "react-icons/si";
+import { SiGoogle } from "react-icons/si";
 import { useSearchParams } from "@/hooks/use-search-params";
 
 const authSchema = z.object({
@@ -99,20 +99,12 @@ export default function AuthPage() {
     }
   }
 
-  const handleSocialLogin = (provider: 'google' | 'apple') => {
-    if (provider === 'google') {
-      // If we have a redirect parameter, add it to the state to preserve it
-      const redirectUrl = redirectPath 
-        ? `/api/auth/google?state=${encodeURIComponent(redirectPath)}`
-        : '/api/auth/google';
-      window.location.href = redirectUrl;
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Error", 
-        description: "Apple login not implemented yet"
-      });
-    }
+  const handleGoogleLogin = () => {
+    // If we have a redirect parameter, add it to the state to preserve it
+    const redirectUrl = redirectPath 
+      ? `/api/auth/google?state=${encodeURIComponent(redirectPath)}`
+      : '/api/auth/google';
+    window.location.href = redirectUrl;
   };
 
   return (
@@ -128,24 +120,14 @@ export default function AuthPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <Button
-                variant="outline"
-                onClick={() => handleSocialLogin('google')}
-                className="w-full"
-              >
-                <SiGoogle className="mr-2 h-4 w-4" />
-                Google
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => handleSocialLogin('apple')}
-                className="w-full"
-              >
-                <SiApple className="mr-2 h-4 w-4" />
-                Apple
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              onClick={handleGoogleLogin}
+              className="w-full"
+            >
+              <SiGoogle className="mr-2 h-4 w-4" />
+              Continue with Google
+            </Button>
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
