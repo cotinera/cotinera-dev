@@ -12,7 +12,6 @@ import { MapView } from "@/components/map-view";
 import { Checklist } from "@/components/checklist";
 import { CalendarView } from "@/components/calendar-view";
 import { MapView as MapViewComp } from "@/components/map-view";
-import { ChatMessages } from "@/components/chat-messages";
 import { BudgetTracker } from "@/components/budget-tracker";
 import { TripIdeasAndPlaces } from "@/components/trip-ideas-and-places";
 
@@ -254,12 +253,6 @@ export default function TripDetail() {
             </div>
 
             <div className="space-y-8">
-              <section>
-                <ChatMessages 
-                  tripId={trip.id}
-                />
-              </section>
-
               <section>
                 <Checklist 
                   tripId={trip.id}
