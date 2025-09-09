@@ -4,8 +4,9 @@ import { useTutorial } from "@/hooks/use-tutorial";
 import { Button } from "@/components/ui/button";
 import { TripCard } from "@/components/trip-card";
 import { TravelGuide } from "@/components/travel-guide";
-import { Plus, LogOut, Trash2, Settings, UserCircle } from "lucide-react";
+import { Plus, LogOut, Trash2, Settings, MapPin, Calendar, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useState, useMemo } from "react";
 import { useAuth } from "@/hooks/use-auth";
 import { Link } from "wouter";
@@ -75,6 +76,19 @@ export default function Dashboard() {
     });
   }, [trips]);
 
+  // Calculate trip statistics
+  const upcomingTrips = useMemo(() => {
+    const now = new Date();
+    return trips.filter(trip => {
+      const endDate = new Date(trip.endDate);
+      return endDate >= now;
+    });
+  }, [trips]);
+
+  const totalDestinations = useMemo(() => {
+    return new Set(trips.map(trip => trip.location)).size;
+  }, [trips]);
+
   const form = useForm<TripFormData>({
     resolver: zodResolver(tripFormSchema),
     defaultValues: {
@@ -97,13 +111,11 @@ export default function Dashboard() {
             });
 
             if (!res.ok) {
-              // Try to parse error response as JSON
               let errorMessage = `Failed to delete trip ${id}`;
               try {
                 const errorData = await res.json();
                 errorMessage = errorData.message || errorData.error || errorMessage;
               } catch {
-                // If response is not JSON, use text
                 const errorText = await res.text();
                 errorMessage = errorText || errorMessage;
               }
@@ -119,17 +131,10 @@ export default function Dashboard() {
       return results;
     },
     onSuccess: (deletedTripIds) => {
-      // Check if in development bypass mode - same logic as in useTrips hook
       const isDevelopmentBypass = localStorage.getItem("dev_bypass_auth") === "true";
-      
-      // Use different query key based on auth mode
       const tripsQueryKey = isDevelopmentBypass ? ["/api/trips"] : ["/api/my-trips"];
       
-      // Log successful deletion
       console.log(`Successfully deleted trip IDs:`, deletedTripIds);
-      
-      // Don't try to update cache directly, which may cause issues
-      // Just invalidate the query to force a refetch
       queryClient.invalidateQueries({ queryKey: tripsQueryKey });
 
       toast({
@@ -185,7 +190,6 @@ export default function Dashboard() {
         return;
       }
 
-      // Validate dates
       const startDate = new Date(data.startDate);
       const endDate = new Date(data.endDate);
 
@@ -233,13 +237,17 @@ export default function Dashboard() {
         onComplete={completeTutorial}
         isFirstTime={isFirstTime}
       />
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Personal Group Coordinator</h1>
+      
+      {/* Header */}
+      <header className="border-b border-border/50 bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
+        <div className="container mx-auto px-6 py-4 flex justify-between items-center">
+          <h1 className="text-2xl font-bold bg-gradient-adventure bg-clip-text text-transparent">
+            Personal Group Coordinator
+          </h1>
           <div className="flex items-center gap-3">
             <Dialog open={isPreferencesOpen} onOpenChange={setIsPreferencesOpen}>
               <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" title="Travel Preferences">
+                <Button variant="ghost" size="icon" className="hover:bg-primary/10" title="Travel Preferences">
                   <Settings className="h-5 w-5" />
                 </Button>
               </DialogTrigger>
@@ -254,142 +262,235 @@ export default function Dashboard() {
             {user ? (
               <div className="flex items-center gap-3">
                 <div className="hidden md:flex items-center gap-2">
-                  <Avatar className="h-8 w-8">
+                  <Avatar className="h-8 w-8 ring-2 ring-primary/20">
                     <AvatarImage src={user.avatar || ""} alt={user.name || user.email} />
-                    <AvatarFallback>
+                    <AvatarFallback className="bg-gradient-ocean text-white">
                       {user.name ? user.name.charAt(0).toUpperCase() : "U"}
                     </AvatarFallback>
                   </Avatar>
                   <span className="text-sm font-medium">{user.name || user.email}</span>
                 </div>
-                <Button variant="ghost" size="icon" title="Logout" onClick={() => logout()}>
+                <Button variant="ghost" size="icon" className="hover:bg-destructive/10 hover:text-destructive" title="Logout" onClick={() => logout()}>
                   <LogOut className="h-5 w-5" />
                 </Button>
               </div>
             ) : (
               <Link href="/auth">
-                <Button>Login</Button>
+                <Button className="bg-gradient-adventure hover:shadow-card transition-all duration-300">Login</Button>
               </Link>
             )}
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl font-semibold">Your Trips</h2>
-            {selectedTrips.length > 0 && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setShowDeleteDialog(true)}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Selected ({selectedTrips.length})
-              </Button>
-            )}
+      {/* Hero Section */}
+      <section className="relative h-96 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-adventure" />
+        <div className="absolute inset-0 bg-black/20" />
+        <div className="relative z-10 flex items-center justify-center h-full">
+          <div className="text-center text-white px-6">
+            <h1 className="text-5xl font-bold mb-4 drop-shadow-lg">
+              Your Next Adventure Awaits
+            </h1>
+            <p className="text-xl mb-8 max-w-2xl mx-auto drop-shadow-md opacity-90">
+              Plan, organize, and coordinate unforgettable trips with friends and family.
+            </p>
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogTrigger asChild>
+                <Button size="lg" variant="secondary" className="bg-white text-primary hover:bg-white/90 shadow-hero transition-all duration-300 hover:scale-105" data-tutorial="new-trip">
+                  <Plus className="h-5 w-5 mr-2" />
+                  Start Planning Your Trip
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[600px]">
+                <DialogHeader>
+                  <DialogTitle>Create New Trip</DialogTitle>
+                </DialogHeader>
+                <Form {...form}>
+                  <form
+                    onSubmit={form.handleSubmit(onCreateTrip)}
+                    className="space-y-4"
+                  >
+                    <FormField
+                      control={form.control}
+                      name="title"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Title</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Summer Vacation" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="location"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Location</FormLabel>
+                          <FormControl>
+                            <MapPicker
+                              value={field.value}
+                              onChange={(address, coordinates) => {
+                                field.onChange(address);
+                                setSelectedCoordinates(coordinates);
+                              }}
+                              placeholder="Search for a location..."
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="startDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Start Date</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="endDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>End Date</FormLabel>
+                            <FormControl>
+                              <Input type="date" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <Button type="submit" className="w-full bg-gradient-adventure hover:shadow-card transition-all duration-300">
+                      Create Trip
+                    </Button>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
           </div>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button data-tutorial="new-trip">
-                <Plus className="h-4 w-4 mr-2" />
-                New Trip
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px]">
-              <DialogHeader>
-                <DialogTitle>Create New Trip</DialogTitle>
-              </DialogHeader>
-              <Form {...form}>
-                <form
-                  onSubmit={form.handleSubmit(onCreateTrip)}
-                  className="space-y-4"
-                >
-                  <FormField
-                    control={form.control}
-                    name="title"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Title</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Summer Vacation" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="location"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Location</FormLabel>
-                        <FormControl>
-                          <MapPicker
-                            value={field.value}
-                            onChange={(address, coordinates) => {
-                              field.onChange(address);
-                              setSelectedCoordinates(coordinates);
-                            }}
-                            placeholder="Search for a location..."
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="startDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Start Date</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="endDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>End Date</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <Button type="submit" className="w-full">
-                    Create Trip
-                  </Button>
-                </form>
-              </Form>
-            </DialogContent>
-          </Dialog>
+        </div>
+      </section>
+
+      {/* Dashboard Content */}
+      <main className="container mx-auto px-6 py-12">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <Card className="bg-card border-border/50 shadow-soft hover:shadow-card transition-all duration-300">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Trips</CardTitle>
+              <Calendar className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">{trips.length}</div>
+              <p className="text-xs text-muted-foreground">
+                {upcomingTrips.length} upcoming
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border-border/50 shadow-soft hover:shadow-card transition-all duration-300">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Destinations</CardTitle>
+              <MapPin className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">{totalDestinations}</div>
+              <p className="text-xs text-muted-foreground">
+                Unique locations explored
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border-border/50 shadow-soft hover:shadow-card transition-all duration-300">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Trips</CardTitle>
+              <Users className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-foreground">{upcomingTrips.length}</div>
+              <p className="text-xs text-muted-foreground">
+                Currently being planned
+              </p>
+            </CardContent>
+          </Card>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sortedTrips.map((trip) => (
-            <TripCard
-              key={trip.id}
-              trip={trip}
-              selectable={selectedTrips.length > 0}
-              selected={selectedTrips.includes(trip.id)}
-              onSelect={toggleTripSelection}
-              onDelete={handleSingleDelete}
-            />
-          ))}
-          {trips.length === 0 && (
-            <div className="col-span-full text-center py-8 text-muted-foreground">
-              No trips yet. Create one to get started!
+        {/* Trips Section */}
+        <div className="space-y-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-3xl font-bold text-foreground">Your Trips</h2>
+              <p className="text-muted-foreground mt-1">
+                Manage and track all your travel plans in one place
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              {selectedTrips.length > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="hover:shadow-soft transition-all duration-300"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete Selected ({selectedTrips.length})
+                </Button>
+              )}
+              <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-gradient-adventure hover:shadow-card transition-all duration-300">
+                    <Plus className="h-4 w-4 mr-2" />
+                    New Trip
+                  </Button>
+                </DialogTrigger>
+              </Dialog>
+            </div>
+          </div>
+
+          {trips.length === 0 ? (
+            <Card className="text-center py-12 bg-card border-border/50 shadow-soft">
+              <CardContent>
+                <MapPin className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-foreground mb-2">
+                  No trips planned yet
+                </h3>
+                <p className="text-muted-foreground mb-6">
+                  Start planning your next adventure by creating your first trip!
+                </p>
+                <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-gradient-adventure hover:shadow-card transition-all duration-300">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Your First Trip
+                    </Button>
+                  </DialogTrigger>
+                </Dialog>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {sortedTrips.map((trip) => (
+                <TripCard
+                  key={trip.id}
+                  trip={trip}
+                  selectable={selectedTrips.length > 0}
+                  selected={selectedTrips.includes(trip.id)}
+                  onSelect={toggleTripSelection}
+                  onDelete={handleSingleDelete}
+                />
+              ))}
             </div>
           )}
         </div>
