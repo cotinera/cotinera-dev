@@ -3354,7 +3354,8 @@ export function registerRoutes(app: Express): Server {
         return res.status(404).json({ error: "Trip idea not found" });
       }
       
-      // Check if user is a participant of this trip
+      // Check if user is a participant of this trip or the trip owner
+      const [trip] = await db.select().from(trips).where(eq(trips.id, tripId)).limit(1);
       const [participant] = await db.select()
         .from(participants)
         .where(and(
@@ -3362,7 +3363,7 @@ export function registerRoutes(app: Express): Server {
           eq(participants.userId, userId)
         ));
         
-      if (!participant) {
+      if (!participant && trip?.ownerId !== userId) {
         return res.status(403).json({ error: "You must be a participant in this trip to update ideas" });
       }
       
@@ -3379,7 +3380,7 @@ export function registerRoutes(app: Express): Server {
         .set({
           title: title || existingIdea.title,
           description: description !== undefined ? description : existingIdea.description,
-          status: status || existingIdea.status,
+          status: status !== undefined ? status : existingIdea.status,
           coordinates: coordinates !== undefined ? coordinates : existingIdea.coordinates,
           location: location !== undefined ? location : existingIdea.location,
           ownerId: ownerId || existingIdea.ownerId,

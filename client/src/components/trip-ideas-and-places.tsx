@@ -296,11 +296,11 @@ export function TripIdeasAndPlaces({
     },
   });
 
-  // Sensors for drag and drop - more sensitive activation
+  // Sensors for drag and drop - stable configuration
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 3, // Reduced distance for better responsiveness
+        distance: 8, // Balanced distance to prevent accidental drags
       },
     })
   );
@@ -393,16 +393,25 @@ export function TripIdeasAndPlaces({
 
   const updateIdeaStatusMutation = useMutation({
     mutationFn: async ({ ideaId, status }: { ideaId: number; status: string }) => {
+      console.log('Sending PATCH request:', { ideaId, status, url: `/api/trips/${tripId}/ideas/${ideaId}` });
       const response = await axios.patch(`/api/trips/${tripId}/ideas/${ideaId}`, { status });
+      console.log('PATCH response:', response.data);
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Update success:', data);
       queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "ideas"] });
+      toast({
+        title: "Success",
+        description: "Idea moved successfully!",
+      });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error('Update error:', error);
+      console.error('Error response:', error.response?.data);
       toast({
         title: "Error",
-        description: "Failed to update idea status",
+        description: error.response?.data?.error || "Failed to update idea status",
         variant: "destructive",
       });
     },
@@ -411,6 +420,7 @@ export function TripIdeasAndPlaces({
   // Drag and drop handlers
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
+    console.log('Drag started:', event.active.id);
   };
 
   const handleDragOver = (event: DragOverEvent) => {
@@ -423,7 +433,12 @@ export function TripIdeasAndPlaces({
     setActiveId(null);
     setOverId(null);
 
-    if (!over) return;
+    console.log('Drag ended:', { active: active.id, over: over?.id });
+
+    if (!over) {
+      console.log('No valid drop target');
+      return;
+    }
 
     const activeId = active.id as string;
     const overId = over.id as string;
@@ -431,38 +446,61 @@ export function TripIdeasAndPlaces({
     // Parse the active item
     const [activeType, activeItemId] = activeId.split('-');
     
+    // Only handle idea dragging for now
+    if (activeType !== 'idea') {
+      console.log('Not an idea, skipping');
+      return;
+    }
+
     // Determine target column
     let targetColumn: ColumnType;
     
     // Check if dropped directly on a column
     if (['pending', 'booked', 'unsure', 'places'].includes(overId)) {
       targetColumn = overId as ColumnType;
+      console.log('Dropped on column:', targetColumn);
     } else if (overId.includes('-')) {
       // Dropped on an item, find its column
       const [overType, overItemId] = overId.split('-');
       if (overType === 'place') {
-        targetColumn = 'places';
+        console.log('Cannot drop ideas on places column');
+        return; // Don't allow dropping ideas in places column
       } else {
         // Find the idea and get its status
         const overIdea = ideas.find((idea: TripIdea) => idea.id.toString() === overItemId);
         targetColumn = overIdea?.status || 'pending';
+        console.log('Dropped on item, target column:', targetColumn);
       }
     } else {
+      console.log('Invalid drop target:', overId);
       return; // Invalid drop target
     }
 
-    // Only handle idea status changes for now (places are more complex)
-    if (activeType === 'idea' && targetColumn !== 'places') {
-      const ideaId = parseInt(activeItemId);
-      const currentIdea = ideas.find((idea: TripIdea) => idea.id === ideaId);
-      
-      if (currentIdea && currentIdea.status !== targetColumn) {
-        updateIdeaStatusMutation.mutate({
-          ideaId,
-          status: targetColumn
-        });
-      }
+    // Don't allow dropping in places column
+    if (targetColumn === 'places') {
+      console.log('Cannot drop ideas in places column');
+      return;
     }
+
+    const ideaId = parseInt(activeItemId);
+    const currentIdea = ideas.find((idea: TripIdea) => idea.id === ideaId);
+    
+    if (!currentIdea) {
+      console.log('Current idea not found:', ideaId);
+      return;
+    }
+
+    if (currentIdea.status === targetColumn) {
+      console.log('Idea already in target column');
+      return;
+    }
+
+    console.log('Updating idea status:', { ideaId, from: currentIdea.status, to: targetColumn });
+    
+    updateIdeaStatusMutation.mutate({
+      ideaId,
+      status: targetColumn
+    });
   };
 
   const onAddIdeaSubmit = (data: z.infer<typeof tripIdeaSchema>) => {
