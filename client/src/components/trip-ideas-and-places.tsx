@@ -114,10 +114,12 @@ interface TripIdeasAndPlacesProps {
 // Draggable Card Component
 function DraggableCard({ 
   item, 
-  type 
+  type,
+  onEditIdea
 }: { 
   item: TripIdea | PinnedPlace; 
   type: 'idea' | 'place';
+  onEditIdea?: (idea: TripIdea) => void;
 }) {
   const {
     attributes,
@@ -148,16 +150,27 @@ function DraggableCard({
   const createdAt = isIdea ? idea!.createdAt : place!.createdAt;
   const ownerName = isIdea ? idea!.ownerName : null;
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Only handle clicks if we're not dragging and it's an idea
+    if (!isDragging && isIdea && onEditIdea) {
+      e.stopPropagation();
+      onEditIdea(idea!);
+    }
+  };
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...listeners}
       className={`touch-none select-none ${isDragging ? 'pointer-events-none' : ''}`}
     >
-      <Card className={`bg-white border border-border/50 shadow-soft hover:shadow-card transition-all duration-300 cursor-grab active:cursor-grabbing ${isDragging ? 'shadow-2xl scale-105' : ''}`}>
-        <CardContent className="p-4 space-y-3">
+      <Card 
+        className={`bg-white border border-border/50 shadow-soft hover:shadow-card transition-all duration-300 cursor-grab active:cursor-grabbing ${isDragging ? 'shadow-2xl scale-105' : ''}`}
+        onClick={handleCardClick}
+      >
+        <div {...listeners} className="w-full h-full">
+          <CardContent className="p-4 space-y-3">
           {/* Drag Handle and Title */}
           <div className="flex items-start gap-3">
             <div className="mt-1 text-muted-foreground">
@@ -212,7 +225,8 @@ function DraggableCard({
               </span>
             )}
           </div>
-        </CardContent>
+          </CardContent>
+        </div>
       </Card>
     </div>
   );
@@ -222,11 +236,13 @@ function DraggableCard({
 function DroppableColumn({ 
   column, 
   items, 
-  type 
+  type,
+  onEditIdea
 }: { 
   column: Column; 
   items: (TripIdea | PinnedPlace)[]; 
   type: 'idea' | 'place';
+  onEditIdea?: (idea: TripIdea) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
@@ -261,6 +277,7 @@ function DroppableColumn({
                 key={`${type}-${item.id}`}
                 item={item} 
                 type={type}
+                onEditIdea={onEditIdea}
               />
             ))}
             {items.length === 0 && (
@@ -282,12 +299,25 @@ export function TripIdeasAndPlaces({
 }: TripIdeasAndPlacesProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingIdea, setEditingIdea] = useState<TripIdea | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   // Form for adding new ideas
   const ideaForm = useForm<z.infer<typeof tripIdeaSchema>>({
+    resolver: zodResolver(tripIdeaSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      status: "pending",
+      location: "",
+    },
+  });
+
+  // Form for editing ideas
+  const editForm = useForm<z.infer<typeof tripIdeaSchema>>({
     resolver: zodResolver(tripIdeaSchema),
     defaultValues: {
       title: "",
@@ -422,6 +452,34 @@ export function TripIdeasAndPlaces({
     },
   });
 
+  const updateIdeaMutation = useMutation({
+    mutationFn: async ({ ideaId, data }: { ideaId: number; data: z.infer<typeof tripIdeaSchema> }) => {
+      const response = await axios.patch(`/api/trips/${tripId}/ideas/${ideaId}`, data, {
+        headers: {
+          'x-dev-bypass': 'true'
+        }
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "ideas"] });
+      setIsEditDialogOpen(false);
+      setEditingIdea(null);
+      editForm.reset();
+      toast({
+        title: "Success",
+        description: "Idea updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.response?.data?.error || "Failed to update idea",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Drag and drop handlers
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
@@ -510,6 +568,23 @@ export function TripIdeasAndPlaces({
 
   const onAddIdeaSubmit = (data: z.infer<typeof tripIdeaSchema>) => {
     addIdeaMutation.mutate(data);
+  };
+
+  const onEditIdeaSubmit = (data: z.infer<typeof tripIdeaSchema>) => {
+    if (editingIdea) {
+      updateIdeaMutation.mutate({ ideaId: editingIdea.id, data });
+    }
+  };
+
+  const handleEditIdea = (idea: TripIdea) => {
+    setEditingIdea(idea);
+    editForm.reset({
+      title: idea.title,
+      description: idea.description || "",
+      status: idea.status,
+      location: idea.location || "",
+    });
+    setIsEditDialogOpen(true);
   };
 
   // Get active item for drag overlay
@@ -623,6 +698,88 @@ export function TripIdeasAndPlaces({
             </Form>
           </DialogContent>
         </Dialog>
+
+        {/* Edit Idea Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Idea</DialogTitle>
+            </DialogHeader>
+            <Form {...editForm}>
+              <form onSubmit={editForm.handleSubmit(onEditIdeaSubmit)} className="space-y-4">
+                <FormField
+                  control={editForm.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Title</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter idea title..." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="Describe your idea..." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="booked">Booked</SelectItem>
+                          <SelectItem value="unsure">Unsure</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editForm.control}
+                  name="location"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Location</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter location..." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="flex justify-end space-x-2">
+                  <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" variant="adventure">
+                    Update Idea
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Kanban Board */}
@@ -640,6 +797,7 @@ export function TripIdeasAndPlaces({
               column={column}
               items={getColumnItems(column.id)}
               type={column.id === 'places' ? 'place' : 'idea'}
+              onEditIdea={column.id !== 'places' ? handleEditIdea : undefined}
             />
           ))}
         </div>
