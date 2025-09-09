@@ -1585,11 +1585,17 @@ export function registerRoutes(app: Express): Server {
       }
 
       const tripId = parseInt(req.params.tripId);
-      const { email, role } = req.body;
+      const { email, phone, role, inviteMethod = "email" } = req.body;
 
-      if (!email) {
-        return res.status(400).json({ error: "Email is required" });
+      if (inviteMethod === "email" && !email) {
+        return res.status(400).json({ error: "Email is required for email invitations" });
       }
+      
+      if (inviteMethod === "phone" && !phone) {
+        return res.status(400).json({ error: "Phone number is required for phone invitations" });
+      }
+      
+      const contactInfo = inviteMethod === "email" ? email : phone;
       
       // Verify that the authenticated user is the owner of the trip or has admin rights
       const trip = await db.query.trips.findFirst({
@@ -1622,31 +1628,57 @@ export function registerRoutes(app: Express): Server {
         where: eq(users.id, req.user?.id || 0)
       });
       
-      // Check if the user already exists by email
-      let invitedUser = await db.query.users.findFirst({
-        where: eq(users.email, email)
-      });
+      // Check if the user already exists by email or phone
+      let invitedUser = null;
+      let existingParticipant = null;
       
-      // Check if the participant already exists in the trip
-      if (invitedUser) {
-        const existingParticipant = await db.query.participants.findFirst({
-          where: and(
-            eq(participants.tripId, tripId),
-            eq(participants.userId, invitedUser.id)
-          )
+      if (inviteMethod === "email") {
+        invitedUser = await db.query.users.findFirst({
+          where: eq(users.email, email)
         });
         
-        if (existingParticipant) {
-          return res.status(400).json({ error: "User is already a participant in this trip" });
+        if (invitedUser) {
+          existingParticipant = await db.query.participants.findFirst({
+            where: and(
+              eq(participants.tripId, tripId),
+              eq(participants.userId, invitedUser.id)
+            )
+          });
+        } else {
+          // Check if participant already exists by email (for pending invitations)
+          existingParticipant = await db.query.participants.findFirst({
+            where: and(
+              eq(participants.tripId, tripId),
+              eq(participants.email, email)
+            )
+          });
         }
+      } else {
+        // For phone invitations, check by phone number in participants table
+        existingParticipant = await db.query.participants.findFirst({
+          where: and(
+            eq(participants.tripId, tripId),
+            eq(participants.phone, phone)
+          )
+        });
+      }
+      
+      if (existingParticipant) {
+        return res.status(400).json({ 
+          error: `User is already a participant in this trip` 
+        });
       }
       
       // Create the participant with pending status
+      const participantName = invitedUser?.name || 
+        (inviteMethod === "email" ? email.split('@')[0] : `User-${phone?.slice(-4)}`);
+      
       const [newParticipant] = await db.insert(participants).values({
         tripId,
         userId: invitedUser?.id || null,
-        name: invitedUser?.name || email.split('@')[0],
-        email: email,
+        name: participantName,
+        email: inviteMethod === "email" ? email : null,
+        phone: inviteMethod === "phone" ? phone : null,
         status: 'pending',
         role: role || 'viewer'
       }).returning();
@@ -1666,34 +1698,61 @@ export function registerRoutes(app: Express): Server {
         notificationId = notification.id;
       }
       
-      // Import email utility
-      const { sendTripInvitationEmail } = await import('./utils/email');
-      
-      // Send email invitation
-      try {
-        const baseUrl = process.env.BASE_URL || `https://${req.headers.host}`;
-        let inviteLink;
+      // Send invitation based on method
+      if (inviteMethod === "email" && email) {
+        // Import email utility
+        const { sendTripInvitationEmail } = await import('./utils/email');
         
-        // If user exists, link to the notification response page
-        if (invitedUser && notificationId) {
-          inviteLink = `${baseUrl}/notifications/${notificationId}/respond`;
-        } else {
-          // If user doesn't exist yet, link to the sign-up page
-          inviteLink = `${baseUrl}/auth?join=true&email=${encodeURIComponent(email)}&trip=${tripId}`;
+        try {
+          const baseUrl = process.env.BASE_URL || `https://${req.headers.host}`;
+          let inviteLink;
+          
+          // If user exists, link to the notification response page
+          if (invitedUser && notificationId) {
+            inviteLink = `${baseUrl}/notifications/${notificationId}/respond`;
+          } else {
+            // If user doesn't exist yet, link to the sign-up page
+            inviteLink = `${baseUrl}/auth?join=true&email=${encodeURIComponent(email)}&trip=${tripId}`;
+          }
+          
+          // Send the email
+          await sendTripInvitationEmail({
+            to: email,
+            inviterName: inviter?.name || 'Someone',
+            tripTitle: trip.title,
+            inviteLink
+          });
+          
+          console.log(`Sent invitation email to ${email} for trip "${trip.title}"`);
+        } catch (emailError) {
+          console.error('Failed to send invitation email:', emailError);
+          // Continue with the process even if email sending fails
         }
+      } else if (inviteMethod === "phone" && phone) {
+        // Handle phone/SMS invitation
+        console.log(`Phone invitation would be sent to ${phone} for trip: ${trip.title}`);
+        const inviteMessage = `${inviter?.name || 'Someone'} has invited you to join the trip "${trip.title}". Please download our app to accept the invitation.`;
+        console.log(`SMS Message: ${inviteMessage}`);
         
-        // Send the email
-        await sendTripInvitationEmail({
-          to: email,
-          inviterName: inviter?.name || 'Someone',
-          tripTitle: trip.title,
-          inviteLink
-        });
-        
-        console.log(`Sent invitation email to ${email} for trip "${trip.title}"`);
-      } catch (emailError) {
-        console.error('Failed to send invitation email:', emailError);
-        // Continue with the process even if email sending fails
+        // TODO: Implement SMS service integration
+        // For SMS integration, you would:
+        // 1. Set up Twilio account and get API credentials
+        // 2. Create an SMS utility service
+        // 3. Send SMS with invitation link
+        /*
+        try {
+          const { sendTripInvitationSMS } = await import('./utils/smsService');
+          await sendTripInvitationSMS({
+            to: phone,
+            inviterName: inviter?.name || 'Someone',
+            tripTitle: trip.title,
+            inviteLink: `${baseUrl}/auth?join=true&phone=${encodeURIComponent(phone)}&trip=${tripId}`
+          });
+          console.log(`Sent invitation SMS to ${phone} for trip "${trip.title}"`);
+        } catch (smsError) {
+          console.error('Failed to send invitation SMS:', smsError);
+        }
+        */
       }
       
       res.status(201).json({

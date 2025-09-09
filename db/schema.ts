@@ -232,6 +232,7 @@ export const participants = pgTable("participants", {
   status: text("status").notNull().default('pending'),
   role: text("role").notNull().default('viewer'),
   email: text("email"),
+  phone: text("phone"),
   joinedAt: timestamp("joined_at").defaultNow(),
   arrivalDate: date("arrival_date"),
   departureDate: date("departure_date"),
