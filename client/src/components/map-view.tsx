@@ -257,7 +257,7 @@ export function MapView({
   const [selectedPlaceDetails, setSelectedPlaceDetails] = useState<PlaceDetails | null>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [expandedReviews, setExpandedReviews] = useState(false);
-  const { accommodations = [] } = useAccommodations(tripId && !isNaN(Number(tripId)) ? Number(tripId) : undefined);
+  const { accommodations = [] } = useAccommodations(tripId ? (isNaN(Number(tripId)) ? undefined : Number(tripId)) : undefined);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [placeResults, setPlaceResults] = useState<google.maps.places.PlaceResult[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
@@ -356,7 +356,7 @@ export function MapView({
   } = usePlacesAutocomplete({
     requestOptions: {
       types: ['establishment', 'geocode'],
-      location: isLoaded ? new google.maps.LatLng(coordinates.lat, coordinates.lng) : undefined,
+      location: isLoaded && window.google ? new google.maps.LatLng(coordinates.lat, coordinates.lng) : undefined,
       radius: 50000,
     },
     debounce: 300,
@@ -577,6 +577,12 @@ export function MapView({
     const searchValue = e.target.value;
     setValue(searchValue);
 
+    // Only show categories if search is empty or very short
+    if (!searchValue || searchValue.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
     // Find matching categories
     const matchingCategories = categoryButtons.filter(category =>
       category.searchTerms.some(term =>
@@ -585,7 +591,8 @@ export function MapView({
       )
     );
 
-    // Combine category and place results
+    // Create category results but don't immediately set them
+    // Let the useEffect handle combining with place results
     const categoryResults: SearchResult[] = matchingCategories.map(category => ({
       type: 'category',
       id: category.id,
@@ -593,7 +600,11 @@ export function MapView({
       icon: category.icon
     }));
 
-    setSearchResults([...categoryResults]);
+    // Store category results temporarily, place results will be added by useEffect
+    setSearchResults(prevResults => {
+      const placeResults = prevResults.filter(r => r.type === 'place');
+      return [...categoryResults, ...placeResults];
+    });
   }, [setValue]);
 
   const handlePinPlace = useCallback(async () => {
@@ -657,7 +668,16 @@ export function MapView({
 
   // Effect for updating the search results when the user types
   useEffect(() => {
-    if (!ready || !data.length) return;
+    if (!ready) {
+      // If not ready, only show categories
+      return;
+    }
+
+    if (!data.length) {
+      // If no place data, remove place results but keep categories
+      setSearchResults(prevResults => prevResults.filter(r => r.type === 'category'));
+      return;
+    }
 
     const placeResults: SearchResult[] = data.map(suggestion => ({
       type: 'place',
