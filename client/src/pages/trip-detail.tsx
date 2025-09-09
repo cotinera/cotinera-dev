@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, MapPin, Calendar, Users, Share2, Edit, Camera, Star, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, MapPin, Calendar, Users, Share2, Edit, DollarSign, Star, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
 import type { Trip, Destination } from "@db/schema";
@@ -22,21 +21,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { TripHeaderEdit } from "@/components/trip-header-edit";
 import { IntegratedTripParticipants } from "@/components/integrated-trip-participants";
-import { TripTimeline } from "@/components/trip-timeline";
-import { Checklist } from "@/components/checklist";
-import { CalendarView } from "@/components/calendar-view";
-import { MapView } from "@/components/map-view";
-import { BudgetTracker } from "@/components/budget-tracker";
-import { TripIdeasAndPlaces } from "@/components/trip-ideas-and-places";
-
-interface PinnedPlace {
-  id: number;
-  name: string;
-  coordinates: {
-    lat: number;
-    lng: number;
-  };
-}
 
 export default function TripDetail() {
   const [, params] = useRoute("/trips/:id");
@@ -45,7 +29,6 @@ export default function TripDetail() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [currentDestinationId, setCurrentDestinationId] = useState<number | undefined>();
   const queryClient = useQueryClient();
 
   const { data: trip, isLoading, error } = useQuery<Trip>({
@@ -168,175 +151,146 @@ export default function TripDetail() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="sm" onClick={() => setLocation("/")}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Trips
-              </Button>
-            </div>
+      <header className="border-b">
+        <div className="relative overflow-hidden py-12">
+          {trip.thumbnail && (
+            <div 
+              className="absolute inset-0 bg-cover bg-center"
+              style={{ 
+                backgroundImage: `url(${trip.thumbnail})`,
+                filter: 'blur(20px)',
+                transform: 'scale(1.2)',
+                opacity: '0.9'
+              }} 
+            />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-b from-background/30 to-background/70" />
+          <div className="container mx-auto px-4 relative z-10">
+            <Button 
+              variant="ghost" 
+              onClick={() => setLocation("/")} 
+              className="absolute left-4 top-0"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </Button>
             
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleShare}>
-                <Share2 className="w-4 h-4 mr-2" />
-                Share
-              </Button>
-              <Button variant="outline" size="sm">
-                <Edit className="w-4 h-4 mr-2" />
-                Edit
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                onClick={() => setShowDeleteDialog(true)}
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete
-              </Button>
-            </div>
+            <TripHeaderEdit 
+              trip={trip} 
+              onBack={() => setLocation("/")} 
+            />
           </div>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="relative h-64 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-adventure opacity-90" />
-        <div className="absolute inset-0 flex items-center justify-center">
-          <Camera className="w-16 h-16 text-white/50" />
-        </div>
-        <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-          <div className="container mx-auto">
-            <div className="flex items-end justify-between">
-              <div>
-                <h1 className="text-3xl font-bold mb-2">{trip.title}</h1>
-                <p className="text-white/90 mb-4">{trip.description || "An amazing adventure awaits!"}</p>
-                
-                <div className="flex items-center gap-6 text-sm">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4" />
-                    <span>{formatDate(trip.startDate)} - {formatDate(trip.endDate)}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <MapPin className="w-4 h-4" />
-                    <span>{destinations.length} destinations</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Users className="w-4 h-4" />
-                    <span>{participants.length + 1} travelers</span>
-                  </div>
-                </div>
-              </div>
-              
-              <Badge variant="secondary" className="bg-white/20 text-white border-white/30">
-                {getDaysDifference(trip.startDate, trip.endDate)} days
-              </Badge>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* Main Content */}
-      <main className="container mx-auto px-6 py-8">
+      <main className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
-          <div className="lg:col-span-2">
-            <Tabs defaultValue="overview" className="space-y-6">
-              <TabsList className="grid grid-cols-5 w-full">
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="itinerary">Itinerary</TabsTrigger>
-                <TabsTrigger value="places">Places</TabsTrigger>
-                <TabsTrigger value="checklist">Checklist</TabsTrigger>
-                <TabsTrigger value="calendar">Calendar</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="overview" className="space-y-6">
-                {/* Destinations */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <MapPin className="w-5 h-5" />
-                      Destinations
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {destinations.length > 0 ? (
-                      destinations.map((destination, index) => (
-                        <div key={destination.id} className="flex items-start gap-4 p-4 rounded-lg border border-border/50 hover:shadow-soft transition-all">
-                          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
-                            {index + 1}
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-foreground">{destination.name}</h3>
-                            <p className="text-sm text-muted-foreground mb-2">{destination.description || "Explore this amazing destination"}</p>
-                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                              <span>{formatDate(destination.startDate)} - {formatDate(destination.endDate)}</span>
-                              <span>{getDaysDifference(destination.startDate, destination.endDate)} days</span>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="text-muted-foreground text-center py-4">No destinations added yet. Start planning your itinerary!</p>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Quick Actions */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Button 
-                    variant="outline" 
-                    className="h-16 flex-col gap-2"
-                    onClick={() => setLocation(`/trips/${trip.id}/map`)}
-                  >
-                    <MapPin className="w-5 h-5" />
-                    View Map
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="h-16 flex-col gap-2"
-                    onClick={() => setLocation(`/trips/${trip.id}/calendar`)}
-                  >
-                    <Calendar className="w-5 h-5" />
-                    Calendar
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="h-16 flex-col gap-2"
-                    onClick={() => setLocation(`/trips/${trip.id}/spending`)}
-                  >
-                    <Star className="w-5 h-5" />
-                    Expenses
-                  </Button>
+          <div className="lg:col-span-2 space-y-8">
+            {/* Trip Overview */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="w-5 h-5" />
+                  Trip Overview
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <div className="text-2xl font-bold text-foreground">{getDaysDifference(trip.startDate, trip.endDate)}</div>
+                    <p className="text-sm text-muted-foreground">Days</p>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-foreground">{destinations.length}</div>
+                    <p className="text-sm text-muted-foreground">Destinations</p>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-foreground">{participants.length + 1}</div>
+                    <p className="text-sm text-muted-foreground">Travelers</p>
+                  </div>
                 </div>
-              </TabsContent>
 
-              <TabsContent value="itinerary">
-                <TripTimeline 
-                  tripId={trip.id} 
-                  currentDestinationId={currentDestinationId}
-                  onDestinationChange={setCurrentDestinationId}
-                />
-              </TabsContent>
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="font-medium mb-2">Trip Dates</h4>
+                    <p className="text-muted-foreground">{formatDate(trip.startDate)} - {formatDate(trip.endDate)}</p>
+                  </div>
+                  
+                  {trip.description && (
+                    <div>
+                      <h4 className="font-medium mb-2">Description</h4>
+                      <p className="text-muted-foreground">{trip.description}</p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
-              <TabsContent value="places">
-                <TripIdeasAndPlaces
-                  tripId={trip.id}
-                  participants={participants}
-                  tripCoordinates={destinations[0]?.coordinates || trip.coordinates || undefined}
-                />
-              </TabsContent>
+            {/* Destinations */}
+            {destinations.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MapPin className="w-5 h-5" />
+                    Destinations
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {destinations.map((destination, index) => (
+                    <div key={destination.id} className="flex items-start gap-4 p-4 rounded-lg border border-border/50 hover:shadow-soft transition-all">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-foreground">{destination.name}</h3>
+                        <p className="text-sm text-muted-foreground mb-2">{destination.description || "Explore this amazing destination"}</p>
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <span>{formatDate(destination.startDate)} - {formatDate(destination.endDate)}</span>
+                          <span>{getDaysDifference(destination.startDate, destination.endDate)} days</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+            )}
 
-              <TabsContent value="checklist">
-                <Checklist tripId={trip.id} />
-              </TabsContent>
-
-              <TabsContent value="calendar">
-                <CalendarView tripId={trip.id} />
-              </TabsContent>
-            </Tabs>
+            {/* Quick Actions */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col gap-2"
+                onClick={() => setLocation(`/trips/${trip.id}/map`)}
+              >
+                <MapPin className="w-6 h-6" />
+                View Map
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col gap-2"
+                onClick={() => setLocation(`/trips/${trip.id}/calendar`)}
+              >
+                <Calendar className="w-6 h-6" />
+                Calendar
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col gap-2"
+                onClick={() => setLocation(`/trips/${trip.id}/spending`)}
+              >
+                <DollarSign className="w-6 h-6" />
+                Expenses
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-20 flex-col gap-2"
+              >
+                <Star className="w-6 h-6" />
+                Activities
+              </Button>
+            </div>
           </div>
 
           {/* Sidebar */}
@@ -386,13 +340,28 @@ export default function TripDetail() {
               </CardContent>
             </Card>
 
-            {/* Budget Overview */}
+            {/* Trip Actions */}
             <Card>
               <CardHeader>
-                <CardTitle>Budget Overview</CardTitle>
+                <CardTitle>Trip Actions</CardTitle>
               </CardHeader>
-              <CardContent>
-                <BudgetTracker tripId={trip.id} />
+              <CardContent className="space-y-3">
+                <Button variant="outline" className="w-full justify-start" onClick={handleShare}>
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Share Trip
+                </Button>
+                <Button variant="outline" className="w-full justify-start">
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit Details
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => setShowDeleteDialog(true)}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Trip
+                </Button>
               </CardContent>
             </Card>
           </div>
