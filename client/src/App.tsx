@@ -2,12 +2,12 @@ import { Switch, Route } from "wouter";
 import { queryClient } from "@/lib";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { GoogleOAuthProvider } from "@react-oauth/google";
-import { Toaster } from "@/components/ui";
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, TutorialProvider } from "@/hooks";
-// Import ThemeProvider and ThemeToggle directly to avoid module resolution issues
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
-import { AppHeader } from "@/components";
 import {
   NotFound,
   Dashboard,
@@ -44,19 +44,22 @@ function Router() {
 function App() {
   return (
     <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || ""}>
-      <ThemeProvider defaultTheme="light" storageKey="ui-theme">
+      <ThemeProvider defaultTheme="light" storageKey="trip-coordinator-theme">
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <TutorialProvider>
-              <div className="flex flex-col min-h-screen">
-                <main className="flex-1">
-                  <Router />
-                </main>
-                <ThemeToggle />
-              </div>
-              <Toaster />
-            </TutorialProvider>
-          </AuthProvider>
+          <TooltipProvider>
+            <AuthProvider>
+              <TutorialProvider>
+                <div className="flex flex-col min-h-screen bg-background">
+                  <main className="flex-1">
+                    <Router />
+                  </main>
+                  <ThemeToggle />
+                </div>
+                <Toaster />
+                <Sonner />
+              </TutorialProvider>
+            </AuthProvider>
+          </TooltipProvider>
         </QueryClientProvider>
       </ThemeProvider>
     </GoogleOAuthProvider>
