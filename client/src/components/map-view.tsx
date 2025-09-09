@@ -257,7 +257,7 @@ export function MapView({
   const [selectedPlaceDetails, setSelectedPlaceDetails] = useState<PlaceDetails | null>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [expandedReviews, setExpandedReviews] = useState(false);
-  const { accommodations = [] } = useAccommodations(tripId ? Number(tripId) : undefined);
+  const { accommodations = [] } = useAccommodations(tripId && !isNaN(Number(tripId)) ? Number(tripId) : undefined);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [placeResults, setPlaceResults] = useState<google.maps.places.PlaceResult[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
@@ -626,7 +626,7 @@ export function MapView({
       }
 
       // Invalidate pinned places query to refresh the list
-      queryClient.invalidateQueries([`/api/trips/${tripId}/pinned-places`]);
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/pinned-places`] });
 
       toast({
         title: "Place pinned successfully",
