@@ -26,6 +26,8 @@ import {
   useSensor,
   useSensors,
   closestCenter,
+  DragOverEvent,
+  useDroppable,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -132,6 +134,7 @@ function DraggableCard({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+    opacity: isDragging ? 0.5 : 1,
   };
 
   const isIdea = type === 'idea';
@@ -148,17 +151,15 @@ function DraggableCard({
     <div
       ref={setNodeRef}
       style={style}
-      className={`${isDragging ? 'opacity-50' : ''}`}
+      {...attributes}
+      {...listeners}
+      className="touch-none"
     >
-      <Card className="bg-white border border-border/50 shadow-soft hover:shadow-card transition-all duration-300 cursor-pointer">
+      <Card className="bg-white border border-border/50 shadow-soft hover:shadow-card transition-all duration-300 cursor-grab active:cursor-grabbing">
         <CardContent className="p-4 space-y-3">
           {/* Drag Handle and Title */}
           <div className="flex items-start gap-3">
-            <div
-              {...attributes}
-              {...listeners}
-              className="mt-1 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing transition-colors"
-            >
+            <div className="mt-1 text-muted-foreground">
               <GripVertical className="h-4 w-4" />
             </div>
             <div className="flex-1 min-w-0">
@@ -216,8 +217,8 @@ function DraggableCard({
   );
 }
 
-// Column Component
-function KanbanColumn({ 
+// Droppable Column Component
+function DroppableColumn({ 
   column, 
   items, 
   type 
@@ -226,8 +227,17 @@ function KanbanColumn({
   items: (TripIdea | PinnedPlace)[]; 
   type: 'idea' | 'place';
 }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: column.id,
+  });
+
   return (
-    <div className="flex flex-col min-h-0">
+    <div 
+      ref={setNodeRef}
+      className={`flex flex-col min-h-0 transition-all duration-200 ${
+        isOver ? 'bg-primary/5 rounded-lg' : ''
+      }`}
+    >
       {/* Column Header */}
       <div className={`${column.bgColor} rounded-lg p-3 mb-4`}>
         <div className="flex items-center justify-between">
@@ -239,12 +249,12 @@ function KanbanColumn({
       </div>
 
       {/* Column Items */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-[200px] p-2 rounded-lg">
         <SortableContext 
           items={items.map(item => `${type}-${item.id}`)}
           strategy={verticalListSortingStrategy}
         >
-          <div className="space-y-3 min-h-[200px]">
+          <div className="space-y-3">
             {items.map((item) => (
               <DraggableCard 
                 key={`${type}-${item.id}`}
@@ -252,6 +262,11 @@ function KanbanColumn({
                 type={type}
               />
             ))}
+            {items.length === 0 && (
+              <div className="h-16 border-2 border-dashed border-border/30 rounded-lg flex items-center justify-center text-muted-foreground text-sm">
+                Drop items here
+              </div>
+            )}
           </div>
         </SortableContext>
       </div>
@@ -266,6 +281,7 @@ export function TripIdeasAndPlaces({
 }: TripIdeasAndPlacesProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [overId, setOverId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -280,11 +296,11 @@ export function TripIdeasAndPlaces({
     },
   });
 
-  // Sensors for drag and drop
+  // Sensors for drag and drop - more sensitive activation
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 3, // Reduced distance for better responsiveness
       },
     })
   );
@@ -382,10 +398,6 @@ export function TripIdeasAndPlaces({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "ideas"] });
-      toast({
-        title: "Success",
-        description: "Idea status updated",
-      });
     },
     onError: () => {
       toast({
@@ -401,9 +413,15 @@ export function TripIdeasAndPlaces({
     setActiveId(event.active.id as string);
   };
 
+  const handleDragOver = (event: DragOverEvent) => {
+    const { over } = event;
+    setOverId(over ? over.id as string : null);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     setActiveId(null);
+    setOverId(null);
 
     if (!over) return;
 
@@ -415,7 +433,11 @@ export function TripIdeasAndPlaces({
     
     // Determine target column
     let targetColumn: ColumnType;
-    if (overId.includes('-')) {
+    
+    // Check if dropped directly on a column
+    if (['pending', 'booked', 'unsure', 'places'].includes(overId)) {
+      targetColumn = overId as ColumnType;
+    } else if (overId.includes('-')) {
       // Dropped on an item, find its column
       const [overType, overItemId] = overId.split('-');
       if (overType === 'place') {
@@ -426,8 +448,7 @@ export function TripIdeasAndPlaces({
         targetColumn = overIdea?.status || 'pending';
       }
     } else {
-      // Dropped on a column
-      targetColumn = overId as ColumnType;
+      return; // Invalid drop target
     }
 
     // Only handle idea status changes for now (places are more complex)
@@ -566,11 +587,12 @@ export function TripIdeasAndPlaces({
         sensors={sensors}
         collisionDetection={closestCenter}
         onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {columns.map((column) => (
-            <KanbanColumn
+            <DroppableColumn
               key={column.id}
               column={column}
               items={getColumnItems(column.id)}
@@ -581,7 +603,9 @@ export function TripIdeasAndPlaces({
 
         <DragOverlay>
           {activeItem && activeType && (
-            <DraggableCard item={activeItem} type={activeType} />
+            <div className="transform rotate-3 scale-105 shadow-2xl">
+              <DraggableCard item={activeItem} type={activeType} />
+            </div>
           )}
         </DragOverlay>
       </DndContext>
