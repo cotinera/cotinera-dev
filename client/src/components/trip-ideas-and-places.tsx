@@ -15,6 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import axios from "axios";
 import { format, parseISO, isValid } from "date-fns";
+import { LocationSearchBar } from "@/components/location-search-bar";
 
 // DnD Kit imports
 import {
@@ -680,7 +681,19 @@ export function TripIdeasAndPlaces({
                     <FormItem>
                       <FormLabel>Location</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter location..." {...field} />
+                        <LocationSearchBar
+                          placeholder="Search for a location..."
+                          value={field.value || ""}
+                          onChange={(address, coordinates, name) => {
+                            field.onChange(address);
+                          }}
+                          searchBias={tripCoordinates ? {
+                            lat: tripCoordinates.lat,
+                            lng: tripCoordinates.lng,
+                            radius: 50000 // 50km radius bias
+                          } : undefined}
+                          className="w-full"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -762,7 +775,19 @@ export function TripIdeasAndPlaces({
                     <FormItem>
                       <FormLabel>Location</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter location..." {...field} />
+                        <LocationSearchBar
+                          placeholder="Search for a location..."
+                          value={field.value || ""}
+                          onChange={(address, coordinates, name) => {
+                            field.onChange(address);
+                          }}
+                          searchBias={tripCoordinates ? {
+                            lat: tripCoordinates.lat,
+                            lng: tripCoordinates.lng,
+                            radius: 50000 // 50km radius bias
+                          } : undefined}
+                          className="w-full"
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
