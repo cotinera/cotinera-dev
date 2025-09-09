@@ -1,14 +1,21 @@
-import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
-import { ArrowLeft, MapPin, Calendar, Users, Share2, Edit, DollarSign, Star, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/use-auth";
-import type { Trip, Destination } from "@db/schema";
+import { ViewToggle } from "@/components/view-toggle";
+import type { Trip } from "@db/schema";
+import { TripHeaderEdit } from "@/components/trip-header-edit";
+import { IntegratedTripParticipants } from "@/components/integrated-trip-participants";
+import { TripTimeline } from "@/components/trip-timeline";
+import { MapRouteView } from "@/components/map-route-view";
+import { MapView } from "@/components/map-view";
+import { Checklist } from "@/components/checklist";
+import { CalendarView } from "@/components/calendar-view";
+import { MapView as MapViewComp } from "@/components/map-view";
+import { BudgetTracker } from "@/components/budget-tracker";
+import { TripIdeasAndPlaces } from "@/components/trip-ideas-and-places";
+
+import { Loader2, ArrowLeft, Trash2 } from "lucide-react";
+import type { Destination } from "@db/schema";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,8 +26,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { TripHeaderEdit } from "@/components/trip-header-edit";
-import { IntegratedTripParticipants } from "@/components/integrated-trip-participants";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
+
+interface PinnedPlace {
+  id: number;
+  name: string;
+  coordinates: {
+    lat: number;
+    lng: number;
+  };
+}
 
 export default function TripDetail() {
   const [, params] = useRoute("/trips/:id");
@@ -29,6 +46,7 @@ export default function TripDetail() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [currentDestinationId, setCurrentDestinationId] = useState<number | undefined>();
   const queryClient = useQueryClient();
 
   const { data: trip, isLoading, error } = useQuery<Trip>({
@@ -43,7 +61,7 @@ export default function TripDetail() {
     enabled: !!tripId,
   });
 
-  const { data: destinations = [] } = useQuery<Destination[]>({
+  const { data: destinations } = useQuery<Destination[]>({
     queryKey: [`/api/trips/${tripId}/destinations`],
     queryFn: async () => {
       const res = await fetch(`/api/trips/${tripId}/destinations`);
@@ -53,6 +71,20 @@ export default function TripDetail() {
     enabled: !!tripId,
   });
 
+  const { data: pinnedPlaces } = useQuery<PinnedPlace[]>({
+    queryKey: [`/api/trips/${tripId}/pinned-places`, currentDestinationId],
+    queryFn: async () => {
+      const url = new URL(`/api/trips/${tripId}/pinned-places`, window.location.origin);
+      if (currentDestinationId) {
+        url.searchParams.append('destinationId', currentDestinationId.toString());
+      }
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch pinned places");
+      return res.json();
+    },
+    enabled: !!tripId,
+  });
+  
   const { data: participants = [] } = useQuery({
     queryKey: [`/api/trips/${tripId}/participants`],
     queryFn: async () => {
@@ -63,21 +95,30 @@ export default function TripDetail() {
     enabled: !!tripId,
   });
 
+  const currentDestination = destinations?.find(d => d.id === currentDestinationId);
+
   const deleteTrip = useMutation({
     mutationFn: async () => {
       if (!tripId) throw new Error("No trip ID provided");
+
       const res = await fetch(`/api/trips/${tripId}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
       });
+
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ message: "Failed to delete trip" }));
         throw new Error(errorData.message || "Failed to delete trip");
       }
+
       return res.json().catch(() => ({}));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/trips"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}`] });
+
       toast({
         title: "Success",
         description: "Trip deleted successfully",
@@ -85,6 +126,7 @@ export default function TripDetail() {
       setLocation("/");
     },
     onError: (error: Error) => {
+      console.error("Delete trip error:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -92,29 +134,6 @@ export default function TripDetail() {
       });
     },
   });
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric'
-    });
-  };
-
-  const getDaysDifference = (start: string, end: string) => {
-    const startDate = new Date(start);
-    const endDate = new Date(end);
-    const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  };
-
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
-    toast({
-      title: "Link copied!",
-      description: "Trip link has been copied to clipboard.",
-    });
-  };
 
   const handleDelete = async () => {
     try {
@@ -132,16 +151,23 @@ export default function TripDetail() {
     );
   }
 
-  if (error || !trip) {
+  if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">
-            {error ? "Error loading trip" : "Trip not found"}
-          </h1>
-          <p className="text-muted-foreground mb-4">
-            {error ? (error as Error).message : "The trip you're looking for doesn't exist."}
-          </p>
+          <h1 className="text-2xl font-bold mb-4">Error loading trip</h1>
+          <p className="text-muted-foreground mb-4">{(error as Error).message}</p>
+          <Button onClick={() => setLocation("/")}>Back to Dashboard</Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!trip) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Trip not found</h1>
           <Button onClick={() => setLocation("/")}>Back to Dashboard</Button>
         </div>
       </div>
@@ -150,7 +176,6 @@ export default function TripDetail() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b">
         <div className="relative overflow-hidden py-12">
           {trip.thumbnail && (
@@ -158,23 +183,33 @@ export default function TripDetail() {
               className="absolute inset-0 bg-cover bg-center"
               style={{ 
                 backgroundImage: `url(${trip.thumbnail})`,
-                filter: 'blur(20px)',
-                transform: 'scale(1.2)',
-                opacity: '0.9'
+                filter: "blur(20px)",
+                transform: "scale(1.2)",
+                opacity: "0.9",
               }} 
             />
           )}
           <div className="absolute inset-0 bg-gradient-to-b from-background/30 to-background/70" />
           <div className="container mx-auto px-4 relative z-10">
-            <Button 
-              variant="ghost" 
-              onClick={() => setLocation("/")} 
-              className="absolute left-4 top-0"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back
-            </Button>
-            
+            <div className="flex justify-between items-center absolute left-4 top-0">
+              <Button
+                variant="ghost"
+                onClick={() => setLocation("/")}
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back
+              </Button>
+              <Button
+                variant="ghost"
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Trip
+              </Button>
+            </div>
+
+
             <TripHeaderEdit 
               trip={trip} 
               onBack={() => setLocation("/")} 
@@ -183,187 +218,43 @@ export default function TripDetail() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Trip Overview */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MapPin className="w-5 h-5" />
-                  Trip Overview
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div>
-                    <div className="text-2xl font-bold text-foreground">{getDaysDifference(trip.startDate, trip.endDate)}</div>
-                    <p className="text-sm text-muted-foreground">Days</p>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-foreground">{destinations.length}</div>
-                    <p className="text-sm text-muted-foreground">Destinations</p>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-bold text-foreground">{participants.length + 1}</div>
-                    <p className="text-sm text-muted-foreground">Travelers</p>
-                  </div>
-                </div>
+        <div className="space-y-8">
+          <section>
+            <TripTimeline 
+              tripId={trip.id} 
+              currentDestinationId={currentDestinationId}
+              onDestinationChange={setCurrentDestinationId}
+            />
+          </section>
+          
+          <section className="mb-8">
+            <IntegratedTripParticipants 
+              tripId={trip.id}
+              isOwner={user?.id === trip.ownerId}
+            />
+          </section>
 
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-medium mb-2">Trip Dates</h4>
-                    <p className="text-muted-foreground">{formatDate(trip.startDate)} - {formatDate(trip.endDate)}</p>
-                  </div>
-                  
-                  {trip.description && (
-                    <div>
-                      <h4 className="font-medium mb-2">Description</h4>
-                      <p className="text-muted-foreground">{trip.description}</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+          <div className="grid gap-8 md:grid-cols-[2fr,1fr]">
+            <div className="space-y-8">
+              {/* Map view removed to clear space on the Details page */}
 
-            {/* Destinations */}
-            {destinations.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <MapPin className="w-5 h-5" />
-                    Destinations
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {destinations.map((destination, index) => (
-                    <div key={destination.id} className="flex items-start gap-4 p-4 rounded-lg border border-border/50 hover:shadow-soft transition-all">
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-semibold">
-                        {index + 1}
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-foreground">{destination.name}</h3>
-                        <p className="text-sm text-muted-foreground mb-2">{destination.description || "Explore this amazing destination"}</p>
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          <span>{formatDate(destination.startDate)} - {formatDate(destination.endDate)}</span>
-                          <span>{getDaysDifference(destination.startDate, destination.endDate)} days</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Quick Actions */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Button 
-                variant="outline" 
-                className="h-20 flex-col gap-2"
-                onClick={() => setLocation(`/trips/${trip.id}/map`)}
-              >
-                <MapPin className="w-6 h-6" />
-                View Map
-              </Button>
-              <Button 
-                variant="outline" 
-                className="h-20 flex-col gap-2"
-                onClick={() => setLocation(`/trips/${trip.id}/calendar`)}
-              >
-                <Calendar className="w-6 h-6" />
-                Calendar
-              </Button>
-              <Button 
-                variant="outline" 
-                className="h-20 flex-col gap-2"
-                onClick={() => setLocation(`/trips/${trip.id}/spending`)}
-              >
-                <DollarSign className="w-6 h-6" />
-                Expenses
-              </Button>
-              <Button 
-                variant="outline" 
-                className="h-20 flex-col gap-2"
-              >
-                <Star className="w-6 h-6" />
-                Activities
-              </Button>
-            </div>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Participants */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="w-5 h-5" />
-                  Travelers ({participants.length + 1})
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {/* Trip owner */}
-                <div className="flex items-center gap-3">
-                  <Avatar className="w-8 h-8">
-                    <AvatarImage src={user?.avatar} />
-                    <AvatarFallback>
-                      {user?.name?.charAt(0) || "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{user?.name || user?.email}</p>
-                    <p className="text-xs text-muted-foreground">Owner</p>
-                  </div>
-                </div>
-                
-                {/* Other participants */}
-                {participants.map((participant: any) => (
-                  <div key={participant.id} className="flex items-center gap-3">
-                    <Avatar className="w-8 h-8">
-                      <AvatarFallback>
-                        {participant.name?.charAt(0) || "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{participant.name}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{participant.status || "participant"}</p>
-                    </div>
-                  </div>
-                ))}
-                
-                <IntegratedTripParticipants 
+              <section>
+                <TripIdeasAndPlaces
                   tripId={trip.id}
-                  isOwner={user?.id === trip.ownerId}
+                  participants={participants}
+                  tripCoordinates={currentDestination?.coordinates || trip.coordinates || undefined}
                 />
-              </CardContent>
-            </Card>
+              </section>
+            </div>
 
-            {/* Trip Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Trip Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button variant="outline" className="w-full justify-start" onClick={handleShare}>
-                  <Share2 className="w-4 h-4 mr-2" />
-                  Share Trip
-                </Button>
-                <Button variant="outline" className="w-full justify-start">
-                  <Edit className="w-4 h-4 mr-2" />
-                  Edit Details
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={() => setShowDeleteDialog(true)}
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete Trip
-                </Button>
-              </CardContent>
-            </Card>
+            <div className="space-y-8">
+              <section>
+                <Checklist 
+                  tripId={trip.id}
+                />
+              </section>
+            </div>
           </div>
         </div>
       </main>
