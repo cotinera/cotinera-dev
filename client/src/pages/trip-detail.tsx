@@ -145,19 +145,31 @@ export default function TripDetail() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-border" />
+      <div className="flex items-center justify-center min-h-screen bg-gradient-adventure">
+        <div className="text-center text-white">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 drop-shadow-lg" />
+          <p className="text-lg font-medium drop-shadow-md">Loading your adventure...</p>
+        </div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Error loading trip</h1>
-          <p className="text-muted-foreground mb-4">{(error as Error).message}</p>
-          <Button onClick={() => setLocation("/")}>Back to Dashboard</Button>
+      <div className="flex items-center justify-center min-h-screen bg-gradient-sunset">
+        <div className="text-center text-white max-w-md mx-4">
+          <div className="bg-white/10 backdrop-blur rounded-lg p-8 shadow-hero">
+            <h1 className="text-2xl font-bold mb-4">Unable to Load Trip</h1>
+            <p className="text-white/90 mb-6">{(error as Error).message}</p>
+            <Button 
+              onClick={() => setLocation("/")}
+              variant="secondary"
+              className="bg-white text-primary hover:bg-white/90"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -165,10 +177,20 @@ export default function TripDetail() {
 
   if (!trip) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Trip not found</h1>
-          <Button onClick={() => setLocation("/")}>Back to Dashboard</Button>
+      <div className="flex items-center justify-center min-h-screen bg-gradient-ocean">
+        <div className="text-center text-white max-w-md mx-4">
+          <div className="bg-white/10 backdrop-blur rounded-lg p-8 shadow-hero">
+            <h1 className="text-2xl font-bold mb-4">Trip Not Found</h1>
+            <p className="text-white/90 mb-6">The trip you're looking for doesn't exist or you don't have access to it.</p>
+            <Button 
+              onClick={() => setLocation("/")}
+              variant="secondary"
+              className="bg-white text-primary hover:bg-white/90"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -176,7 +198,7 @@ export default function TripDetail() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
+      <header className="border-b border-border/50 shadow-soft">
         <div className="relative overflow-hidden py-12">
           {trip.thumbnail && (
             <div 
@@ -185,23 +207,26 @@ export default function TripDetail() {
                 backgroundImage: `url(${trip.thumbnail})`,
                 filter: "blur(20px)",
                 transform: "scale(1.2)",
-                opacity: "0.9",
+                opacity: "0.7",
               }} 
             />
           )}
-          <div className="absolute inset-0 bg-gradient-to-b from-background/30 to-background/70" />
-          <div className="container mx-auto px-4 relative z-10">
-            <div className="flex justify-between items-center absolute left-4 top-0">
+          <div className="absolute inset-0 bg-gradient-adventure opacity-80" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-black/40" />
+          
+          <div className="container mx-auto px-6 relative z-10">
+            <div className="flex justify-between items-center absolute left-6 top-4">
               <Button
                 variant="ghost"
                 onClick={() => setLocation("/")}
+                className="text-white hover:bg-white/20 border border-white/20 backdrop-blur-sm transition-all duration-300"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back
               </Button>
               <Button
                 variant="ghost"
-                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                className="text-white hover:bg-destructive/20 border border-destructive/20 backdrop-blur-sm transition-all duration-300"
                 onClick={() => setShowDeleteDialog(true)}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
@@ -209,18 +234,19 @@ export default function TripDetail() {
               </Button>
             </div>
 
-
-            <TripHeaderEdit 
-              trip={trip} 
-              onBack={() => setLocation("/")} 
-            />
+            <div className="pt-16">
+              <TripHeaderEdit 
+                trip={trip} 
+                onBack={() => setLocation("/")} 
+              />
+            </div>
           </div>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8">
-        <div className="space-y-8">
-          <section>
+      <main className="container mx-auto px-6 py-12">
+        <div className="space-y-12">
+          <section className="bg-card/50 rounded-lg p-6 shadow-soft border border-border/50 backdrop-blur-sm">
             <TripTimeline 
               tripId={trip.id} 
               currentDestinationId={currentDestinationId}
@@ -228,18 +254,16 @@ export default function TripDetail() {
             />
           </section>
           
-          <section className="mb-8">
+          <section className="bg-card/50 rounded-lg p-6 shadow-soft border border-border/50 backdrop-blur-sm">
             <IntegratedTripParticipants 
               tripId={trip.id}
               isOwner={user?.id === trip.ownerId}
             />
           </section>
 
-          <div className="grid gap-8 md:grid-cols-[2fr,1fr]">
+          <div className="grid gap-8 lg:grid-cols-[2fr,1fr]">
             <div className="space-y-8">
-              {/* Map view removed to clear space on the Details page */}
-
-              <section>
+              <section className="bg-card/50 rounded-lg p-6 shadow-soft border border-border/50 backdrop-blur-sm">
                 <TripIdeasAndPlaces
                   tripId={trip.id}
                   participants={participants}
@@ -249,7 +273,7 @@ export default function TripDetail() {
             </div>
 
             <div className="space-y-8">
-              <section>
+              <section className="bg-card/50 rounded-lg p-6 shadow-soft border border-border/50 backdrop-blur-sm">
                 <Checklist 
                   tripId={trip.id}
                 />
@@ -260,21 +284,21 @@ export default function TripDetail() {
       </main>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="shadow-hero border-border/50">
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure you want to delete this trip?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="text-xl">Are you sure you want to delete this trip?</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
               This action cannot be undone. This will permanently delete the trip
-              and all its associated data.
+              and all its associated data including participants, activities, and expenses.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="hover:bg-secondary/80">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 hover:shadow-soft transition-all duration-300"
             >
-              Delete
+              Delete Trip
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
