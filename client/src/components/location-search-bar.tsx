@@ -1,16 +1,9 @@
-import { useState, useRef, useEffect } from "react";
-import { Input } from "@/components/ui/input";
-import { Loader2 } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { MapPin } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Input } from '@/components/ui/input';
+import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, MapPin } from 'lucide-react';
 
 interface LocationSearchBarProps {
   value: string;
@@ -37,38 +30,64 @@ export function LocationSearchBar({
   const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
   const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
   const placesService = useRef<google.maps.places.PlacesService | null>(null);
   const mapRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
+  // Handle input ref callback
   useEffect(() => {
     if (onInputRef && inputRef.current) {
       onInputRef(inputRef.current);
     }
   }, [onInputRef]);
 
+  // Initialize Google Maps services when available
   useEffect(() => {
-    // Check if Google Maps and Places library are fully loaded
-    if (!window.google || !window.google.maps || !window.google.maps.places) {
-      console.log('Google Maps or Places library not loaded yet');
-      return;
-    }
-
-    try {
-
-      autocompleteService.current = new google.maps.places.AutocompleteService();
-      if (mapRef.current) {
-        placesService.current = new google.maps.places.PlacesService(mapRef.current);
+    const initializeServices = () => {
+      if (window.google && window.google.maps && window.google.maps.places) {
+        try {
+          autocompleteService.current = new google.maps.places.AutocompleteService();
+          if (mapRef.current) {
+            placesService.current = new google.maps.places.PlacesService(mapRef.current);
+          }
+          setIsGoogleMapsReady(true);
+          return true;
+        } catch (error) {
+          console.error('Error initializing Google Places services:', error);
+          return false;
+        }
       }
-    } catch (error) {
-      console.error('Error initializing Google Places services:', error);
+      return false;
+    };
+
+    // Try to initialize immediately
+    if (!initializeServices()) {
+      // If not ready, poll until ready
+      const interval = setInterval(() => {
+        if (initializeServices()) {
+          clearInterval(interval);
+        }
+      }, 1000);
+
+      // Clear interval after 15 seconds
+      const timeout = setTimeout(() => {
+        clearInterval(interval);
+        setError('Google Maps failed to load. Please refresh the page.');
+      }, 15000);
+
+      return () => {
+        clearInterval(interval);
+        clearTimeout(timeout);
+      };
     }
   }, []);
 
-  const handleSearch = async (searchValue: string) => {
-    if (!searchValue || !autocompleteService.current) {
+  const handleSearch = useCallback(async (searchValue: string) => {
+    if (!searchValue || !autocompleteService.current || !isGoogleMapsReady) {
       setPredictions([]);
+      setIsOpen(false);
       return;
     }
 
@@ -79,10 +98,9 @@ export function LocationSearchBar({
       let locationBias: google.maps.places.AutocompletionRequest['locationBias'] | undefined;
 
       if (searchBias && searchBias.lat && searchBias.lng) {
-        const radius = searchBias.radius || 5000; // Default 5km radius for tighter local search
+        const radius = searchBias.radius || 50000; // Default 50km radius
         const location = new google.maps.LatLng(searchBias.lat, searchBias.lng);
 
-        // Create a tight circular bias around the current location
         locationBias = {
           center: location,
           radius: radius
@@ -93,7 +111,6 @@ export function LocationSearchBar({
         input: searchValue,
         types: ['establishment', 'geocode'],
         locationBias: locationBias,
-        strictBounds: true, // This makes the location bias stronger
         fields: ['formatted_address', 'geometry', 'name', 'place_id']
       });
 
@@ -104,28 +121,32 @@ export function LocationSearchBar({
         // Calculate distances and sort
         const predictionsWithDistance = await Promise.all(
           response.predictions.map(async (prediction) => {
-            const details = await new Promise<google.maps.places.PlaceResult>((resolve, reject) => {
-              placesService.current!.getDetails(
-                {
-                  placeId: prediction.place_id,
-                  fields: ['geometry']
-                },
-                (result, status) => {
-                  if (status === google.maps.places.PlacesServiceStatus.OK && result) {
-                    resolve(result);
-                  } else {
-                    reject(new Error('Failed to get place details'));
+            try {
+              const details = await new Promise<google.maps.places.PlaceResult>((resolve, reject) => {
+                placesService.current!.getDetails(
+                  {
+                    placeId: prediction.place_id,
+                    fields: ['geometry']
+                  },
+                  (result, status) => {
+                    if (status === google.maps.places.PlacesServiceStatus.OK && result) {
+                      resolve(result);
+                    } else {
+                      reject(new Error('Failed to get place details'));
+                    }
                   }
-                }
+                );
+              });
+
+              const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                location,
+                details.geometry!.location!
               );
-            });
 
-            const distance = google.maps.geometry.spherical.computeDistanceBetween(
-              location,
-              details.geometry!.location!
-            );
-
-            return { prediction, distance };
+              return { prediction, distance };
+            } catch (error) {
+              return { prediction, distance: Infinity };
+            }
           })
         );
 
@@ -141,10 +162,11 @@ export function LocationSearchBar({
       console.error('Autocomplete error:', err);
       setError('Failed to load suggestions. Please try again.');
       setPredictions([]);
+      setIsOpen(false);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [searchBias, isGoogleMapsReady]);
 
   const handleSelect = async (placeId: string) => {
     if (!placesService.current) return;
@@ -185,6 +207,12 @@ export function LocationSearchBar({
     }
   };
 
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+    onChange(newValue);
+    handleSearch(newValue);
+  };
+
   if (error) {
     return (
       <Alert variant="destructive">
@@ -200,12 +228,19 @@ export function LocationSearchBar({
         <Input
           ref={inputRef}
           value={value}
-          onChange={(e) => {
-            onChange(e.target.value);
-            handleSearch(e.target.value);
+          onChange={handleInputChange}
+          onFocus={() => {
+            if (predictions.length > 0) {
+              setIsOpen(true);
+            }
+          }}
+          onBlur={() => {
+            // Delay hiding to allow for click events
+            setTimeout(() => setIsOpen(false), 200);
           }}
           placeholder={placeholder}
           className={className}
+          disabled={!isGoogleMapsReady}
         />
         {isLoading && (
           <div className="absolute right-2 top-1/2 -translate-y-1/2">
