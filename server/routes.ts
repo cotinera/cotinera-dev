@@ -2307,7 +2307,7 @@ export function registerRoutes(app: Express): Server {
     try {
       const tripId = parseInt(req.params.tripId);
       const placeId = parseInt(req.params.placeId);
-      const { notes, category, name, coordinates } = req.body;
+      const { notes, category, name, coordinates, icon } = req.body;
 
       const [updatedPlace] = await db
         .update(pinnedPlaces)
@@ -2316,6 +2316,7 @@ export function registerRoutes(app: Express): Server {
           category: category || 'tourist',
           name: name || undefined,
           coordinates: coordinates || undefined,
+          icon: icon || '📍',
         })
         .where(
           and(
