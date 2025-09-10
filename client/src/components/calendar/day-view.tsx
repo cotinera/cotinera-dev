@@ -275,7 +275,7 @@ function DraggableEvent({
       } ${!isResizing && !isDragging ? 'cursor-pointer' : ''}`}
     >
       <div
-        className="absolute top-0 left-0 w-full h-2 cursor-ns-resize hover:bg-black/30 transition-colors"
+        className="absolute top-0 left-0 w-full h-3 cursor-ns-resize hover:bg-black/30 transition-colors group-hover/event:bg-white/20"
         onMouseDown={(e) => handleResizeStart(e, 'top')}
       />
 
@@ -311,7 +311,7 @@ function DraggableEvent({
       </span>
 
       <div
-        className="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize hover:bg-black/30 transition-colors"
+        className="absolute bottom-0 left-0 w-full h-3 cursor-ns-resize hover:bg-black/30 transition-colors group-hover/event:bg-white/20"
         onMouseDown={(e) => handleResizeStart(e, 'bottom')}
       />
     </div>
