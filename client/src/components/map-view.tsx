@@ -852,7 +852,15 @@ export function MapView({
               <div className="relative w-full">
                 <LocationSearchBar
                   value={searchValue}
-                  onChange={handleLocationChange}
+                  onChange={(address, coords, name) => {
+                    // Always update the search value when user types
+                    setSearchValue(address);
+                    
+                    // Only handle location change when coordinates are provided (user selected a place)
+                    if (coords) {
+                      handleLocationChange(address, coords, name);
+                    }
+                  }}
                   placeholder="Search for places..."
                   className="w-full bg-background/90 backdrop-blur-sm"
                   searchBias={{
@@ -861,8 +869,9 @@ export function MapView({
                     radius: 50000
                   }}
                   onInputRef={(ref) => {
-                    if (searchInputRef.current !== ref) {
-                      (searchInputRef as any).current = ref;
+                    // Store the input ref for potential focus management
+                    if (ref) {
+                      (searchInputRef as React.MutableRefObject<HTMLInputElement | null>).current = ref;
                     }
                   }}
                 />
