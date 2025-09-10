@@ -287,6 +287,7 @@ export const pinnedPlaces = pgTable("pinned_places", {
   destinationId: integer("destination_id").references(() => destinations.id),
   addedToChecklist: boolean("added_to_checklist").notNull().default(false),
   category: text("category").notNull().default('other'),
+  icon: text("icon").notNull().default('📍'), // Custom icon/emoji for the pinned place
   createdAt: timestamp("created_at").defaultNow(),
 });
 
