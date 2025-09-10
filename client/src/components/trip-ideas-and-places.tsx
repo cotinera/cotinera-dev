@@ -16,6 +16,7 @@ import { z } from "zod";
 import axios from "axios";
 import { format, parseISO, isValid } from "date-fns";
 import { LocationSearchBar } from "@/components/location-search-bar";
+import { IconPicker } from "@/components/icon-picker";
 
 // DnD Kit imports
 import {
@@ -906,6 +907,107 @@ export function TripIdeasAndPlaces({
                   <Button type="submit" variant="adventure">
                     Update Idea
                   </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Place Dialog */}
+        <Dialog open={isEditPlaceDialogOpen} onOpenChange={setIsEditPlaceDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Place</DialogTitle>
+            </DialogHeader>
+            <Form {...editPlaceForm}>
+              <form onSubmit={editPlaceForm.handleSubmit(onEditPlaceSubmit)} className="space-y-4">
+                <FormField
+                  control={editPlaceForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter place name..." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editPlaceForm.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Notes</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="Add notes about this place..." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editPlaceForm.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="restaurant">Restaurant</SelectItem>
+                          <SelectItem value="attraction">Attraction</SelectItem>
+                          <SelectItem value="hotel">Hotel</SelectItem>
+                          <SelectItem value="shopping">Shopping</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={editPlaceForm.control}
+                  name="icon"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Icon</FormLabel>
+                      <FormControl>
+                        <IconPicker 
+                          selectedIcon={field.value} 
+                          onIconSelect={field.onChange}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="flex justify-between space-x-2">
+                  <Button 
+                    type="button" 
+                    variant="destructive" 
+                    onClick={onDeletePlace}
+                    disabled={deletePlaceMutation.isPending}
+                  >
+                    {deletePlaceMutation.isPending ? "Deleting..." : "Delete Place"}
+                  </Button>
+                  <div className="flex space-x-2">
+                    <Button type="button" variant="outline" onClick={() => setIsEditPlaceDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      variant="adventure"
+                      disabled={updatePlaceMutation.isPending}
+                    >
+                      {updatePlaceMutation.isPending ? "Updating..." : "Update Place"}
+                    </Button>
+                  </div>
                 </div>
               </form>
             </Form>
