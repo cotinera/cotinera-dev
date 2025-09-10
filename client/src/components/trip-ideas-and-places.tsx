@@ -48,10 +48,12 @@ const tripIdeaSchema = z.object({
   plannedTime: z.string().optional(),
 });
 
-// Define the PinnedPlace schema
+// Define the PinnedPlace schema for editing
 const pinnedPlaceSchema = z.object({
-  address: z.string().min(2, { message: "Address is required" }),
+  name: z.string().min(1, "Name is required"),
   notes: z.string().optional(),
+  category: z.string().optional(),
+  icon: z.string().default('📍'),
 });
 
 // Define types for our data
@@ -315,6 +317,8 @@ export function TripIdeasAndPlaces({
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingIdea, setEditingIdea] = useState<TripIdea | null>(null);
+  const [isEditPlaceDialogOpen, setIsEditPlaceDialogOpen] = useState(false);
+  const [editingPlace, setEditingPlace] = useState<PinnedPlace | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -338,6 +342,17 @@ export function TripIdeasAndPlaces({
       description: "",
       status: "pending",
       location: "",
+    },
+  });
+
+  // Form for editing places
+  const editPlaceForm = useForm<z.infer<typeof pinnedPlaceSchema>>({
+    resolver: zodResolver(pinnedPlaceSchema),
+    defaultValues: {
+      name: "",
+      notes: "",
+      category: "",
+      icon: "📍",
     },
   });
 
@@ -494,6 +509,61 @@ export function TripIdeasAndPlaces({
     },
   });
 
+  const updatePlaceMutation = useMutation({
+    mutationFn: async ({ placeId, data }: { placeId: number; data: z.infer<typeof pinnedPlaceSchema> }) => {
+      const response = await axios.patch(`/api/trips/${tripId}/pinned-places/${placeId}`, data, {
+        headers: {
+          'x-dev-bypass': 'true'
+        }
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/pinned-places`] });
+      setIsEditPlaceDialogOpen(false);
+      setEditingPlace(null);
+      editPlaceForm.reset();
+      toast({
+        title: "Success",
+        description: "Place updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.response?.data?.error || "Failed to update place",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deletePlaceMutation = useMutation({
+    mutationFn: async (placeId: number) => {
+      const response = await axios.delete(`/api/trips/${tripId}/pinned-places/${placeId}`, {
+        headers: {
+          'x-dev-bypass': 'true'
+        }
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/pinned-places`] });
+      setIsEditPlaceDialogOpen(false);
+      setEditingPlace(null);
+      toast({
+        title: "Success",
+        description: "Place deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.response?.data?.error || "Failed to delete place",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Drag and drop handlers
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
@@ -590,6 +660,18 @@ export function TripIdeasAndPlaces({
     }
   };
 
+  const onEditPlaceSubmit = (data: z.infer<typeof pinnedPlaceSchema>) => {
+    if (editingPlace) {
+      updatePlaceMutation.mutate({ placeId: editingPlace.id, data });
+    }
+  };
+
+  const onDeletePlace = () => {
+    if (editingPlace && window.confirm("Are you sure you want to delete this place?")) {
+      deletePlaceMutation.mutate(editingPlace.id);
+    }
+  };
+
   const handleEditIdea = (idea: TripIdea) => {
     setEditingIdea(idea);
     editForm.reset({
@@ -599,6 +681,17 @@ export function TripIdeasAndPlaces({
       location: idea.location || "",
     });
     setIsEditDialogOpen(true);
+  };
+
+  const handleEditPlace = (place: PinnedPlace) => {
+    setEditingPlace(place);
+    editPlaceForm.reset({
+      name: place.name,
+      notes: place.notes || "",
+      category: place.category || "",
+      icon: place.icon || "📍",
+    });
+    setIsEditPlaceDialogOpen(true);
   };
 
   // Get active item for drag overlay
@@ -836,6 +929,7 @@ export function TripIdeasAndPlaces({
               items={getColumnItems(column.id)}
               type={column.id === 'places' ? 'place' : 'idea'}
               onEditIdea={column.id !== 'places' ? handleEditIdea : undefined}
+              onEditPlace={column.id === 'places' ? handleEditPlace : undefined}
             />
           ))}
         </div>
