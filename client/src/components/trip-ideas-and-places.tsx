@@ -116,11 +116,13 @@ interface TripIdeasAndPlacesProps {
 function DraggableCard({ 
   item, 
   type,
-  onEditIdea
+  onEditIdea,
+  onEditPlace
 }: { 
   item: TripIdea | PinnedPlace; 
   type: 'idea' | 'place';
   onEditIdea?: (idea: TripIdea) => void;
+  onEditPlace?: (place: PinnedPlace) => void;
 }) {
   const {
     attributes,
@@ -152,10 +154,14 @@ function DraggableCard({
   const ownerName = isIdea ? idea!.ownerName : null;
 
   const handleCardClick = (e: React.MouseEvent) => {
-    // Only handle clicks if we're not dragging and it's an idea
-    if (!isDragging && isIdea && onEditIdea) {
+    // Handle clicks if we're not dragging
+    if (!isDragging) {
       e.stopPropagation();
-      onEditIdea(idea!);
+      if (isIdea && onEditIdea) {
+        onEditIdea(idea!);
+      } else if (!isIdea && onEditPlace) {
+        onEditPlace(place!);
+      }
     }
   };
 
@@ -242,12 +248,14 @@ function DroppableColumn({
   column, 
   items, 
   type,
-  onEditIdea
+  onEditIdea,
+  onEditPlace
 }: { 
   column: Column; 
   items: (TripIdea | PinnedPlace)[]; 
   type: 'idea' | 'place';
   onEditIdea?: (idea: TripIdea) => void;
+  onEditPlace?: (place: PinnedPlace) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
@@ -283,6 +291,7 @@ function DroppableColumn({
                 item={item} 
                 type={type}
                 onEditIdea={onEditIdea}
+                onEditPlace={onEditPlace}
               />
             ))}
             {items.length === 0 && (
