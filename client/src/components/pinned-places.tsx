@@ -559,7 +559,7 @@ export function PinnedPlaces({
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
+                    <span className="text-base">{place.icon || '📍'}</span>
                     <p className="text-sm font-medium truncate">{place.name}</p>
                     <span 
                       className="text-xs bg-primary/10 hover:bg-primary/20 text-primary rounded-full px-2 py-0.5 cursor-pointer flex items-center"

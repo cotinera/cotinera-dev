@@ -201,7 +201,11 @@ function DraggableCard({
           {/* Location */}
           {location && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground truncate">
-              <MapPin className="h-3 w-3 flex-shrink-0" />
+              {!isIdea ? (
+                <span className="text-xs flex-shrink-0">{place!.icon || '📍'}</span>
+              ) : (
+                <MapPin className="h-3 w-3 flex-shrink-0" />
+              )}
               <span className="truncate">{location}</span>
             </div>
           )}
