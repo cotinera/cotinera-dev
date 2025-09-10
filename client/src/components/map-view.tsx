@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAccommodations } from "@/hooks/use-accommodations";
 import { cn } from "@/lib/utils";
 import { useGoogleMapsScript, useMapCoordinates, GoogleMap, MarkerF, PlaceDetails, PinnedPlace } from "@/lib/google-maps";
-import usePlacesAutocomplete, { getGeocode, getLatLng } from "use-places-autocomplete";
+import { LocationSearchBar } from "@/components/location-search-bar";
 
 // Helpers and components
 function calculateDistance(point1: { lat: number; lng: number }, point2: { lat: number; lng: number }): number {
@@ -257,7 +257,8 @@ export function MapView({
   const [selectedPlaceDetails, setSelectedPlaceDetails] = useState<PlaceDetails | null>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [expandedReviews, setExpandedReviews] = useState(false);
-  const { accommodations = [] } = useAccommodations(tripId ? (isNaN(Number(tripId)) ? undefined : Number(tripId)) : undefined);
+  const numericTripId = tripId && !isNaN(Number(tripId)) ? Number(tripId) : undefined;
+  const { accommodations = [] } = useAccommodations(numericTripId);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [placeResults, setPlaceResults] = useState<google.maps.places.PlaceResult[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
@@ -347,20 +348,8 @@ export function MapView({
     );
   }, []);
 
-  const {
-    ready,
-    value,
-    suggestions: { status, data },
-    setValue,
-    clearSuggestions,
-  } = usePlacesAutocomplete({
-    requestOptions: {
-      types: ['establishment', 'geocode'],
-      location: isLoaded && window.google ? new google.maps.LatLng(coordinates.lat, coordinates.lng) : undefined,
-      radius: 50000,
-    },
-    debounce: 300,
-  });
+  const [searchValue, setSearchValue] = useState('');
+  const [showSearchResults, setShowSearchResults] = useState(false);
 
   const allPinnedPlaces = useMemo(() => {
     if (!pinnedPlaces) return [];
@@ -530,82 +519,54 @@ export function MapView({
     }
   }, [initPlacesService, handleMapIdle, coordinates]);
 
-  const handleSearchSelect = useCallback(async (result: SearchResult) => {
+  const handleSearchSelect = useCallback((result: SearchResult) => {
     if (result.type === 'category') {
       // Handle category selection
       const category = categoryButtons.find(c => c.id === result.id);
       if (category) {
         setSelectedCategory(category.id);
-        setValue(category.label, false);
-        clearSuggestions();
+        setSearchValue(category.label);
+        setShowSearchResults(false);
       }
-    } else {
-      // Handle place selection
-      if (result.placeId) {
-        try {
-          clearSuggestions();
-          setValue(result.description, false);
+    }
+  }, []);
 
-          const results = await getGeocode({ placeId: result.placeId });
-          const { lat, lng } = await getLatLng(results[0]);
-
-          // Important: Always update both coordinates
-          setCoordinates({ lat, lng });
-          // Always set searchedLocation for user-initiated searches
-          setSearchedLocation({ lat, lng });
-
-          if (mapRef.current) {
-            // Use our shared animation function with easing and better spatial context
-            smoothMapAnimation(
-              mapRef, 
-              coordinates, 
-              { lat, lng },
-              // Optional callback when animation completes
-              undefined
-            );
+  const handleLocationChange = useCallback((address: string, coords?: { lat: number; lng: number }, name?: string) => {
+    if (coords) {
+      setCoordinates(coords);
+      setSearchedLocation(coords);
+      
+      if (mapRef.current) {
+        smoothMapAnimation(
+          mapRef, 
+          coordinates, 
+          coords
+        );
+      }
+      
+      // Try to get place details if we have a name
+      if (name && placesServiceRef.current) {
+        const request = {
+          query: name,
+          locationBias: {
+            center: new google.maps.LatLng(coords.lat, coords.lng),
+            radius: 100
+          },
+          fields: ['place_id']
+        };
+        
+        placesServiceRef.current.findPlaceFromQuery(
+          request,
+          (results, status) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && results && results[0] && results[0].place_id) {
+              fetchDetails(results[0].place_id);
+            }
           }
-
-          fetchDetails(result.placeId);
-        } catch (error) {
-          console.error("Error selecting place:", error);
-        }
+        );
       }
     }
-  }, [clearSuggestions, setValue, setCoordinates, fetchDetails, coordinates]);
-
-  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const searchValue = e.target.value;
-    setValue(searchValue);
-
-    // Only show categories if search is empty or very short
-    if (!searchValue || searchValue.length < 2) {
-      setSearchResults([]);
-      return;
-    }
-
-    // Find matching categories
-    const matchingCategories = categoryButtons.filter(category =>
-      category.searchTerms.some(term =>
-        term.toLowerCase().includes(searchValue.toLowerCase()) ||
-        searchValue.toLowerCase().includes(term.toLowerCase())
-      )
-    );
-
-    // Create category results but don't immediately set them
-    // Let the useEffect handle combining with place results
-    const categoryResults: SearchResult[] = matchingCategories.map(category => ({
-      type: 'category',
-      id: category.id,
-      description: category.label,
-      icon: category.icon
-    }));
-
-    // Store category results temporarily, place results will be added by useEffect
-    setSearchResults(prevResults => {
-      const placeResults = prevResults.filter(r => r.type === 'place');
-      return [...categoryResults, ...placeResults];
-    });
-  }, [setValue]);
+    setShowSearchResults(false);
+  }, [setCoordinates, coordinates, fetchDetails]);
 
   const handlePinPlace = useCallback(async () => {
     if (!selectedPlaceDetails || !tripId) return;
@@ -666,32 +627,32 @@ export function MapView({
     }
   }, [selectedCategory, refreshPlaces]);
 
-  // Effect for updating the search results when the user types
-  useEffect(() => {
-    if (!ready) {
-      // If not ready, only show categories
-      return;
+  const handleSearchInputChange = useCallback((value: string) => {
+    setSearchValue(value);
+    
+    // Show categories when searching
+    if (value.length >= 2) {
+      const matchingCategories = categoryButtons.filter(category =>
+        category.searchTerms.some(term =>
+          term.toLowerCase().includes(value.toLowerCase()) ||
+          value.toLowerCase().includes(term.toLowerCase())
+        )
+      );
+      
+      const categoryResults: SearchResult[] = matchingCategories.map(category => ({
+        type: 'category',
+        id: category.id,
+        description: category.label,
+        icon: category.icon
+      }));
+      
+      setSearchResults(categoryResults);
+      setShowSearchResults(true);
+    } else {
+      setSearchResults([]);
+      setShowSearchResults(false);
     }
-
-    if (!data.length) {
-      // If no place data, remove place results but keep categories
-      setSearchResults(prevResults => prevResults.filter(r => r.type === 'category'));
-      return;
-    }
-
-    const placeResults: SearchResult[] = data.map(suggestion => ({
-      type: 'place',
-      id: suggestion.place_id,
-      placeId: suggestion.place_id,
-      description: suggestion.description,
-      secondaryText: suggestion.structured_formatting?.secondary_text
-    }));
-
-    setSearchResults(prevResults => [
-      ...prevResults.filter(r => r.type === 'category'),
-      ...placeResults
-    ]);
-  }, [data, ready]);
+  }, []);
 
   // Effect to simulate a search based on a place name if provided
   useEffect(() => {
@@ -889,19 +850,25 @@ export function MapView({
           {!hideSearchAndFilters && (
             <div className="absolute top-4 left-4 right-4 z-10 flex flex-col gap-2">
               <div className="relative w-full">
-                <div className="relative">
-                  <Search className="h-4 w-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    ref={searchInputRef}
-                    placeholder="Search for places or categories..."
-                    className="pl-10 pr-4 h-10 w-full bg-background/90 backdrop-blur-sm"
-                    value={value}
-                    onChange={handleInputChange}
-                    onFocus={() => setIsSearchFocused(true)}
-                    onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
-                  />
-                </div>
-                {isSearchFocused && searchResults.length > 0 && (
+                <LocationSearchBar
+                  value={searchValue}
+                  onChange={handleLocationChange}
+                  placeholder="Search for places..."
+                  className="w-full bg-background/90 backdrop-blur-sm"
+                  searchBias={{
+                    lat: coordinates.lat,
+                    lng: coordinates.lng,
+                    radius: 50000
+                  }}
+                  onInputRef={(ref) => {
+                    if (searchInputRef.current !== ref) {
+                      (searchInputRef as any).current = ref;
+                    }
+                  }}
+                />
+                
+                {/* Show category suggestions only when typing */}
+                {showSearchResults && searchResults.length > 0 && (
                   <Card className="absolute top-full left-0 right-0 mt-1 max-h-60 overflow-y-auto shadow-lg z-20">
                     <ScrollArea className="p-2">
                       {searchResults.map((result) => (
@@ -917,17 +884,10 @@ export function MapView({
                             <div className="text-sm font-medium truncate">
                               {result.description}
                             </div>
-                            {result.secondaryText && (
-                              <div className="text-xs text-muted-foreground truncate">
-                                {result.secondaryText}
-                              </div>
-                            )}
                           </div>
-                          {result.type === 'category' && (
-                            <Badge variant="outline" className="ml-2 text-xs">
-                              Category
-                            </Badge>
-                          )}
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            Category
+                          </Badge>
                         </div>
                       ))}
                     </ScrollArea>
