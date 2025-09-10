@@ -10,6 +10,7 @@ import { useAccommodations } from "@/hooks/use-accommodations";
 import { cn } from "@/lib/utils";
 import { useGoogleMapsScript, useMapCoordinates, GoogleMap, MarkerF, PlaceDetails, PinnedPlace } from "@/lib/google-maps";
 import { LocationSearchBar } from "@/components/location-search-bar";
+import { IconPicker } from "@/components/icon-picker";
 
 // Helpers and components
 function calculateDistance(point1: { lat: number; lng: number }, point2: { lat: number; lng: number }): number {
@@ -257,6 +258,7 @@ export function MapView({
   const [selectedPlaceDetails, setSelectedPlaceDetails] = useState<PlaceDetails | null>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [expandedReviews, setExpandedReviews] = useState(false);
+  const [selectedIcon, setSelectedIcon] = useState('📍'); // Icon for pinning places
   const numericTripId = tripId && !isNaN(Number(tripId)) ? Number(tripId) : undefined;
   const { accommodations = [] } = useAccommodations(numericTripId);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -590,6 +592,7 @@ export function MapView({
           coordinates: placeCoordinates,
           category: selectedPlaceDetails.types?.[0] || "attraction",
           address: selectedPlaceDetails.formatted_address,
+          icon: selectedIcon, // Include the selected icon
         }),
       });
 
@@ -831,13 +834,23 @@ export function MapView({
         )}
 
         {tripId && (
-          <Button 
-            onClick={handlePinPlace} 
-            className="w-full"
-          >
-            <MapPin className="h-4 w-4 mr-2" />
-            Pin to Trip
-          </Button>
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Choose an icon:</span>
+              <IconPicker
+                selectedIcon={selectedIcon}
+                onIconSelect={setSelectedIcon}
+                className="flex-shrink-0"
+              />
+            </div>
+            <Button 
+              onClick={handlePinPlace} 
+              className="w-full"
+            >
+              <span className="mr-2">{selectedIcon}</span>
+              Pin to Trip
+            </Button>
+          </div>
         )}
       </div>
     );
