@@ -49,11 +49,20 @@ export function LocationSearchBar({
   }, [onInputRef]);
 
   useEffect(() => {
-    if (!window.google) return;
+    // Check if Google Maps and Places library are fully loaded
+    if (!window.google || !window.google.maps || !window.google.maps.places) {
+      console.log('Google Maps or Places library not loaded yet');
+      return;
+    }
 
-    autocompleteService.current = new google.maps.places.AutocompleteService();
-    if (mapRef.current) {
-      placesService.current = new google.maps.places.PlacesService(mapRef.current);
+    try {
+
+      autocompleteService.current = new google.maps.places.AutocompleteService();
+      if (mapRef.current) {
+        placesService.current = new google.maps.places.PlacesService(mapRef.current);
+      }
+    } catch (error) {
+      console.error('Error initializing Google Places services:', error);
     }
   }, []);
 
