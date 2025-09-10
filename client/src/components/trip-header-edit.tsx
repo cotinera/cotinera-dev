@@ -152,13 +152,13 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
     return (
       <div className="text-center">
         <h1 
-          className="text-3xl font-bold mb-2 hover:text-primary/80 transition-colors cursor-pointer inline-block" 
+          className="text-3xl font-bold mb-2 text-white hover:text-primary/80 transition-colors cursor-pointer inline-block" 
           onClick={() => setIsEditing(true)}
           title="Click to edit title"
         >
           {trip.title}
         </h1>
-        <div className="flex items-center justify-center gap-2 text-muted-foreground mt-2">
+        <div className="flex items-center justify-center gap-2 text-white mt-2">
           <MapPin className="h-4 w-4" />
           <span 
             className="hover:text-primary/80 transition-colors cursor-pointer"
@@ -168,7 +168,7 @@ export function TripHeaderEdit({ trip, onBack }: TripHeaderEditProps) {
             {trip.location}
           </span>
         </div>
-        <div className="flex items-center justify-center gap-2 text-muted-foreground mt-1">
+        <div className="flex items-center justify-center gap-2 text-white mt-1">
           <Calendar className="h-4 w-4" />
           <span 
             className="hover:text-primary/80 transition-colors cursor-pointer"
