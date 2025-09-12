@@ -598,7 +598,7 @@ export function TripIdeasAndPlaces({
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/pinned-places`] });
+      queryClient.invalidateQueries({ queryKey: placesKey });
       setIsEditPlaceDialogOpen(false);
       setEditingPlace(null);
       toast({
