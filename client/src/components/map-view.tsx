@@ -994,12 +994,14 @@ export function MapView({
                   position={place.coordinates}
                   onClick={() => handleMarkerClick(place)}
                   icon={{
-                    path: google.maps.SymbolPath.CIRCLE,
-                    fillColor: selectedPlace?.id === place.id ? '#22c55e' : '#3b82f6',
-                    fillOpacity: 1,
-                    strokeWeight: 2,
-                    strokeColor: '#ffffff',
-                    scale: 8,
+                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+                        <circle cx="16" cy="16" r="15" fill="${selectedPlace?.id === place.id ? '#22c55e' : '#ffffff'}" stroke="#333" stroke-width="2"/>
+                        <text x="16" y="22" text-anchor="middle" font-size="16" fill="black">${place.icon || '📍'}</text>
+                      </svg>
+                    `)}`,
+                    scaledSize: new google.maps.Size(32, 32),
+                    anchor: new google.maps.Point(16, 16),
                   }}
                 />
               ))}
@@ -1052,12 +1054,14 @@ export function MapView({
                   position={accom.coordinates as google.maps.LatLngLiteral}
                   onClick={() => handleMarkerClick(accom as Accommodation)}
                   icon={{
-                    path: google.maps.SymbolPath.CIRCLE,
-                    fillColor: '#f97316',
-                    fillOpacity: 0.8,
-                    strokeWeight: 2,
-                    strokeColor: '#ffffff',
-                    scale: 7,
+                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+                        <circle cx="16" cy="16" r="15" fill="#ffffff" stroke="#f97316" stroke-width="2"/>
+                        <text x="16" y="22" text-anchor="middle" font-size="16" fill="black">🏨</text>
+                      </svg>
+                    `)}`,
+                    scaledSize: new google.maps.Size(32, 32),
+                    anchor: new google.maps.Point(16, 16),
                   }}
                 />
               ))}
