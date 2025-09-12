@@ -4,7 +4,7 @@ import { useTutorial } from "@/hooks/use-tutorial";
 import { Button } from "@/components/ui/button";
 import { TripCard } from "@/components/trip-card";
 import { TravelGuide } from "@/components/travel-guide";
-import { Plus, LogOut, Trash2, Settings, MapPin, Calendar, Users } from "lucide-react";
+import { Plus, LogOut, Trash2, MapPin, Calendar, Users } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useState, useMemo } from "react";
@@ -42,7 +42,6 @@ import { MapPicker } from "@/components/map-picker";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { TravelPreferencesForm } from "@/components/travel-preferences-form";
 
 const tripFormSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -60,7 +59,6 @@ export default function Dashboard() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isPreferencesOpen, setIsPreferencesOpen] = useState(false);
   const [selectedCoordinates, setSelectedCoordinates] = useState<{ lat: number; lng: number } | null>(null);
   const [selectedTrips, setSelectedTrips] = useState<number[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -242,23 +240,10 @@ export default function Dashboard() {
       <header className="border-b border-border/50 bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold bg-gradient-adventure bg-clip-text text-transparent">
-            Personal Group Coordinator
+            <span className="font-bold">ATLAS</span>
+            <span className="text-lg italic ml-1">by PGC</span>
           </h1>
           <div className="flex items-center gap-3">
-            <Dialog open={isPreferencesOpen} onOpenChange={setIsPreferencesOpen}>
-              <DialogTrigger asChild>
-                <Button variant="ghost" size="icon" className="hover:bg-primary/10" title="Travel Preferences">
-                  <Settings className="h-5 w-5" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Travel Preferences</DialogTitle>
-                </DialogHeader>
-                <TravelPreferencesForm onClose={() => setIsPreferencesOpen(false)} />
-              </DialogContent>
-            </Dialog>
-            
             {user ? (
               <div className="flex items-center gap-3">
                 <div className="hidden md:flex items-center gap-2">

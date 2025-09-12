@@ -31,7 +31,7 @@ interface TutorialStep {
 
 const tutorialSteps: TutorialStep[] = [
   {
-    title: "Welcome to PGC!",
+    title: "Welcome to Atlas!",
     description: "I'm Marco, your travel companion! Let me show you around our awesome trip planning tools!",
     icon: Plane,
     expression: "excited",
