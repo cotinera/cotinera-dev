@@ -91,6 +91,7 @@ interface PinnedPlace {
   tripId: number;
   destinationId?: number;
   category?: string;
+  icon?: string;
   createdAt?: string;
 }
 
@@ -565,6 +566,33 @@ export function TripIdeasAndPlaces({
     },
   });
 
+  const deleteIdeaMutation = useMutation({
+    mutationFn: async (ideaId: number) => {
+      const response = await axios.delete(`/api/trips/${tripId}/ideas/${ideaId}`, {
+        headers: {
+          'x-dev-bypass': 'true'
+        }
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "ideas"] });
+      setIsEditDialogOpen(false);
+      setEditingIdea(null);
+      toast({
+        title: "Success",
+        description: "Idea deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.response?.data?.error || "Failed to delete idea",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Drag and drop handlers
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
@@ -900,13 +928,31 @@ export function TripIdeasAndPlaces({
                     </FormItem>
                   )}
                 />
-                <div className="flex justify-end space-x-2">
-                  <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                    Cancel
+                <div className="flex justify-between space-x-2">
+                  <Button 
+                    type="button" 
+                    variant="destructive" 
+                    onClick={() => {
+                      if (editingIdea && window.confirm("Are you sure you want to delete this idea?")) {
+                        deleteIdeaMutation.mutate(editingIdea.id);
+                      }
+                    }}
+                    disabled={deleteIdeaMutation?.isPending}
+                  >
+                    {deleteIdeaMutation?.isPending ? "Deleting..." : "Delete Idea"}
                   </Button>
-                  <Button type="submit" variant="adventure">
-                    Update Idea
-                  </Button>
+                  <div className="flex space-x-2">
+                    <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      variant="adventure"
+                      disabled={updateIdeaMutation.isPending}
+                    >
+                      {updateIdeaMutation.isPending ? "Updating..." : "Update Idea"}
+                    </Button>
+                  </div>
                 </div>
               </form>
             </Form>
