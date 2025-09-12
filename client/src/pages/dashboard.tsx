@@ -370,47 +370,6 @@ export default function Dashboard() {
 
       {/* Dashboard Content */}
       <main className="container mx-auto px-6 py-12">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <Card className="bg-card border-border/50 shadow-soft hover:shadow-card transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Trips</CardTitle>
-              <Calendar className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{trips.length}</div>
-              <p className="text-xs text-muted-foreground">
-                {upcomingTrips.length} upcoming
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-border/50 shadow-soft hover:shadow-card transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Destinations</CardTitle>
-              <MapPin className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{totalDestinations}</div>
-              <p className="text-xs text-muted-foreground">
-                Unique locations explored
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-border/50 shadow-soft hover:shadow-card transition-all duration-300">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Trips</CardTitle>
-              <Users className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">{upcomingTrips.length}</div>
-              <p className="text-xs text-muted-foreground">
-                Currently being planned
-              </p>
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Trips Section */}
         <div className="space-y-8">

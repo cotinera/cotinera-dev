@@ -219,14 +219,14 @@ export default function TripDetail() {
               <Button
                 variant="ghost"
                 onClick={() => setLocation("/")}
-                className="text-white hover:bg-white/20 border border-white/20 backdrop-blur-sm transition-all duration-300"
+                className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-300"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back
               </Button>
               <Button
                 variant="ghost"
-                className="text-white hover:bg-destructive/20 border border-destructive/20 backdrop-blur-sm transition-all duration-300"
+                className="text-white hover:bg-destructive/20 backdrop-blur-sm transition-all duration-300"
                 onClick={() => setShowDeleteDialog(true)}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
@@ -261,25 +261,11 @@ export default function TripDetail() {
             />
           </section>
 
-          <div className="grid gap-8 lg:grid-cols-[2fr,1fr]">
-            <div className="space-y-8">
-              <section className="bg-card/50 rounded-lg p-6 shadow-soft border border-border/50 backdrop-blur-sm">
-                <TripIdeasAndPlaces
-                  tripId={trip.id}
-                  participants={participants}
-                  tripCoordinates={currentDestination?.coordinates || trip.coordinates || undefined}
-                />
-              </section>
-            </div>
-
-            <div className="space-y-8">
-              <section className="bg-card/50 rounded-lg p-6 shadow-soft border border-border/50 backdrop-blur-sm">
-                <Checklist 
-                  tripId={trip.id}
-                />
-              </section>
-            </div>
-          </div>
+          <section className="bg-card/50 rounded-lg p-6 shadow-soft border border-border/50 backdrop-blur-sm">
+            <Checklist 
+              tripId={trip.id}
+            />
+          </section>
         </div>
       </main>
 
