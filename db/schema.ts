@@ -288,6 +288,7 @@ export const pinnedPlaces = pgTable("pinned_places", {
   addedToChecklist: boolean("added_to_checklist").notNull().default(false),
   category: text("category").notNull().default('other'),
   icon: text("icon").notNull().default('📍'), // Custom icon/emoji for the pinned place
+  status: text("status").$type<"places" | "pending" | "booked">().default("places"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

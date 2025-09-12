@@ -32,6 +32,7 @@ import {
 import { Form, FormControl, FormField, FormItem, FormLabel } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
@@ -57,6 +58,7 @@ interface PinnedPlace {
   openingHours?: string[];
   icon?: string;
   category?: string;
+  status?: "places" | "pending" | "booked";
 }
 
 interface AddPinnedPlaceForm {
@@ -67,6 +69,7 @@ interface AddPinnedPlaceForm {
 interface EditPinnedPlaceForm {
   address?: string;
   notes?: string;
+  status?: "places" | "pending" | "booked";
 }
 
 interface PinnedPlacesProps {
@@ -157,6 +160,7 @@ export function PinnedPlaces({
     defaultValues: {
       address: "",
       notes: "",
+      status: "places",
     },
   });
 
@@ -165,6 +169,7 @@ export function PinnedPlaces({
       editForm.reset({
         address: placeToEdit.name,
         notes: placeToEdit.notes || "",
+        status: placeToEdit.status || "places",
       });
       setEditedPlaceCoordinates(placeToEdit.coordinates);
       setEditedPlaceName(placeToEdit.name);
@@ -287,6 +292,7 @@ export function PinnedPlaces({
           ...variables.data,
           name: variables.data.name || editedPlaceName,
           coordinates: variables.data.coordinates || editedPlaceCoordinates,
+          status: variables.data.status,
         }),
       });
 
@@ -563,6 +569,15 @@ export function PinnedPlaces({
                   <div className="flex items-center gap-2">
                     <span className="text-base">{place.icon || '📍'}</span>
                     <p className="text-sm font-medium truncate">{place.name}</p>
+                    {place.status && place.status !== "places" && (
+                      <span className={cn(
+                        "text-xs rounded-full px-2 py-0.5",
+                        place.status === "pending" && "bg-yellow-100 text-yellow-800",
+                        place.status === "booked" && "bg-green-100 text-green-800"
+                      )}>
+                        {place.status === "pending" ? "Pending" : "Booked"}
+                      </span>
+                    )}
                     <span 
                       className="text-xs bg-primary/10 hover:bg-primary/20 text-primary rounded-full px-2 py-0.5 cursor-pointer flex items-center"
                       onClick={(e) => {
@@ -702,6 +717,27 @@ export function PinnedPlaces({
                     <FormControl>
                       <Textarea {...field} placeholder="Add any notes about this place..." />
                     </FormControl>
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={editForm.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="places">Places</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="booked">Booked</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </FormItem>
                 )}
               />

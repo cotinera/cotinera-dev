@@ -53,6 +53,7 @@ export function LocationSearchBar({
             placesService.current = new google.maps.places.PlacesService(mapRef.current);
           }
           setIsGoogleMapsReady(true);
+          setError(null); // Clear any error when successfully initialized
           return true;
         } catch (error) {
           console.error('Error initializing Google Places services:', error);
@@ -71,11 +72,14 @@ export function LocationSearchBar({
         }
       }, 1000);
 
-      // Clear interval after 15 seconds
+      // Clear interval after 30 seconds (increase timeout)
       const timeout = setTimeout(() => {
         clearInterval(interval);
-        setError('Google Maps failed to load. Please refresh the page.');
-      }, 15000);
+        // Only show error if Google Maps truly didn't load
+        if (!window.google || !window.google.maps) {
+          setError('Google Maps failed to load. Please refresh the page.');
+        }
+      }, 30000);
 
       return () => {
         clearInterval(interval);
@@ -110,8 +114,7 @@ export function LocationSearchBar({
       const response = await autocompleteService.current.getPlacePredictions({
         input: searchValue,
         types: ['establishment', 'geocode'],
-        locationBias: locationBias,
-        fields: ['formatted_address', 'geometry', 'name', 'place_id']
+        locationBias: locationBias
       });
 
       // Sort predictions by distance if we have location bias
