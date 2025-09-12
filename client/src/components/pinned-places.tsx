@@ -55,6 +55,8 @@ interface PinnedPlace {
   website?: string;
   rating?: number;
   openingHours?: string[];
+  icon?: string;
+  category?: string;
 }
 
 interface AddPinnedPlaceForm {

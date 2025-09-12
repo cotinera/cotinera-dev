@@ -42,11 +42,12 @@ import { CSS } from "@dnd-kit/utilities";
 const tripIdeaSchema = z.object({
   title: z.string().min(2, { message: "Title is required" }),
   description: z.string().optional(),
-  status: z.enum(["pending", "booked", "unsure"]).default("pending"),
+  status: z.enum(["pending", "booked"]).default("pending"),
   location: z.string().optional(),
   ownerId: z.number().optional(),
   plannedDate: z.date().optional(),
   plannedTime: z.string().optional(),
+  placeId: z.number().optional(),
 });
 
 // Define the PinnedPlace schema for editing
@@ -62,7 +63,7 @@ interface TripIdea {
   id: number;
   title: string;
   description?: string;
-  status: "pending" | "booked" | "unsure";
+  status: "pending" | "booked";
   location?: string;
   ownerId?: number;
   ownerName?: string;
@@ -76,6 +77,7 @@ interface TripIdea {
     lat: number;
     lng: number;
   };
+  placeId?: number;
 }
 
 interface PinnedPlace {
@@ -95,7 +97,7 @@ interface PinnedPlace {
   createdAt?: string;
 }
 
-type ColumnType = "pending" | "booked" | "unsure" | "places";
+type ColumnType = "places" | "pending" | "booked";
 
 interface Column {
   id: ColumnType;
@@ -392,6 +394,13 @@ export function TripIdeasAndPlaces({
   // Define columns
   const columns: Column[] = [
     {
+      id: "places",
+      title: "Places",
+      count: pinnedPlaces.length,
+      color: "text-blue-800",
+      bgColor: "bg-blue-200"
+    },
+    {
       id: "pending",
       title: "Pending",
       count: ideas.filter((idea: TripIdea) => idea.status === "pending").length,
@@ -404,20 +413,6 @@ export function TripIdeasAndPlaces({
       count: ideas.filter((idea: TripIdea) => idea.status === "booked").length,
       color: "text-green-800",
       bgColor: "bg-green-200"
-    },
-    {
-      id: "unsure", 
-      title: "Unsure",
-      count: ideas.filter((idea: TripIdea) => idea.status === "unsure").length,
-      color: "text-orange-800", 
-      bgColor: "bg-orange-200"
-    },
-    {
-      id: "places",
-      title: "Places",
-      count: pinnedPlaces.length,
-      color: "text-blue-800",
-      bgColor: "bg-blue-200"
     }
   ];
 
@@ -593,6 +588,39 @@ export function TripIdeasAndPlaces({
     },
   });
 
+  // Create idea from pinned place mutation
+  const createIdeaFromPlaceMutation = useMutation({
+    mutationFn: async (data: {
+      title: string;
+      description: string;
+      status: "pending" | "booked";
+      location: string;
+      coordinates: { lat: number; lng: number };
+      placeId: number;
+    }) => {
+      const response = await axios.post(`/api/trips/${tripId}/ideas`, data, {
+        headers: {
+          'x-dev-bypass': 'true'
+        }
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "ideas"] });
+      toast({
+        title: "Success",
+        description: "Place added to trip ideas!",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.response?.data?.error || "Failed to create idea from place",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Drag and drop handlers
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
@@ -622,9 +650,63 @@ export function TripIdeasAndPlaces({
     // Parse the active item
     const [activeType, activeItemId] = activeId.split('-');
     
-    // Only handle idea dragging for now
+    // Handle both ideas and places
+    if (activeType === 'place') {
+      // Handle place dragging
+      const placeId = parseInt(activeItemId);
+      const place = pinnedPlaces.find((p: PinnedPlace) => p.id === placeId);
+      
+      if (!place) {
+        console.log('Place not found:', placeId);
+        return;
+      }
+
+      // Determine target column
+      let targetColumn: ColumnType;
+      
+      if (['places', 'pending', 'booked'].includes(overId)) {
+        targetColumn = overId as ColumnType;
+      } else if (overId.includes('-')) {
+        const [overType, overItemId] = overId.split('-');
+        if (overType === 'place') {
+          targetColumn = 'places';
+        } else {
+          const overIdea = ideas.find((idea: TripIdea) => idea.id.toString() === overItemId);
+          targetColumn = overIdea?.status || 'pending';
+        }
+      } else {
+        return;
+      }
+
+      // If dropping in Pending or Booked, create an idea from the place
+      if (targetColumn === 'pending' || targetColumn === 'booked') {
+        console.log('Creating idea from place:', place.name, 'with status:', targetColumn);
+        
+        // Create an idea from the place
+        createIdeaFromPlaceMutation.mutate({
+          title: place.name,
+          description: place.notes || '',
+          status: targetColumn,
+          location: place.address,
+          coordinates: place.coordinates,
+          placeId: place.id
+        });
+      }
+      // If dropping back in places column, do nothing (it's already there)
+      return;
+    }
+    
+    // Handle idea dragging
     if (activeType !== 'idea') {
-      console.log('Not an idea, skipping');
+      console.log('Unknown type, skipping');
+      return;
+    }
+
+    const ideaId = parseInt(activeItemId);
+    const currentIdea = ideas.find((idea: TripIdea) => idea.id === ideaId);
+    
+    if (!currentIdea) {
+      console.log('Current idea not found:', ideaId);
       return;
     }
 
@@ -632,15 +714,14 @@ export function TripIdeasAndPlaces({
     let targetColumn: ColumnType;
     
     // Check if dropped directly on a column
-    if (['pending', 'booked', 'unsure', 'places'].includes(overId)) {
+    if (['places', 'pending', 'booked'].includes(overId)) {
       targetColumn = overId as ColumnType;
       console.log('Dropped on column:', targetColumn);
     } else if (overId.includes('-')) {
       // Dropped on an item, find its column
       const [overType, overItemId] = overId.split('-');
       if (overType === 'place') {
-        console.log('Cannot drop ideas on places column');
-        return; // Don't allow dropping ideas in places column
+        targetColumn = 'places';
       } else {
         // Find the idea and get its status
         const overIdea = ideas.find((idea: TripIdea) => idea.id.toString() === overItemId);
@@ -652,17 +733,9 @@ export function TripIdeasAndPlaces({
       return; // Invalid drop target
     }
 
-    // Don't allow dropping in places column
+    // Don't allow dropping ideas in places column
     if (targetColumn === 'places') {
       console.log('Cannot drop ideas in places column');
-      return;
-    }
-
-    const ideaId = parseInt(activeItemId);
-    const currentIdea = ideas.find((idea: TripIdea) => idea.id === ideaId);
-    
-    if (!currentIdea) {
-      console.log('Current idea not found:', ideaId);
       return;
     }
 
@@ -802,7 +875,6 @@ export function TripIdeasAndPlaces({
                         <SelectContent>
                           <SelectItem value="pending">Pending</SelectItem>
                           <SelectItem value="booked">Booked</SelectItem>
-                          <SelectItem value="unsure">Unsure</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
@@ -896,7 +968,6 @@ export function TripIdeasAndPlaces({
                         <SelectContent>
                           <SelectItem value="pending">Pending</SelectItem>
                           <SelectItem value="booked">Booked</SelectItem>
-                          <SelectItem value="unsure">Unsure</SelectItem>
                         </SelectContent>
                       </Select>
                       <FormMessage />
