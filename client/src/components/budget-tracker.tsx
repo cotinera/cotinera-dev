@@ -172,6 +172,32 @@ interface ExpenseSummary {
   }[];
 }
 
+interface Repayment {
+  id: number;
+  tripId: number;
+  expenseId: number;
+  paidBy: number;
+  paidTo: number;
+  amount: number;
+  currency: string;
+  date: string;
+  notes?: string;
+  paidByUser?: User;
+  paidToUser?: User;
+  expense?: Expense;
+}
+
+interface ParticipantBalance {
+  participantId: number;
+  participantName: string;
+  avatar?: string;
+  totalPaid: number;
+  totalOwed: number;
+  netBalance: number; // positive means they are owed money, negative means they owe money
+  owesToOthers: { [participantId: number]: number };
+  owedByOthers: { [participantId: number]: number };
+}
+
 // Form schemas
 const expenseSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -286,6 +312,19 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
       }
       const data = await response.json();
       return data as ExpenseSummary;
+    },
+  });
+
+  // Fetch repayments for this trip
+  const { data: repayments = [], isLoading: isLoadingRepayments } = useQuery({
+    queryKey: ["repayments", tripId],
+    queryFn: async () => {
+      const response = await fetch(`/api/trips/${tripId}/repayments`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch repayments");
+      }
+      const data = await response.json();
+      return data as Repayment[];
     },
   });
 
@@ -517,13 +556,15 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
       return response.json();
     },
     onSuccess: () => {
-      // Force refetch the expenses to update the UI
+      // Force refetch the expenses and repayments to update the UI
       queryClient.invalidateQueries({ queryKey: ["expenses", tripId] });
       queryClient.invalidateQueries({ queryKey: ["expenses-summary", tripId] });
+      queryClient.invalidateQueries({ queryKey: ["repayments", tripId] });
       
       // Make sure the query is refetched immediately
       queryClient.refetchQueries({ queryKey: ["expenses", tripId] });
       queryClient.refetchQueries({ queryKey: ["expenses-summary", tripId] });
+      queryClient.refetchQueries({ queryKey: ["repayments", tripId] });
       
       toast({
         title: "Repayment added",
@@ -540,6 +581,87 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
       });
     },
   });
+
+  // Calculate participant balances
+  const calculateBalances = (): ParticipantBalance[] => {
+    const balanceMap = new Map<number, ParticipantBalance>();
+
+    // Initialize balance map with all participants
+    participants.forEach(participant => {
+      balanceMap.set(participant.id, {
+        participantId: participant.id,
+        participantName: participant.name || participant.user?.name || 'Unknown',
+        avatar: participant.user?.avatar,
+        totalPaid: 0,
+        totalOwed: 0,
+        netBalance: 0,
+        owesToOthers: {},
+        owedByOthers: {}
+      });
+    });
+
+    // Calculate what each participant paid
+    expenses.forEach(expense => {
+      const balance = balanceMap.get(expense.paidBy);
+      if (balance) {
+        balance.totalPaid += expense.amount;
+      }
+    });
+
+    // Calculate what each participant owes (assuming equal split for now)
+    expenses.forEach(expense => {
+      const splitAmount = expense.amount / participants.length;
+      participants.forEach(participant => {
+        const balance = balanceMap.get(participant.id);
+        if (balance) {
+          balance.totalOwed += splitAmount;
+          
+          // If this participant didn't pay this expense, they owe the payer
+          if (participant.id !== expense.paidBy) {
+            const payerBalance = balanceMap.get(expense.paidBy);
+            if (payerBalance) {
+              if (!balance.owesToOthers[expense.paidBy]) {
+                balance.owesToOthers[expense.paidBy] = 0;
+              }
+              balance.owesToOthers[expense.paidBy] += splitAmount;
+              
+              if (!payerBalance.owedByOthers[participant.id]) {
+                payerBalance.owedByOthers[participant.id] = 0;
+              }
+              payerBalance.owedByOthers[participant.id] += splitAmount;
+            }
+          }
+        }
+      });
+    });
+
+    // Apply repayments to reduce debts
+    repayments.forEach(repayment => {
+      const payer = balanceMap.get(repayment.paidBy);
+      const receiver = balanceMap.get(repayment.paidTo);
+      
+      if (payer && receiver) {
+        // Reduce the amount owed by the payer to the receiver
+        if (payer.owesToOthers[repayment.paidTo]) {
+          payer.owesToOthers[repayment.paidTo] = Math.max(0, payer.owesToOthers[repayment.paidTo] - repayment.amount);
+        }
+        
+        // Reduce the amount owed by the payer to the receiver from receiver's perspective
+        if (receiver.owedByOthers[repayment.paidBy]) {
+          receiver.owedByOthers[repayment.paidBy] = Math.max(0, receiver.owedByOthers[repayment.paidBy] - repayment.amount);
+        }
+      }
+    });
+
+    // Calculate net balances
+    balanceMap.forEach((balance) => {
+      balance.netBalance = balance.totalPaid - balance.totalOwed;
+    });
+
+    return Array.from(balanceMap.values());
+  };
+
+  const participantBalances = calculateBalances();
 
   // Handle creating an expense
   const onSubmit = (data: ExpenseFormValues) => {
@@ -601,7 +723,7 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
     return CURRENCY_ICONS[currency] || CURRENCY_ICONS["default"];
   };
 
-  if (isLoadingExpenses || isLoadingSummary) {
+  if (isLoadingExpenses || isLoadingSummary || isLoadingRepayments) {
     return (
       <div className="flex justify-center items-center h-40">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -648,9 +770,10 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="list">Expenses List</TabsTrigger>
           <TabsTrigger value="summary">Summary</TabsTrigger>
+          <TabsTrigger value="balances">Balances</TabsTrigger>
         </TabsList>
 
         {/* Expenses List Tab */}
@@ -902,6 +1025,174 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Add First Expense
                   </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Balances Tab */}
+        <TabsContent value="balances" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Participant Balances</CardTitle>
+              <CardDescription>
+                Track who owes whom and settle up expenses
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {participantBalances.length === 0 ? (
+                <div className="text-center py-10">
+                  <CircleDollarSign className="mx-auto h-12 w-12 text-muted-foreground" />
+                  <h3 className="mt-2 text-lg font-semibold">No balance data</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Add some expenses to see participant balances.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Overall Balance Summary */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {participantBalances.map((balance) => (
+                      <Card key={balance.participantId} className="relative">
+                        <CardHeader className="pb-2">
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={balance.avatar} alt={balance.participantName} />
+                              <AvatarFallback>
+                                {balance.participantName.charAt(0).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <CardTitle className="text-base font-medium">
+                                {balance.participantName}
+                              </CardTitle>
+                              <CardDescription className="text-xs">
+                                Net Balance
+                              </CardDescription>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-muted-foreground">Net Balance:</span>
+                              <span className={`font-semibold ${
+                                balance.netBalance > 0 
+                                  ? 'text-green-600' 
+                                  : balance.netBalance < 0 
+                                  ? 'text-red-600' 
+                                  : 'text-gray-600'
+                              }`}>
+                                {formatCurrency(Math.abs(balance.netBalance), 'USD')}
+                                {balance.netBalance > 0 && ' (owed to you)'}
+                                {balance.netBalance < 0 && ' (you owe)'}
+                                {balance.netBalance === 0 && ' (settled)'}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-muted-foreground">Total Paid:</span>
+                              <span className="text-sm">
+                                {formatCurrency(balance.totalPaid, 'USD')}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-muted-foreground">Share of Expenses:</span>
+                              <span className="text-sm">
+                                {formatCurrency(balance.totalOwed, 'USD')}
+                              </span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {/* Detailed Debt Breakdown */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">Settlement Details</h3>
+                    {participantBalances.map((balance) => {
+                      const hasDebts = Object.keys(balance.owesToOthers).some(id => balance.owesToOthers[parseInt(id)] > 0);
+                      const hasCredits = Object.keys(balance.owedByOthers).some(id => balance.owedByOthers[parseInt(id)] > 0);
+                      
+                      if (!hasDebts && !hasCredits) return null;
+                      
+                      return (
+                        <Card key={`details-${balance.participantId}`}>
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <Avatar className="h-6 w-6">
+                                <AvatarImage src={balance.avatar} alt={balance.participantName} />
+                                <AvatarFallback className="text-xs">
+                                  {balance.participantName.charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              {balance.participantName}
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            {/* What this person owes to others */}
+                            {hasDebts && (
+                              <div>
+                                <h4 className="text-sm font-medium text-red-600 mb-2">Owes:</h4>
+                                <div className="space-y-1">
+                                  {Object.entries(balance.owesToOthers).map(([creditorId, amount]) => {
+                                    if (amount <= 0) return null;
+                                    const creditor = participants.find(p => p.id === parseInt(creditorId));
+                                    return (
+                                      <div key={`debt-${creditorId}`} className="flex items-center justify-between text-sm">
+                                        <div className="flex items-center gap-2">
+                                          <Avatar className="h-5 w-5">
+                                            <AvatarImage src={creditor?.user?.avatar} alt={creditor?.name} />
+                                            <AvatarFallback className="text-xs">
+                                              {creditor?.name?.charAt(0).toUpperCase()}
+                                            </AvatarFallback>
+                                          </Avatar>
+                                          <span>{creditor?.name || 'Unknown'}</span>
+                                        </div>
+                                        <span className="text-red-600 font-medium">
+                                          {formatCurrency(amount, 'USD')}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* What others owe to this person */}
+                            {hasCredits && (
+                              <div>
+                                <h4 className="text-sm font-medium text-green-600 mb-2">Owed by:</h4>
+                                <div className="space-y-1">
+                                  {Object.entries(balance.owedByOthers).map(([debtorId, amount]) => {
+                                    if (amount <= 0) return null;
+                                    const debtor = participants.find(p => p.id === parseInt(debtorId));
+                                    return (
+                                      <div key={`credit-${debtorId}`} className="flex items-center justify-between text-sm">
+                                        <div className="flex items-center gap-2">
+                                          <Avatar className="h-5 w-5">
+                                            <AvatarImage src={debtor?.user?.avatar} alt={debtor?.name} />
+                                            <AvatarFallback className="text-xs">
+                                              {debtor?.name?.charAt(0).toUpperCase()}
+                                            </AvatarFallback>
+                                          </Avatar>
+                                          <span>{debtor?.name || 'Unknown'}</span>
+                                        </div>
+                                        <span className="text-green-600 font-medium">
+                                          {formatCurrency(amount, 'USD')}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </CardContent>

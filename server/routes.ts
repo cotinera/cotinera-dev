@@ -2324,7 +2324,12 @@ export function registerRoutes(app: Express): Server {
     try {
       const tripId = parseInt(req.params.tripId);
       const placeId = parseInt(req.params.placeId);
-      const { notes, category, name, coordinates, icon } = req.body;
+      const { notes, category, name, coordinates, icon, status } = req.body;
+
+      // Validate status field if provided
+      if (status && !["places", "pending", "booked"].includes(status)) {
+        return res.status(400).json({ error: "Invalid status. Must be 'places', 'pending', or 'booked'" });
+      }
 
       const [updatedPlace] = await db
         .update(pinnedPlaces)
@@ -2334,6 +2339,7 @@ export function registerRoutes(app: Express): Server {
           name: name || undefined,
           coordinates: coordinates || undefined,
           icon: icon || '📍',
+          status: status || undefined,
         })
         .where(
           and(

@@ -95,6 +95,7 @@ interface PinnedPlace {
   category?: string;
   icon?: string;
   createdAt?: string;
+  status: "places" | "pending" | "booked";
 }
 
 type ColumnType = "places" | "pending" | "booked";
@@ -222,13 +223,6 @@ function DraggableCard({
             </div>
           )}
 
-          {/* External Link - for demonstration */}
-          {Math.random() > 0.7 && (
-            <div className="flex items-center gap-1 text-xs text-primary cursor-pointer hover:underline">
-              <ExternalLink className="h-3 w-3" />
-              <span>View Link</span>
-            </div>
-          )}
 
           {/* Author and Date */}
           <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/30">
@@ -378,12 +372,18 @@ export function TripIdeasAndPlaces({
     },
   });
 
+  const placesKey = ["/api/trips", tripId, "pinned-places"];
   const { data: pinnedPlacesData } = useQuery({
-    queryKey: [`/api/trips/${tripId}/pinned-places`],
+    queryKey: placesKey,
     queryFn: async () => {
-      const res = await fetch(`/api/trips/${tripId}/pinned-places`);
-      if (!res.ok) throw new Error('Failed to fetch pinned places');
-      return res.json();
+      const response = await axios.get(`/api/trips/${tripId}/pinned-places`, {
+        headers: {
+          'x-dev-bypass': 'true',
+          'Cache-Control': 'no-cache',
+        },
+        withCredentials: true,
+      });
+      return response.data;
     },
   });
 
@@ -396,21 +396,21 @@ export function TripIdeasAndPlaces({
     {
       id: "places",
       title: "Places",
-      count: pinnedPlaces.length,
+      count: pinnedPlaces.filter((place: PinnedPlace) => place.status === "places").length,
       color: "text-blue-800",
       bgColor: "bg-blue-200"
     },
     {
       id: "pending",
       title: "Pending",
-      count: ideas.filter((idea: TripIdea) => idea.status === "pending").length,
+      count: pinnedPlaces.filter((place: PinnedPlace) => place.status === "pending").length,
       color: "text-yellow-800",
       bgColor: "bg-yellow-200"
     },
     {
       id: "booked",
       title: "Booked", 
-      count: ideas.filter((idea: TripIdea) => idea.status === "booked").length,
+      count: pinnedPlaces.filter((place: PinnedPlace) => place.status === "booked").length,
       color: "text-green-800",
       bgColor: "bg-green-200"
     }
@@ -418,10 +418,7 @@ export function TripIdeasAndPlaces({
 
   // Get items for each column
   const getColumnItems = (columnId: ColumnType) => {
-    if (columnId === "places") {
-      return pinnedPlaces;
-    }
-    return ideas.filter((idea: TripIdea) => idea.status === columnId);
+    return pinnedPlaces.filter((place: PinnedPlace) => place.status === columnId);
   };
 
   // Mutations
@@ -516,7 +513,7 @@ export function TripIdeasAndPlaces({
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/pinned-places`] });
+      queryClient.invalidateQueries({ queryKey: placesKey });
       setIsEditPlaceDialogOpen(false);
       setEditingPlace(null);
       editPlaceForm.reset();
@@ -531,6 +528,63 @@ export function TripIdeasAndPlaces({
         description: error.response?.data?.error || "Failed to update place",
         variant: "destructive",
       });
+    },
+  });
+
+  const updatePlaceStatusMutation = useMutation({
+    mutationFn: async ({ placeId, status }: { placeId: number; status: "places" | "pending" | "booked" }) => {
+      console.log('Updating place status:', { placeId, status });
+      const response = await axios.patch(`/api/trips/${tripId}/pinned-places/${placeId}`, { status }, {
+        headers: {
+          'x-dev-bypass': 'true'
+        }
+      });
+      return response.data;
+    },
+    onMutate: async ({ placeId, status }) => {
+      // Cancel any outgoing refetches
+      await queryClient.cancelQueries({ queryKey: placesKey });
+      
+      // Snapshot the previous value
+      const previousData = queryClient.getQueryData(placesKey);
+      
+      // Optimistically update to the new status
+      queryClient.setQueryData(placesKey, (old: any) => {
+        if (!old || !old.places) return old;
+        
+        return {
+          ...old,
+          places: old.places.map((place: PinnedPlace) => 
+            place.id === placeId ? { ...place, status } : place
+          )
+        };
+      });
+      
+      // Return a context object with the snapshotted value
+      return { previousData };
+    },
+    onError: (err, variables, context) => {
+      // If the mutation fails, use the context to roll back
+      if (context?.previousData) {
+        queryClient.setQueryData(placesKey, context.previousData);
+      }
+      
+      console.error('Update place status error:', err);
+      toast({
+        title: "Error",
+        description: (err as any).response?.data?.error || "Failed to update place status",
+        variant: "destructive",
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Place moved successfully!",
+      });
+    },
+    onSettled: () => {
+      // Always refetch after error or success
+      queryClient.invalidateQueries({ queryKey: placesKey });
     },
   });
 
@@ -650,104 +704,47 @@ export function TripIdeasAndPlaces({
     // Parse the active item
     const [activeType, activeItemId] = activeId.split('-');
     
-    // Handle both ideas and places
-    if (activeType === 'place') {
-      // Handle place dragging
-      const placeId = parseInt(activeItemId);
-      const place = pinnedPlaces.find((p: PinnedPlace) => p.id === placeId);
-      
-      if (!place) {
-        console.log('Place not found:', placeId);
-        return;
-      }
-
-      // Determine target column
-      let targetColumn: ColumnType;
-      
-      if (['places', 'pending', 'booked'].includes(overId)) {
-        targetColumn = overId as ColumnType;
-      } else if (overId.includes('-')) {
-        const [overType, overItemId] = overId.split('-');
-        if (overType === 'place') {
-          targetColumn = 'places';
-        } else {
-          const overIdea = ideas.find((idea: TripIdea) => idea.id.toString() === overItemId);
-          targetColumn = overIdea?.status || 'pending';
-        }
-      } else {
-        return;
-      }
-
-      // If dropping in Pending or Booked, create an idea from the place
-      if (targetColumn === 'pending' || targetColumn === 'booked') {
-        console.log('Creating idea from place:', place.name, 'with status:', targetColumn);
-        
-        // Create an idea from the place
-        createIdeaFromPlaceMutation.mutate({
-          title: place.name,
-          description: place.notes || '',
-          status: targetColumn,
-          location: place.address,
-          coordinates: place.coordinates,
-          placeId: place.id
-        });
-      }
-      // If dropping back in places column, do nothing (it's already there)
-      return;
-    }
-    
-    // Handle idea dragging
-    if (activeType !== 'idea') {
-      console.log('Unknown type, skipping');
+    // Only handle place dragging now
+    if (activeType !== 'place') {
+      console.log('Only places can be dragged');
       return;
     }
 
-    const ideaId = parseInt(activeItemId);
-    const currentIdea = ideas.find((idea: TripIdea) => idea.id === ideaId);
+    const placeId = parseInt(activeItemId);
+    const place = pinnedPlaces.find((p: PinnedPlace) => p.id === placeId);
     
-    if (!currentIdea) {
-      console.log('Current idea not found:', ideaId);
+    if (!place) {
+      console.log('Place not found:', placeId);
       return;
     }
 
     // Determine target column
     let targetColumn: ColumnType;
     
-    // Check if dropped directly on a column
     if (['places', 'pending', 'booked'].includes(overId)) {
       targetColumn = overId as ColumnType;
-      console.log('Dropped on column:', targetColumn);
     } else if (overId.includes('-')) {
-      // Dropped on an item, find its column
       const [overType, overItemId] = overId.split('-');
       if (overType === 'place') {
-        targetColumn = 'places';
+        // Find the place and get its status
+        const overPlace = pinnedPlaces.find((place: PinnedPlace) => place.id.toString() === overItemId);
+        targetColumn = overPlace?.status || 'places';
       } else {
-        // Find the idea and get its status
-        const overIdea = ideas.find((idea: TripIdea) => idea.id.toString() === overItemId);
-        targetColumn = overIdea?.status || 'pending';
-        console.log('Dropped on item, target column:', targetColumn);
+        return;
       }
     } else {
-      console.log('Invalid drop target:', overId);
-      return; // Invalid drop target
-    }
-
-    // Don't allow dropping ideas in places column
-    if (targetColumn === 'places') {
-      console.log('Cannot drop ideas in places column');
       return;
     }
 
-    if (currentIdea.status === targetColumn) {
-      console.log('Idea already in target column');
+    if (place.status === targetColumn) {
+      console.log('Place already in target column');
       return;
     }
 
-    console.log('Updating idea status:', { ideaId, from: currentIdea.status, to: targetColumn });
+    console.log('Updating place status:', { placeId, from: place.status, to: targetColumn });
     
-    updateIdeaStatusMutation.mutate({
-      ideaId,
+    updatePlaceStatusMutation.mutate({
+      placeId,
       status: targetColumn
     });
   };
@@ -1140,15 +1137,14 @@ export function TripIdeasAndPlaces({
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {columns.map((column) => (
             <DroppableColumn
               key={column.id}
               column={column}
               items={getColumnItems(column.id)}
-              type={column.id === 'places' ? 'place' : 'idea'}
-              onEditIdea={column.id !== 'places' ? handleEditIdea : undefined}
-              onEditPlace={column.id === 'places' ? handleEditPlace : undefined}
+              type="place"
+              onEditPlace={handleEditPlace}
             />
           ))}
         </div>
