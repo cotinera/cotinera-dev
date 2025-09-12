@@ -159,6 +159,19 @@ export const expenseSplits = pgTable("expense_splits", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const repayments = pgTable("repayments", {
+  id: serial("id").primaryKey(),
+  tripId: integer("trip_id").notNull().references(() => trips.id),
+  expenseId: integer("expense_id").notNull().references(() => expenses.id),
+  paidBy: integer("paid_by").notNull().references(() => users.id),
+  paidTo: integer("paid_to").notNull().references(() => users.id),
+  amount: numeric("amount").notNull(),
+  currency: text("currency").default("USD"),
+  date: date("date").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const taskAssignments = pgTable("task_assignments", {
   id: serial("id").primaryKey(),
   tripId: integer("trip_id").notNull().references(() => trips.id),

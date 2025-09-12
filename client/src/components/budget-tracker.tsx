@@ -195,6 +195,22 @@ const expenseSchema = z.object({
 
 type ExpenseFormValues = z.infer<typeof expenseSchema>;
 
+// Repayment form schema
+const repaymentSchema = z.object({
+  expenseId: z.number().min(1, "Please select an expense"),
+  paidBy: z.number().min(1, "Please select who is paying"),
+  paidTo: z.number().min(1, "Please select who is receiving"),
+  amount: z.string().min(1, "Amount is required").refine(
+    (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0,
+    { message: "Amount must be a positive number" }
+  ),
+  currency: z.string().min(1, "Currency is required"),
+  date: z.string().min(1, "Date is required"),
+  notes: z.string().optional(),
+});
+
+type RepaymentFormValues = z.infer<typeof repaymentSchema>;
+
 // Category icons mapping
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   "food": <Utensils size={16} />,
@@ -233,6 +249,7 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
   const [activeTab, setActiveTab] = useState("list");
+  const [isAddRepaymentOpen, setIsAddRepaymentOpen] = useState(false);
   
   // Fetch trip participants for payer selection
   const { data: participants = [] as Participant[] } = useQuery({
@@ -294,6 +311,20 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
       currency: "USD",
       category: "other",
       date: format(new Date(), "yyyy-MM-dd"),
+    },
+  });
+
+  // Repayment form
+  const repaymentForm = useForm<RepaymentFormValues>({
+    resolver: zodResolver(repaymentSchema),
+    defaultValues: {
+      expenseId: 0,
+      paidBy: participants[0]?.id || 0,
+      paidTo: participants[1]?.id || 0,
+      amount: "",
+      currency: "USD",
+      date: format(new Date(), "yyyy-MM-dd"),
+      notes: "",
     },
   });
 
@@ -467,6 +498,49 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
     },
   });
 
+  // Create repayment mutation
+  const createRepaymentMutation = useMutation({
+    mutationFn: async (values: RepaymentFormValues) => {
+      const response = await fetch(`/api/trips/${tripId}/repayments`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(values),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create repayment");
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      // Force refetch the expenses to update the UI
+      queryClient.invalidateQueries({ queryKey: ["expenses", tripId] });
+      queryClient.invalidateQueries({ queryKey: ["expenses-summary", tripId] });
+      
+      // Make sure the query is refetched immediately
+      queryClient.refetchQueries({ queryKey: ["expenses", tripId] });
+      queryClient.refetchQueries({ queryKey: ["expenses-summary", tripId] });
+      
+      toast({
+        title: "Repayment added",
+        description: "Your repayment has been recorded successfully.",
+      });
+      setIsAddRepaymentOpen(false);
+      repaymentForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Handle creating an expense
   const onSubmit = (data: ExpenseFormValues) => {
     createExpenseMutation.mutate(data);
@@ -475,6 +549,11 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
   // Handle editing an expense
   const onEditSubmit = (data: ExpenseFormValues) => {
     updateExpenseMutation.mutate(data);
+  };
+
+  // Handle creating a repayment
+  const onRepaymentSubmit = (data: RepaymentFormValues) => {
+    createRepaymentMutation.mutate(data);
   };
 
   // Handle edit button click
@@ -557,13 +636,21 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
           <PlusCircle className="mr-2 h-4 w-4" />
           Add Expense
         </Button>
+        <Button 
+          onClick={() => {
+            setIsAddRepaymentOpen(true);
+          }}
+          variant="outline"
+        >
+          <CreditCard className="mr-2 h-4 w-4" />
+          Add Repayment
+        </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="list">Expenses List</TabsTrigger>
           <TabsTrigger value="summary">Summary</TabsTrigger>
-          <TabsTrigger value="charts">Charts</TabsTrigger>
         </TabsList>
 
         {/* Expenses List Tab */}
@@ -821,117 +908,6 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
           </Card>
         </TabsContent>
 
-        {/* Charts Tab */}
-        <TabsContent value="charts" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Expense Visualization</CardTitle>
-              <CardDescription>
-                Visualize your expenses by category and over time
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {summary?.totalExpenses > 0 ? (
-                <div className="space-y-8">
-                  <div className="rounded-lg border bg-card text-card-foreground shadow">
-                    <div className="p-6">
-                      <h3 className="font-semibold">Expenses by Category</h3>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
-                          <Pie
-                            data={summary.categoryBreakdown}
-                            cx="50%"
-                            cy="50%"
-                            labelLine={false}
-                            outerRadius={100}
-                            fill="#8884d8"
-                            dataKey="amount"
-                            nameKey="category"
-                            isAnimationActive={false}
-                            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                          >
-                            {summary.categoryBreakdown.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                            ))}
-                          </Pie>
-                          <Tooltip 
-                            formatter={(value) => [formatCurrency(value as number, summary.currency), "Amount"]} 
-                            labelFormatter={(label) => `${label}`}
-                          />
-                          <Legend />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                  
-                  {summary.dateBreakdown.length > 1 && (
-                    <div className="rounded-lg border bg-card text-card-foreground shadow">
-                      <div className="p-6">
-                        <h3 className="font-semibold">Expenses Over Time</h3>
-                        <ResponsiveContainer width="100%" height={300}>
-                          <BarChart
-                            data={summary.dateBreakdown}
-                            margin={{
-                              top: 20,
-                              right: 30,
-                              left: 20,
-                              bottom: 5,
-                            }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis 
-                              dataKey="date" 
-                              tick={{ fontSize: 12 }}
-                              tickFormatter={(date) => format(new Date(date), "MMM dd")}
-                            />
-                            <YAxis 
-                              tick={{ fontSize: 12 }}
-                              tickFormatter={(value) => {
-                                if (value >= 1000) {
-                                  return `${summary.currency} ${(value / 1000).toFixed(1)}k`;
-                                }
-                                return `${summary.currency} ${value}`;
-                              }}
-                            />
-                            <Tooltip 
-                              formatter={(value) => [formatCurrency(value as number, summary.currency), "Amount"]}
-                              labelFormatter={(label) => format(new Date(label as string), "MMMM dd, yyyy")}
-                            />
-                            <Bar 
-                              dataKey="amount" 
-                              fill="#0088FE" 
-                              radius={[4, 4, 0, 0]}
-                              isAnimationActive={false}
-                            />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <ReceiptText className="mx-auto h-12 w-12 text-muted-foreground" />
-                  <h3 className="mt-2 text-xl font-semibold">No chart data available</h3>
-                  <p className="text-muted-foreground mt-1">
-                    Add expenses to see visualization of your spending
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    className="mt-4"
-                    onClick={() => {
-                      form.reset();
-                      setIsAddExpenseOpen(true);
-                    }}
-                  >
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add First Expense
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
 
       {/* Add Expense Dialog */}
@@ -1393,6 +1369,246 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   )}
                   Save Changes
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Repayment Dialog */}
+      <Dialog open={isAddRepaymentOpen} onOpenChange={setIsAddRepaymentOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Add Repayment</DialogTitle>
+            <DialogDescription>
+              Record a repayment between participants for a specific expense
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Form {...repaymentForm}>
+            <form onSubmit={repaymentForm.handleSubmit(onRepaymentSubmit)} className="space-y-4">
+              <FormField
+                control={repaymentForm.control}
+                name="expenseId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Related Expense</FormLabel>
+                    <Select 
+                      onValueChange={(value) => field.onChange(parseInt(value))} 
+                      value={field.value?.toString()}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select the expense being repaid" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {expenses.map((expense) => (
+                          <SelectItem key={expense.id} value={expense.id.toString()}>
+                            <div className="flex items-center justify-between w-full">
+                              <span>{expense.title}</span>
+                              <span className="text-muted-foreground ml-2">
+                                {formatCurrency(expense.amount, expense.currency)}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={repaymentForm.control}
+                  name="paidBy"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Paid By</FormLabel>
+                      <Select 
+                        onValueChange={(value) => field.onChange(parseInt(value))} 
+                        value={field.value?.toString()}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Who is paying" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {participants.map((participant) => (
+                            <SelectItem key={participant.id} value={participant.id.toString()}>
+                              <div className="flex items-center gap-2">
+                                <Avatar className="h-6 w-6">
+                                  <AvatarFallback>{participant.name?.charAt(0) || 'U'}</AvatarFallback>
+                                </Avatar>
+                                <span>{participant.name || participant.user?.name || 'Unknown'}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={repaymentForm.control}
+                  name="paidTo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Paid To</FormLabel>
+                      <Select 
+                        onValueChange={(value) => field.onChange(parseInt(value))} 
+                        value={field.value?.toString()}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Who is receiving" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {participants.map((participant) => (
+                            <SelectItem key={participant.id} value={participant.id.toString()}>
+                              <div className="flex items-center gap-2">
+                                <Avatar className="h-6 w-6">
+                                  <AvatarFallback>{participant.name?.charAt(0) || 'U'}</AvatarFallback>
+                                </Avatar>
+                                <span>{participant.name || participant.user?.name || 'Unknown'}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={repaymentForm.control}
+                  name="amount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Amount</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                          <Input 
+                            type="number" 
+                            placeholder="0.00" 
+                            step="0.01" 
+                            min="0.01" 
+                            className="pl-8" 
+                            {...field} 
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={repaymentForm.control}
+                  name="currency"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Currency</FormLabel>
+                      <Select 
+                        onValueChange={field.onChange} 
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select currency" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="USD">
+                            <div className="flex items-center">
+                              <BadgeDollarSign className="mr-2 h-4 w-4" />
+                              <span>USD ($)</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="EUR">
+                            <div className="flex items-center">
+                              <BadgeEuro className="mr-2 h-4 w-4" />
+                              <span>EUR (€)</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="GBP">
+                            <div className="flex items-center">
+                              <BadgePoundSterling className="mr-2 h-4 w-4" />
+                              <span>GBP (£)</span>
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="JPY">
+                            <div className="flex items-center">
+                              <BadgeJapaneseYen className="mr-2 h-4 w-4" />
+                              <span>JPY (¥)</span>
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              
+              <FormField
+                control={repaymentForm.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Calendar className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input type="date" className="pl-8" {...field} />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={repaymentForm.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Add any notes about this repayment" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <DialogFooter>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => setIsAddRepaymentOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit"
+                  disabled={createRepaymentMutation.isPending}
+                >
+                  {createRepaymentMutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Add Repayment
                 </Button>
               </DialogFooter>
             </form>
