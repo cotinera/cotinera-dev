@@ -637,6 +637,24 @@ export const customValuesRelations = relations(customValues, ({ one }) => ({
   }),
 }));
 
+export const repaymentsRelations = relations(repayments, ({ one }) => ({
+  trip: one(trips, {
+    fields: [repayments.tripId],
+    references: [trips.id],
+  }),
+  expense: one(expenses, {
+    fields: [repayments.expenseId],
+    references: [expenses.id],
+  }),
+  paidByUser: one(users, {
+    fields: [repayments.paidBy],
+    references: [users.id],
+  }),
+  paidToUser: one(users, {
+    fields: [repayments.paidTo],
+    references: [users.id],
+  }),
+}));
 
 export const insertUserSchema = createInsertSchema(users, {
   email: z.string().email("Invalid email address"),
@@ -661,6 +679,8 @@ export const insertActivitySuggestionSchema = createInsertSchema(activitySuggest
 export const selectActivitySuggestionSchema = createSelectSchema(activitySuggestions);
 export const insertExpenseSchema = createInsertSchema(expenses);
 export const selectExpenseSchema = createSelectSchema(expenses);
+export const insertRepaymentSchema = createInsertSchema(repayments);
+export const selectRepaymentSchema = createSelectSchema(repayments);
 export const insertTaskAssignmentSchema = createInsertSchema(taskAssignments);
 export const selectTaskAssignmentSchema = createSelectSchema(taskAssignments);
 export const insertDestinationSchema = createInsertSchema(destinations);
@@ -688,6 +708,7 @@ export type ActivitySuggestion = typeof activitySuggestions.$inferSelect;
 export type ActivityVote = typeof activityVotes.$inferSelect;
 export type Expense = typeof expenses.$inferSelect;
 export type ExpenseSplit = typeof expenseSplits.$inferSelect;
+export type Repayment = typeof repayments.$inferSelect;
 export type TaskAssignment = typeof taskAssignments.$inferSelect;
 export type Destination = typeof destinations.$inferSelect;
 export type PinnedPlace = typeof pinnedPlaces.$inferSelect;

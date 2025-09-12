@@ -3704,6 +3704,44 @@ export function registerRoutes(app: Express): Server {
       });
     }
   });
+
+  // Get repayments for a trip
+  app.get("/api/trips/:tripId/repayments", async (req, res) => {
+    try {
+      const tripIdStr = req.params.tripId;
+      
+      if (!tripIdStr || isNaN(parseInt(tripIdStr))) {
+        return res.status(400).json({ 
+          error: 'Invalid trip ID',
+          details: 'Trip ID must be a valid number'
+        });
+      }
+      
+      const tripId = parseInt(tripIdStr);
+      
+      // Import repayments table
+      const { repayments } = await import("@db/schema");
+      
+      // Fetch all repayments for this trip with user information
+      const tripRepayments = await db.query.repayments.findMany({
+        where: eq(repayments.tripId, tripId),
+        with: {
+          paidByUser: true,
+          paidToUser: true,
+          expense: true
+        },
+        orderBy: desc(repayments.date)
+      });
+      
+      res.json(tripRepayments);
+    } catch (error) {
+      console.error('Error fetching repayments:', error);
+      res.status(500).json({ 
+        error: 'Failed to fetch repayments',
+        details: error instanceof Error ? error.message : 'An unexpected error occurred'
+      });
+    }
+  });
   
   // Notification endpoints
   
