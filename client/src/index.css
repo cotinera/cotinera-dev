@@ -105,10 +105,10 @@ All colors MUST be HSL.
     --chart-4: 15 90% 50%;
     --chart-5: 210 20% 95%;
 
-    /* Dark mode gradients */
-    --gradient-ocean: linear-gradient(135deg, hsl(195, 100%, 65%), hsl(200, 95%, 45%));
-    --gradient-sunset: linear-gradient(135deg, hsl(35, 95%, 65%), hsl(15, 90%, 50%));
-    --gradient-adventure: linear-gradient(135deg, hsl(195, 100%, 65%), hsl(35, 95%, 65%));
+    /* Dark mode gradients - much darker and more sophisticated */
+    --gradient-ocean: linear-gradient(135deg, hsl(195, 80%, 25%), hsl(200, 70%, 20%));
+    --gradient-sunset: linear-gradient(135deg, hsl(35, 80%, 25%), hsl(15, 70%, 20%));
+    --gradient-adventure: linear-gradient(135deg, hsl(215, 30%, 15%), hsl(215, 25%, 8%));
     
     /* Dark mode shadows */
     --shadow-soft: 0 4px 20px hsl(0, 0%, 0% / 0.3);

@@ -108,28 +108,31 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-adventure flex items-center justify-center relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-adventure dark:bg-gradient-to-br dark:from-background dark:via-card dark:to-background flex items-center justify-center relative overflow-hidden">
       {/* Background decoration */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-secondary/20" />
-      <div className="absolute top-20 left-20 opacity-10">
-        <Plane className="h-32 w-32 rotate-12" />
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-secondary/20 dark:from-primary/10 dark:via-transparent dark:to-accent/10" />
+      <div className="absolute top-20 left-20 opacity-10 dark:opacity-5">
+        <Plane className="h-32 w-32 rotate-12 text-white dark:text-foreground/50" />
       </div>
-      <div className="absolute bottom-20 right-20 opacity-10">
-        <MapPin className="h-24 w-24 -rotate-12" />
+      <div className="absolute bottom-20 right-20 opacity-10 dark:opacity-5">
+        <MapPin className="h-24 w-24 -rotate-12 text-white dark:text-foreground/50" />
       </div>
-      <div className="absolute top-1/2 left-10 opacity-5">
-        <Luggage className="h-40 w-40" />
+      <div className="absolute top-1/2 left-10 opacity-5 dark:opacity-3">
+        <Luggage className="h-40 w-40 text-white dark:text-foreground/30" />
       </div>
       
       <div className="container relative z-10 flex items-center justify-center">
         <div className="grid lg:grid-cols-2 gap-12 items-center max-w-6xl w-full">
           {/* Hero Section */}
-          <div className="text-white space-y-6 text-center lg:text-left">
+          <div className="text-white dark:text-foreground space-y-6 text-center lg:text-left">
             <div className="flex items-center gap-3 justify-center lg:justify-start">
-              <div className="p-3 rounded-lg bg-white/20 backdrop-blur shadow-hero">
-                <Luggage className="h-8 w-8" />
+              <div className="p-3 rounded-lg bg-white/20 dark:bg-primary/20 backdrop-blur shadow-hero">
+                <Luggage className="h-8 w-8 text-white dark:text-primary" />
               </div>
-              <h1 className="text-3xl font-bold">Travel Planner</h1>
+              <h1 className="text-3xl font-bold">
+                <span className="font-bold">ATLAS</span>
+                <span className="text-2xl italic ml-1 opacity-80">by PGC</span>
+              </h1>
             </div>
             
             <div className="space-y-4">
@@ -140,7 +143,7 @@ export default function AuthPage() {
                 </span>
               </h2>
               
-              <p className="text-xl text-white/90 max-w-md">
+              <p className="text-xl text-white/90 dark:text-foreground/80 max-w-md">
                 Collaborate with friends, discover amazing places, manage expenses, 
                 and create unforgettable memories together.
               </p>
@@ -149,27 +152,27 @@ export default function AuthPage() {
             <div className="flex items-center gap-8 justify-center lg:justify-start">
               <div className="text-center">
                 <div className="text-2xl font-bold">500+</div>
-                <div className="text-sm text-white/80">Trips Planned</div>
+                <div className="text-sm text-white/80 dark:text-foreground/60">Trips Planned</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold">2K+</div>
-                <div className="text-sm text-white/80">Happy Travelers</div>
+                <div className="text-sm text-white/80 dark:text-foreground/60">Happy Travelers</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold">50+</div>
-                <div className="text-sm text-white/80">Countries</div>
+                <div className="text-sm text-white/80 dark:text-foreground/60">Countries</div>
               </div>
             </div>
           </div>
           
           {/* Auth Form */}
           <div className="flex justify-center">
-            <Card className="w-full max-w-md bg-white/10 backdrop-blur border-white/20 shadow-hero">
+            <Card className="w-full max-w-md bg-white/10 dark:bg-card/80 backdrop-blur border-white/20 dark:border-border/50 shadow-hero">
               <CardHeader className="text-center">
-                <CardTitle className="text-2xl text-white">
+                <CardTitle className="text-2xl text-white dark:text-foreground">
                   {isLogin ? "Welcome Back" : "Join the Adventure"}
                 </CardTitle>
-                <CardDescription className="text-white/80">
+                <CardDescription className="text-white/80 dark:text-muted-foreground">
                   {isLogin
                     ? "Sign in to continue planning your trips"
                     : "Start planning amazing group trips today"}
@@ -180,7 +183,7 @@ export default function AuthPage() {
                   <Button
                     variant="secondary"
                     onClick={handleGoogleLogin}
-                    className="w-full bg-white text-primary hover:bg-white/90 shadow-soft"
+                    className="w-full bg-white dark:bg-card text-primary dark:text-foreground hover:bg-white/90 dark:hover:bg-card/80 shadow-soft border-0 dark:border dark:border-border"
                   >
                     <SiGoogle className="mr-2 h-4 w-4" />
                     Continue with Google
@@ -191,7 +194,7 @@ export default function AuthPage() {
                       <span className="w-full border-t border-white/30" />
                     </div>
                     <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-background/10 backdrop-blur px-2 text-white/70">
+                      <span className="bg-background/10 dark:bg-card/80 backdrop-blur px-2 text-white/70 dark:text-muted-foreground">
                         Or continue with email
                       </span>
                     </div>
@@ -204,16 +207,16 @@ export default function AuthPage() {
                         name="email"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-white">Email</FormLabel>
+                            <FormLabel className="text-white dark:text-foreground">Email</FormLabel>
                             <FormControl>
                               <Input 
                                 type="email" 
                                 placeholder="you@example.com" 
-                                className="bg-white/20 border-white/30 text-white placeholder:text-white/60 focus:bg-white/30"
+                                className="bg-white/20 dark:bg-input border-white/30 dark:border-border text-white dark:text-foreground placeholder:text-white/60 dark:placeholder:text-muted-foreground focus:bg-white/30 dark:focus:bg-accent"
                                 {...field} 
                               />
                             </FormControl>
-                            <FormMessage className="text-orange-200" />
+                            <FormMessage className="text-orange-200 dark:text-destructive" />
                           </FormItem>
                         )}
                       />
@@ -222,16 +225,16 @@ export default function AuthPage() {
                         name="password"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-white">Password</FormLabel>
+                            <FormLabel className="text-white dark:text-foreground">Password</FormLabel>
                             <FormControl>
                               <Input 
                                 type="password" 
                                 placeholder="********" 
-                                className="bg-white/20 border-white/30 text-white placeholder:text-white/60 focus:bg-white/30"
+                                className="bg-white/20 dark:bg-input border-white/30 dark:border-border text-white dark:text-foreground placeholder:text-white/60 dark:placeholder:text-muted-foreground focus:bg-white/30 dark:focus:bg-accent"
                                 {...field} 
                               />
                             </FormControl>
-                            <FormMessage className="text-orange-200" />
+                            <FormMessage className="text-orange-200 dark:text-destructive" />
                           </FormItem>
                         )}
                       />
@@ -250,7 +253,7 @@ export default function AuthPage() {
                   <Button
                     type="button"
                     variant="ghost"
-                    className="w-full text-white hover:bg-white/10 border border-white/20"
+                    className="w-full text-white dark:text-foreground hover:bg-white/10 dark:hover:bg-accent border border-white/20 dark:border-border"
                     onClick={() => setIsLogin(!isLogin)}
                     disabled={isLoading}
                   >
@@ -260,11 +263,11 @@ export default function AuthPage() {
                   </Button>
 
                   {/* Development Bypass Button */}
-                  <div className="pt-4 border-t border-white/20">
+                  <div className="pt-4 border-t border-white/20 dark:border-border">
                     <Button
                       type="button"
                       variant="outline"
-                      className="w-full bg-yellow-500/20 hover:bg-yellow-500/30 border-yellow-400/40 text-yellow-100"
+                      className="w-full bg-yellow-500/20 dark:bg-yellow-500/10 hover:bg-yellow-500/30 dark:hover:bg-yellow-500/20 border-yellow-400/40 dark:border-yellow-400/20 text-yellow-100 dark:text-yellow-300"
                       onClick={handleDevBypass}
                     >
                       Developer: Bypass Authentication
