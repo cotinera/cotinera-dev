@@ -3634,6 +3634,76 @@ export function registerRoutes(app: Express): Server {
       res.status(500).json({ error: 'Failed to update expense split' });
     }
   });
+
+  // Repayments endpoint
+  app.post("/api/trips/:tripId/repayments", async (req, res) => {
+    try {
+      const tripIdStr = req.params.tripId;
+      
+      if (!tripIdStr || isNaN(parseInt(tripIdStr))) {
+        return res.status(400).json({ 
+          error: 'Invalid trip ID',
+          details: 'Trip ID must be a valid number'
+        });
+      }
+      
+      const tripId = parseInt(tripIdStr);
+      const { expenseId, paidBy, paidTo, amount, currency, date, notes } = req.body;
+      
+      // Basic validation
+      if (!expenseId || !paidBy || !paidTo) {
+        return res.status(400).json({ 
+          error: 'Missing required fields',
+          details: 'expenseId, paidBy, and paidTo are required'
+        });
+      }
+
+      if (paidBy === paidTo) {
+        return res.status(400).json({ 
+          error: 'Invalid repayment',
+          details: 'Cannot make a repayment to yourself'
+        });
+      }
+      
+      let amountValue;
+      try {
+        amountValue = parseFloat(amount);
+        if (isNaN(amountValue) || amountValue <= 0) {
+          throw new Error('Invalid amount');
+        }
+      } catch (error) {
+        return res.status(400).json({ 
+          error: 'Invalid amount',
+          details: 'Amount must be a positive number'
+        });
+      }
+      
+      const repaymentDate = date || new Date().toISOString().split('T')[0];
+      
+      // Import repayments table if not already imported
+      const { repayments } = await import("@db/schema");
+      
+      // Create the repayment
+      const [newRepayment] = await db.insert(repayments).values({
+        tripId,
+        expenseId: parseInt(expenseId),
+        paidBy: parseInt(paidBy),
+        paidTo: parseInt(paidTo),
+        amount: amountValue.toString(),
+        currency: currency || 'USD',
+        date: repaymentDate,
+        notes: notes || null
+      }).returning();
+      
+      res.json(newRepayment);
+    } catch (error) {
+      console.error('Error creating repayment:', error);
+      res.status(500).json({ 
+        error: 'Failed to create repayment',
+        details: error instanceof Error ? error.message : 'An unexpected error occurred'
+      });
+    }
+  });
   
   // Notification endpoints
   
