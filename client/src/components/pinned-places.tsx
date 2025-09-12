@@ -111,8 +111,14 @@ export function PinnedPlaces({
     console.log('Selected coordinates:', selectedCoordinates);
   }, [tripCoordinates, selectedCoordinates]);
 
+  // Standardized query key format for consistent cache invalidation
+  // Include destinationId in key when present for proper cache separation
+  const pinnedPlacesQueryKey = destinationId 
+    ? ["/api/trips", tripId, "pinned-places", destinationId]
+    : ["/api/trips", tripId, "pinned-places"];
+  
   const pinnedPlacesQuery = useQuery<{ tripLocation: { lat: number; lng: number } | null; places: PinnedPlace[] }>({
-    queryKey: [`/api/trips/${tripId}/pinned-places`, destinationId],
+    queryKey: pinnedPlacesQueryKey,
     queryFn: async () => {
       const url = new URL(`/api/trips/${tripId}/pinned-places`, window.location.origin);
       if (destinationId) {
@@ -215,7 +221,7 @@ export function PinnedPlaces({
     },
     onSuccess: (newPlace) => {
       queryClient.setQueryData<{ tripLocation: { lat: number; lng: number } | null; places: PinnedPlace[] }>(
-        [`/api/trips/${tripId}/pinned-places`, destinationId],
+        pinnedPlacesQueryKey,
         (old) => ({
           tripLocation: old?.tripLocation || null,
           places: [...(old?.places || []), newPlace]
@@ -223,7 +229,7 @@ export function PinnedPlaces({
       );
 
       queryClient.invalidateQueries({
-        queryKey: [`/api/trips/${tripId}/pinned-places`]
+        queryKey: pinnedPlacesQueryKey
       });
 
       if (onPinPlace) {
@@ -265,7 +271,7 @@ export function PinnedPlaces({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: [`/api/trips/${tripId}/pinned-places`]
+        queryKey: pinnedPlacesQueryKey
       });
       setPlaceToDelete(null);
       toast({
@@ -305,7 +311,7 @@ export function PinnedPlaces({
     },
     onSuccess: (updatedPlace) => {
       queryClient.setQueryData<{ tripLocation: { lat: number; lng: number } | null; places: PinnedPlace[] }>(
-        [`/api/trips/${tripId}/pinned-places`, destinationId],
+        pinnedPlacesQueryKey,
         (old) => ({
           tripLocation: old?.tripLocation || null,
           places: old?.places?.map(place =>
@@ -590,22 +596,26 @@ export function PinnedPlaces({
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 relative z-10">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={(e) => handleEditClick(e, place)}
-                    className="p-0 h-8 w-8 text-muted-foreground hover:text-primary"
+                    className="p-0 h-8 w-8 text-muted-foreground hover:text-primary relative z-10 pointer-events-auto"
+                    aria-label={`Edit ${place.name}`}
+                    data-testid={`edit-place-${place.id}`}
                   >
-                    <Pencil className="h-4 w-4" />
+                    <Pencil className="h-4 w-4 pointer-events-none" />
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={(e) => handleDeleteClick(e, place)}
-                    className="p-0 h-8 w-8 text-destructive hover:text-destructive"
+                    className="p-0 h-8 w-8 text-destructive hover:text-destructive relative z-10 pointer-events-auto"
+                    aria-label={`Delete ${place.name}`}
+                    data-testid={`delete-place-${place.id}`}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-4 w-4 pointer-events-none" />
                   </Button>
                 </div>
               </div>
