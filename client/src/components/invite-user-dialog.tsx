@@ -56,11 +56,21 @@ export function InviteUserDialog({ isOpen, onClose, tripId }: InviteUserDialogPr
 
   const inviteMutation = useMutation({
     mutationFn: async (values: InviteFormValues) => {
+      // Check if development bypass is enabled
+      const isDevelopmentBypass = localStorage.getItem("dev_bypass_auth") === "true";
+      
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+      
+      // Add development bypass header if in dev mode
+      if (isDevelopmentBypass) {
+        headers['x-dev-bypass'] = 'true';
+      }
+      
       const response = await fetch(`/api/trips/${tripId}/invite`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify(values),
       });
       

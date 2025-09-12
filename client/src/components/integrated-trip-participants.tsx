@@ -390,9 +390,21 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
 
   const updateRoleMutation = useMutation({
     mutationFn: async ({ id, role }: { id: number; role: string }) => {
+      // Check if development bypass is enabled
+      const isDevelopmentBypass = localStorage.getItem("dev_bypass_auth") === "true";
+      
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+      
+      // Add development bypass header if in dev mode
+      if (isDevelopmentBypass) {
+        headers['x-dev-bypass'] = 'true';
+      }
+      
       const res = await fetch(`/api/trips/${tripId}/participants/${id}/role`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ role }),
       });
 
@@ -420,8 +432,19 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
 
   const resendInviteMutation = useMutation({
     mutationFn: async (participantId: number) => {
+      // Check if development bypass is enabled
+      const isDevelopmentBypass = localStorage.getItem("dev_bypass_auth") === "true";
+      
+      const headers: HeadersInit = {};
+      
+      // Add development bypass header if in dev mode
+      if (isDevelopmentBypass) {
+        headers['x-dev-bypass'] = 'true';
+      }
+      
       const res = await fetch(`/api/trips/${tripId}/participants/${participantId}/resend-invite`, {
         method: "POST",
+        headers,
       });
 
       if (!res.ok) {
@@ -447,8 +470,19 @@ export function IntegratedTripParticipants({ tripId, isOwner = false }: Integrat
 
   const removeParticipantMutation = useMutation({
     mutationFn: async (participantId: number) => {
+      // Check if development bypass is enabled
+      const isDevelopmentBypass = localStorage.getItem("dev_bypass_auth") === "true";
+      
+      const headers: HeadersInit = {};
+      
+      // Add development bypass header if in dev mode
+      if (isDevelopmentBypass) {
+        headers['x-dev-bypass'] = 'true';
+      }
+      
       const res = await fetch(`/api/trips/${tripId}/participants/${participantId}`, {
         method: "DELETE",
+        headers,
       });
 
       if (!res.ok) {

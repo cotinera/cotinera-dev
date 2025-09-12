@@ -67,8 +67,19 @@ export function TripParticipantsList({ tripId, isOwner }: TripParticipantsListPr
 
   const removeMutation = useMutation({
     mutationFn: async (participantId: number) => {
+      // Check if development bypass is enabled
+      const isDevelopmentBypass = localStorage.getItem("dev_bypass_auth") === "true";
+      
+      const headers: HeadersInit = {};
+      
+      // Add development bypass header if in dev mode
+      if (isDevelopmentBypass) {
+        headers['x-dev-bypass'] = 'true';
+      }
+      
       const response = await fetch(`/api/trips/${tripId}/participants/${participantId}`, {
         method: "DELETE",
+        headers,
       });
       
       if (!response.ok) {
@@ -97,11 +108,21 @@ export function TripParticipantsList({ tripId, isOwner }: TripParticipantsListPr
 
   const updateRoleMutation = useMutation({
     mutationFn: async ({ participantId, role }: { participantId: number; role: string }) => {
+      // Check if development bypass is enabled
+      const isDevelopmentBypass = localStorage.getItem("dev_bypass_auth") === "true";
+      
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+      
+      // Add development bypass header if in dev mode
+      if (isDevelopmentBypass) {
+        headers['x-dev-bypass'] = 'true';
+      }
+      
       const response = await fetch(`/api/trips/${tripId}/participants/${participantId}/role`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({ role }),
       });
       
@@ -130,8 +151,19 @@ export function TripParticipantsList({ tripId, isOwner }: TripParticipantsListPr
 
   const resendInviteMutation = useMutation({
     mutationFn: async (participantId: number) => {
+      // Check if development bypass is enabled
+      const isDevelopmentBypass = localStorage.getItem("dev_bypass_auth") === "true";
+      
+      const headers: HeadersInit = {};
+      
+      // Add development bypass header if in dev mode
+      if (isDevelopmentBypass) {
+        headers['x-dev-bypass'] = 'true';
+      }
+      
       const response = await fetch(`/api/trips/${tripId}/participants/${participantId}/resend-invite`, {
         method: "POST",
+        headers,
       });
       
       if (!response.ok) {
