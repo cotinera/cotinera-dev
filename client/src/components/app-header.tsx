@@ -30,7 +30,8 @@ export function AppHeader() {
                 <Luggage className="h-5 w-5" />
               </div>
               <span className="bg-gradient-adventure bg-clip-text text-transparent">
-                Travel Planner
+                <span className="font-bold">ATLAS</span>
+                <span className="text-sm italic ml-1">by PGC</span>
               </span>
             </div>
           </Link>
