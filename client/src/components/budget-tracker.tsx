@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { 
   Card, 
@@ -131,6 +131,7 @@ interface Participant {
   tripId: number;
   role: string;
   joinedAt?: string;
+  name?: string;
   user?: User;
 }
 
@@ -208,16 +209,35 @@ const expenseSchema = z.object({
   currency: z.string().min(1, "Currency is required"),
   category: z.string().min(1, "Category is required"),
   date: z.string().min(1, "Date is required"),
-  paidBy: z.number().optional(), // Add paidBy field that's optional in the schema
+  paidBy: z.number().min(1, "Please select who paid for this expense"),
   // Optional: Custom split amounts
   splits: z.array(
     z.object({
       userId: z.number(),
-      amount: z.string(),
+      amount: z.string().refine(
+        (val) => !isNaN(parseFloat(val)) && parseFloat(val) > 0,
+        { message: "Split amount must be a positive number" }
+      ),
       status: z.enum(["pending", "paid"]),
     })
   ).optional(),
-});
+}).refine(
+  (data) => {
+    // Custom validation to ensure split amounts are reasonable
+    if (data.splits && data.splits.length > 0) {
+      const totalAmount = parseFloat(data.amount);
+      const totalSplitAmount = data.splits.reduce((sum, split) => sum + parseFloat(split.amount), 0);
+      const difference = Math.abs(totalAmount - totalSplitAmount);
+      // Allow for small rounding differences (up to 1 cent)
+      return difference < 0.01;
+    }
+    return true;
+  },
+  {
+    message: "Total split amounts must equal the expense amount",
+    path: ["splits"]
+  }
+);
 
 type ExpenseFormValues = z.infer<typeof expenseSchema>;
 
@@ -276,7 +296,10 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
   const [activeTab, setActiveTab] = useState("list");
   const [isAddRepaymentOpen, setIsAddRepaymentOpen] = useState(false);
-  
+  const [splitMode, setSplitMode] = useState<'equal' | 'custom'>('equal');
+  const [splitCount, setSplitCount] = useState(2);
+  const [selectedParticipants, setSelectedParticipants] = useState<number[]>([]);
+
   // Fetch trip participants for payer selection
   const { data: participants = [] as Participant[] } = useQuery({
     queryKey: ["participants", tripId],
@@ -341,6 +364,46 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
     },
   });
 
+  // Calculate split amounts
+  const splitAmount = useMemo(() => {
+    const amount = parseFloat(form.watch('amount') || '0');
+    if (splitMode === 'equal' && splitCount > 0) {
+      return amount / splitCount;
+    }
+    if (splitMode === 'custom' && selectedParticipants.length > 0) {
+      return amount / selectedParticipants.length;
+    }
+    return 0;
+  }, [form.watch('amount'), splitMode, splitCount, selectedParticipants.length]);
+
+  // Get participants who can be selected for splitting (excluding payer)
+  const availableParticipants = useMemo(() => {
+    const paidBy = form.watch('paidBy');
+    return participants.filter((p: Participant) => p.id !== paidBy);
+  }, [participants, form.watch('paidBy')]);
+
+  // Reset selected participants when payer changes
+  useEffect(() => {
+    setSelectedParticipants([]);
+    setSplitCount(2);
+  }, [form.watch('paidBy')]);
+
+  // Auto-select participants for equal split
+  useEffect(() => {
+    if (splitMode === 'equal' && availableParticipants.length > 0) {
+      const participantsToSelect = availableParticipants.slice(0, Math.min(splitCount - 1, availableParticipants.length));
+      setSelectedParticipants(participantsToSelect.map((p: Participant) => p.id));
+    }
+  }, [splitMode, splitCount, availableParticipants]);
+
+  // Reset form and state when dialog closes
+  const resetFormState = () => {
+    form.reset();
+    setSplitMode('equal');
+    setSplitCount(2);
+    setSelectedParticipants([]);
+  };
+
   // Edit expense form
   const editForm = useForm<ExpenseFormValues>({
     resolver: zodResolver(expenseSchema),
@@ -399,7 +462,7 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
         description: "Your expense has been added successfully.",
       });
       setIsAddExpenseOpen(false);
-      form.reset();
+      resetFormState();
     },
     onError: (error: Error) => {
       toast({
@@ -587,7 +650,7 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
     const balanceMap = new Map<number, ParticipantBalance>();
 
     // Initialize balance map with all participants
-    participants.forEach(participant => {
+    participants.forEach((participant: Participant) => {
       balanceMap.set(participant.id, {
         participantId: participant.id,
         participantName: participant.name || participant.user?.name || 'Unknown',
@@ -609,9 +672,9 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
     });
 
     // Calculate what each participant owes (assuming equal split for now)
-    expenses.forEach(expense => {
+    expenses.forEach((expense: Expense) => {
       const splitAmount = expense.amount / participants.length;
-      participants.forEach(participant => {
+      participants.forEach((participant: Participant) => {
         const balance = balanceMap.get(participant.id);
         if (balance) {
           balance.totalOwed += splitAmount;
@@ -665,7 +728,33 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
 
   // Handle creating an expense
   const onSubmit = (data: ExpenseFormValues) => {
-    createExpenseMutation.mutate(data);
+    // Format splits data for backend
+    const splits = [];
+    const amount = parseFloat(data.amount);
+    const paidBy = data.paidBy;
+
+    // Add split for the person who paid (status: 'paid')
+    splits.push({
+      userId: paidBy,
+      amount: splitAmount.toString(),
+      status: 'paid' as const
+    });
+
+    // Add splits for selected participants (status: 'pending')
+    selectedParticipants.forEach(participantId => {
+      splits.push({
+        userId: participantId,
+        amount: splitAmount.toString(),
+        status: 'pending' as const
+      });
+    });
+
+    const expenseData = {
+      ...data,
+      splits: splits.length > 1 ? splits : undefined // Only include splits if there are participants to split with
+    };
+
+    createExpenseMutation.mutate(expenseData);
   };
 
   // Handle editing an expense
@@ -808,7 +897,7 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {expenses.map((expense) => (
+                      {expenses.map((expense: Expense) => (
                         <TableRow key={expense.id}>
                           <TableCell className="whitespace-nowrap">
                             {format(new Date(expense.date), "MMM dd, yyyy")}
@@ -875,7 +964,7 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
                     <>No expenses recorded</>
                   )}
                 </div>
-                {summary?.totalExpenses > 0 && (
+                {summary?.totalExpenses && summary.totalExpenses > 0 && (
                   <div className="font-bold flex items-center gap-1">
                     Total: {formatCurrency(summary.totalExpenses, summary.currency)}
                   </div>
@@ -895,7 +984,7 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {summary?.totalExpenses > 0 ? (
+              {summary?.totalExpenses && summary.totalExpenses > 0 ? (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <Card>
@@ -908,7 +997,7 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
                         <div className="flex items-center gap-1">
                           <CircleDollarSign className="h-5 w-5 text-primary" />
                           <span className="text-2xl font-bold">
-                            {formatCurrency(summary.totalExpenses, summary.currency)}
+                            {summary ? formatCurrency(summary.totalExpenses, summary.currency) : '$0.00'}
                           </span>
                         </div>
                       </CardContent>
@@ -921,7 +1010,7 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        {summary.categoryBreakdown.length > 0 ? (
+                        {summary && summary.categoryBreakdown.length > 0 ? (
                           <div className="flex items-center gap-2">
                             {getCategoryIcon(summary.categoryBreakdown[0].category)}
                             <div>
@@ -974,7 +1063,7 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
-                        {summary.categoryBreakdown.map((category, index) => (
+                        {summary ? summary.categoryBreakdown.map((category, index) => (
                           <div key={category.category} className="grid grid-cols-6 gap-2 items-center">
                             <div className="col-span-2 sm:col-span-1 flex items-center gap-2">
                               {getCategoryIcon(category.category)}
@@ -1002,7 +1091,7 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
                               </div>
                             </div>
                           </div>
-                        ))}
+                        )) : []}
                       </div>
                     </CardContent>
                   </Card>
@@ -1136,9 +1225,9 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
                               <div>
                                 <h4 className="text-sm font-medium text-red-600 mb-2">Owes:</h4>
                                 <div className="space-y-1">
-                                  {Object.entries(balance.owesToOthers).map(([creditorId, amount]) => {
+                                  {Object.entries(balance.owesToOthers).map(([creditorId, amount]: [string, number]) => {
                                     if (amount <= 0) return null;
-                                    const creditor = participants.find(p => p.id === parseInt(creditorId));
+                                    const creditor = participants.find((p: Participant) => p.id === parseInt(creditorId));
                                     return (
                                       <div key={`debt-${creditorId}`} className="flex items-center justify-between text-sm">
                                         <div className="flex items-center gap-2">
@@ -1165,9 +1254,9 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
                               <div>
                                 <h4 className="text-sm font-medium text-green-600 mb-2">Owed by:</h4>
                                 <div className="space-y-1">
-                                  {Object.entries(balance.owedByOthers).map(([debtorId, amount]) => {
+                                  {Object.entries(balance.owedByOthers).map(([debtorId, amount]: [string, number]) => {
                                     if (amount <= 0) return null;
-                                    const debtor = participants.find(p => p.id === parseInt(debtorId));
+                                    const debtor = participants.find((p: Participant) => p.id === parseInt(debtorId));
                                     return (
                                       <div key={`credit-${debtorId}`} className="flex items-center justify-between text-sm">
                                         <div className="flex items-center gap-2">
@@ -1394,13 +1483,13 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {participants.map((participant) => (
+                        {participants.map((participant: Participant) => (
                           <SelectItem key={participant.id} value={participant.id.toString()}>
                             <div className="flex items-center gap-2">
                               <Avatar className="h-6 w-6">
-                                <AvatarFallback>{participant.name.charAt(0)}</AvatarFallback>
+                                <AvatarFallback>{(participant.name || participant.user?.name || 'U').charAt(0)}</AvatarFallback>
                               </Avatar>
-                              <span>{participant.name}</span>
+                              <span>{participant.name || participant.user?.name || 'Unknown'}</span>
                             </div>
                           </SelectItem>
                         ))}
@@ -1411,11 +1500,178 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
                 )}
               />
               
+              {/* Expense Splitting Controls */}
+              <div className="border-t pt-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium">Split Expense</h3>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      type="button"
+                      variant={splitMode === 'equal' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setSplitMode('equal')}
+                    >
+                      Equal Split
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={splitMode === 'custom' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setSplitMode('custom')}
+                    >
+                      Custom Split
+                    </Button>
+                  </div>
+                </div>
+                
+                {splitMode === 'equal' && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-4 items-end">
+                      <div className="col-span-2">
+                        <Label htmlFor="split-count">Split between how many people?</Label>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSplitCount(Math.max(2, splitCount - 1))}
+                            disabled={splitCount <= 2}
+                          >
+                            -
+                          </Button>
+                          <Input
+                            id="split-count"
+                            type="number"
+                            min="2"
+                            max={participants.length}
+                            value={splitCount}
+                            onChange={(e) => setSplitCount(Math.min(participants.length, Math.max(2, parseInt(e.target.value) || 2)))}
+                            className="w-20 text-center"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSplitCount(Math.min(participants.length, splitCount + 1))}
+                            disabled={splitCount >= participants.length}
+                          >
+                            +
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Each person owes:</p>
+                        <p className="text-lg font-semibold text-green-600">
+                          {form.watch('currency') === 'USD' && '$'}
+                          {form.watch('currency') === 'EUR' && '€'}
+                          {form.watch('currency') === 'GBP' && '£'}
+                          {form.watch('currency') === 'JPY' && '¥'}
+                          {splitAmount.toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {availableParticipants.length > 0 && (
+                      <div className="space-y-2">
+                        <Label>Will be split among:</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="flex items-center space-x-2 p-2 bg-green-50 rounded-md">
+                            <Avatar className="h-6 w-6">
+                              <AvatarFallback>
+                                {participants.find((p: Participant) => p.id === form.watch('paidBy'))?.name?.charAt(0) || '?'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-sm">
+                              {participants.find((p: Participant) => p.id === form.watch('paidBy'))?.name || 'Unknown'} (Paid)
+                            </span>
+                          </div>
+                          {selectedParticipants.map((participantId: number) => {
+                            const participant = participants.find((p: Participant) => p.id === participantId);
+                            return (
+                              <div key={participantId} className="flex items-center space-x-2 p-2 bg-blue-50 rounded-md">
+                                <Avatar className="h-6 w-6">
+                                  <AvatarFallback>{participant?.name?.charAt(0) || '?'}</AvatarFallback>
+                                </Avatar>
+                                <span className="text-sm">{participant?.name || 'Unknown'} (Owes)</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {splitMode === 'custom' && (
+                  <div className="space-y-3">
+                    <div>
+                      <Label>Select who should split this expense:</Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        The person who paid is automatically included
+                      </p>
+                    </div>
+                    
+                    {availableParticipants.length > 0 ? (
+                      <div className="space-y-2">
+                        {availableParticipants.map((participant: Participant) => (
+                          <div key={participant.id} className="flex items-center space-x-3">
+                            <input
+                              type="checkbox"
+                              id={`participant-${participant.id}`}
+                              checked={selectedParticipants.includes(participant.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedParticipants([...selectedParticipants, participant.id]);
+                                } else {
+                                  setSelectedParticipants(selectedParticipants.filter(id => id !== participant.id));
+                                }
+                              }}
+                              className="rounded border-gray-300"
+                            />
+                            <label htmlFor={`participant-${participant.id}`} className="flex items-center space-x-2 cursor-pointer">
+                              <Avatar className="h-6 w-6">
+                                <AvatarFallback>{participant.name?.charAt(0) || '?'}</AvatarFallback>
+                              </Avatar>
+                              <span className="text-sm">{participant.name || participant.user?.name || 'Unknown'}</span>
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground p-4 bg-gray-50 rounded-md text-center">
+                        No other participants available to split with
+                      </p>
+                    )}
+                    
+                    {selectedParticipants.length > 0 && (
+                      <div className="mt-4 p-3 bg-blue-50 rounded-md">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">Each person owes:</span>
+                          <span className="text-lg font-semibold text-green-600">
+                            {form.watch('currency') === 'USD' && '$'}
+                            {form.watch('currency') === 'EUR' && '€'}
+                            {form.watch('currency') === 'GBP' && '£'}
+                            {form.watch('currency') === 'JPY' && '¥'}
+                            {splitAmount.toFixed(2)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Split among {selectedParticipants.length + 1} people (including the payer)
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              
               <DialogFooter>
                 <Button 
                   type="button" 
                   variant="outline" 
-                  onClick={() => setIsAddExpenseOpen(false)}
+                  onClick={() => {
+                    setIsAddExpenseOpen(false);
+                    resetFormState();
+                  }}
                 >
                   Cancel
                 </Button>
@@ -1627,13 +1883,13 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {participants.map((participant) => (
+                        {participants.map((participant: Participant) => (
                           <SelectItem key={participant.id} value={participant.id.toString()}>
                             <div className="flex items-center gap-2">
                               <Avatar className="h-6 w-6">
-                                <AvatarFallback>{participant.name.charAt(0)}</AvatarFallback>
+                                <AvatarFallback>{(participant.name || participant.user?.name || 'U').charAt(0)}</AvatarFallback>
                               </Avatar>
-                              <span>{participant.name}</span>
+                              <span>{participant.name || participant.user?.name || 'Unknown'}</span>
                             </div>
                           </SelectItem>
                         ))}
@@ -1695,7 +1951,7 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {expenses.map((expense) => (
+                        {expenses.map((expense: Expense) => (
                           <SelectItem key={expense.id} value={expense.id.toString()}>
                             <div className="flex items-center justify-between w-full">
                               <span>{expense.title}</span>
@@ -1729,7 +1985,7 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {participants.map((participant) => (
+                          {participants.map((participant: Participant) => (
                             <SelectItem key={participant.id} value={participant.id.toString()}>
                               <div className="flex items-center gap-2">
                                 <Avatar className="h-6 w-6">
@@ -1762,7 +2018,7 @@ export function BudgetTracker({ tripId }: BudgetTrackerProps) {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
-                          {participants.map((participant) => (
+                          {participants.map((participant: Participant) => (
                             <SelectItem key={participant.id} value={participant.id.toString()}>
                               <div className="flex items-center gap-2">
                                 <Avatar className="h-6 w-6">
