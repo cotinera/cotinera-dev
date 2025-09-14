@@ -8,7 +8,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Clock, MapPin, GripVertical, ExternalLink, User } from "lucide-react";
+import { Calendar as CalendarUI } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Plus, Clock, MapPin, GripVertical, ExternalLink, User, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -56,6 +58,15 @@ const pinnedPlaceSchema = z.object({
   notes: z.string().optional(),
   category: z.string().optional(),
   icon: z.string().default('📍'),
+});
+
+// Define the Calendar Event schema for adding places to calendar
+const calendarEventSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  description: z.string().optional(),
+  date: z.date({ required_error: "Date is required" }),
+  startTime: z.string().min(1, "Start time is required"),
+  endTime: z.string().min(1, "End time is required"),
 });
 
 // Define types for our data
@@ -124,12 +135,14 @@ function DraggableCard({
   item, 
   type,
   onEditIdea,
-  onEditPlace
+  onEditPlace,
+  onAddToCalendar
 }: { 
   item: TripIdea | PinnedPlace; 
   type: 'idea' | 'place';
   onEditIdea?: (idea: TripIdea) => void;
   onEditPlace?: (place: PinnedPlace) => void;
+  onAddToCalendar?: (place: PinnedPlace) => void;
 }) {
   const {
     attributes,
@@ -198,6 +211,20 @@ function DraggableCard({
                 </p>
               )}
             </div>
+            {/* Calendar Button for Places */}
+            {!isIdea && onAddToCalendar && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0 text-muted-foreground hover:text-primary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddToCalendar(place!);
+                }}
+              >
+                <Calendar className="h-3 w-3" />
+              </Button>
+            )}
           </div>
 
           {/* Time/Duration Info */}
@@ -249,13 +276,15 @@ function DroppableColumn({
   items, 
   type,
   onEditIdea,
-  onEditPlace
+  onEditPlace,
+  onAddToCalendar
 }: { 
   column: Column; 
   items: (TripIdea | PinnedPlace)[]; 
   type: 'idea' | 'place';
   onEditIdea?: (idea: TripIdea) => void;
   onEditPlace?: (place: PinnedPlace) => void;
+  onAddToCalendar?: (place: PinnedPlace) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
@@ -292,6 +321,7 @@ function DroppableColumn({
                 type={type}
                 onEditIdea={onEditIdea}
                 onEditPlace={onEditPlace}
+                onAddToCalendar={onAddToCalendar}
               />
             ))}
             {items.length === 0 && (
@@ -317,6 +347,8 @@ export function TripIdeasAndPlaces({
   const [editingIdea, setEditingIdea] = useState<TripIdea | null>(null);
   const [isEditPlaceDialogOpen, setIsEditPlaceDialogOpen] = useState(false);
   const [editingPlace, setEditingPlace] = useState<PinnedPlace | null>(null);
+  const [isCalendarDialogOpen, setIsCalendarDialogOpen] = useState(false);
+  const [calendarPlace, setCalendarPlace] = useState<PinnedPlace | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -351,6 +383,18 @@ export function TripIdeasAndPlaces({
       notes: "",
       category: "",
       icon: "📍",
+    },
+  });
+
+  // Form for adding to calendar
+  const calendarForm = useForm<z.infer<typeof calendarEventSchema>>({
+    resolver: zodResolver(calendarEventSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      date: new Date(),
+      startTime: "09:00",
+      endTime: "10:00",
     },
   });
 
@@ -531,6 +575,42 @@ export function TripIdeasAndPlaces({
     },
   });
 
+  const addToCalendarMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof calendarEventSchema> & { coordinates?: { lat: number; lng: number }; location?: string }) => {
+      const { date, startTime, endTime, ...rest } = data;
+      
+      // Convert date and times to proper ISO strings
+      const startDateTime = new Date(`${date.toISOString().split('T')[0]}T${startTime}:00`);
+      const endDateTime = new Date(`${date.toISOString().split('T')[0]}T${endTime}:00`);
+      
+      const activityData = {
+        ...rest,
+        startTime: startDateTime.toISOString(),
+        endTime: endDateTime.toISOString(),
+      };
+      
+      const response = await axios.post(`/api/trips/${tripId}/activities`, activityData);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "activities"] });
+      setIsCalendarDialogOpen(false);
+      setCalendarPlace(null);
+      calendarForm.reset();
+      toast({
+        title: "Success",
+        description: "Event added to calendar successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.response?.data?.error || "Failed to add event to calendar",
+        variant: "destructive",
+      });
+    },
+  });
+
   const updatePlaceStatusMutation = useMutation({
     mutationFn: async ({ placeId, status }: { placeId: number; status: "places" | "pending" | "booked" }) => {
       console.log('Updating place status:', { placeId, status });
@@ -674,6 +754,29 @@ export function TripIdeasAndPlaces({
       });
     },
   });
+
+  // Calendar handlers
+  const handleAddToCalendar = (place: PinnedPlace) => {
+    setCalendarPlace(place);
+    calendarForm.reset({
+      title: place.name,
+      description: place.notes || "",
+      date: new Date(),
+      startTime: "09:00",
+      endTime: "10:00",
+    });
+    setIsCalendarDialogOpen(true);
+  };
+
+  const handleCalendarSubmit = (data: z.infer<typeof calendarEventSchema>) => {
+    if (calendarPlace) {
+      addToCalendarMutation.mutate({
+        ...data,
+        location: calendarPlace.address,
+        coordinates: calendarPlace.coordinates,
+      });
+    }
+  };
 
   // Drag and drop handlers
   const handleDragStart = (event: DragStartEvent) => {
@@ -1127,6 +1230,133 @@ export function TripIdeasAndPlaces({
             </Form>
           </DialogContent>
         </Dialog>
+
+        {/* Add to Calendar Dialog */}
+        <Dialog open={isCalendarDialogOpen} onOpenChange={setIsCalendarDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add to Calendar</DialogTitle>
+            </DialogHeader>
+            <Form {...calendarForm}>
+              <form onSubmit={calendarForm.handleSubmit(handleCalendarSubmit)} className="space-y-4">
+                <FormField
+                  control={calendarForm.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Event Title</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter event title..." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={calendarForm.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description (Optional)</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="Add event description..." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={calendarForm.control}
+                  name="date"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Date</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              className={`w-full pl-3 text-left font-normal ${!field.value && "text-muted-foreground"}`}
+                            >
+                              {field.value ? (
+                                format(field.value, "PPP")
+                              ) : (
+                                <span>Pick a date</span>
+                              )}
+                              <Calendar className="ml-auto h-4 w-4 opacity-50" />
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarUI
+                            mode="single"
+                            selected={field.value}
+                            onSelect={field.onChange}
+                            disabled={(date) =>
+                              date < new Date() || date < new Date("1900-01-01")
+                            }
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={calendarForm.control}
+                    name="startTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Start Time</FormLabel>
+                        <FormControl>
+                          <Input type="time" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={calendarForm.control}
+                    name="endTime"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>End Time</FormLabel>
+                        <FormControl>
+                          <Input type="time" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                {calendarPlace && (
+                  <div className="p-3 bg-muted rounded-lg">
+                    <p className="text-sm text-muted-foreground mb-1">Location:</p>
+                    <p className="text-sm font-medium">{calendarPlace.address}</p>
+                  </div>
+                )}
+                <div className="flex justify-end space-x-2">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setIsCalendarDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    variant="adventure"
+                    disabled={addToCalendarMutation.isPending}
+                  >
+                    {addToCalendarMutation.isPending ? "Adding..." : "Add to Calendar"}
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Kanban Board */}
@@ -1145,6 +1375,7 @@ export function TripIdeasAndPlaces({
               items={getColumnItems(column.id)}
               type="place"
               onEditPlace={handleEditPlace}
+              onAddToCalendar={handleAddToCalendar}
             />
           ))}
         </div>
