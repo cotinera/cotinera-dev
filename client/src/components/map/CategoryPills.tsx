@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Utensils, Hotel, Wine, Coffee, MapPin, ShoppingCart, Moon } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Utensils, Hotel, Wine, Coffee, MapPin, ShoppingCart, Moon, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Official Places API types mapping
@@ -87,6 +88,18 @@ export function CategoryPills({
 
   return (
     <div className={cn('space-y-3', className)}>
+      {/* Keyword Search Input */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="text"
+          placeholder="Search by name or keyword..."
+          value={keyword}
+          onChange={(e) => onKeywordChange(e.target.value)}
+          className="pl-10 pr-4 py-2"
+        />
+      </div>
+
       {/* Category Pills */}
       <div className="flex flex-wrap gap-2">
         {categories.map((category) => {

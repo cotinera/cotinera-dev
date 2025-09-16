@@ -53,14 +53,12 @@ function debounce<T extends (...args: any[]) => any>(
 }
 
 export class PlacesSearchService {
-  private placesService: google.maps.places.PlacesService | null = null;
+  private map: google.maps.Map | null = null;
   private currentController: AbortController | null = null;
   private nextPageToken: string | null = null;
   
   constructor(map: google.maps.Map) {
-    if (map) {
-      this.placesService = new google.maps.places.PlacesService(map);
-    }
+    this.map = map;
   }
 
   // Cancel any ongoing search
@@ -71,121 +69,164 @@ export class PlacesSearchService {
     }
   }
 
-  // Convert Google Places result to our format
-  private convertPlaceResult(place: google.maps.places.PlaceResult): PlaceSearchResult {
+  // Convert new Places API result to our format
+  private convertPlaceResult(place: google.maps.places.Place): PlaceSearchResult {
     return {
-      place_id: place.place_id || '',
-      name: place.name || '',
-      formatted_address: place.formatted_address || place.vicinity || '',
+      place_id: place.id || '',
+      name: place.displayName || '',
+      formatted_address: place.formattedAddress || '',
       geometry: {
         location: {
-          lat: place.geometry?.location?.lat() || 0,
-          lng: place.geometry?.location?.lng() || 0,
+          lat: place.location?.lat() || 0,
+          lng: place.location?.lng() || 0,
         },
       },
       rating: place.rating,
-      user_ratings_total: place.user_ratings_total,
-      price_level: place.price_level,
-      opening_hours: place.opening_hours ? {
-        open_now: place.opening_hours.open_now || false
+      user_ratings_total: place.userRatingCount,
+      price_level: place.priceLevel,
+      opening_hours: place.regularOpeningHours ? {
+        open_now: place.regularOpeningHours.openNow || false
       } : undefined,
       types: place.types || [],
-      photos: place.photos,
-      vicinity: place.vicinity,
-      business_status: place.business_status,
+      photos: place.photos || [],
+      vicinity: place.shortFormattedAddress || '',
+      business_status: place.businessStatus || '',
     };
   }
 
-  // Perform nearbySearch with proper error handling and cancellation
-  private performNearbySearch(options: SearchOptions): Promise<SearchResult> {
-    return new Promise((resolve, reject) => {
-      if (!this.placesService) {
-        reject(new Error('Places service not initialized'));
-        return;
-      }
+  // Perform searchNearby with new API and proper error handling
+  private async performNearbySearch(options: SearchOptions): Promise<SearchResult> {
+    if (!this.map) {
+      throw new Error('Map not initialized');
+    }
 
-      // Cancel any ongoing search
-      this.cancelCurrentSearch();
-      
-      // Create new abort controller for this search
-      this.currentController = new AbortController();
-      const { signal } = this.currentController;
+    // Cancel any ongoing search
+    this.cancelCurrentSearch();
+    
+    // Create new abort controller for this search
+    this.currentController = new AbortController();
+    const { signal } = this.currentController;
 
-      const request: google.maps.places.PlaceSearchRequest = {
-        bounds: options.bounds || undefined,
-        type: options.category ? CATEGORY_TYPES[options.category].type : undefined,
-        keyword: options.keyword || undefined,
-        openNow: options.openNow || undefined,
+    try {
+      // Prepare the search request using new API format
+      const request: google.maps.places.SearchNearbyRequest = {
+        // Required parameters
+        fields: [
+          'id', 'displayName', 'formattedAddress', 'location', 
+          'rating', 'userRatingCount', 'priceLevel', 'regularOpeningHours',
+          'types', 'photos', 'shortFormattedAddress', 'businessStatus'
+        ],
+        // Location restriction
+        locationRestriction: this.buildLocationRestriction(options),
+        // Optional parameters
+        maxResultCount: 20,
+        rankPreference: google.maps.places.SearchNearbyRankPreference.POPULARITY,
+        language: 'en-US',
+        region: 'us',
       };
 
-      // If not withinMap, use location + radius instead of bounds
-      if (!options.withinMap && options.map) {
-        const center = options.map.getCenter();
-        if (center) {
-          request.location = center;
-          request.radius = 5000; // 5km radius as fallback
-          delete request.bounds;
-        }
+      // Add category filter if specified
+      if (options.category) {
+        request.includedPrimaryTypes = [CATEGORY_TYPES[options.category].type];
       }
 
-      this.placesService.nearbySearch(request, (results, status, pagination) => {
-        // Check if this request was cancelled
-        if (signal.aborted) {
-          reject(new Error('Search cancelled'));
-          return;
-        }
+      // Check if request was cancelled before making API call
+      if (signal.aborted) {
+        throw new Error('Search cancelled');
+      }
 
-        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-          const convertedResults = results.map(this.convertPlaceResult);
-          
-          resolve({
-            results: convertedResults,
-            hasNextPage: !!pagination?.hasNextPage,
-            nextPageToken: pagination?.hasNextPage ? 'next' : undefined, // Simplified token
-          });
-          
-          // Store pagination for next page requests
-          if (pagination?.hasNextPage) {
-            this.nextPageToken = 'next';
-            // Store the actual pagination object for next page calls
-            (this as any)._pagination = pagination;
-          }
-        } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
-          resolve({ results: [], hasNextPage: false });
-        } else {
-          reject(new Error(`Places search failed: ${status}`));
+      // Call the new searchNearby API
+      const { places } = await google.maps.places.Place.searchNearby(request);
+      
+      // Check again if cancelled after API call
+      if (signal.aborted) {
+        throw new Error('Search cancelled');
+      }
+
+      // Filter results based on options
+      let filteredPlaces = places || [];
+      
+      if (options.openNow) {
+        filteredPlaces = filteredPlaces.filter(place => 
+          place.regularOpeningHours?.openNow === true
+        );
+      }
+
+      if (options.keyword) {
+        const keyword = options.keyword.toLowerCase();
+        filteredPlaces = filteredPlaces.filter(place => 
+          place.displayName?.toLowerCase().includes(keyword) ||
+          place.formattedAddress?.toLowerCase().includes(keyword)
+        );
+      }
+
+      const convertedResults = filteredPlaces.map(this.convertPlaceResult);
+      
+      return {
+        results: convertedResults,
+        hasNextPage: false, // New API doesn't support pagination in the same way
+        nextPageToken: undefined,
+      };
+    } catch (error) {
+      // Check if error was due to cancellation
+      if (signal.aborted) {
+        throw new Error('Search cancelled');
+      }
+      
+      // Handle specific API errors
+      if (error instanceof Error) {
+        if (error.message.includes('ZERO_RESULTS')) {
+          return { results: [], hasNextPage: false };
         }
-      });
-    });
+        if (error.message.includes('OVER_QUERY_LIMIT')) {
+          throw new Error('Search quota exceeded. Please try again later.');
+        }
+        if (error.message.includes('INVALID_REQUEST')) {
+          throw new Error('Invalid search parameters. Please try different criteria.');
+        }
+      }
+      
+      throw new Error(`Places search failed: ${error}`);
+    }
   }
 
-  // Get next page of results
-  async getNextPage(): Promise<SearchResult> {
-    return new Promise((resolve, reject) => {
-      const pagination = (this as any)._pagination;
+  // Build location restriction based on options
+  private buildLocationRestriction(options: SearchOptions): google.maps.places.SearchNearbyRequest['locationRestriction'] {
+    if (options.withinMap && options.bounds) {
+      // Use bounds if searching within map
+      const ne = options.bounds.getNorthEast();
+      const sw = options.bounds.getSouthWest();
       
-      if (!pagination || !pagination.hasNextPage) {
-        resolve({ results: [], hasNextPage: false });
-        return;
-      }
-
-      pagination.nextPage((results: google.maps.places.PlaceResult[], status: google.maps.places.PlacesServiceStatus, newPagination: any) => {
-        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-          const convertedResults = results.map(this.convertPlaceResult);
-          
-          resolve({
-            results: convertedResults,
-            hasNextPage: !!newPagination?.hasNextPage,
-            nextPageToken: newPagination?.hasNextPage ? 'next' : undefined,
-          });
-          
-          // Update stored pagination
-          (this as any)._pagination = newPagination;
-        } else {
-          reject(new Error(`Next page search failed: ${status}`));
+      return {
+        rectangle: {
+          low: { latitude: sw.lat(), longitude: sw.lng() },
+          high: { latitude: ne.lat(), longitude: ne.lng() }
         }
-      });
-    });
+      };
+    } else {
+      // Use circle with center and radius if not restricted to map bounds
+      const center = options.map.getCenter();
+      if (center) {
+        return {
+          circle: {
+            center: { 
+              latitude: center.lat(), 
+              longitude: center.lng() 
+            },
+            radius: 5000 // 5km radius
+          }
+        };
+      }
+    }
+    
+    throw new Error('Unable to determine search location');
+  }
+
+  // Get next page of results (simplified for new API)
+  async getNextPage(): Promise<SearchResult> {
+    // New API doesn't support traditional pagination
+    // Could implement offset-based pagination if needed
+    return { results: [], hasNextPage: false };
   }
 
   // Debounced search method
@@ -206,9 +247,8 @@ export class PlacesSearchService {
   // Cleanup method
   destroy() {
     this.cancelCurrentSearch();
-    this.placesService = null;
+    this.map = null;
     this.nextPageToken = null;
-    (this as any)._pagination = null;
   }
 }
 

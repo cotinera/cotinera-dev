@@ -12,6 +12,9 @@ import { useGoogleMapsScript, useMapCoordinates, GoogleMap, MarkerF, PlaceDetail
 import { LocationSearchBar } from "@/components/location-search-bar";
 import { IconPicker } from "@/components/icon-picker";
 import { PlaceDetailsSidebar } from "@/components/place-details-sidebar";
+import { CategoryPills, CategoryId } from "@/components/map/CategoryPills";
+import { ResultsList } from "@/components/map/ResultsList";
+import { PlacesSearchService, PlaceSearchResult as SearchServiceResult, SearchFilters } from "@/lib/places/search";
 
 // Helpers and components
 function calculateDistance(point1: { lat: number; lng: number }, point2: { lat: number; lng: number }): number {
@@ -272,17 +275,29 @@ export function MapView({
   const [selectedIcon, setSelectedIcon] = useState('📍'); // Icon for pinning places
   const numericTripId = tripId && !isNaN(Number(tripId)) ? Number(tripId) : undefined;
   const { accommodations = [] } = useAccommodations(numericTripId);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [placeResults, setPlaceResults] = useState<PlaceSearchResult[]>([]);
-  const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
-  const [activeFilters, setActiveFilters] = useState<Record<string, any>>({});
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  // Category filter state - using CategoryId type from CategoryPills
+  const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
+  const [openNow, setOpenNow] = useState(false);
+  const [withinMap, setWithinMap] = useState(true);
+  const [keyword, setKeyword] = useState('');
+  
+  // Search results state
+  const [searchResults, setSearchResults] = useState<SearchServiceResult[]>([]);
+  const [isLoadingSearch, setIsLoadingSearch] = useState(false);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  
+  // Legacy state removed - using only new search flow
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchedLocation, setSearchedLocation] = useState<{ lat: number; lng: number } | null>(null);
   const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
   
-  // Search result markers management
+  // Places search service
+  const placesSearchServiceRef = useRef<PlacesSearchService | null>(null);
+  
+  // Search result markers management - updated to use new search results
   const {
     markers: searchMarkers,
     selectedPlaceId: selectedSearchPlaceId,
@@ -290,10 +305,15 @@ export function MapView({
     handleMarkerClick: handleSearchMarkerClick,
   } = useSearchResultMarkers(
     mapRef.current,
-    placeResults,
+    searchResults,
     (place) => {
       if (place.place_id) {
-        fetchDetails(place.place_id);
+        setSelectedResultId(place.place_id);
+        if (onShowPlaceDetails) {
+          onShowPlaceDetails(place.place_id);
+        } else {
+          fetchDetails(place.place_id);
+        }
       }
     }
   );
@@ -493,87 +513,189 @@ export function MapView({
     fetchDetails(event.placeId);
   }, [fetchDetails]);
 
-  const refreshPlaces = useCallback(() => {
-    if (!selectedCategory || !placesServiceRef.current || !mapRef.current) return;
-
-    setIsLoadingPlaces(true);
-    const category = categoryButtons.find(c => c.id === selectedCategory);
-
-    if (!category) return;
-
-    const bounds = mapRef.current.getBounds();
-    if (!bounds) return;
-
-    const request: google.maps.places.PlaceSearchRequest = {
-      bounds,
-      type: category.type[0],
-    };
-
-    // Add price level filter if set
-    if (activeFilters.price) {
-      request.minPriceLevel = activeFilters.price;
-      request.maxPriceLevel = activeFilters.price;
+  // New search functionality using PlacesSearchService
+  const performSearch = useCallback(async () => {
+    if (!placesSearchServiceRef.current || !mapRef.current) return;
+    
+    // Only search if we have a category or keyword
+    if (!selectedCategory && !keyword.trim()) {
+      setSearchResults([]);
+      return;
     }
 
-    placesServiceRef.current.nearbySearch(request, (results, status) => {
-      setIsLoadingPlaces(false);
-      if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-        // Apply post-query filters
-        let filteredResults = results;
+    setIsLoadingSearch(true);
+    setSelectedResultId(null);
 
-        // Filter by rating
-        if (activeFilters.rating) {
-          filteredResults = filteredResults.filter(
-            place => (place.rating || 0) >= activeFilters.rating
-          );
-        }
+    try {
+      const bounds = withinMap ? mapRef.current.getBounds() : null;
+      
+      const searchOptions: SearchFilters & { map: google.maps.Map } = {
+        category: selectedCategory,
+        openNow,
+        withinMap,
+        keyword: keyword.trim(),
+        bounds,
+        map: mapRef.current
+      };
 
-        // Filter by open now
-        if (activeFilters.hours === true) {
-          filteredResults = filteredResults.filter(
-            place => place.opening_hours?.isOpen?.() === true
-          );
-        }
+      const result = await placesSearchServiceRef.current.searchDebounced(searchOptions);
+      setSearchResults(result.results);
+      setHasNextPage(result.hasNextPage);
+    } catch (error) {
+      console.error('Search error:', error);
+      toast({
+        title: "Search Error",
+        description: "Failed to search for places. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingSearch(false);
+    }
+  }, [selectedCategory, openNow, withinMap, keyword, toast]);
 
-        // Convert to PlaceSearchResult format
-        const convertedResults = filteredResults.map(convertPlaceResult);
-        setPlaceResults(convertedResults);
+  // Load more results
+  const loadMoreResults = useCallback(async () => {
+    if (!placesSearchServiceRef.current || !hasNextPage || isLoadingMore) return;
+
+    setIsLoadingMore(true);
+    try {
+      const result = await placesSearchServiceRef.current.getNextPage();
+      setSearchResults(prev => [...prev, ...result.results]);
+      setHasNextPage(result.hasNextPage);
+    } catch (error) {
+      console.error('Load more error:', error);
+      toast({
+        title: "Load More Error", 
+        description: "Failed to load more results. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingMore(false);
+    }
+  }, [hasNextPage, isLoadingMore, toast]);
+
+  // Legacy refreshPlaces function removed - using new search flow with PlacesSearchService
+
+  // Effect to trigger search when filters change
+  useEffect(() => {
+    if (placesSearchServiceRef.current && mapRef.current) {
+      performSearch();
+    }
+  }, [selectedCategory, openNow, withinMap, keyword, performSearch]);
+
+  // Handler for category filter changes
+  const handleCategoryChange = useCallback((category: CategoryId | null) => {
+    setSelectedCategory(category);
+  }, []);
+
+  // Handler for open now filter changes
+  const handleOpenNowChange = useCallback((openNowValue: boolean) => {
+    setOpenNow(openNowValue);
+  }, []);
+
+  // Handler for within map filter changes
+  const handleWithinMapChange = useCallback((withinMapValue: boolean) => {
+    setWithinMap(withinMapValue);
+  }, []);
+
+  // Handler for keyword search changes
+  const handleKeywordChange = useCallback((keywordValue: string) => {
+    setKeyword(keywordValue);
+  }, []);
+
+  // Throttle utility for map move events
+  const throttleRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const throttledMapSearch = useCallback(() => {
+    if (throttleRef.current) {
+      clearTimeout(throttleRef.current);
+    }
+    
+    throttleRef.current = setTimeout(() => {
+      if (withinMap && placesSearchServiceRef.current && mapRef.current) {
+        performSearch();
       }
-    });
-  }, [selectedCategory, activeFilters, convertPlaceResult]);
+    }, 400); // 400ms throttling for optimal performance
+  }, [withinMap, performSearch]);
 
+  // Handler for search result clicks
+  const handleResultClick = useCallback((result: SearchServiceResult) => {
+    setSelectedResultId(result.place_id);
+    
+    // Animate to result location
+    if (mapRef.current) {
+      const resultCoords = result.geometry.location;
+      smoothMapAnimation(mapRef, coordinates, resultCoords);
+    }
+    
+    // Show place details
+    if (onShowPlaceDetails) {
+      onShowPlaceDetails(result.place_id);
+    } else {
+      // Fallback to local place details
+      fetchDetails(result.place_id);
+    }
+  }, [coordinates, onShowPlaceDetails, fetchDetails]);
+
+  // Category click handler using new search flow
   const handleCategoryClick = useCallback((category: CategoryButton) => {
     setSelectedCategory(currentCategory => {
       const newCategory = currentCategory === category.id ? null : category.id;
       if (newCategory) {
-        refreshPlaces();
+        performSearch();
       } else {
-        setPlaceResults([]);
+        setSearchResults([]);
       }
       return newCategory;
     });
-  }, [refreshPlaces]);
+  }, [performSearch]);
 
-  const handleMapIdle = useCallback(() => {
-    if (selectedCategory) {
-      refreshPlaces();
+  // Modern map bounds change handler with throttling
+  const handleMapBoundsChanged = useCallback(() => {
+    // Only trigger search if withinMap filter is enabled
+    if (withinMap) {
+      throttledMapSearch();
     }
-  }, [selectedCategory, refreshPlaces]);
+  }, [withinMap, throttledMapSearch]);
+
+  // Cleanup effect for throttled search and map listeners
+  useEffect(() => {
+    return () => {
+      // Cleanup throttled search timeout
+      if (throttleRef.current) {
+        clearTimeout(throttleRef.current);
+      }
+      // Cleanup map event listeners
+      if (mapRef.current) {
+        google.maps.event.clearListeners(mapRef.current, 'bounds_changed');
+      }
+      // Cleanup places search service
+      if (placesSearchServiceRef.current) {
+        placesSearchServiceRef.current.destroy();
+      }
+    };
+  }, []);
 
   const onMapLoad = useCallback((map: google.maps.Map) => {
     mapRef.current = map;
     initPlacesService(map);
     
-    // Only add the idle listener once
+    // Initialize the places search service
+    placesSearchServiceRef.current = new PlacesSearchService(map);
+    
+    // Clear any existing listeners
+    google.maps.event.clearListeners(map, 'bounds_changed');
     google.maps.event.clearListeners(map, 'idle');
-    map.addListener('idle', handleMapIdle);
+    
+    // Add throttled bounds change listener for map movement
+    map.addListener('bounds_changed', handleMapBoundsChanged);
     
     // Set initial center explicitly to ensure the map displays properly on first load
     if (coordinates) {
       map.setCenter(coordinates);
       map.setZoom(12);
     }
-  }, [initPlacesService, handleMapIdle, coordinates]);
+  }, [initPlacesService, handleMapBoundsChanged, coordinates]);
 
   const handleSearchSelect = useCallback((result: SearchResult) => {
     if (result.type === 'category') {
@@ -673,16 +795,12 @@ export function MapView({
   }, [selectedPlaceDetails, tripId, coordinates, queryClient, toast]);
 
   const handleFilterChange = useCallback((filterId: string, value: any) => {
-    setActiveFilters(prev => ({
-      ...prev,
-      [filterId]: value === prev[filterId] ? null : value
-    }));
-
-    // Refresh places with new filters
+    // Legacy filter handling removed - using new CategoryPills component for filters
+    // Trigger search with new category selection
     if (selectedCategory) {
-      refreshPlaces();
+      performSearch();
     }
-  }, [selectedCategory, refreshPlaces]);
+  }, [selectedCategory, performSearch]);
 
   const handleSearchInputChange = useCallback((value: string) => {
     setSearchValue(value);
@@ -973,55 +1091,18 @@ export function MapView({
                 )}
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                {categoryButtons.map((category) => (
-                  <Button
-                    key={category.id}
-                    size="sm"
-                    variant={selectedCategory === category.id ? "default" : "outline"}
-                    className="bg-background/90 backdrop-blur-sm"
-                    onClick={() => handleCategoryClick(category)}
-                  >
-                    {category.icon}
-                    <span className="ml-2">{category.label}</span>
-                  </Button>
-                ))}
-              </div>
-
-              {selectedCategory && (
-                <div className="flex flex-wrap gap-2">
-                  {subFilters.map((filter) => (
-                    <div key={filter.id} className="relative group">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="bg-background/90 backdrop-blur-sm"
-                      >
-                        {filter.icon && <span className="mr-2">{filter.icon}</span>}
-                        {filter.label}
-                        <ChevronDown className="h-4 w-4 ml-1" />
-                      </Button>
-                      <div className="absolute top-full left-0 mt-1 w-44 hidden group-hover:block z-20">
-                        <Card className="p-2 shadow-lg">
-                          {filter.options.map((option) => (
-                            <div
-                              key={option.id}
-                              className={`p-2 cursor-pointer rounded text-sm ${
-                                activeFilters[filter.id] === option.value
-                                  ? "bg-primary text-primary-foreground"
-                                  : "hover:bg-muted"
-                              }`}
-                              onClick={() => handleFilterChange(filter.id, option.value)}
-                            >
-                              {option.label}
-                            </div>
-                          ))}
-                        </Card>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {/* Category Pills Component */}
+              <CategoryPills
+                selectedCategory={selectedCategory}
+                onCategoryChange={handleCategoryChange}
+                openNow={openNow}
+                onOpenNowChange={handleOpenNowChange}
+                withinMap={withinMap}
+                onWithinMapChange={handleWithinMapChange}
+                keyword={keyword}
+                onKeywordChange={handleKeywordChange}
+                className="bg-background/90 backdrop-blur-sm rounded-lg p-3"
+              />
             </div>
           )}
 
@@ -1110,14 +1191,7 @@ export function MapView({
             </div>
           )}
           
-          {isLoadingPlaces && (
-            <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-              <div className="bg-background p-4 rounded-lg shadow-lg flex items-center gap-3">
-                <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                <span>Loading places...</span>
-              </div>
-            </div>
-          )}
+          {/* Legacy loading overlay removed - using search loading state instead */}
         </div>
 
         {selectedPlaceDetails ? (
@@ -1138,41 +1212,68 @@ export function MapView({
           </div>
         ) : (
           <div className={`w-full md:w-2/5 border-t md:border-t-0 md:border-l ${!hideSearchAndFilters ? 'block' : 'hidden'}`}>
-            <ScrollArea className="h-[600px] p-4">
-              <h3 className="text-lg font-semibold mb-4">Pinned Places</h3>
-              {allPinnedPlaces.length > 0 ? (
-                <div className="space-y-3">
-                  {allPinnedPlaces.map((place: PinnedPlace) => (
-                    <div
-                      key={place.id}
-                      className={`p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors ${
-                        selectedPlace?.id === place.id ? "border-primary bg-primary/10" : ""
-                      }`}
-                      onClick={() => handleLocalPlaceNameClick(place)}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h4 className="font-medium">{place.name}</h4>
-                          <p className="text-sm text-muted-foreground truncate">
-                            {place.name}
-                          </p>
+            <ScrollArea className="h-[600px]">
+              <div className="p-4">
+                {/* Search Results Section */}
+                {(searchResults.length > 0 || isLoadingSearch) && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center">
+                      <Search className="h-5 w-5 mr-2" />
+                      Search Results
+                    </h3>
+                    <ResultsList
+                      results={searchResults}
+                      isLoading={isLoadingSearch}
+                      hasNextPage={hasNextPage}
+                      selectedResultId={selectedResultId}
+                      onResultClick={handleResultClick}
+                      onLoadMore={loadMoreResults}
+                      isLoadingMore={isLoadingMore}
+                    />
+                  </div>
+                )}
+
+                {/* Pinned Places Section */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4 flex items-center">
+                    <MapPin className="h-5 w-5 mr-2" />
+                    Pinned Places
+                  </h3>
+                  {allPinnedPlaces.length > 0 ? (
+                    <div className="space-y-3">
+                      {allPinnedPlaces.map((place: PinnedPlace) => (
+                        <div
+                          key={place.id}
+                          className={`p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors ${
+                            selectedPlace?.id === place.id ? "border-primary bg-primary/10" : ""
+                          }`}
+                          onClick={() => handleLocalPlaceNameClick(place)}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <h4 className="font-medium">{place.name}</h4>
+                              <p className="text-sm text-muted-foreground truncate">
+                                {place.name}
+                              </p>
+                            </div>
+                            <MapPin className={`h-4 w-4 flex-shrink-0 ${
+                              selectedPlace?.id === place.id ? "text-primary" : "text-muted-foreground"
+                            }`} />
+                          </div>
                         </div>
-                        <MapPin className={`h-4 w-4 flex-shrink-0 ${
-                          selectedPlace?.id === place.id ? "text-primary" : "text-muted-foreground"
-                        }`} />
-                      </div>
+                      ))}
                     </div>
-                  ))}
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <MapPin className="h-10 w-10 mx-auto mb-2 opacity-20" />
+                      <p>No places pinned yet</p>
+                      <p className="text-sm mt-1">
+                        Search for places and pin them to your trip
+                      </p>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <MapPin className="h-10 w-10 mx-auto mb-2 opacity-20" />
-                  <p>No places pinned yet</p>
-                  <p className="text-sm mt-1">
-                    Search for places and pin them to your trip
-                  </p>
-                </div>
-              )}
+              </div>
             </ScrollArea>
           </div>
         )}

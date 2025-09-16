@@ -23,7 +23,12 @@ interface LocationSearchBarProps {
   onShowPlaceDetails?: (placeId: string) => void; // Callback to show place details in sidebar
 }
 
-interface EnhancedPrediction extends google.maps.places.AutocompletePrediction {
+interface EnhancedPrediction {
+  place_id: string;
+  structured_formatting: {
+    main_text: string;
+    secondary_text: string;
+  };
   rating?: number;
   user_ratings_total?: number;
   price_level?: number;
@@ -80,8 +85,7 @@ export function LocationSearchBar({
   const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const [isPlaceDetailsOpen, setIsPlaceDetailsOpen] = useState(false);
-  const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
-  const placesService = useRef<google.maps.places.PlacesService | null>(null);
+  const sessionToken = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
   const mapRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -92,17 +96,15 @@ export function LocationSearchBar({
     }
   }, [onInputRef]);
 
-  // Initialize Google Maps services when available
+  // Initialize Google Maps and session token when available
   useEffect(() => {
     const initializeServices = () => {
       if (window.google && window.google.maps && window.google.maps.places) {
         try {
-          autocompleteService.current = new google.maps.places.AutocompleteService();
-          if (mapRef.current) {
-            placesService.current = new google.maps.places.PlacesService(mapRef.current);
-          }
+          // Create a new session token for the autocomplete session
+          sessionToken.current = new google.maps.places.AutocompleteSessionToken();
           setIsGoogleMapsReady(true);
-          setError(null); // Clear any error when successfully initialized
+          setError(null);
           return true;
         } catch (error) {
           console.error('Error initializing Google Places services:', error);
@@ -121,10 +123,9 @@ export function LocationSearchBar({
         }
       }, 1000);
 
-      // Clear interval after 30 seconds (increase timeout)
+      // Clear interval after 30 seconds
       const timeout = setTimeout(() => {
         clearInterval(interval);
-        // Only show error if Google Maps truly didn't load
         if (!window.google || !window.google.maps) {
           setError('Google Maps failed to load. Please refresh the page.');
         }
@@ -138,7 +139,7 @@ export function LocationSearchBar({
   }, []);
 
   const handleSearch = useCallback(async (searchValue: string) => {
-    if (!searchValue || !autocompleteService.current || !isGoogleMapsReady) {
+    if (!searchValue || !isGoogleMapsReady || !sessionToken.current) {
       setPredictions([]);
       setIsOpen(false);
       return;
@@ -148,85 +149,104 @@ export function LocationSearchBar({
     setError(null);
 
     try {
-      let locationBias: google.maps.places.AutocompletionRequest['locationBias'] | undefined;
+      // Prepare the autocomplete request using new API
+      const request: google.maps.places.AutocompleteRequest = {
+        input: searchValue,
+        sessionToken: sessionToken.current,
+        includedPrimaryTypes: ['establishment', 'geocode'],
+        language: 'en-US',
+        region: 'us',
+      };
 
+      // Add location bias if provided
       if (searchBias && searchBias.lat && searchBias.lng) {
-        const radius = searchBias.radius || 50000; // Default 50km radius
-        const location = new google.maps.LatLng(searchBias.lat, searchBias.lng);
-
-        locationBias = {
-          center: location,
-          radius: radius
+        const radius = searchBias.radius || 50000;
+        request.locationBias = {
+          circle: {
+            center: {
+              latitude: searchBias.lat,
+              longitude: searchBias.lng
+            },
+            radius: radius
+          }
         };
       }
 
-      const response = await autocompleteService.current.getPlacePredictions({
-        input: searchValue,
-        types: ['establishment', 'geocode'],
-        locationBias: locationBias
-      });
+      // Use the new AutocompleteSuggestion API
+      const { suggestions } = await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
 
-      // Enhance predictions with additional place details
-      const enhancedPredictions = await Promise.all(
-        response.predictions.slice(0, 8).map(async (prediction) => {
+      // Convert suggestions to our enhanced prediction format
+      const enhancedPredictions: EnhancedPrediction[] = await Promise.all(
+        suggestions.slice(0, 8).map(async (suggestion) => {
           try {
-            const basicDetails = await new Promise<google.maps.places.PlaceResult>((resolve, reject) => {
-              placesService.current!.getDetails(
-                {
-                  placeId: prediction.place_id,
-                  fields: ['rating', 'user_ratings_total', 'price_level', 'opening_hours', 'types', 'photos', 'geometry'],
-                },
-                (result, status) => {
-                  if (status === google.maps.places.PlacesServiceStatus.OK && result) {
-                    resolve(result);
-                  } else {
-                    resolve({} as google.maps.places.PlaceResult);
-                  }
-                }
-              );
+            // Fetch place details using the new Place API
+            const place = new google.maps.places.Place({
+              id: suggestion.placePrediction?.placeId || '',
+              requestedLanguage: 'en-US'
+            });
+
+            // Fetch fields we need
+            await place.fetchFields({
+              fields: ['rating', 'userRatingCount', 'priceLevel', 'regularOpeningHours', 'types', 'photos', 'location', 'displayName', 'formattedAddress']
             });
 
             return {
-              ...prediction,
-              rating: basicDetails.rating,
-              user_ratings_total: basicDetails.user_ratings_total,
-              price_level: basicDetails.price_level,
-              opening_hours: basicDetails.opening_hours,
-              types: basicDetails.types || [],
-              photos: basicDetails.photos,
-              geometry: basicDetails.geometry
+              place_id: suggestion.placePrediction?.placeId || '',
+              structured_formatting: {
+                main_text: suggestion.placePrediction?.structuredFormat?.mainText?.text || '',
+                secondary_text: suggestion.placePrediction?.structuredFormat?.secondaryText?.text || ''
+              },
+              rating: place.rating,
+              user_ratings_total: place.userRatingCount,
+              price_level: place.priceLevel,
+              opening_hours: place.regularOpeningHours ? {
+                open_now: place.regularOpeningHours.openNow || false
+              } : undefined,
+              types: place.types || [],
+              photos: place.photos || [],
+              geometry: place.location ? {
+                location: {
+                  lat: () => place.location!.lat(),
+                  lng: () => place.location!.lng()
+                }
+              } : undefined
             } as EnhancedPrediction;
           } catch {
+            // Fallback to basic prediction data if place details fail
             return {
-              ...prediction,
+              place_id: suggestion.placePrediction?.placeId || '',
+              structured_formatting: {
+                main_text: suggestion.placePrediction?.structuredFormat?.mainText?.text || '',
+                secondary_text: suggestion.placePrediction?.structuredFormat?.secondaryText?.text || ''
+              },
               types: [],
             } as EnhancedPrediction;
           }
         })
       );
 
-      // Sort enhanced predictions by distance if we have location bias
+      // Sort enhanced predictions by distance if we have location bias and geometry
       if (searchBias && enhancedPredictions.length > 0) {
-        const location = new google.maps.LatLng(searchBias.lat, searchBias.lng);
+        const biasLocation = new google.maps.LatLng(searchBias.lat, searchBias.lng);
 
-        // Calculate distances and sort
-        const predictionsWithDistance = await Promise.all(
-          enhancedPredictions.map(async (prediction) => {
-            try {
-              if (prediction.geometry?.location) {
-                const distance = google.maps.geometry.spherical.computeDistanceBetween(
-                  location,
-                  prediction.geometry.location
-                );
-                return { prediction, distance };
-              } else {
-                return { prediction, distance: Infinity };
-              }
-            } catch (error) {
+        const predictionsWithDistance = enhancedPredictions.map((prediction) => {
+          try {
+            if (prediction.geometry?.location) {
+              const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                biasLocation,
+                new google.maps.LatLng(
+                  prediction.geometry.location.lat(),
+                  prediction.geometry.location.lng()
+                )
+              );
+              return { prediction, distance };
+            } else {
               return { prediction, distance: Infinity };
             }
-          })
-        );
+          } catch {
+            return { prediction, distance: Infinity };
+          }
+        });
 
         // Sort by distance
         predictionsWithDistance.sort((a, b) => a.distance - b.distance);
@@ -238,7 +258,20 @@ export function LocationSearchBar({
       setIsOpen(true);
     } catch (err) {
       console.error('Autocomplete error:', err);
-      setError('Failed to load suggestions. Please try again.');
+      if (err instanceof Error) {
+        if (err.message.includes('ZERO_RESULTS')) {
+          setPredictions([]);
+          setIsOpen(false);
+        } else if (err.message.includes('OVER_QUERY_LIMIT')) {
+          setError('Search quota exceeded. Please try again later.');
+        } else if (err.message.includes('INVALID_REQUEST')) {
+          setError('Invalid search request. Please try different criteria.');
+        } else {
+          setError('Failed to load suggestions. Please try again.');
+        }
+      } else {
+        setError('Failed to load suggestions. Please try again.');
+      }
       setPredictions([]);
       setIsOpen(false);
     } finally {
@@ -248,6 +281,9 @@ export function LocationSearchBar({
 
   const handleSelect = (placeId: string) => {
     setIsOpen(false);
+    
+    // Create a new session token for the next search session
+    sessionToken.current = new google.maps.places.AutocompleteSessionToken();
     
     if (showDetailedView && onShowPlaceDetails) {
       // For interactive map - show place details in sidebar
