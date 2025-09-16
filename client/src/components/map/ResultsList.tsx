@@ -6,7 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Star, Clock, Phone, MapPin, ChevronRight, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { PlaceSearchResult } from '@/lib/places/search';
+import type { PlaceSearchResult } from '@/lib/places/search';
 
 // Skeleton loader for loading states
 function ResultSkeleton() {

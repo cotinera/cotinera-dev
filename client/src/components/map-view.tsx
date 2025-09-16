@@ -8,13 +8,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAccommodations } from "@/hooks/use-accommodations";
 import { cn } from "@/lib/utils";
-import { useGoogleMapsScript, useMapCoordinates, GoogleMap, MarkerF, PlaceDetails, PinnedPlace, SearchResultMarkers, useSearchResultMarkers, PlaceSearchResult } from "@/lib/google-maps";
+import { useGoogleMapsScript, useMapCoordinates, GoogleMap, MarkerF, PlaceDetails, PinnedPlace, SearchResultMarkers, useSearchResultMarkers } from "@/lib/google-maps";
+import type { PlaceSearchResult } from "@/lib/google-maps";
 import { LocationSearchBar } from "@/components/location-search-bar";
 import { IconPicker } from "@/components/icon-picker";
 import { PlaceDetailsSidebar } from "@/components/place-details-sidebar";
 import { CategoryPills, CategoryId } from "@/components/map/CategoryPills";
 import { ResultsList } from "@/components/map/ResultsList";
-import { PlacesSearchService, PlaceSearchResult as SearchServiceResult, SearchFilters } from "@/lib/places/search";
+import { PlacesSearchService } from "@/lib/places/search";
+import type { PlaceSearchResult as SearchServiceResult, SearchFilters } from "@/lib/places/search";
 
 // Helpers and components
 function calculateDistance(point1: { lat: number; lng: number }, point2: { lat: number; lng: number }): number {

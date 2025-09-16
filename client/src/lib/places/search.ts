@@ -1,7 +1,10 @@
 // Re-export types and interfaces from the centralized API wrapper
-export {
+export type {
   PlaceSearchResult,
   SearchResult,
+} from './api-wrapper';
+
+export {
   PlacesApiError,
   PlacesApiErrorType,
   getPlacesApiWrapper,
@@ -9,10 +12,13 @@ export {
 } from './api-wrapper';
 
 import { CATEGORY_TYPES, CategoryId } from '@/components/map/CategoryPills';
-import { 
+import type { 
   PlaceSearchResult, 
   SearchResult, 
-  SearchOptions as ApiSearchOptions,
+  SearchOptions as ApiSearchOptions
+} from './api-wrapper';
+
+import {
   getPlacesApiWrapper 
 } from './api-wrapper';
 
