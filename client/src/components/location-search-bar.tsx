@@ -19,6 +19,8 @@ interface LocationSearchBarProps {
     radius?: number;
   };
   onInputRef?: (ref: HTMLInputElement | null) => void;
+  showDetailedView?: boolean; // When true, shows detailed sidebar instead of immediate selection
+  onShowPlaceDetails?: (placeId: string) => void; // Callback to show place details in sidebar
 }
 
 interface EnhancedPrediction extends google.maps.places.AutocompletePrediction {
@@ -30,6 +32,12 @@ interface EnhancedPrediction extends google.maps.places.AutocompletePrediction {
   };
   types: string[];
   photos?: google.maps.places.PlacePhoto[];
+  geometry?: {
+    location: {
+      lat: () => number;
+      lng: () => number;
+    };
+  };
 }
 
 const getPlaceCategory = (types: string[]) => {
@@ -62,6 +70,8 @@ export function LocationSearchBar({
   className,
   searchBias,
   onInputRef,
+  showDetailedView = false,
+  onShowPlaceDetails,
 }: LocationSearchBarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [predictions, setPredictions] = useState<EnhancedPrediction[]>([]);
@@ -237,9 +247,16 @@ export function LocationSearchBar({
   }, [searchBias, isGoogleMapsReady]);
 
   const handleSelect = (placeId: string) => {
-    setSelectedPlaceId(placeId);
-    setIsPlaceDetailsOpen(true);
     setIsOpen(false);
+    
+    if (showDetailedView && onShowPlaceDetails) {
+      // For interactive map - show place details in sidebar
+      onShowPlaceDetails(placeId);
+    } else {
+      // For calendar/other contexts - show bottom sheet
+      setSelectedPlaceId(placeId);
+      setIsPlaceDetailsOpen(true);
+    }
   };
 
   const handlePlaceSelect = (address: string, coordinates: { lat: number; lng: number }, name: string) => {
@@ -356,12 +373,14 @@ export function LocationSearchBar({
         </div>
       )}
       
-      <PlaceDetailsSheet
-        open={isPlaceDetailsOpen}
-        onOpenChange={setIsPlaceDetailsOpen}
-        placeId={selectedPlaceId}
-        onSelectPlace={handlePlaceSelect}
-      />
+      {!showDetailedView && (
+        <PlaceDetailsSheet
+          open={isPlaceDetailsOpen}
+          onOpenChange={setIsPlaceDetailsOpen}
+          placeId={selectedPlaceId}
+          onSelectPlace={handlePlaceSelect}
+        />
+      )}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { useGoogleMapsScript, useMapCoordinates, GoogleMap, MarkerF, PlaceDetails, PinnedPlace } from "@/lib/google-maps";
 import { LocationSearchBar } from "@/components/location-search-bar";
 import { IconPicker } from "@/components/icon-picker";
+import { PlaceDetailsSidebar } from "@/components/place-details-sidebar";
 
 // Helpers and components
 function calculateDistance(point1: { lat: number; lng: number }, point2: { lat: number; lng: number }): number {
@@ -185,6 +186,11 @@ interface MapViewProps {
   className?: string;
   selectedPlace?: PinnedPlace | null;
   hideSearchAndFilters?: boolean;
+  showPlaceDetailsSidebar?: boolean;
+  selectedPlaceForDetails?: string | null;
+  onShowPlaceDetails?: (placeId: string) => void;
+  onSelectPlaceFromDetails?: (address: string, coordinates: { lat: number; lng: number }, name: string) => void;
+  onClosePlaceDetails?: () => void;
 }
 
 // Types for search results
@@ -250,7 +256,12 @@ export function MapView({
   onPlaceNameClick,
   className,
   selectedPlace,
-  hideSearchAndFilters = false
+  hideSearchAndFilters = false,
+  showPlaceDetailsSidebar = false,
+  selectedPlaceForDetails,
+  onShowPlaceDetails,
+  onSelectPlaceFromDetails,
+  onClosePlaceDetails
 }: MapViewProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -887,6 +898,8 @@ export function MapView({
                       (searchInputRef as React.MutableRefObject<HTMLInputElement | null>).current = ref;
                     }
                   }}
+                  showDetailedView={showPlaceDetailsSidebar}
+                  onShowPlaceDetails={onShowPlaceDetails}
                 />
                 
                 {/* Show category suggestions only when typing */}
@@ -1087,6 +1100,16 @@ export function MapView({
             <ScrollArea className="h-[600px]">
               {renderPlaceDetails()}
             </ScrollArea>
+          </div>
+        ) : showPlaceDetailsSidebar && selectedPlaceForDetails ? (
+          <div className="w-full md:w-2/5 border-t md:border-t-0 md:border-l">
+            <div className="p-4">
+              <PlaceDetailsSidebar
+                placeId={selectedPlaceForDetails}
+                onSelectPlace={onSelectPlaceFromDetails}
+                onClose={onClosePlaceDetails}
+              />
+            </div>
           </div>
         ) : (
           <div className={`w-full md:w-2/5 border-t md:border-t-0 md:border-l ${!hideSearchAndFilters ? 'block' : 'hidden'}`}>

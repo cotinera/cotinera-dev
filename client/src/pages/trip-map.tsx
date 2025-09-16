@@ -16,6 +16,7 @@ export default function TripMap() {
   const tripId = params ? parseInt(params.id) : null;
   const [, setLocation] = useLocation();
   const [selectedPlace, setSelectedPlace] = useState<PinnedPlace | null>(null);
+  const [selectedPlaceForDetails, setSelectedPlaceForDetails] = useState<string | null>(null);
 
   const { data: trip, isLoading, error } = useQuery<Trip>({
     queryKey: ["/api/trips", tripId],
@@ -49,6 +50,20 @@ export default function TripMap() {
 
   const handlePinClick = (place: PinnedPlace) => {
     setSelectedPlace(place);
+  };
+
+  const handleShowPlaceDetails = (placeId: string) => {
+    setSelectedPlaceForDetails(placeId);
+  };
+
+  const handleSelectPlaceFromDetails = (address: string, coordinates: { lat: number; lng: number }, name: string) => {
+    // Handle place selection from details sidebar
+    console.log('Selected place from details:', { address, coordinates, name });
+    setSelectedPlaceForDetails(null);
+  };
+
+  const handleClosePlaceDetails = () => {
+    setSelectedPlaceForDetails(null);
   };
 
   if (isLoading) {
@@ -157,6 +172,11 @@ export default function TripMap() {
                   selectedPlace={selectedPlace}
                   onPinClick={handlePinClick}
                   className="w-full h-full rounded-b-lg"
+                  showPlaceDetailsSidebar={true}
+                  selectedPlaceForDetails={selectedPlaceForDetails}
+                  onShowPlaceDetails={handleShowPlaceDetails}
+                  onSelectPlaceFromDetails={handleSelectPlaceFromDetails}
+                  onClosePlaceDetails={handleClosePlaceDetails}
                 />
               </div>
             </CardContent>
