@@ -172,60 +172,53 @@ const getPlaceCategory = (types: string[]) => {
   return types[0]?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Place';
 };
 
-// Calculate time until close with live countdown
+// Calculate time until close with live countdown and timezone support
 const calculateTimeUntilClose = (openingHours?: PlaceCurrentOpeningHours, utcOffsetMinutes?: number) => {
-  if (!openingHours || !openingHours.open_now) {
-    return null;
-  }
+  if (!openingHours || !openingHours.open_now) return null;
+  const periods = openingHours.periods || [];
+  if (periods.length === 0) return { text: 'Open', isClosingSoon: false };
 
   const now = new Date();
-  const currentDay = now.getDay();
-  const currentTime = now.getHours() * 100 + now.getMinutes();
+  const userTz = -now.getTimezoneOffset();
+  const placeTz = utcOffsetMinutes ?? userTz;
+  const placeLocal = new Date(now.getTime() + (placeTz - userTz) * 60000);
 
-  // Find today's period
-  const todayPeriod = openingHours.periods?.find(period => period.open.day === currentDay);
-  if (!todayPeriod?.close) {
-    return { text: 'Open 24 hours', isClosingSoon: false };
+  const day = placeLocal.getDay();
+  const minutesToday = placeLocal.getHours() * 60 + placeLocal.getMinutes();
+  const WEEK = 7 * 1440;
+  const nowWeekMin = day * 1440 + minutesToday; // 0..10079
+  const parseHM = (t: string) => Number(t.slice(0,2)) * 60 + Number(t.slice(2,4));
+
+  let minutesUntilClose: number | null = null;
+
+  for (const p of periods) {
+    if (!p.open) continue;
+    if (!p.close) return { text: 'Open 24 hours', isClosingSoon: false };
+
+    const start = p.open.day * 1440 + parseHM(p.open.time);
+    let end = p.close.day * 1440 + parseHM(p.close.time);
+    if (end <= start) end += WEEK; // overnight or spans week boundary
+
+    const candidates = [nowWeekMin, nowWeekMin + WEEK, nowWeekMin - WEEK];
+    for (const n of candidates) {
+      if (n >= start && n < end) {
+        const remaining = end - n;
+        if (minutesUntilClose == null || remaining < minutesUntilClose) {
+          minutesUntilClose = remaining;
+        }
+        break;
+      }
+    }
   }
 
-  const closeTime = parseInt(todayPeriod.close.time);
-  let minutesUntilClose: number;
-  
-  if (closeTime > currentTime) {
-    // Closes later today
-    const closeHour = Math.floor(closeTime / 100);
-    const closeMinute = closeTime % 100;
-    const closeDate = new Date(now);
-    closeDate.setHours(closeHour, closeMinute, 0, 0);
-    minutesUntilClose = Math.floor((closeDate.getTime() - now.getTime()) / (1000 * 60));
-  } else {
-    // Closes tomorrow (crosses midnight)
-    const nextDay = new Date(now);
-    nextDay.setDate(nextDay.getDate() + 1);
-    const closeHour = Math.floor(closeTime / 100);
-    const closeMinute = closeTime % 100;
-    nextDay.setHours(closeHour, closeMinute, 0, 0);
-    minutesUntilClose = Math.floor((nextDay.getTime() - now.getTime()) / (1000 * 60));
+  if (minutesUntilClose == null) return null; // not currently open
+  if (minutesUntilClose <= 0) return { text: 'Closing soon', isClosingSoon: true };
+  if (minutesUntilClose < 60) return { text: `Closes in ${minutesUntilClose}m`, isClosingSoon: minutesUntilClose <= 30 };
+  if (minutesUntilClose < 1440) {
+    const h = Math.floor(minutesUntilClose / 60);
+    const m = minutesUntilClose % 60;
+    return { text: m ? `Closes in ${h}h ${m}m` : `Closes in ${h}h`, isClosingSoon: minutesUntilClose <= 120 };
   }
-
-  if (minutesUntilClose <= 0) {
-    return { text: 'Closing soon', isClosingSoon: true };
-  }
-  
-  if (minutesUntilClose < 60) {
-    return { 
-      text: `Closes in ${minutesUntilClose}m`, 
-      isClosingSoon: minutesUntilClose <= 30 
-    };
-  } else if (minutesUntilClose < 1440) { // Less than 24 hours
-    const hours = Math.floor(minutesUntilClose / 60);
-    const minutes = minutesUntilClose % 60;
-    return { 
-      text: minutes > 0 ? `Closes in ${hours}h ${minutes}m` : `Closes in ${hours}h`, 
-      isClosingSoon: minutesUntilClose <= 120 // 2 hours
-    };
-  }
-  
   return { text: 'Open', isClosingSoon: false };
 };
 
