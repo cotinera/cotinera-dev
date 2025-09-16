@@ -3,7 +3,10 @@ import { Input } from '@/components/ui/input';
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, MapPin } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, MapPin, Star, Clock, Phone, ChevronRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { PlaceDetailsSheet } from './place-details-sheet';
 
 interface LocationSearchBarProps {
   value: string;
@@ -18,6 +21,40 @@ interface LocationSearchBarProps {
   onInputRef?: (ref: HTMLInputElement | null) => void;
 }
 
+interface EnhancedPrediction extends google.maps.places.AutocompletePrediction {
+  rating?: number;
+  user_ratings_total?: number;
+  price_level?: number;
+  opening_hours?: {
+    open_now: boolean;
+  };
+  types: string[];
+  photos?: google.maps.places.PlacePhoto[];
+}
+
+const getPlaceCategory = (types: string[]) => {
+  const priorityTypes = {
+    restaurant: 'Restaurant',
+    food: 'Food',
+    lodging: 'Hotel',
+    tourist_attraction: 'Attraction',
+    shopping_mall: 'Shopping',
+    store: 'Store',
+    hospital: 'Hospital',
+    bank: 'Bank',
+    gas_station: 'Gas Station',
+    park: 'Park'
+  };
+  
+  for (const [type, label] of Object.entries(priorityTypes)) {
+    if (types.includes(type)) {
+      return label;
+    }
+  }
+  
+  return types[0]?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Place';
+};
+
 export function LocationSearchBar({
   value,
   onChange,
@@ -27,10 +64,12 @@ export function LocationSearchBar({
   onInputRef,
 }: LocationSearchBarProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [predictions, setPredictions] = useState<google.maps.places.AutocompletePrediction[]>([]);
+  const [predictions, setPredictions] = useState<EnhancedPrediction[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const [isPlaceDetailsOpen, setIsPlaceDetailsOpen] = useState(false);
   const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
   const placesService = useRef<google.maps.places.PlacesService | null>(null);
   const mapRef = useRef<HTMLDivElement | null>(null);
@@ -117,36 +156,62 @@ export function LocationSearchBar({
         locationBias: locationBias
       });
 
-      // Sort predictions by distance if we have location bias
-      if (searchBias && response.predictions.length > 0) {
+      // Enhance predictions with additional place details
+      const enhancedPredictions = await Promise.all(
+        response.predictions.slice(0, 8).map(async (prediction) => {
+          try {
+            const basicDetails = await new Promise<google.maps.places.PlaceResult>((resolve, reject) => {
+              placesService.current!.getDetails(
+                {
+                  placeId: prediction.place_id,
+                  fields: ['rating', 'user_ratings_total', 'price_level', 'opening_hours', 'types', 'photos', 'geometry'],
+                },
+                (result, status) => {
+                  if (status === google.maps.places.PlacesServiceStatus.OK && result) {
+                    resolve(result);
+                  } else {
+                    resolve({} as google.maps.places.PlaceResult);
+                  }
+                }
+              );
+            });
+
+            return {
+              ...prediction,
+              rating: basicDetails.rating,
+              user_ratings_total: basicDetails.user_ratings_total,
+              price_level: basicDetails.price_level,
+              opening_hours: basicDetails.opening_hours,
+              types: basicDetails.types || [],
+              photos: basicDetails.photos,
+              geometry: basicDetails.geometry
+            } as EnhancedPrediction;
+          } catch {
+            return {
+              ...prediction,
+              types: [],
+            } as EnhancedPrediction;
+          }
+        })
+      );
+
+      // Sort enhanced predictions by distance if we have location bias
+      if (searchBias && enhancedPredictions.length > 0) {
         const location = new google.maps.LatLng(searchBias.lat, searchBias.lng);
 
         // Calculate distances and sort
         const predictionsWithDistance = await Promise.all(
-          response.predictions.map(async (prediction) => {
+          enhancedPredictions.map(async (prediction) => {
             try {
-              const details = await new Promise<google.maps.places.PlaceResult>((resolve, reject) => {
-                placesService.current!.getDetails(
-                  {
-                    placeId: prediction.place_id,
-                    fields: ['geometry']
-                  },
-                  (result, status) => {
-                    if (status === google.maps.places.PlacesServiceStatus.OK && result) {
-                      resolve(result);
-                    } else {
-                      reject(new Error('Failed to get place details'));
-                    }
-                  }
+              if (prediction.geometry?.location) {
+                const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                  location,
+                  prediction.geometry.location
                 );
-              });
-
-              const distance = google.maps.geometry.spherical.computeDistanceBetween(
-                location,
-                details.geometry!.location!
-              );
-
-              return { prediction, distance };
+                return { prediction, distance };
+              } else {
+                return { prediction, distance: Infinity };
+              }
             } catch (error) {
               return { prediction, distance: Infinity };
             }
@@ -155,9 +220,9 @@ export function LocationSearchBar({
 
         // Sort by distance
         predictionsWithDistance.sort((a, b) => a.distance - b.distance);
-        setPredictions(predictionsWithDistance.map(p => p.prediction));
+        setPredictions(predictionsWithDistance.map(item => item.prediction));
       } else {
-        setPredictions(response.predictions);
+        setPredictions(enhancedPredictions);
       }
 
       setIsOpen(true);
@@ -171,43 +236,16 @@ export function LocationSearchBar({
     }
   }, [searchBias, isGoogleMapsReady]);
 
-  const handleSelect = async (placeId: string) => {
-    if (!placesService.current) return;
+  const handleSelect = (placeId: string) => {
+    setSelectedPlaceId(placeId);
+    setIsPlaceDetailsOpen(true);
+    setIsOpen(false);
+  };
 
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const place = await new Promise<google.maps.places.PlaceResult>((resolve, reject) => {
-        placesService.current!.getDetails(
-          {
-            placeId: placeId,
-            fields: ['formatted_address', 'geometry', 'name', 'types'],
-          },
-          (result, status) => {
-            if (status === google.maps.places.PlacesServiceStatus.OK && result) {
-              resolve(result);
-            } else {
-              reject(new Error('Failed to get place details'));
-            }
-          }
-        );
-      });
-
-      if (place.geometry?.location) {
-        const coordinates = {
-          lat: place.geometry.location.lat(),
-          lng: place.geometry.location.lng(),
-        };
-        onChange(place.formatted_address || '', coordinates, place.name || '');
-      }
-    } catch (err) {
-      console.error('Place details error:', err);
-      setError('Failed to get location details');
-    } finally {
-      setIsLoading(false);
-      setIsOpen(false);
-    }
+  const handlePlaceSelect = (address: string, coordinates: { lat: number; lng: number }, name: string) => {
+    onChange(address, coordinates, name);
+    setIsPlaceDetailsOpen(false);
+    setSelectedPlaceId(null);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -261,15 +299,51 @@ export function LocationSearchBar({
                     <CommandItem
                       key={prediction.place_id}
                       onSelect={() => handleSelect(prediction.place_id)}
-                      className="flex items-center gap-2 px-4 py-2 hover:bg-accent cursor-pointer"
+                      className="flex items-start gap-3 px-4 py-3 hover:bg-accent cursor-pointer"
                     >
-                      <MapPin className="h-4 w-4 shrink-0" />
-                      <div className="flex flex-col">
-                        <span className="text-sm">{prediction.structured_formatting.main_text}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {prediction.structured_formatting.secondary_text}
-                        </span>
+                      <MapPin className="h-4 w-4 shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-medium truncate">{prediction.structured_formatting.main_text}</span>
+                          {prediction.rating && (
+                            <div className="flex items-center gap-1">
+                              <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                              <span className="text-xs font-medium">{prediction.rating.toFixed(1)}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs text-muted-foreground truncate">
+                            {prediction.structured_formatting.secondary_text}
+                          </span>
+                          {prediction.types.length > 0 && (
+                            <Badge variant="secondary" className="text-xs px-1.5 py-0.5 h-auto">
+                              {getPlaceCategory(prediction.types)}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          {prediction.opening_hours?.open_now !== undefined && (
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              <span className={cn(
+                                prediction.opening_hours.open_now ? "text-green-600" : "text-red-600"
+                              )}>
+                                {prediction.opening_hours.open_now ? "Open" : "Closed"}
+                              </span>
+                            </div>
+                          )}
+                          {prediction.price_level && (
+                            <span className="text-green-600 font-medium">
+                              {'$'.repeat(prediction.price_level)}
+                            </span>
+                          )}
+                          {prediction.user_ratings_total && (
+                            <span>({prediction.user_ratings_total} reviews)</span>
+                          )}
+                        </div>
                       </div>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                     </CommandItem>
                   ))}
                 </ScrollArea>
@@ -281,6 +355,13 @@ export function LocationSearchBar({
           </Command>
         </div>
       )}
+      
+      <PlaceDetailsSheet
+        open={isPlaceDetailsOpen}
+        onOpenChange={setIsPlaceDetailsOpen}
+        placeId={selectedPlaceId}
+        onSelectPlace={handlePlaceSelect}
+      />
     </div>
   );
 }
