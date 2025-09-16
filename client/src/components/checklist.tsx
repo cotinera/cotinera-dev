@@ -11,23 +11,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { Plus, Pencil, Trash2, Calendar as CalendarIcon, User } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
 
 interface ChecklistProps {
   tripId?: number;
@@ -37,12 +22,8 @@ export function Checklist({ tripId }: ChecklistProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [newItemTitle, setNewItemTitle] = useState("");
-  const [newItemAssignedTo, setNewItemAssignedTo] = useState<string>("");
-  const [newItemDeadline, setNewItemDeadline] = useState<Date | undefined>(undefined);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
-  const [editingAssignedTo, setEditingAssignedTo] = useState<string>("");
-  const [editingDeadline, setEditingDeadline] = useState<Date | undefined>(undefined);
 
   const { data: items = [], isError } = useQuery<ChecklistItem[]>({
     queryKey: [`/api/trips/${tripId}/checklist`],
@@ -54,18 +35,6 @@ export function Checklist({ tripId }: ChecklistProps) {
         const error = await res.json().catch(() => ({ message: 'Failed to fetch checklist items' }));
         throw new Error(error.message);
       }
-      return res.json();
-    },
-    enabled: !!tripId,
-  });
-
-  const { data: participants = [] } = useQuery({
-    queryKey: [`/api/trips/${tripId}/participants`],
-    queryFn: async () => {
-      const res = await fetch(`/api/trips/${tripId}/participants`, {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error('Failed to fetch participants');
       return res.json();
     },
     enabled: !!tripId,
@@ -104,13 +73,13 @@ export function Checklist({ tripId }: ChecklistProps) {
   });
 
   const createItem = useMutation({
-    mutationFn: async (data: { title: string; assignedTo?: number; deadline?: string }) => {
+    mutationFn: async (title: string) => {
       const res = await fetch(`/api/trips/${tripId}/checklist`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ title }),
         credentials: "include",
       });
 
@@ -126,8 +95,6 @@ export function Checklist({ tripId }: ChecklistProps) {
         queryKey: [`/api/trips/${tripId}/checklist`],
       });
       setNewItemTitle("");
-      setNewItemAssignedTo("");
-      setNewItemDeadline(undefined);
     },
     onError: (error: Error) => {
       toast({
@@ -139,13 +106,13 @@ export function Checklist({ tripId }: ChecklistProps) {
   });
 
   const updateItem = useMutation({
-    mutationFn: async ({ id, title, completed, assignedTo, deadline }: Partial<ChecklistItem> & { id: number }) => {
+    mutationFn: async ({ id, title, completed }: Partial<ChecklistItem> & { id: number }) => {
       const res = await fetch(`/api/trips/${tripId}/checklist/${id}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ title, completed, assignedTo, deadline }),
+        body: JSON.stringify({ title, completed }),
         credentials: "include",
       });
 
@@ -162,8 +129,6 @@ export function Checklist({ tripId }: ChecklistProps) {
       });
       setEditingId(null);
       setEditingTitle("");
-      setEditingAssignedTo("");
-      setEditingDeadline(undefined);
     },
     onError: (error: Error) => {
       toast({
@@ -195,31 +160,19 @@ export function Checklist({ tripId }: ChecklistProps) {
       return;
     }
 
-    createItem.mutate({
-      title: newItemTitle,
-      assignedTo: newItemAssignedTo ? parseInt(newItemAssignedTo) : undefined,
-      deadline: newItemDeadline ? newItemDeadline.toISOString() : undefined,
-    });
+    createItem.mutate(newItemTitle);
   };
 
   const startEditing = (item: ChecklistItem) => {
     setEditingId(item.id);
     setEditingTitle(item.title);
-    setEditingAssignedTo(item.assignedTo ? item.assignedTo.toString() : "");
-    setEditingDeadline(item.deadline ? new Date(item.deadline) : undefined);
   };
 
   const handleEditSubmit = (item: ChecklistItem) => {
     if (editingTitle.trim() === "") {
       return;
     }
-    updateItem.mutate({ 
-      id: item.id, 
-      title: editingTitle, 
-      completed: item.completed,
-      assignedTo: editingAssignedTo ? parseInt(editingAssignedTo) : undefined,
-      deadline: editingDeadline || null,
-    });
+    updateItem.mutate({ id: item.id, title: editingTitle, completed: item.completed });
   };
 
   const handleDeleteItem = (itemId: number) => {
@@ -256,57 +209,15 @@ export function Checklist({ tripId }: ChecklistProps) {
         <CardDescription>Track your trip preparation tasks</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-3 mb-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Add new item..."
-              value={newItemTitle}
-              onChange={(e) => setNewItemTitle(e.target.value)}
-              className="flex-1"
-            />
-            <Button type="submit" size="icon" disabled={createItem.isPending}>
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-          
-          <div className="flex gap-2">
-            <Select value={newItemAssignedTo} onValueChange={setNewItemAssignedTo}>
-              <SelectTrigger className="flex-1">
-                <SelectValue placeholder="Assign to..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">No assignee</SelectItem>
-                {participants.map((participant: any) => (
-                  <SelectItem key={participant.id} value={participant.userId?.toString() || participant.id.toString()}>
-                    {participant.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "flex-1 justify-start text-left font-normal",
-                    !newItemDeadline && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {newItemDeadline ? format(newItemDeadline, "PPP") : "Set deadline"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={newItemDeadline}
-                  onSelect={setNewItemDeadline}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
+        <form onSubmit={handleSubmit} className="flex gap-2 mb-4">
+          <Input
+            placeholder="Add new item..."
+            value={newItemTitle}
+            onChange={(e) => setNewItemTitle(e.target.value)}
+          />
+          <Button type="submit" size="icon" disabled={createItem.isPending}>
+            <Plus className="h-4 w-4" />
+          </Button>
         </form>
 
         <div className="space-y-2">
@@ -324,7 +235,7 @@ export function Checklist({ tripId }: ChecklistProps) {
               />
               {editingId === item.id ? (
                 <form
-                  className="flex-1 space-y-2"
+                  className="flex-1 flex gap-2"
                   onSubmit={(e) => {
                     e.preventDefault();
                     handleEditSubmit(item);
@@ -333,94 +244,20 @@ export function Checklist({ tripId }: ChecklistProps) {
                   <Input
                     value={editingTitle}
                     onChange={(e) => setEditingTitle(e.target.value)}
+                    onBlur={() => handleEditSubmit(item)}
                     autoFocus
-                    placeholder="Task title"
                   />
-                  <div className="flex gap-2">
-                    <Select value={editingAssignedTo} onValueChange={setEditingAssignedTo}>
-                      <SelectTrigger className="flex-1">
-                        <SelectValue placeholder="Assign to..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">No assignee</SelectItem>
-                        {participants.map((participant: any) => (
-                          <SelectItem key={participant.id} value={participant.userId?.toString() || participant.id.toString()}>
-                            {participant.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "flex-1 justify-start text-left font-normal",
-                            !editingDeadline && "text-muted-foreground"
-                          )}
-                          type="button"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {editingDeadline ? format(editingDeadline, "PPP") : "Set deadline"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={editingDeadline}
-                          onSelect={setEditingDeadline}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button type="submit" size="sm" className="flex-1">
-                      Save
-                    </Button>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1"
-                      onClick={() => {
-                        setEditingId(null);
-                        setEditingTitle("");
-                        setEditingAssignedTo("");
-                        setEditingDeadline(undefined);
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
                 </form>
               ) : (
                 <>
-                  <div className="flex-1">
-                    <label
-                      htmlFor={`item-${item.id}`}
-                      className={`block cursor-pointer ${
-                        item.completed ? "line-through text-muted-foreground" : ""
-                      }`}
-                    >
-                      {item.title}
-                    </label>
-                    <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
-                      {(item as any).assignedUser && (
-                        <div className="flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          <span>{(item as any).assignedUser.name}</span>
-                        </div>
-                      )}
-                      {item.deadline && (
-                        <div className="flex items-center gap-1">
-                          <CalendarIcon className="h-3 w-3" />
-                          <span>{format(new Date(item.deadline), "MMM d, yyyy")}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <label
+                    htmlFor={`item-${item.id}`}
+                    className={`flex-1 cursor-pointer ${
+                      item.completed ? "line-through text-muted-foreground" : ""
+                    }`}
+                  >
+                    {item.title}
+                  </label>
                   <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100">
                     <Button
                       variant="ghost"
