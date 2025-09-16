@@ -4,9 +4,10 @@ import { MdRestaurant, MdHotel } from "react-icons/md";
 import { FaLandmark, FaShoppingBag, FaUmbrellaBeach, FaGlassCheers, FaStore, FaTree } from "react-icons/fa";
 import { useEffect, useState, useCallback, useRef } from "react";
 import type { Libraries } from "@react-google-maps/api";
+import { MarkerClusterer } from "@googlemaps/markerclusterer";
 
 // Define the required Google Maps libraries
-const libraries: Libraries = ["places"];
+const libraries: Libraries = ["places", "marker"];
 export const GOOGLE_MAPS_LIBRARIES = libraries;
 
 // Map container styling configuration
@@ -255,6 +256,21 @@ export const usePlacesService = () => {
           place_id: place.place_id || requestedPlaceId,
           name: place.name || 'Unnamed Place',
           formatted_address: place.formatted_address || 'No address available',
+          // Fix opening hours compatibility
+          opening_hours: place.opening_hours ? {
+            weekday_text: place.opening_hours.weekday_text || [],
+            isOpen: () => place.opening_hours?.isOpen() || false,
+            periods: place.opening_hours.periods?.map(period => ({
+              open: {
+                day: period.open?.day || 0,
+                time: period.open?.time || '0000'
+              },
+              close: {
+                day: period.close?.day || 0,
+                time: period.close?.time || '2359'
+              }
+            }))
+          } : undefined,
           // Derive reservable status from types and business_status
           reservable: place.types?.includes('restaurant') || place.types?.includes('lodging'),
           // Derive dining options from types
@@ -418,3 +434,325 @@ export const useGoogleMapsScript = () => {
 
 // Export components from @react-google-maps/api
 export { GoogleMap, MarkerF };
+
+// Interface for search result markers
+export interface SearchResultMarker {
+  id: string;
+  position: Coordinates;
+  place: PlaceSearchResult;
+  isSelected?: boolean;
+  onClick?: () => void;
+}
+
+// Interface for PlaceSearchResult (matching the places/search.ts file)
+export interface PlaceSearchResult {
+  place_id: string;
+  name: string;
+  formatted_address: string;
+  geometry: {
+    location: {
+      lat: number;
+      lng: number;
+    };
+  };
+  rating?: number;
+  user_ratings_total?: number;
+  price_level?: number;
+  opening_hours?: {
+    open_now: boolean;
+  };
+  types: string[];
+  photos?: google.maps.places.PlacePhoto[];
+  vicinity?: string;
+  business_status?: string;
+}
+
+/**
+ * Creates an HTML element for AdvancedMarkerElement content
+ * @param category - Place category for icon selection
+ * @param isSelected - Whether the marker is currently selected
+ * @param name - Place name for tooltip
+ * @returns HTMLElement to be used as marker content
+ */
+export const createAdvancedMarkerContent = (
+  category: PlaceCategory, 
+  isSelected: boolean = false,
+  name: string = ''
+): HTMLElement => {
+  const markerDiv = document.createElement('div');
+  markerDiv.className = 'advanced-marker-content';
+  markerDiv.title = name;
+  
+  // Set up the marker styles
+  markerDiv.style.cssText = `
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 2px solid white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    position: relative;
+    ${isSelected 
+      ? 'background: linear-gradient(45deg, #22c55e, #16a34a); transform: scale(1.2); z-index: 1000;'
+      : 'background: linear-gradient(45deg, #a855f7, #8b5cf6);'
+    }
+  `;
+
+  // Get icon for the category
+  const IconComponent = CATEGORY_ICONS[category];
+  if (IconComponent && typeof IconComponent === 'function') {
+    // Create icon element
+    const iconElement = document.createElement('span');
+    iconElement.style.cssText = `
+      color: white;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    `;
+    
+    // Create a simple icon representation for the category
+    let iconText = '';
+    switch (category) {
+      case 'restaurant':
+        iconText = '🍽️';
+        break;
+      case 'hotel':
+        iconText = '🏨';
+        break;
+      case 'attraction':
+        iconText = '🎯';
+        break;
+      case 'shopping':
+        iconText = '🛍️';
+        break;
+      case 'beach':
+        iconText = '🏖️';
+        break;
+      case 'nightlife':
+        iconText = '🍻';
+        break;
+      case 'store':
+        iconText = '🏪';
+        break;
+      case 'park':
+        iconText = '🌳';
+        break;
+      default:
+        iconText = '📍';
+    }
+    
+    iconElement.textContent = iconText;
+    markerDiv.appendChild(iconElement);
+  } else {
+    // Fallback icon
+    markerDiv.textContent = '📍';
+    markerDiv.style.color = 'white';
+  }
+
+  // Add hover effects
+  markerDiv.addEventListener('mouseenter', () => {
+    if (!isSelected) {
+      markerDiv.style.transform = 'scale(1.1)';
+      markerDiv.style.zIndex = '999';
+    }
+  });
+
+  markerDiv.addEventListener('mouseleave', () => {
+    if (!isSelected) {
+      markerDiv.style.transform = 'scale(1)';
+      markerDiv.style.zIndex = 'auto';
+    }
+  });
+
+  return markerDiv;
+};
+
+/**
+ * Component for rendering search result markers using AdvancedMarkerElement
+ */
+export const SearchResultMarkers = ({
+  markers,
+  map,
+  onMarkerClick,
+  selectedMarkerId
+}: {
+  markers: SearchResultMarker[];
+  map: google.maps.Map | null;
+  onMarkerClick?: (marker: SearchResultMarker) => void;
+  selectedMarkerId?: string | null;
+}) => {
+  const markersRef = useRef<Map<string, google.maps.marker.AdvancedMarkerElement>>(new Map());
+  const clustererRef = useRef<MarkerClusterer | null>(null);
+
+  useEffect(() => {
+    if (!map || !window.google?.maps?.marker) {
+      return;
+    }
+
+    // Clear existing markers
+    markersRef.current.forEach(marker => {
+      marker.map = null;
+    });
+    markersRef.current.clear();
+
+    // Destroy existing clusterer
+    if (clustererRef.current) {
+      clustererRef.current.clearMarkers();
+      clustererRef.current = null;
+    }
+
+    // Create new markers
+    const advancedMarkers: google.maps.marker.AdvancedMarkerElement[] = [];
+
+    markers.forEach((markerData) => {
+      const { category } = getPrimaryCategory(markerData.place.types);
+      const isSelected = selectedMarkerId === markerData.id;
+      
+      const content = createAdvancedMarkerContent(
+        category,
+        isSelected,
+        markerData.place.name
+      );
+
+      const advancedMarker = new google.maps.marker.AdvancedMarkerElement({
+        map: null, // Don't add to map yet, clusterer will handle it
+        position: markerData.position,
+        content: content,
+        title: markerData.place.name,
+      });
+
+      // Add click handler
+      content.addEventListener('click', () => {
+        if (onMarkerClick) {
+          onMarkerClick(markerData);
+        }
+      });
+
+      markersRef.current.set(markerData.id, advancedMarker);
+      advancedMarkers.push(advancedMarker);
+    });
+
+    // Initialize clusterer only if we have many markers (>50)
+    if (advancedMarkers.length > 50) {
+      clustererRef.current = new MarkerClusterer({
+        map,
+        markers: advancedMarkers,
+        renderer: {
+          render: ({ count, position }) => {
+            // Custom cluster styling
+            const clusterDiv = document.createElement('div');
+            clusterDiv.style.cssText = `
+              width: 50px;
+              height: 50px;
+              border-radius: 50%;
+              background: linear-gradient(45deg, #3b82f6, #1d4ed8);
+              color: white;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: bold;
+              font-size: 14px;
+              border: 2px solid white;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+              cursor: pointer;
+            `;
+            clusterDiv.textContent = count.toString();
+
+            return new google.maps.marker.AdvancedMarkerElement({
+              position,
+              content: clusterDiv,
+            });
+          },
+        },
+      });
+    } else {
+      // For smaller numbers, add markers directly to map
+      advancedMarkers.forEach(marker => {
+        marker.map = map;
+      });
+    }
+
+    // Cleanup function
+    return () => {
+      markersRef.current.forEach(marker => {
+        marker.map = null;
+      });
+      markersRef.current.clear();
+      
+      if (clustererRef.current) {
+        clustererRef.current.clearMarkers();
+        clustererRef.current = null;
+      }
+    };
+  }, [markers, map, onMarkerClick, selectedMarkerId]);
+
+  // Update marker selection when selectedMarkerId changes
+  useEffect(() => {
+    markersRef.current.forEach((marker, markerId) => {
+      const markerData = markers.find(m => m.id === markerId);
+      if (markerData && marker.content instanceof HTMLElement) {
+        const { category } = getPrimaryCategory(markerData.place.types);
+        const isSelected = selectedMarkerId === markerId;
+        
+        // Update the marker content to reflect selection state
+        const newContent = createAdvancedMarkerContent(
+          category,
+          isSelected,
+          markerData.place.name
+        );
+        
+        // Add click handler to new content
+        newContent.addEventListener('click', () => {
+          if (onMarkerClick) {
+            onMarkerClick(markerData);
+          }
+        });
+        
+        marker.content = newContent;
+      }
+    });
+  }, [selectedMarkerId, markers, onMarkerClick]);
+
+  return null; // This component doesn't render React elements
+};
+
+/**
+ * Hook to manage search result markers with clustering
+ */
+export const useSearchResultMarkers = (
+  map: google.maps.Map | null,
+  places: PlaceSearchResult[],
+  onPlaceClick?: (place: PlaceSearchResult) => void
+) => {
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+
+  const markers: SearchResultMarker[] = places.map(place => ({
+    id: place.place_id,
+    position: {
+      lat: place.geometry.location.lat,
+      lng: place.geometry.location.lng,
+    },
+    place,
+    isSelected: selectedPlaceId === place.place_id,
+  }));
+
+  const handleMarkerClick = useCallback((marker: SearchResultMarker) => {
+    setSelectedPlaceId(marker.id);
+    if (onPlaceClick) {
+      onPlaceClick(marker.place);
+    }
+  }, [onPlaceClick]);
+
+  return {
+    markers,
+    selectedPlaceId,
+    setSelectedPlaceId,
+    handleMarkerClick,
+  };
+};

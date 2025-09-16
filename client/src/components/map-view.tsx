@@ -8,7 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAccommodations } from "@/hooks/use-accommodations";
 import { cn } from "@/lib/utils";
-import { useGoogleMapsScript, useMapCoordinates, GoogleMap, MarkerF, PlaceDetails, PinnedPlace } from "@/lib/google-maps";
+import { useGoogleMapsScript, useMapCoordinates, GoogleMap, MarkerF, PlaceDetails, PinnedPlace, SearchResultMarkers, useSearchResultMarkers, PlaceSearchResult } from "@/lib/google-maps";
 import { LocationSearchBar } from "@/components/location-search-bar";
 import { IconPicker } from "@/components/icon-picker";
 import { PlaceDetailsSidebar } from "@/components/place-details-sidebar";
@@ -273,7 +273,7 @@ export function MapView({
   const numericTripId = tripId && !isNaN(Number(tripId)) ? Number(tripId) : undefined;
   const { accommodations = [] } = useAccommodations(numericTripId);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [placeResults, setPlaceResults] = useState<google.maps.places.PlaceResult[]>([]);
+  const [placeResults, setPlaceResults] = useState<PlaceSearchResult[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
   const [activeFilters, setActiveFilters] = useState<Record<string, any>>({});
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -281,6 +281,22 @@ export function MapView({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchedLocation, setSearchedLocation] = useState<{ lat: number; lng: number } | null>(null);
   const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
+  
+  // Search result markers management
+  const {
+    markers: searchMarkers,
+    selectedPlaceId: selectedSearchPlaceId,
+    setSelectedPlaceId: setSelectedSearchPlaceId,
+    handleMarkerClick: handleSearchMarkerClick,
+  } = useSearchResultMarkers(
+    mapRef.current,
+    placeResults,
+    (place) => {
+      if (place.place_id) {
+        fetchDetails(place.place_id);
+      }
+    }
+  );
 
   // Load Google Maps script
   const { isLoaded, loadError, errorMessage } = useGoogleMapsScript();
@@ -370,6 +386,31 @@ export function MapView({
     if ('places' in pinnedPlaces) return pinnedPlaces.places;
     return [];
   }, [pinnedPlaces]);
+  
+  // Convert google.maps.places.PlaceResult to PlaceSearchResult
+  const convertPlaceResult = useCallback((place: google.maps.places.PlaceResult): PlaceSearchResult => {
+    return {
+      place_id: place.place_id || '',
+      name: place.name || '',
+      formatted_address: place.formatted_address || place.vicinity || '',
+      geometry: {
+        location: {
+          lat: place.geometry?.location?.lat() || 0,
+          lng: place.geometry?.location?.lng() || 0,
+        },
+      },
+      rating: place.rating,
+      user_ratings_total: place.user_ratings_total,
+      price_level: place.price_level,
+      opening_hours: place.opening_hours ? {
+        open_now: place.opening_hours.open_now || false
+      } : undefined,
+      types: place.types || [],
+      photos: place.photos,
+      vicinity: place.vicinity,
+      business_status: place.business_status,
+    };
+  }, []);
 
   const fetchDetails = useCallback((placeId: string) => {
     getPlaceDetails(placeId, (place, status) => {
@@ -494,10 +535,12 @@ export function MapView({
           );
         }
 
-        setPlaceResults(filteredResults);
+        // Convert to PlaceSearchResult format
+        const convertedResults = filteredResults.map(convertPlaceResult);
+        setPlaceResults(convertedResults);
       }
     });
-  }, [selectedCategory, activeFilters]);
+  }, [selectedCategory, activeFilters, convertPlaceResult]);
 
   const handleCategoryClick = useCallback((category: CategoryButton) => {
     setSelectedCategory(currentCategory => {
@@ -1034,31 +1077,13 @@ export function MapView({
                 />
               )}
               
-              {/* Render place search results */}
-              {placeResults.map((place, idx) => (
-                place.geometry?.location && (
-                  <MarkerF
-                    key={`search-${place.place_id || idx}`}
-                    position={{
-                      lat: place.geometry.location.lat(),
-                      lng: place.geometry.location.lng(),
-                    }}
-                    onClick={() => {
-                      if (place.place_id) {
-                        fetchDetails(place.place_id);
-                      }
-                    }}
-                    icon={{
-                      path: google.maps.SymbolPath.CIRCLE,
-                      fillColor: '#a855f7',
-                      fillOpacity: 0.8,
-                      strokeWeight: 2,
-                      strokeColor: '#ffffff',
-                      scale: 7,
-                    }}
-                  />
-                )
-              ))}
+              {/* Render place search results using AdvancedMarkerElement */}
+              <SearchResultMarkers
+                markers={searchMarkers}
+                map={mapRef.current}
+                onMarkerClick={handleSearchMarkerClick}
+                selectedMarkerId={selectedSearchPlaceId}
+              />
 
               {/* Render accommodations */}
               {accommodations.filter((accom: any) => accom.coordinates !== null).map((accom: any) => (
