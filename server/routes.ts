@@ -973,8 +973,6 @@ export function registerRoutes(app: Express): Server {
         tripId: parseInt(req.params.tripId),
         title: req.body.title,
         completed: false,
-        ...(req.body.assigneeId && { assigneeId: parseInt(req.body.assigneeId) }),
-        ...(req.body.deadline && { deadline: req.body.deadline }),
       }).returning();
 
       res.json(newItem);
@@ -990,11 +988,7 @@ export function registerRoutes(app: Express): Server {
         .update(checklist)
         .set({
           ...(req.body.completed !== undefined && { completed: req.body.completed }),
-          ...(req.body.title !== undefined && { title: req.body.title }),
-          ...(req.body.assigneeId !== undefined && { 
-            assigneeId: req.body.assigneeId ? parseInt(req.body.assigneeId) : null 
-          }),
-          ...(req.body.deadline !== undefined && { deadline: req.body.deadline })
+          ...(req.body.title !== undefined && { title: req.body.title })
         })
         .where(
           and(
