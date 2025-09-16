@@ -22,7 +22,7 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   name: text("name"),
   username: text("username"),
-  avatar: text("avatar").default(null),
+  avatar: text("avatar"),
   provider: text("provider").default("email"),
   provider_id: text("provider_id"),
   preferences: jsonb("preferences").$type<{
@@ -275,6 +275,8 @@ export const checklist = pgTable("checklist", {
   tripId: integer("trip_id").notNull().references(() => trips.id),
   title: text("title").notNull(),
   completed: boolean("completed").default(false),
+  assignedTo: integer("assigned_to").references(() => users.id),
+  deadline: timestamp("deadline"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -464,6 +466,10 @@ export const checklistRelations = relations(checklist, ({ one }) => ({
   trip: one(trips, {
     fields: [checklist.tripId],
     references: [trips.id],
+  }),
+  assignedUser: one(users, {
+    fields: [checklist.assignedTo],
+    references: [users.id],
   }),
 }));
 

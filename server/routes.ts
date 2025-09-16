@@ -71,7 +71,7 @@ export function registerRoutes(app: Express): Server {
       res.json(user);
     } catch (error) {
       console.error('Test user creation error:', error);
-      res.status(500).json({ error: "Failed to create test user: " + error.message });
+      res.status(500).json({ error: "Failed to create test user: " + (error instanceof Error ? error.message : String(error)) });
     }
   });
 
@@ -432,7 +432,7 @@ export function registerRoutes(app: Express): Server {
       res.json({
         trip: tripDetails,
         accessLevel: shareLink.accessLevel,
-        isParticipant: req.user ? tripParticipants.some(p => p.userId === req.user.id) : false
+        isParticipant: req.user ? tripParticipants.some(p => p.userId === req.user?.id) : false
       });
 
     } catch (error) {
@@ -877,7 +877,6 @@ export function registerRoutes(app: Express): Server {
         description: req.body.description || null,
         location: req.body.location || null,
         coordinates: req.body.coordinates || null,
-        participants: req.body.participants || [], //Restored participants field
       }).returning();
 
       if (!newActivity) {
@@ -888,7 +887,7 @@ export function registerRoutes(app: Express): Server {
       res.json(newActivity);
     } catch (error) {
       console.error('Error creating activity:', error);
-      res.status(500).json({ error: 'Failed to create activity: ' + error.message });
+      res.status(500).json({ error: 'Failed to create activity: ' + (error instanceof Error ? error.message : String(error)) });
     }
   });
 
@@ -903,7 +902,6 @@ export function registerRoutes(app: Express): Server {
           location: req.body.location,
           startTime: new Date(req.body.startTime),
           endTime: new Date(req.body.endTime),
-          participants: req.body.participants || [],
           coordinates: req.body.coordinates || null,
         })
         .where(
@@ -959,6 +957,15 @@ export function registerRoutes(app: Express): Server {
       const tripId = parseInt(req.params.tripId);
       const checklistItems = await db.query.checklist.findMany({
         where: eq(checklist.tripId, tripId),
+        with: {
+          assignedUser: {
+            columns: {
+              id: true,
+              name: true,
+              username: true
+            }
+          }
+        }
       });
       res.json(checklistItems);
     } catch (error) {
@@ -973,6 +980,8 @@ export function registerRoutes(app: Express): Server {
         tripId: parseInt(req.params.tripId),
         title: req.body.title,
         completed: false,
+        assignedTo: req.body.assignedTo || null,
+        deadline: req.body.deadline || null,
       }).returning();
 
       res.json(newItem);
@@ -988,7 +997,9 @@ export function registerRoutes(app: Express): Server {
         .update(checklist)
         .set({
           ...(req.body.completed !== undefined && { completed: req.body.completed }),
-          ...(req.body.title !== undefined && { title: req.body.title })
+          ...(req.body.title !== undefined && { title: req.body.title }),
+          ...(req.body.assignedTo !== undefined && { assignedTo: req.body.assignedTo }),
+          ...(req.body.deadline !== undefined && { deadline: req.body.deadline })
         })
         .where(
           and(
@@ -1032,7 +1043,7 @@ export function registerRoutes(app: Express): Server {
       res.json(deletedItem);
     } catch (error) {
       console.error('Error deleting checklist item:', error);
-      res.status(500).json({ error: 'Failed to delete checklist item' });
+      res.status(500).json({ error: 'Failed to delete checklist item: ' + (error instanceof Error ? error.message : String(error)) });
     }
   });
 
@@ -1195,7 +1206,7 @@ export function registerRoutes(app: Express): Server {
             accommodationId = newAccommodation.id;
           } catch (error) {
             console.error('Error creating accommodation:', error);
-            throw new Error('Failed to create accommodation: ' + error.message);
+            throw new Error('Failed to create accommodation: ' + (error instanceof Error ? error.message : String(error)));
           }
         }
 
@@ -1220,7 +1231,7 @@ export function registerRoutes(app: Express): Server {
           console.log('Created participant:', participant);
         } catch (error) {
           console.error('Error creating participant:', error);
-          throw new Error('Failed to create participant record: ' + error.message);
+          throw new Error('Failed to create participant record: ' + (error instanceof Error ? error.message : String(error)));
         }
 
         // Create flight if needed
@@ -1248,7 +1259,7 @@ export function registerRoutes(app: Express): Server {
             console.log('Created flight:', flight);
           } catch (error) {
             console.error('Error creating flight:', error);
-            throw new Error('Failed to create flight record: ' + error.message);
+            throw new Error('Failed to create flight record: ' + (error instanceof Error ? error.message : String(error)));
           }
         }
 
@@ -1273,7 +1284,7 @@ export function registerRoutes(app: Express): Server {
     } catch (error) {
       console.error('Error creating participant:', error);
       res.status(500).json({
-        error: 'Failed to create participant',
+        error: 'Failed to create participant: ' + (error instanceof Error ? error.message : String(error)),
         details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
@@ -2835,7 +2846,7 @@ export function registerRoutes(app: Express): Server {
           amount: amountValue.toString(), // Store as string to avoid float precision issues
           currency: currency || 'USD',
           category: category || 'other',
-          date: formattedDate,
+          date: formattedDate.toISOString().split('T')[0],
         }).returning();
         
         if (!newExpense?.id) {
@@ -3183,7 +3194,7 @@ export function registerRoutes(app: Express): Server {
             amount: amountValue.toString(), // Store as string
             currency: currency || expense.currency,
             category: category || expense.category,
-            date: formattedDate,
+            date: formattedDate.toISOString().split('T')[0],
           })
           .where(eq(expenses.id, expenseId))
           .returning();
