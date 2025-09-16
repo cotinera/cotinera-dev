@@ -90,7 +90,18 @@ export function registerRoutes(app: Express): Server {
         db.select().from(activities).where(eq(activities.tripId, tripId)),
         db.select().from(flights).where(eq(flights.tripId, tripId)),
         db.select().from(accommodations).where(eq(accommodations.tripId, tripId)),
-        db.select().from(checklist).where(eq(checklist.tripId, tripId))
+        db.query.checklist.findMany({
+          where: eq(checklist.tripId, tripId),
+          with: {
+            assignedUser: {
+              columns: {
+                id: true,
+                name: true,
+                username: true
+              }
+            }
+          }
+        })
       ]);
 
       const tripWithDetails = {
