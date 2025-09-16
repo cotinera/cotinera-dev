@@ -275,6 +275,8 @@ export const checklist = pgTable("checklist", {
   tripId: integer("trip_id").notNull().references(() => trips.id),
   title: text("title").notNull(),
   completed: boolean("completed").default(false),
+  assigneeId: integer("assignee_id").references(() => participants.id),
+  deadline: date("deadline"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
