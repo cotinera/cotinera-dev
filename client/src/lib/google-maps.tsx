@@ -17,13 +17,27 @@ export const MAP_CONTAINER_STYLE = {
   position: "relative" as const,
 };
 
-// Default map options
+// Vector Map ID for enhanced performance and features
+export const VECTOR_MAP_ID = 'DEMO_MAP_ID'; // Using demo ID, should be replaced with actual vector map ID
+
+// Default map options with vector map configuration
 export const DEFAULT_MAP_OPTIONS = {
   disableDefaultUI: true,
   zoomControl: true,
   scrollwheel: true,
   clickableIcons: true,
   streetViewControl: false,
+  mapId: VECTOR_MAP_ID, // Enable vector rendering for better performance
+  gestureHandling: 'greedy',
+  restriction: {
+    // Restrict to world bounds for better performance
+    latLngBounds: {
+      north: 85,
+      south: -85,
+      west: -180,
+      east: 180,
+    },
+  },
 };
 
 // Category icons mapping with Google Places types
@@ -413,6 +427,10 @@ export const useGoogleMapsScript = () => {
   const scriptStatus = useLoadScript({
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
     libraries: libraries,
+    version: "weekly", // Use the latest version
+    language: "en",
+    region: "US",
+    preventGoogleFontsLoading: false, // Allow Google Fonts for better map rendering
   });
   
   // Set error message if script loading fails

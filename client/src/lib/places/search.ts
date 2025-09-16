@@ -1,26 +1,20 @@
-import { CATEGORY_TYPES, CategoryId } from '@/components/map/CategoryPills';
+// Re-export types and interfaces from the centralized API wrapper
+export {
+  PlaceSearchResult,
+  SearchResult,
+  PlacesApiError,
+  PlacesApiErrorType,
+  getPlacesApiWrapper,
+  createPlacesApiWrapper,
+} from './api-wrapper';
 
-export interface PlaceSearchResult {
-  place_id: string;
-  name: string;
-  formatted_address: string;
-  geometry: {
-    location: {
-      lat: number;
-      lng: number;
-    };
-  };
-  rating?: number;
-  user_ratings_total?: number;
-  price_level?: number;
-  opening_hours?: {
-    open_now: boolean;
-  };
-  types: string[];
-  photos?: google.maps.places.PlacePhoto[];
-  vicinity?: string;
-  business_status?: string;
-}
+import { CATEGORY_TYPES, CategoryId } from '@/components/map/CategoryPills';
+import { 
+  PlaceSearchResult, 
+  SearchResult, 
+  SearchOptions as ApiSearchOptions,
+  getPlacesApiWrapper 
+} from './api-wrapper';
 
 export interface SearchFilters {
   category: CategoryId | null;
@@ -34,223 +28,85 @@ export interface SearchOptions extends SearchFilters {
   map: google.maps.Map;
 }
 
-export interface SearchResult {
-  results: PlaceSearchResult[];
-  hasNextPage: boolean;
-  nextPageToken?: string;
-}
-
-// Debounce utility
-function debounce<T extends (...args: any[]) => any>(
-  func: T,
-  wait: number
-): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeout);
-    timeout = setTimeout(() => func(...args), wait);
-  };
-}
-
+/**
+ * Legacy PlacesSearchService wrapper for backward compatibility
+ * Uses the new centralized API wrapper under the hood
+ */
 export class PlacesSearchService {
-  private map: google.maps.Map | null = null;
-  private currentController: AbortController | null = null;
-  private nextPageToken: string | null = null;
-  
+  private apiWrapper: ReturnType<typeof getPlacesApiWrapper>;
+  private map: google.maps.Map;
+
   constructor(map: google.maps.Map) {
     this.map = map;
+    this.apiWrapper = getPlacesApiWrapper(map);
   }
 
-  // Cancel any ongoing search
-  private cancelCurrentSearch() {
-    if (this.currentController) {
-      this.currentController.abort();
-      this.currentController = null;
-    }
-  }
-
-  // Convert new Places API result to our format
-  private convertPlaceResult(place: google.maps.places.Place): PlaceSearchResult {
-    return {
-      place_id: place.id || '',
-      name: place.displayName || '',
-      formatted_address: place.formattedAddress || '',
-      geometry: {
-        location: {
-          lat: place.location?.lat() || 0,
-          lng: place.location?.lng() || 0,
-        },
-      },
-      rating: place.rating || undefined,
-      user_ratings_total: place.userRatingCount || undefined,
-      price_level: place.priceLevel ? Number(place.priceLevel) : undefined,
-      opening_hours: place.regularOpeningHours ? {
-        open_now: (place.regularOpeningHours as any).openNow || false
-      } : undefined,
-      types: place.types || [],
-      photos: (place.photos as any) || [],
-      vicinity: place.formattedAddress || '',
-      business_status: place.businessStatus || '',
-    };
-  }
-
-  // Perform searchNearby with new API and proper error handling
-  private async performNearbySearch(options: SearchOptions): Promise<SearchResult> {
-    if (!this.map) {
-      throw new Error('Map not initialized');
-    }
-
-    // Cancel any ongoing search
-    this.cancelCurrentSearch();
-    
-    // Create new abort controller for this search
-    this.currentController = new AbortController();
-    const { signal } = this.currentController;
-
+  /**
+   * Perform a debounced search using the centralized API wrapper
+   */
+  async searchDebounced(options: SearchOptions): Promise<SearchResult> {
     try {
-      // Prepare the search request using new API format
-      const request: google.maps.places.SearchNearbyRequest = {
-        // Required parameters
-        fields: [
-          'id', 'displayName', 'formattedAddress', 'location', 
-          'rating', 'userRatingCount', 'priceLevel', 'regularOpeningHours',
-          'types', 'photos', 'businessStatus'
-        ],
-        // Location restriction
-        locationRestriction: this.buildLocationRestriction(options),
-        // Optional parameters
-        maxResultCount: 20,
-        rankPreference: google.maps.places.SearchNearbyRankPreference.POPULARITY,
-        language: 'en-US',
-        region: 'us',
+      const apiOptions: ApiSearchOptions = {
+        bounds: options.bounds || undefined,
+        category: options.category,
+        openNow: options.openNow,
+        keyword: options.keyword,
+        withinMap: options.withinMap,
+        maxResults: 20,
       };
 
-      // Add category filter if specified
-      if (options.category) {
-        request.includedPrimaryTypes = [CATEGORY_TYPES[options.category].type];
-      }
-
-      // Check if request was cancelled before making API call
-      if (signal.aborted) {
-        throw new Error('Search cancelled');
-      }
-
-      // Call the new searchNearby API
-      const { places } = await google.maps.places.Place.searchNearby(request);
-      
-      // Check again if cancelled after API call
-      if (signal.aborted) {
-        throw new Error('Search cancelled');
-      }
-
-      // Filter results based on options
-      let filteredPlaces = places || [];
-      
-      if (options.openNow) {
-        filteredPlaces = filteredPlaces.filter(place => 
-          (place.regularOpeningHours as any)?.openNow === true
-        );
-      }
-
-      if (options.keyword) {
-        const keyword = options.keyword.toLowerCase();
-        filteredPlaces = filteredPlaces.filter(place => 
-          place.displayName?.toLowerCase().includes(keyword) ||
-          place.formattedAddress?.toLowerCase().includes(keyword)
-        );
-      }
-
-      const convertedResults = filteredPlaces.map(this.convertPlaceResult);
-      
-      return {
-        results: convertedResults,
-        hasNextPage: false, // New API doesn't support pagination in the same way
-        nextPageToken: undefined,
-      };
-    } catch (error) {
-      // Check if error was due to cancellation
-      if (signal.aborted) {
-        throw new Error('Search cancelled');
-      }
-      
-      // Handle specific API errors
-      if (error instanceof Error) {
-        if (error.message.includes('ZERO_RESULTS')) {
-          return { results: [], hasNextPage: false };
-        }
-        if (error.message.includes('OVER_QUERY_LIMIT')) {
-          throw new Error('Search quota exceeded. Please try again later.');
-        }
-        if (error.message.includes('INVALID_REQUEST')) {
-          throw new Error('Invalid search parameters. Please try different criteria.');
-        }
-      }
-      
-      throw new Error(`Places search failed: ${error}`);
-    }
-  }
-
-  // Build location restriction based on options
-  private buildLocationRestriction(options: SearchOptions): google.maps.places.SearchNearbyRequest['locationRestriction'] {
-    if (options.withinMap && options.bounds) {
-      // Use bounds if searching within map
-      const ne = options.bounds.getNorthEast();
-      const sw = options.bounds.getSouthWest();
-      
-      return {
-        west: sw.lng(),
-        north: ne.lat(),
-        east: ne.lng(),
-        south: sw.lat()
-      } as any;
-    } else {
-      // Use circle with center and radius if not restricted to map bounds
-      const center = options.map.getCenter();
-      if (center) {
-        return {
-          center: { 
-            lat: center.lat(), 
-            lng: center.lng() 
-          },
-          radius: 5000 // 5km radius
-        } as any;
-      }
-    }
-    
-    throw new Error('Unable to determine search location');
-  }
-
-  // Get next page of results (simplified for new API)
-  async getNextPage(): Promise<SearchResult> {
-    // New API doesn't support traditional pagination
-    // Could implement offset-based pagination if needed
-    return { results: [], hasNextPage: false };
-  }
-
-  // Debounced search method
-  searchDebounced = debounce(async (options: SearchOptions): Promise<SearchResult> => {
-    try {
-      return await this.performNearbySearch(options);
+      return await this.apiWrapper.searchNearby(apiOptions);
     } catch (error) {
       console.error('Search error:', error);
       throw error;
     }
-  }, 200);
-
-  // Immediate search method (for testing or immediate needs)
-  async searchImmediate(options: SearchOptions): Promise<SearchResult> {
-    return this.performNearbySearch(options);
   }
 
-  // Cleanup method
+  /**
+   * Perform an immediate search using the centralized API wrapper
+   */
+  async searchImmediate(options: SearchOptions): Promise<SearchResult> {
+    return this.searchDebounced(options);
+  }
+
+  /**
+   * Get next page of results (not supported by new API)
+   */
+  async getNextPage(): Promise<SearchResult> {
+    return { 
+      results: [], 
+      hasNextPage: false,
+      requestId: 'legacy_next_page',
+      executionTime: 0,
+    };
+  }
+
+  /**
+   * Cancel current search
+   */
+  cancelCurrentSearch() {
+    this.apiWrapper.cancelSearch();
+  }
+
+  /**
+   * Cleanup method
+   */
   destroy() {
-    this.cancelCurrentSearch();
-    this.map = null;
-    this.nextPageToken = null;
+    this.apiWrapper.cancelAll();
   }
 }
 
-// Export a factory function to create the service
+/**
+ * Factory function to create the legacy search service
+ * @deprecated Use getPlacesApiWrapper() directly for new code
+ */
 export function createPlacesSearchService(map: google.maps.Map): PlacesSearchService {
   return new PlacesSearchService(map);
+}
+
+/**
+ * Direct access to the modern API wrapper (recommended)
+ */
+export function getPlacesSearchWrapper(map?: google.maps.Map) {
+  return getPlacesApiWrapper(map);
 }
