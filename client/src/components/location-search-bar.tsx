@@ -21,28 +21,21 @@ interface LocationSearchBarProps {
   onInputRef?: (ref: HTMLInputElement | null) => void;
   showDetailedView?: boolean; // When true, shows detailed sidebar instead of immediate selection
   onShowPlaceDetails?: (placeId: string) => void; // Callback to show place details in sidebar
+  activeCategory?: string; // Active category for biasing suggestions
+  mapRef?: React.RefObject<google.maps.Map>; // Map reference for animation
 }
 
-interface EnhancedPrediction {
+interface BasicPrediction {
   place_id: string;
+  description: string;
   structured_formatting: {
     main_text: string;
     secondary_text: string;
   };
-  rating?: number;
-  user_ratings_total?: number;
-  price_level?: number;
-  opening_hours?: {
-    open_now: boolean;
-  };
   types: string[];
-  photos?: google.maps.places.PlacePhoto[];
-  geometry?: {
-    location: {
-      lat: () => number;
-      lng: () => number;
-    };
-  };
+  terms: Array<{ offset: number; value: string }>;
+  distance_meters?: number;
+  matched_substrings: Array<{ length: number; offset: number }>;
 }
 
 const getPlaceCategory = (types: string[]) => {
@@ -77,16 +70,21 @@ export function LocationSearchBar({
   onInputRef,
   showDetailedView = false,
   onShowPlaceDetails,
+  activeCategory,
+  mapRef,
 }: LocationSearchBarProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [predictions, setPredictions] = useState<EnhancedPrediction[]>([]);
+  const [predictions, setPredictions] = useState<BasicPrediction[]>([]);
+  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const [isPlaceDetailsOpen, setIsPlaceDetailsOpen] = useState(false);
   const sessionToken = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
-  const mapRef = useRef<HTMLDivElement | null>(null);
+  const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
+  const placesService = useRef<google.maps.places.PlacesService | null>(null);
+  const dummyMapRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Handle input ref callback
@@ -96,11 +94,18 @@ export function LocationSearchBar({
     }
   }, [onInputRef]);
 
-  // Initialize Google Maps and session token when available
+  // Initialize Google Maps services when available
   useEffect(() => {
     const initializeServices = () => {
       if (window.google && window.google.maps && window.google.maps.places) {
         try {
+          // Initialize AutocompleteService and PlacesService
+          autocompleteService.current = new google.maps.places.AutocompleteService();
+          
+          // Create a dummy map element for PlacesService
+          const dummyMapEl = document.createElement('div');
+          placesService.current = new google.maps.places.PlacesService(dummyMapEl);
+          
           // Create a new session token for the autocomplete session
           sessionToken.current = new google.maps.places.AutocompleteSessionToken();
           setIsGoogleMapsReady(true);
@@ -138,160 +143,275 @@ export function LocationSearchBar({
     }
   }, []);
 
-  const handleSearch = useCallback(async (searchValue: string) => {
-    if (!searchValue || !isGoogleMapsReady || !sessionToken.current) {
+  const handleSearch = useCallback((searchValue: string) => {
+    if (!searchValue || !isGoogleMapsReady || !autocompleteService.current || !sessionToken.current) {
       setPredictions([]);
       setIsOpen(false);
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
+    // Clear existing debounce timer
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
 
-    try {
-      // Prepare the autocomplete request using new API
-      const request: google.maps.places.AutocompleteRequest = {
-        input: searchValue,
-        sessionToken: sessionToken.current,
-        includedPrimaryTypes: ['establishment', 'geocode'],
-        language: 'en-US',
-        region: 'us',
-      };
+    // Set new debounce timer
+    const timer = setTimeout(async () => {
+      setIsLoading(true);
+      setError(null);
 
-      // Add location bias if provided
-      if (searchBias && searchBias.lat && searchBias.lng) {
-        const radius = searchBias.radius || 50000;
-        request.locationBias = {
-          circle: {
-            center: {
-              latitude: searchBias.lat,
-              longitude: searchBias.lng
-            },
-            radius: radius
-          }
+      try {
+        // Prepare the autocomplete request
+        const request: google.maps.places.AutocompletionRequest = {
+          input: searchValue,
+          sessionToken: sessionToken.current!,
+          types: ['establishment', 'geocode'],
+          language: 'en-US',
+          componentRestrictions: { country: 'us' },
         };
-      }
 
-      // Use the new AutocompleteSuggestion API
-      const { suggestions } = await google.maps.places.AutocompleteSuggestion.fetchAutocompleteSuggestions(request);
+        // Add location bias if provided
+        if (searchBias && searchBias.lat && searchBias.lng) {
+          const radius = searchBias.radius || 50000;
+          request.bounds = new google.maps.LatLngBounds(
+            new google.maps.LatLng(
+              searchBias.lat - (radius / 111320), // Rough conversion from meters to degrees
+              searchBias.lng - (radius / (111320 * Math.cos(searchBias.lat * Math.PI / 180)))
+            ),
+            new google.maps.LatLng(
+              searchBias.lat + (radius / 111320),
+              searchBias.lng + (radius / (111320 * Math.cos(searchBias.lat * Math.PI / 180)))
+            )
+          );
+          
+          // Also set location for better biasing
+          request.location = new google.maps.LatLng(searchBias.lat, searchBias.lng);
+          request.radius = radius;
+        }
 
-      // Convert suggestions to our enhanced prediction format
-      const enhancedPredictions: EnhancedPrediction[] = await Promise.all(
-        suggestions.slice(0, 8).map(async (suggestion) => {
-          try {
-            // Fetch place details using the new Place API
-            const place = new google.maps.places.Place({
-              id: suggestion.placePrediction?.placeId || '',
-              requestedLanguage: 'en-US'
-            });
-
-            // Fetch fields we need
-            await place.fetchFields({
-              fields: ['rating', 'userRatingCount', 'priceLevel', 'regularOpeningHours', 'types', 'photos', 'location', 'displayName', 'formattedAddress']
-            });
-
-            return {
-              place_id: suggestion.placePrediction?.placeId || '',
-              structured_formatting: {
-                main_text: suggestion.placePrediction?.structuredFormat?.mainText?.text || '',
-                secondary_text: suggestion.placePrediction?.structuredFormat?.secondaryText?.text || ''
-              },
-              rating: place.rating,
-              user_ratings_total: place.userRatingCount,
-              price_level: place.priceLevel,
-              opening_hours: place.regularOpeningHours ? {
-                open_now: place.regularOpeningHours.openNow || false
-              } : undefined,
-              types: place.types || [],
-              photos: place.photos || [],
-              geometry: place.location ? {
-                location: {
-                  lat: () => place.location!.lat(),
-                  lng: () => place.location!.lng()
-                }
-              } : undefined
-            } as EnhancedPrediction;
-          } catch {
-            // Fallback to basic prediction data if place details fail
-            return {
-              place_id: suggestion.placePrediction?.placeId || '',
-              structured_formatting: {
-                main_text: suggestion.placePrediction?.structuredFormat?.mainText?.text || '',
-                secondary_text: suggestion.placePrediction?.structuredFormat?.secondaryText?.text || ''
-              },
-              types: [],
-            } as EnhancedPrediction;
+        // Add category biasing if active category is provided
+        if (activeCategory) {
+          const categoryTypes: Record<string, string[]> = {
+            'restaurants': ['restaurant', 'food', 'meal_takeaway', 'cafe'],
+            'hotels': ['lodging', 'hotel', 'motel'],
+            'attractions': ['tourist_attraction', 'museum', 'amusement_park', 'zoo'],
+            'shopping': ['shopping_mall', 'store', 'clothing_store', 'department_store']
+          };
+          
+          if (categoryTypes[activeCategory]) {
+            request.types = categoryTypes[activeCategory];
           }
-        })
-      );
+        }
 
-      // Sort enhanced predictions by distance if we have location bias and geometry
-      if (searchBias && enhancedPredictions.length > 0) {
-        const biasLocation = new google.maps.LatLng(searchBias.lat, searchBias.lng);
-
-        const predictionsWithDistance = enhancedPredictions.map((prediction) => {
-          try {
-            if (prediction.geometry?.location) {
-              const distance = google.maps.geometry.spherical.computeDistanceBetween(
-                biasLocation,
-                new google.maps.LatLng(
-                  prediction.geometry.location.lat(),
-                  prediction.geometry.location.lng()
-                )
-              );
-              return { prediction, distance };
+        // Use AutocompleteService to get predictions
+        const predictions = await new Promise<google.maps.places.AutocompletePrediction[]>((resolve, reject) => {
+          autocompleteService.current!.getPlacePredictions(request, (results, status) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+              resolve(results);
+            } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+              resolve([]);
             } else {
-              return { prediction, distance: Infinity };
+              reject(new Error(`Autocomplete failed: ${status}`));
             }
-          } catch {
-            return { prediction, distance: Infinity };
-          }
+          });
         });
 
-        // Sort by distance
-        predictionsWithDistance.sort((a, b) => a.distance - b.distance);
-        setPredictions(predictionsWithDistance.map(item => item.prediction));
-      } else {
-        setPredictions(enhancedPredictions);
-      }
+        // Convert to our format without fetching details upfront
+        const basicPredictions: BasicPrediction[] = predictions.slice(0, 8).map((prediction) => ({
+          place_id: prediction.place_id,
+          description: prediction.description,
+          structured_formatting: {
+            main_text: prediction.structured_formatting.main_text,
+            secondary_text: prediction.structured_formatting.secondary_text
+          },
+          types: prediction.types || [],
+          terms: prediction.terms || [],
+          distance_meters: prediction.distance_meters,
+          matched_substrings: prediction.matched_substrings || []
+        }));
 
-      setIsOpen(true);
-    } catch (err) {
-      console.error('Autocomplete error:', err);
-      if (err instanceof Error) {
-        if (err.message.includes('ZERO_RESULTS')) {
-          setPredictions([]);
-          setIsOpen(false);
-        } else if (err.message.includes('OVER_QUERY_LIMIT')) {
-          setError('Search quota exceeded. Please try again later.');
-        } else if (err.message.includes('INVALID_REQUEST')) {
-          setError('Invalid search request. Please try different criteria.');
+        setPredictions(basicPredictions);
+        setIsOpen(true);
+      } catch (err) {
+        console.error('Autocomplete error:', err);
+        if (err instanceof Error) {
+          if (err.message.includes('ZERO_RESULTS')) {
+            setPredictions([]);
+            setIsOpen(false);
+          } else if (err.message.includes('OVER_QUERY_LIMIT')) {
+            setError('Search quota exceeded. Please try again later.');
+          } else if (err.message.includes('INVALID_REQUEST')) {
+            setError('Invalid search request. Please try different criteria.');
+          } else {
+            setError('Failed to load suggestions. Please try again.');
+          }
         } else {
           setError('Failed to load suggestions. Please try again.');
         }
-      } else {
-        setError('Failed to load suggestions. Please try again.');
+        setPredictions([]);
+        setIsOpen(false);
+      } finally {
+        setIsLoading(false);
       }
-      setPredictions([]);
-      setIsOpen(false);
+    }, 200); // 200ms debounce
+
+    setDebounceTimer(timer);
+  }, [searchBias, isGoogleMapsReady, activeCategory, debounceTimer]);
+
+  const handleSelect = async (placeId: string) => {
+    setIsOpen(false);
+    setIsLoading(true);
+    
+    try {
+      if (!placesService.current || !sessionToken.current) {
+        throw new Error('Places service not initialized');
+      }
+
+      // Get detailed place information
+      const placeDetails = await new Promise<google.maps.places.PlaceResult>((resolve, reject) => {
+        placesService.current!.getDetails(
+          {
+            placeId: placeId,
+            fields: [
+              'place_id',
+              'name',
+              'formatted_address',
+              'geometry',
+              'rating',
+              'user_ratings_total',
+              'price_level',
+              'opening_hours',
+              'photos',
+              'types',
+              'website',
+              'formatted_phone_number',
+              'reviews',
+              'business_status',
+              'url'
+            ],
+            sessionToken: sessionToken.current!
+          },
+          (result, status) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && result) {
+              resolve(result);
+            } else {
+              reject(new Error(`Place details failed: ${status}`));
+            }
+          }
+        );
+      });
+      
+      // Create a new session token for the next search session
+      sessionToken.current = new google.maps.places.AutocompleteSessionToken();
+      
+      if (!placeDetails.geometry?.location) {
+        throw new Error('Place has no geometry');
+      }
+      
+      const coordinates = {
+        lat: placeDetails.geometry.location.lat(),
+        lng: placeDetails.geometry.location.lng()
+      };
+      
+      // Animate map to location if mapRef is provided
+      if (mapRef?.current && searchBias) {
+        // Start map animation to place
+        const smoothMapAnimation = (
+          mapRef: React.RefObject<google.maps.Map>,
+          currentCoordinates: { lat: number; lng: number },
+          targetCoordinates: { lat: number; lng: number },
+          onComplete?: () => void
+        ) => {
+          if (!mapRef.current) return;
+          
+          const currentZoom = mapRef.current.getZoom() || 12;
+          const distance = calculateDistance(currentCoordinates, targetCoordinates);
+          
+          let midZoom;
+          if (distance < 1) midZoom = Math.max(currentZoom - 1, 10);
+          else if (distance < 5) midZoom = Math.max(currentZoom - 2, 9);
+          else if (distance < 20) midZoom = Math.max(currentZoom - 3, 8);
+          else midZoom = Math.max(currentZoom - 4, 7);
+          
+          const finalZoom = 16;
+          let step = 0;
+          const totalSteps = 36;
+          const initialZoom = currentZoom;
+          
+          const animate = () => {
+            if (!mapRef.current) return;
+            
+            step++;
+            const easingFactor = Math.sin(Math.PI * step / totalSteps) * 0.5 + 0.5;
+            const frameProgress = step / totalSteps;
+            
+            let currentStepZoom;
+            if (frameProgress < 0.3) {
+              currentStepZoom = initialZoom - (initialZoom - midZoom) * (frameProgress * 3.33);
+            } else if (frameProgress < 0.7) {
+              currentStepZoom = midZoom;
+            } else {
+              const zoomInProgress = (frameProgress - 0.7) * 3.33;
+              currentStepZoom = midZoom + (finalZoom - midZoom) * zoomInProgress;
+            }
+            
+            const lat = currentCoordinates.lat + (targetCoordinates.lat - currentCoordinates.lat) * easingFactor;
+            const lng = currentCoordinates.lng + (targetCoordinates.lng - currentCoordinates.lng) * easingFactor;
+            
+            mapRef.current.setZoom(currentStepZoom);
+            mapRef.current.setCenter({ lat, lng });
+            
+            if (step < totalSteps) {
+              requestAnimationFrame(animate);
+            } else {
+              mapRef.current.setZoom(finalZoom);
+              mapRef.current.setCenter(targetCoordinates);
+              if (onComplete) onComplete();
+            }
+          };
+          
+          animate();
+        };
+        
+        // Helper function to calculate distance
+        const calculateDistance = (point1: { lat: number; lng: number }, point2: { lat: number; lng: number }): number => {
+          const R = 6371;
+          const dLat = (point2.lat - point1.lat) * Math.PI / 180;
+          const dLon = (point2.lng - point1.lng) * Math.PI / 180;
+          const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(point1.lat * Math.PI / 180) * Math.cos(point2.lat * Math.PI / 180) *
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          return R * c;
+        };
+        
+        smoothMapAnimation(mapRef, searchBias, coordinates, () => {
+          // Animation complete, now show place details
+          if (showDetailedView && onShowPlaceDetails) {
+            onShowPlaceDetails(placeId);
+          } else {
+            setSelectedPlaceId(placeId);
+            setIsPlaceDetailsOpen(true);
+          }
+        });
+      } else {
+        // No map animation, directly show place details
+        if (showDetailedView && onShowPlaceDetails) {
+          onShowPlaceDetails(placeId);
+        } else {
+          setSelectedPlaceId(placeId);
+          setIsPlaceDetailsOpen(true);
+        }
+      }
+      
+    } catch (err) {
+      console.error('Error selecting place:', err);
+      setError('Failed to load place details. Please try again.');
+      
+      // Create a new session token for the next search session
+      sessionToken.current = new google.maps.places.AutocompleteSessionToken();
     } finally {
       setIsLoading(false);
-    }
-  }, [searchBias, isGoogleMapsReady]);
-
-  const handleSelect = (placeId: string) => {
-    setIsOpen(false);
-    
-    // Create a new session token for the next search session
-    sessionToken.current = new google.maps.places.AutocompleteSessionToken();
-    
-    if (showDetailedView && onShowPlaceDetails) {
-      // For interactive map - show place details in sidebar
-      onShowPlaceDetails(placeId);
-    } else {
-      // For calendar/other contexts - show bottom sheet
-      setSelectedPlaceId(placeId);
-      setIsPlaceDetailsOpen(true);
     }
   };
 
@@ -304,8 +424,23 @@ export function LocationSearchBar({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     onChange(newValue);
+    
+    // If this is the first keystroke of a new search session, create a new session token
+    if (!sessionToken.current) {
+      sessionToken.current = new google.maps.places.AutocompleteSessionToken();
+    }
+    
     handleSearch(newValue);
   };
+  
+  // Clean up debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+    };
+  }, [debounceTimer]);
 
   if (error) {
     return (
@@ -317,7 +452,7 @@ export function LocationSearchBar({
 
   return (
     <div className="relative">
-      <div ref={mapRef} className="hidden" />
+      <div ref={mapRef as any} className="hidden" />
       <div className="relative">
         <Input
           ref={inputRef}
@@ -358,12 +493,6 @@ export function LocationSearchBar({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-sm font-medium truncate">{prediction.structured_formatting.main_text}</span>
-                          {prediction.rating && (
-                            <div className="flex items-center gap-1">
-                              <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                              <span className="text-xs font-medium">{prediction.rating.toFixed(1)}</span>
-                            </div>
-                          )}
                         </div>
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-xs text-muted-foreground truncate">
@@ -375,26 +504,14 @@ export function LocationSearchBar({
                             </Badge>
                           )}
                         </div>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          {prediction.opening_hours?.open_now !== undefined && (
-                            <div className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              <span className={cn(
-                                prediction.opening_hours.open_now ? "text-green-600" : "text-red-600"
-                              )}>
-                                {prediction.opening_hours.open_now ? "Open" : "Closed"}
-                              </span>
-                            </div>
-                          )}
-                          {prediction.price_level && (
-                            <span className="text-green-600 font-medium">
-                              {'$'.repeat(prediction.price_level)}
-                            </span>
-                          )}
-                          {prediction.user_ratings_total && (
-                            <span>({prediction.user_ratings_total} reviews)</span>
-                          )}
-                        </div>
+                        {prediction.distance_meters && (
+                          <div className="text-xs text-muted-foreground">
+                            {prediction.distance_meters < 1000 
+                              ? `${prediction.distance_meters}m away`
+                              : `${(prediction.distance_meters / 1000).toFixed(1)}km away`
+                            }
+                          </div>
+                        )}
                       </div>
                       <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                     </CommandItem>
