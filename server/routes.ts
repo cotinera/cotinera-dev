@@ -90,19 +90,35 @@ export function registerRoutes(app: Express): Server {
         db.select().from(activities).where(eq(activities.tripId, tripId)),
         db.select().from(flights).where(eq(flights.tripId, tripId)),
         db.select().from(accommodations).where(eq(accommodations.tripId, tripId)),
-        db.query.checklist.findMany({
-          where: eq(checklist.tripId, tripId),
-          with: {
-            assignedUser: {
-              columns: {
-                id: true,
-                name: true,
-                username: true
-              }
-            }
-          }
-        })
+        db.select({
+          id: checklist.id,
+          tripId: checklist.tripId,
+          title: checklist.title,
+          completed: checklist.completed,
+          assignedTo: checklist.assignedTo,
+          deadline: checklist.deadline,
+          createdAt: checklist.createdAt
+        }).from(checklist).where(eq(checklist.tripId, tripId))
       ]);
+
+      // For each checklist item, get the assigned user info if needed
+      const checklistWithUsers = await Promise.all(
+        tripChecklistItems.map(async (item) => {
+          if (item.assignedTo) {
+            const [assignedUser] = await db.select({
+              id: users.id,
+              name: users.name,
+              username: users.username
+            }).from(users).where(eq(users.id, item.assignedTo)).limit(1);
+            
+            return {
+              ...item,
+              assignedUser
+            };
+          }
+          return item;
+        })
+      );
 
       const tripWithDetails = {
         ...trip,
@@ -110,7 +126,7 @@ export function registerRoutes(app: Express): Server {
         activities: tripActivities,
         flights: tripFlights,
         accommodations: tripAccommodations,
-        checklist: tripChecklistItems
+        checklist: checklistWithUsers
       };
 
       res.json(tripWithDetails);
