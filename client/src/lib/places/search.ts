@@ -81,15 +81,15 @@ export class PlacesSearchService {
           lng: place.location?.lng() || 0,
         },
       },
-      rating: place.rating,
-      user_ratings_total: place.userRatingCount,
-      price_level: place.priceLevel,
+      rating: place.rating || undefined,
+      user_ratings_total: place.userRatingCount || undefined,
+      price_level: place.priceLevel ? Number(place.priceLevel) : undefined,
       opening_hours: place.regularOpeningHours ? {
-        open_now: place.regularOpeningHours.openNow || false
+        open_now: (place.regularOpeningHours as any).openNow || false
       } : undefined,
       types: place.types || [],
-      photos: place.photos || [],
-      vicinity: place.shortFormattedAddress || '',
+      photos: (place.photos as any) || [],
+      vicinity: place.formattedAddress || '',
       business_status: place.businessStatus || '',
     };
   }
@@ -114,7 +114,7 @@ export class PlacesSearchService {
         fields: [
           'id', 'displayName', 'formattedAddress', 'location', 
           'rating', 'userRatingCount', 'priceLevel', 'regularOpeningHours',
-          'types', 'photos', 'shortFormattedAddress', 'businessStatus'
+          'types', 'photos', 'businessStatus'
         ],
         // Location restriction
         locationRestriction: this.buildLocationRestriction(options),
@@ -148,7 +148,7 @@ export class PlacesSearchService {
       
       if (options.openNow) {
         filteredPlaces = filteredPlaces.filter(place => 
-          place.regularOpeningHours?.openNow === true
+          (place.regularOpeningHours as any)?.openNow === true
         );
       }
 
@@ -198,24 +198,22 @@ export class PlacesSearchService {
       const sw = options.bounds.getSouthWest();
       
       return {
-        rectangle: {
-          low: { latitude: sw.lat(), longitude: sw.lng() },
-          high: { latitude: ne.lat(), longitude: ne.lng() }
-        }
-      };
+        west: sw.lng(),
+        north: ne.lat(),
+        east: ne.lng(),
+        south: sw.lat()
+      } as any;
     } else {
       // Use circle with center and radius if not restricted to map bounds
       const center = options.map.getCenter();
       if (center) {
         return {
-          circle: {
-            center: { 
-              latitude: center.lat(), 
-              longitude: center.lng() 
-            },
-            radius: 5000 // 5km radius
-          }
-        };
+          center: { 
+            lat: center.lat(), 
+            lng: center.lng() 
+          },
+          radius: 5000 // 5km radius
+        } as any;
       }
     }
     
@@ -237,7 +235,7 @@ export class PlacesSearchService {
       console.error('Search error:', error);
       throw error;
     }
-  }, 250);
+  }, 200);
 
   // Immediate search method (for testing or immediate needs)
   async searchImmediate(options: SearchOptions): Promise<SearchResult> {

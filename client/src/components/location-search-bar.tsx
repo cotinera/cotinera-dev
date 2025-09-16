@@ -81,6 +81,8 @@ export function LocationSearchBar({
   const [isGoogleMapsReady, setIsGoogleMapsReady] = useState(false);
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const [isPlaceDetailsOpen, setIsPlaceDetailsOpen] = useState(false);
+  const [lastSearchValue, setLastSearchValue] = useState('');
+  const [isPrewarmed, setIsPrewarmed] = useState(false);
   const sessionToken = useRef<google.maps.places.AutocompleteSessionToken | null>(null);
   const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
   const placesService = useRef<google.maps.places.PlacesService | null>(null);
@@ -143,10 +145,17 @@ export function LocationSearchBar({
     }
   }, []);
 
-  const handleSearch = useCallback((searchValue: string) => {
+  const handleSearch = useCallback((searchValue: string, isLeadingEdge = false) => {
     if (!searchValue || !isGoogleMapsReady || !autocompleteService.current || !sessionToken.current) {
       setPredictions([]);
       setIsOpen(false);
+      return;
+    }
+
+    // For first character or immediate search, execute without debounce
+    if (isLeadingEdge || (lastSearchValue === '' && searchValue.length === 1)) {
+      performSearch(searchValue);
+      setLastSearchValue(searchValue);
       return;
     }
 
@@ -157,10 +166,18 @@ export function LocationSearchBar({
 
     // Set new debounce timer
     const timer = setTimeout(async () => {
-      setIsLoading(true);
-      setError(null);
+      performSearch(searchValue);
+    }, 130); // 130ms debounce for faster response
 
-      try {
+    setDebounceTimer(timer);
+    setLastSearchValue(searchValue);
+  }, [searchBias, isGoogleMapsReady, activeCategory, debounceTimer, lastSearchValue]);
+
+  const performSearch = useCallback(async (searchValue: string) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
         // Prepare the autocomplete request
         const request: google.maps.places.AutocompletionRequest = {
           input: searchValue,
@@ -189,19 +206,8 @@ export function LocationSearchBar({
           request.radius = radius;
         }
 
-        // Add category biasing if active category is provided
-        if (activeCategory) {
-          const categoryTypes: Record<string, string[]> = {
-            'restaurants': ['restaurant', 'food', 'meal_takeaway', 'cafe'],
-            'hotels': ['lodging', 'hotel', 'motel'],
-            'attractions': ['tourist_attraction', 'museum', 'amusement_park', 'zoo'],
-            'shopping': ['shopping_mall', 'store', 'clothing_store', 'department_store']
-          };
-          
-          if (categoryTypes[activeCategory]) {
-            request.types = categoryTypes[activeCategory];
-          }
-        }
+        // Note: We don't filter by category types to preserve exact matches
+        // Category biasing will be handled client-side in ranking
 
         // Use AutocompleteService to get predictions
         const predictions = await new Promise<google.maps.places.AutocompletePrediction[]>((resolve, reject) => {
@@ -216,8 +222,42 @@ export function LocationSearchBar({
           });
         });
 
-        // Convert to our format without fetching details upfront
-        const basicPredictions: BasicPrediction[] = predictions.slice(0, 8).map((prediction) => ({
+        // Convert to our format and rank by category relevance
+        let rankedPredictions = predictions.slice(0, 8);
+        
+        // Apply client-side category ranking if activeCategory is set
+        if (activeCategory) {
+          const categoryTypes: Record<string, string[]> = {
+            'restaurants': ['restaurant', 'food', 'meal_takeaway', 'cafe'],
+            'hotels': ['lodging', 'hotel', 'motel'],
+            'attractions': ['tourist_attraction', 'museum', 'amusement_park', 'zoo'],
+            'shopping': ['shopping_mall', 'store', 'clothing_store', 'department_store']
+          };
+          
+          const relevantTypes = categoryTypes[activeCategory] || [];
+          
+          rankedPredictions = rankedPredictions.sort((a, b) => {
+            const aHasRelevantType = a.types?.some(type => relevantTypes.includes(type)) || false;
+            const bHasRelevantType = b.types?.some(type => relevantTypes.includes(type)) || false;
+            
+            // Prioritize exact matches first (when search term matches main text closely)
+            const searchLower = searchValue.toLowerCase();
+            const aExactMatch = a.structured_formatting?.main_text?.toLowerCase().includes(searchLower) || false;
+            const bExactMatch = b.structured_formatting?.main_text?.toLowerCase().includes(searchLower) || false;
+            
+            if (aExactMatch && !bExactMatch) return -1;
+            if (!aExactMatch && bExactMatch) return 1;
+            
+            // Then prioritize category matches
+            if (aHasRelevantType && !bHasRelevantType) return -1;
+            if (!aHasRelevantType && bHasRelevantType) return 1;
+            
+            return 0; // Keep original order for same ranking
+          });
+        }
+        
+        // Limit to 6 items for faster rendering
+        const basicPredictions: BasicPrediction[] = rankedPredictions.slice(0, 6).map((prediction) => ({
           place_id: prediction.place_id,
           description: prediction.description,
           structured_formatting: {
@@ -232,31 +272,28 @@ export function LocationSearchBar({
 
         setPredictions(basicPredictions);
         setIsOpen(true);
-      } catch (err) {
-        console.error('Autocomplete error:', err);
-        if (err instanceof Error) {
-          if (err.message.includes('ZERO_RESULTS')) {
-            setPredictions([]);
-            setIsOpen(false);
-          } else if (err.message.includes('OVER_QUERY_LIMIT')) {
-            setError('Search quota exceeded. Please try again later.');
-          } else if (err.message.includes('INVALID_REQUEST')) {
-            setError('Invalid search request. Please try different criteria.');
-          } else {
-            setError('Failed to load suggestions. Please try again.');
-          }
+    } catch (err) {
+      console.error('Autocomplete error:', err);
+      if (err instanceof Error) {
+        if (err.message.includes('ZERO_RESULTS')) {
+          setPredictions([]);
+          setIsOpen(false);
+        } else if (err.message.includes('OVER_QUERY_LIMIT')) {
+          setError('Search quota exceeded. Please try again later.');
+        } else if (err.message.includes('INVALID_REQUEST')) {
+          setError('Invalid search request. Please try different criteria.');
         } else {
           setError('Failed to load suggestions. Please try again.');
         }
-        setPredictions([]);
-        setIsOpen(false);
-      } finally {
-        setIsLoading(false);
+      } else {
+        setError('Failed to load suggestions. Please try again.');
       }
-    }, 200); // 200ms debounce
-
-    setDebounceTimer(timer);
-  }, [searchBias, isGoogleMapsReady, activeCategory, debounceTimer]);
+      setPredictions([]);
+      setIsOpen(false);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [searchBias, isGoogleMapsReady, activeCategory]);
 
   const handleSelect = async (placeId: string) => {
     setIsOpen(false);
@@ -267,27 +304,17 @@ export function LocationSearchBar({
         throw new Error('Places service not initialized');
       }
 
-      // Get detailed place information
-      const placeDetails = await new Promise<google.maps.places.PlaceResult>((resolve, reject) => {
+      // Get minimal place information first for quick display
+      const minimalPlaceDetails = await new Promise<google.maps.places.PlaceResult>((resolve, reject) => {
         placesService.current!.getDetails(
           {
             placeId: placeId,
             fields: [
               'place_id',
-              'name',
+              'name', 
               'formatted_address',
               'geometry',
-              'rating',
-              'user_ratings_total',
-              'price_level',
-              'opening_hours',
-              'photos',
-              'types',
-              'website',
-              'formatted_phone_number',
-              'reviews',
-              'business_status',
-              'url'
+              'types'
             ],
             sessionToken: sessionToken.current!
           },
@@ -304,23 +331,44 @@ export function LocationSearchBar({
       // Create a new session token for the next search session
       sessionToken.current = new google.maps.places.AutocompleteSessionToken();
       
-      if (!placeDetails.geometry?.location) {
+      if (!minimalPlaceDetails.geometry?.location) {
         throw new Error('Place has no geometry');
       }
       
       const coordinates = {
-        lat: placeDetails.geometry.location.lat(),
-        lng: placeDetails.geometry.location.lng()
+        lat: minimalPlaceDetails.geometry.location.lat(),
+        lng: minimalPlaceDetails.geometry.location.lng()
       };
       
-      // Animate map to location if mapRef is provided
+      // PARALLEL EXECUTION: Start animation and show sheet immediately
+      
+      // 1. Show place details immediately with minimal data
+      if (showDetailedView && onShowPlaceDetails) {
+        onShowPlaceDetails(placeId);
+      } else {
+        setSelectedPlaceId(placeId);
+        setIsPlaceDetailsOpen(true);
+      }
+      
+      // 2. Start map animation in parallel (if map is available)
       if (mapRef?.current && searchBias) {
-        // Start map animation to place
+        // Helper function to calculate distance
+        const calculateDistance = (point1: { lat: number; lng: number }, point2: { lat: number; lng: number }): number => {
+          const R = 6371;
+          const dLat = (point2.lat - point1.lat) * Math.PI / 180;
+          const dLon = (point2.lng - point1.lng) * Math.PI / 180;
+          const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(point1.lat * Math.PI / 180) * Math.cos(point2.lat * Math.PI / 180) *
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          return R * c;
+        };
+        
+        // Start smooth map animation (non-blocking)
         const smoothMapAnimation = (
           mapRef: React.RefObject<google.maps.Map>,
           currentCoordinates: { lat: number; lng: number },
-          targetCoordinates: { lat: number; lng: number },
-          onComplete?: () => void
+          targetCoordinates: { lat: number; lng: number }
         ) => {
           if (!mapRef.current) return;
           
@@ -335,7 +383,7 @@ export function LocationSearchBar({
           
           const finalZoom = 16;
           let step = 0;
-          const totalSteps = 36;
+          const totalSteps = 30; // Reduced for faster animation
           const initialZoom = currentZoom;
           
           const animate = () => {
@@ -366,42 +414,14 @@ export function LocationSearchBar({
             } else {
               mapRef.current.setZoom(finalZoom);
               mapRef.current.setCenter(targetCoordinates);
-              if (onComplete) onComplete();
             }
           };
           
           animate();
         };
         
-        // Helper function to calculate distance
-        const calculateDistance = (point1: { lat: number; lng: number }, point2: { lat: number; lng: number }): number => {
-          const R = 6371;
-          const dLat = (point2.lat - point1.lat) * Math.PI / 180;
-          const dLon = (point2.lng - point1.lng) * Math.PI / 180;
-          const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                    Math.cos(point1.lat * Math.PI / 180) * Math.cos(point2.lat * Math.PI / 180) *
-                    Math.sin(dLon/2) * Math.sin(dLon/2);
-          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-          return R * c;
-        };
-        
-        smoothMapAnimation(mapRef, searchBias, coordinates, () => {
-          // Animation complete, now show place details
-          if (showDetailedView && onShowPlaceDetails) {
-            onShowPlaceDetails(placeId);
-          } else {
-            setSelectedPlaceId(placeId);
-            setIsPlaceDetailsOpen(true);
-          }
-        });
-      } else {
-        // No map animation, directly show place details
-        if (showDetailedView && onShowPlaceDetails) {
-          onShowPlaceDetails(placeId);
-        } else {
-          setSelectedPlaceId(placeId);
-          setIsPlaceDetailsOpen(true);
-        }
+        // Start animation (non-blocking)
+        smoothMapAnimation(mapRef, searchBias, coordinates);
       }
       
     } catch (err) {
@@ -419,6 +439,32 @@ export function LocationSearchBar({
     onChange(address, coordinates, name);
     setIsPlaceDetailsOpen(false);
     setSelectedPlaceId(null);
+    
+    // Create a new session token for the next search session
+    sessionToken.current = new google.maps.places.AutocompleteSessionToken();
+  };
+
+  // Pre-warm services on focus for faster first search
+  const handleInputFocus = () => {
+    if (!isPrewarmed && isGoogleMapsReady && autocompleteService.current) {
+      // Pre-warm with a dummy search to initialize caches
+      const dummyRequest: google.maps.places.AutocompletionRequest = {
+        input: ' ', // Minimal input
+        types: ['establishment'],
+        language: 'en-US',
+        componentRestrictions: { country: 'us' },
+      };
+      
+      autocompleteService.current.getPlacePredictions(dummyRequest, () => {
+        // Ignore results, just pre-warm the service
+      });
+      
+      setIsPrewarmed(true);
+    }
+    
+    if (predictions.length > 0) {
+      setIsOpen(true);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -426,7 +472,7 @@ export function LocationSearchBar({
     onChange(newValue);
     
     // If this is the first keystroke of a new search session, create a new session token
-    if (!sessionToken.current) {
+    if (!sessionToken.current || lastSearchValue === '') {
       sessionToken.current = new google.maps.places.AutocompleteSessionToken();
     }
     
@@ -458,11 +504,7 @@ export function LocationSearchBar({
           ref={inputRef}
           value={value}
           onChange={handleInputChange}
-          onFocus={() => {
-            if (predictions.length > 0) {
-              setIsOpen(true);
-            }
-          }}
+          onFocus={handleInputFocus}
           onBlur={() => {
             // Delay hiding to allow for click events
             setTimeout(() => setIsOpen(false), 200);

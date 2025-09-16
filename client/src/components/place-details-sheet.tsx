@@ -112,6 +112,7 @@ const getPlaceCategory = (types: string[]) => {
 
 export function PlaceDetailsSheet({ open, onOpenChange, placeId, onSelectPlace }: PlaceDetailsSheetProps) {
   const [placeDetails, setPlaceDetails] = useState<PlaceDetailsData | null>(null);
+  const [heavyFieldsLoaded, setHeavyFieldsLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
@@ -119,19 +120,22 @@ export function PlaceDetailsSheet({ open, onOpenChange, placeId, onSelectPlace }
   useEffect(() => {
     if (!placeId || !open) {
       setPlaceDetails(null);
+      setHeavyFieldsLoaded(false);
       return;
     }
 
     const fetchPlaceDetails = async () => {
       setLoading(true);
       setError(null);
+      setHeavyFieldsLoaded(false);
 
       try {
         // Initialize Google Places service
         const mapDiv = document.createElement('div');
         const placesService = new google.maps.places.PlacesService(mapDiv);
 
-        const placeData = await new Promise<PlaceDetailsData>((resolve, reject) => {
+        // STAGE 1: Load minimal fields for immediate display
+        const minimalData = await new Promise<PlaceDetailsData>((resolve, reject) => {
           placesService.getDetails(
             {
               placeId: placeId,
@@ -139,19 +143,11 @@ export function PlaceDetailsSheet({ open, onOpenChange, placeId, onSelectPlace }
                 'place_id',
                 'name',
                 'formatted_address',
-                'formatted_phone_number',
-                'international_phone_number',
-                'website',
-                'rating',
-                'user_ratings_total',
-                'price_level',
-                'opening_hours',
-                'photos',
-                'reviews',
                 'types',
                 'geometry',
-                'business_status',
-                'url'
+                'rating',
+                'user_ratings_total',
+                'business_status'
               ],
             },
             (result, status) => {
@@ -164,11 +160,58 @@ export function PlaceDetailsSheet({ open, onOpenChange, placeId, onSelectPlace }
           );
         });
 
-        setPlaceDetails(placeData);
+        // Set minimal data immediately for fast display
+        setPlaceDetails(minimalData);
+        setLoading(false);
+        
+        // STAGE 2: Load heavy fields in the background (non-blocking)
+        setTimeout(async () => {
+          try {
+            const fullData = await new Promise<PlaceDetailsData>((resolve, reject) => {
+              placesService.getDetails(
+                {
+                  placeId: placeId,
+                  fields: [
+                    'place_id',
+                    'name', 
+                    'formatted_address',
+                    'formatted_phone_number',
+                    'international_phone_number',
+                    'website',
+                    'rating',
+                    'user_ratings_total',
+                    'price_level',
+                    'opening_hours',
+                    'photos',
+                    'reviews',
+                    'types',
+                    'geometry',
+                    'business_status',
+                    'url'
+                  ],
+                },
+                (result, status) => {
+                  if (status === google.maps.places.PlacesServiceStatus.OK && result) {
+                    resolve(result as PlaceDetailsData);
+                  } else {
+                    reject(new Error(`Failed to fetch full place details: ${status}`));
+                  }
+                }
+              );
+            });
+            
+            // Update with full data
+            setPlaceDetails(fullData);
+            setHeavyFieldsLoaded(true);
+          } catch (err) {
+            console.error('Error fetching full place details:', err);
+            // Keep minimal data if heavy fields fail
+          }
+        }, 50); // Small delay to ensure sheet opens quickly
+        
       } catch (err) {
         console.error('Error fetching place details:', err);
         setError(err instanceof Error ? err.message : 'Failed to load place details');
-      } finally {
         setLoading(false);
       }
     };
@@ -197,8 +240,8 @@ export function PlaceDetailsSheet({ open, onOpenChange, placeId, onSelectPlace }
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="h-[80vh] p-0">
         <div className="flex flex-col h-full">
-          {/* Header with photos */}
-          {placeDetails?.photos && placeDetails.photos.length > 0 && (
+          {/* Header with photos or skeleton */}
+          {heavyFieldsLoaded && placeDetails?.photos && placeDetails.photos.length > 0 ? (
             <div className="relative h-48 overflow-hidden">
               <img
                 src={getPhotoUrl(placeDetails.photos[selectedPhotoIndex], 800)}
@@ -225,6 +268,10 @@ export function PlaceDetailsSheet({ open, onOpenChange, placeId, onSelectPlace }
                   ))}
                 </div>
               )}
+            </div>
+          ) : (
+            <div className="h-48 bg-muted animate-pulse flex items-center justify-center">
+              <Camera className="h-8 w-8 text-muted-foreground" />
             </div>
           )}
 
@@ -288,20 +335,30 @@ export function PlaceDetailsSheet({ open, onOpenChange, placeId, onSelectPlace }
                       <Navigation className="h-4 w-4" />
                       <span className="text-xs">Select</span>
                     </Button>
-                    {placeDetails.formatted_phone_number && (
+                    {heavyFieldsLoaded && placeDetails.formatted_phone_number ? (
                       <Button variant="outline" className="flex flex-col h-16 gap-1" asChild>
                         <a href={`tel:${placeDetails.formatted_phone_number}`}>
                           <Phone className="h-4 w-4" />
                           <span className="text-xs">Call</span>
                         </a>
                       </Button>
+                    ) : (
+                      <Button variant="outline" className="flex flex-col h-16 gap-1" disabled>
+                        <Phone className="h-4 w-4 animate-pulse" />
+                        <span className="text-xs">Call</span>
+                      </Button>
                     )}
-                    {placeDetails.website && (
+                    {heavyFieldsLoaded && placeDetails.website ? (
                       <Button variant="outline" className="flex flex-col h-16 gap-1" asChild>
                         <a href={placeDetails.website} target="_blank" rel="noopener noreferrer">
                           <Globe className="h-4 w-4" />
                           <span className="text-xs">Website</span>
                         </a>
+                      </Button>
+                    ) : (
+                      <Button variant="outline" className="flex flex-col h-16 gap-1" disabled>
+                        <Globe className="h-4 w-4 animate-pulse" />
+                        <span className="text-xs">Website</span>
                       </Button>
                     )}
                     <Button variant="outline" className="flex flex-col h-16 gap-1">
@@ -311,34 +368,40 @@ export function PlaceDetailsSheet({ open, onOpenChange, placeId, onSelectPlace }
                   </div>
 
                   {/* Opening Hours */}
-                  {placeDetails.opening_hours && (
-                    <>
-                      <Separator />
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          <h3 className="font-medium">Hours</h3>
-                          <Badge variant={placeDetails.opening_hours.open_now ? "default" : "secondary"}>
-                            {placeDetails.opening_hours.open_now ? "Open" : "Closed"}
-                          </Badge>
-                        </div>
-                        <div className="space-y-1">
-                          {placeDetails.opening_hours.weekday_text.map((day, index) => (
-                            <div key={index} className="text-sm text-muted-foreground">
-                              {day}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </>
-                  )}
+                  <Separator />
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      <h3 className="font-medium">Hours</h3>
+                      {heavyFieldsLoaded && placeDetails.opening_hours ? (
+                        <Badge variant={placeDetails.opening_hours.open_now ? "default" : "secondary"}>
+                          {placeDetails.opening_hours.open_now ? "Open" : "Closed"}
+                        </Badge>
+                      ) : (
+                        <div className="h-5 w-12 bg-muted animate-pulse rounded" />
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      {heavyFieldsLoaded && placeDetails.opening_hours ? (
+                        placeDetails.opening_hours.weekday_text.map((day, index) => (
+                          <div key={index} className="text-sm text-muted-foreground">
+                            {day}
+                          </div>
+                        ))
+                      ) : (
+                        Array.from({ length: 7 }, (_, index) => (
+                          <div key={index} className="h-4 bg-muted animate-pulse rounded" />
+                        ))
+                      )}
+                    </div>
+                  </div>
 
                   {/* Contact Info */}
-                  {(placeDetails.formatted_phone_number || placeDetails.website) && (
-                    <>
-                      <Separator />
-                      <div className="space-y-2">
-                        <h3 className="font-medium">Contact</h3>
+                  <Separator />
+                  <div className="space-y-2">
+                    <h3 className="font-medium">Contact</h3>
+                    {heavyFieldsLoaded ? (
+                      <>
                         {placeDetails.formatted_phone_number && (
                           <div className="flex items-center gap-2">
                             <Phone className="h-4 w-4" />
@@ -359,16 +422,30 @@ export function PlaceDetailsSheet({ open, onOpenChange, placeId, onSelectPlace }
                             </a>
                           </div>
                         )}
-                      </div>
-                    </>
-                  )}
+                        {!placeDetails.formatted_phone_number && !placeDetails.website && (
+                          <div className="text-sm text-muted-foreground">No contact information available</div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4" />
+                          <div className="h-4 w-32 bg-muted animate-pulse rounded" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Globe className="h-4 w-4" />
+                          <div className="h-4 w-20 bg-muted animate-pulse rounded" />
+                        </div>
+                      </>
+                    )}
+                  </div>
 
                   {/* Reviews */}
-                  {placeDetails.reviews && placeDetails.reviews.length > 0 && (
-                    <>
-                      <Separator />
-                      <div className="space-y-3">
-                        <h3 className="font-medium">Reviews</h3>
+                  <Separator />
+                  <div className="space-y-3">
+                    <h3 className="font-medium">Reviews</h3>
+                    {heavyFieldsLoaded && placeDetails.reviews && placeDetails.reviews.length > 0 ? (
+                      <>
                         {placeDetails.reviews.slice(0, 3).map((review, index) => (
                           <Card key={index}>
                             <CardContent className="p-4">
@@ -416,9 +493,37 @@ export function PlaceDetailsSheet({ open, onOpenChange, placeId, onSelectPlace }
                             <ChevronRight className="h-4 w-4 ml-1" />
                           </Button>
                         )}
-                      </div>
-                    </>
-                  )}
+                      </>
+                    ) : heavyFieldsLoaded ? (
+                      <div className="text-sm text-muted-foreground">No reviews available</div>
+                    ) : (
+                      Array.from({ length: 2 }, (_, index) => (
+                        <Card key={index}>
+                          <CardContent className="p-4">
+                            <div className="flex items-start gap-3">
+                              <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />
+                              <div className="flex-1 space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-4 w-20 bg-muted animate-pulse rounded" />
+                                  <div className="h-3 w-16 bg-muted animate-pulse rounded" />
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  {Array.from({ length: 5 }, (_, i) => (
+                                    <div key={i} className="h-3 w-3 bg-muted animate-pulse rounded" />
+                                  ))}
+                                </div>
+                                <div className="space-y-1">
+                                  <div className="h-3 w-full bg-muted animate-pulse rounded" />
+                                  <div className="h-3 w-4/5 bg-muted animate-pulse rounded" />
+                                  <div className="h-3 w-3/5 bg-muted animate-pulse rounded" />
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
+                  </div>
                 </>
               )}
             </div>
