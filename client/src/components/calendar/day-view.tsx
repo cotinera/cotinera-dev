@@ -2,6 +2,7 @@ import {
   useState,
   useRef,
   useEffect,
+  useCallback,
 } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -142,7 +143,7 @@ function DraggableEvent({
     setPreviewEnd(eventEnd);
   };
 
-  const handleResizeMove = (e: MouseEvent) => {
+  const handleResizeMove = useCallback((e: MouseEvent) => {
     if (!isResizing || !resizeEdge) return;
 
     e.preventDefault();
@@ -184,9 +185,9 @@ function DraggableEvent({
         setPreviewEnd(newEndTime);
       }
     }
-  };
+  }, [isResizing, resizeEdge]);
 
-  const handleResizeEnd = () => {
+  const handleResizeEnd = useCallback(() => {
     if (isResizing && resizeEdge && previewStart && previewEnd) {
       // Always call onResize with the final preview time
       if (resizeEdge === 'top') {
@@ -201,7 +202,7 @@ function DraggableEvent({
     setPreviewHeight(null);
     setPreviewStart(null);
     setPreviewEnd(null);
-  };
+  }, [isResizing, resizeEdge, previewStart, previewEnd, onResize]);
 
   useEffect(() => {
     if (isResizing) {
@@ -212,7 +213,7 @@ function DraggableEvent({
         window.removeEventListener('mouseup', handleResizeEnd);
       };
     }
-  }, [isResizing, resizeEdge]);
+  }, [isResizing, resizeEdge, handleResizeMove, handleResizeEnd]);
 
   const displayHeight = previewHeight ?? heightInPixels;
   const displayStart = previewStart ?? eventStart;
@@ -253,13 +254,13 @@ function DraggableEvent({
   
   // Handle mouseup to detect if it was a click (not much movement) or a drag
   const handleMouseUp = (e: React.MouseEvent) => {
-    if (!clickRef.current || isResizing) return;
+    if (!clickRef.current || isResizing || isDragging) return;
     
     const deltaX = Math.abs(e.clientX - clickRef.current.x);
     const deltaY = Math.abs(e.clientY - clickRef.current.y);
     
-    // If minimal movement (less than 5px), treat as a click and open edit
-    if (deltaX < 5 && deltaY < 5 && mouseDown) {
+    // If minimal movement (less than 5px) and not dragging, treat as a click and open edit
+    if (deltaX < 5 && deltaY < 5 && mouseDown && !isDragging) {
       onEdit();
     }
     
@@ -783,7 +784,6 @@ export function DayView({ trip }: { trip: Trip }) {
           location: originalEvent.location,
           startTime: newStartTime.toISOString(),
           endTime: newEndTime.toISOString(),
-          participants: originalEvent.participants || [],
           coordinates: originalEvent.coordinates || null,
         }),
       });
@@ -987,7 +987,6 @@ export function DayView({ trip }: { trip: Trip }) {
           endTime: endTime.toISOString(),
           location: values.location || null,
           description: values.description || null,
-          participants: values.participants || [],
           coordinates: values.coordinates || null,
           tripId: trip.id
         }),
@@ -1076,16 +1075,22 @@ export function DayView({ trip }: { trip: Trip }) {
       location: event.location,  
       startTime: optimisticUpdate.startTime,
       endTime: optimisticUpdate.endTime,
-      participants: event.participants || [],
       coordinates: event.coordinates || null,
     };
 
     try {
+      console.log('📤 Sending PATCH request:', {
+        url: `/api/trips/${trip.id}/activities/${event.id}`,
+        updateData
+      });
+
       const res = await fetch(`/api/trips/${trip.id}/activities/${event.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updateData),
       });
+
+      console.log('📥 PATCH response:', { status: res.status, ok: res.ok });
 
       if (!res.ok) {
         // Revert optimistic update on error
@@ -1404,13 +1409,11 @@ export function DayView({ trip }: { trip: Trip }) {
                     method: "PATCH",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
-                      ...selectedEvent,
                       title: values.title,
                       startTime: startTime.toISOString(),
                       endTime: endTime.toISOString(),
                       location: values.location,
                       description: values.description,
-                      participants: values.participants,
                       coordinates: values.coordinates
                     }),
                   });

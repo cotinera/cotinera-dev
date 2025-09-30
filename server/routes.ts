@@ -877,7 +877,6 @@ export function registerRoutes(app: Express): Server {
         description: req.body.description || null,
         location: req.body.location || null,
         coordinates: req.body.coordinates || null,
-        participants: req.body.participants || [], //Restored participants field
       }).returning();
 
       if (!newActivity) {
@@ -895,17 +894,41 @@ export function registerRoutes(app: Express): Server {
   // Update activity
   app.patch("/api/trips/:tripId/activities/:activityId", async (req, res) => {
     try {
+      console.log('PATCH activity request:', {
+        activityId: req.params.activityId,
+        tripId: req.params.tripId,
+        body: req.body
+      });
+
+      // Validate and parse dates
+      const startTime = req.body.startTime ? new Date(req.body.startTime) : undefined;
+      const endTime = req.body.endTime ? new Date(req.body.endTime) : undefined;
+
+      console.log('Parsed dates:', {
+        startTime,
+        endTime,
+        startTimeValid: startTime && !isNaN(startTime.getTime()),
+        endTimeValid: endTime && !isNaN(endTime.getTime())
+      });
+
+      if (startTime && isNaN(startTime.getTime())) {
+        return res.status(400).json({ error: 'Invalid startTime' });
+      }
+      if (endTime && isNaN(endTime.getTime())) {
+        return res.status(400).json({ error: 'Invalid endTime' });
+      }
+
+      const updateData: any = {};
+      if (req.body.title !== undefined) updateData.title = req.body.title;
+      if (req.body.description !== undefined) updateData.description = req.body.description;
+      if (req.body.location !== undefined) updateData.location = req.body.location;
+      if (startTime) updateData.startTime = startTime;
+      if (endTime) updateData.endTime = endTime;
+      if (req.body.coordinates !== undefined) updateData.coordinates = req.body.coordinates || null;
+
       const [updatedActivity] = await db
         .update(activities)
-        .set({
-          title: req.body.title,
-          description: req.body.description,
-          location: req.body.location,
-          startTime: new Date(req.body.startTime),
-          endTime: new Date(req.body.endTime),
-          participants: req.body.participants || [],
-          coordinates: req.body.coordinates || null,
-        })
+        .set(updateData)
         .where(
           and(
             eq(activities.id, parseInt(req.params.activityId)),
@@ -913,6 +936,8 @@ export function registerRoutes(app: Express): Server {
           )
         )
         .returning();
+
+      console.log('Updated activity result:', updatedActivity);
 
       if (!updatedActivity) {
         return res.status(404).json({ error: "Activity not found" });
