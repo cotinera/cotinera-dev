@@ -150,35 +150,37 @@ function DraggableEvent({
     const deltaMinutes = Math.round((deltaY / 48) * 60 / 15) * 15; // Snap to 15-minute increments
 
     if (resizeEdge === 'top') {
-      const newStartTime = new Date(initialEventRef.current.startTime);
-      newStartTime.setMinutes(newStartTime.getMinutes() + deltaMinutes);
+      // Create new start time without mutating
+      const originalStartTime = new Date(initialEventRef.current.startTime);
+      const newStartTime = new Date(originalStartTime.getTime() + deltaMinutes * 60 * 1000);
       
       // Ensure minimum 15-minute duration and doesn't go past end time
       const originalEndTime = new Date(initialEventRef.current.endTime);
       const maxStartTime = new Date(originalEndTime.getTime() - 15 * 60 * 1000);
       
       if (newStartTime <= maxStartTime) {
-        const newDurationMinutes = differenceInMinutes(eventEnd, newStartTime);
+        const newDurationMinutes = differenceInMinutes(originalEndTime, newStartTime);
         const newHeight = Math.max((newDurationMinutes / 60) * 48, 12); // 12px minimum (15 minutes)
         
         setPreviewHeight(newHeight);
         setPreviewStart(newStartTime);
-        setPreviewEnd(eventEnd);
+        setPreviewEnd(originalEndTime);
       }
     } else {
-      const newEndTime = new Date(initialEventRef.current.endTime);
-      newEndTime.setMinutes(newEndTime.getMinutes() + deltaMinutes);
+      // Create new end time without mutating
+      const originalEndTime = new Date(initialEventRef.current.endTime);
+      const newEndTime = new Date(originalEndTime.getTime() + deltaMinutes * 60 * 1000);
       
       // Ensure minimum 15-minute duration and doesn't go before start time
       const originalStartTime = new Date(initialEventRef.current.startTime);
       const minEndTime = new Date(originalStartTime.getTime() + 15 * 60 * 1000);
       
       if (newEndTime >= minEndTime) {
-        const newDurationMinutes = differenceInMinutes(newEndTime, eventStart);
+        const newDurationMinutes = differenceInMinutes(newEndTime, originalStartTime);
         const newHeight = Math.max((newDurationMinutes / 60) * 48, 12); // 12px minimum (15 minutes)
         
         setPreviewHeight(newHeight);
-        setPreviewStart(eventStart);
+        setPreviewStart(originalStartTime);
         setPreviewEnd(newEndTime);
       }
     }
@@ -233,7 +235,9 @@ function DraggableEvent({
 
   const combinedRef = (el: HTMLDivElement | null) => {
     if (!isResizing) setNodeRef(el);
-    elementRef.current = el;
+    if (elementRef.current !== el) {
+      (elementRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+    }
   };
 
   // Store the initial click position to determine if it's a click or drag
@@ -702,40 +706,9 @@ export function DayView({ trip }: { trip: Trip }) {
   };
 
   const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event;
-    if (!over) return;
-
-    const draggedId = active.id as string;
-    const [dateStr, hourStr] = (over.id as string).split("|");
-    const newDate = new Date(dateStr);
-    const newHour = parseInt(hourStr);
-
-    // Find the dragged event (could be original or split segment)
-    const splitEvent = splitActivities.find((a) => a.id.toString() === draggedId);
-    if (!splitEvent) return;
-
-    // Get the original event and its duration
-    const originalEvent = splitEvent.originalEvent || splitEvent;
-    const originalStart = new Date(originalEvent.startTime);
-    const originalEnd = new Date(originalEvent.endTime);
-    const fullDurationInMinutes = differenceInMinutes(originalEnd, originalStart);
-
-    const newStartTime = snapToQuarterHour(new Date(newDate.setHours(newHour, 0, 0)));
-    const newEndTime = new Date(newStartTime);
-    newEndTime.setMinutes(newStartTime.getMinutes() + fullDurationInMinutes);
-
+    const { over } = event;
     if (over) {
       setActiveDropId(over.id as string);
-
-      // Update the original event in the activities array
-      queryClient.setQueryData(
-        [`/api/trips/${trip.id}/activities`],
-        activities.map(activity =>
-          activity.id === originalEvent.id
-            ? { ...activity, startTime: newStartTime.toISOString(), endTime: newEndTime.toISOString() }
-            : activity
-        )
-      );
     }
   };
 
@@ -763,8 +736,7 @@ export function DayView({ trip }: { trip: Trip }) {
     const fullDurationInMinutes = differenceInMinutes(originalEnd, originalStart);
 
     const newStartTime = snapToQuarterHour(new Date(newDate.setHours(newHour, 0, 0)));
-    const newEndTime = new Date(newStartTime);
-    newEndTime.setMinutes(newStartTime.getMinutes() + fullDurationInMinutes);
+    const newEndTime = new Date(newStartTime.getTime() + fullDurationInMinutes * 60 * 1000);
 
     const tripStart = startOfDay(new Date(trip.startDate));
     const tripEnd = endOfDay(new Date(trip.endDate));
@@ -778,34 +750,82 @@ export function DayView({ trip }: { trip: Trip }) {
       return;
     }
 
+    // Check if position actually changed
+    if (originalStart.getTime() === newStartTime.getTime()) {
+      return; // No change, don't update
+    }
+
+    // Create optimistic update
+    const optimisticUpdate = {
+      ...originalEvent,
+      startTime: newStartTime.toISOString(),
+      endTime: newEndTime.toISOString(),
+    };
+
+    // Apply optimistic update to cache immediately
+    queryClient.setQueryData(
+      [`/api/trips/${trip.id}/activities`],
+      (old: Activity[] | undefined) => {
+        if (!old) return [optimisticUpdate];
+        return old.map(activity => 
+          activity.id === originalEvent.id ? optimisticUpdate : activity
+        );
+      }
+    );
+
     try {
       const res = await fetch(`/api/trips/${trip.id}/activities/${originalEvent.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...originalEvent,
+          title: originalEvent.title,
+          description: originalEvent.description,
+          location: originalEvent.location,
           startTime: newStartTime.toISOString(),
           endTime: newEndTime.toISOString(),
+          participants: originalEvent.participants || [],
+          coordinates: originalEvent.coordinates || null,
         }),
       });
 
-      if (!res.ok) throw new Error("Failed to update activity");
+      if (!res.ok) {
+        // Revert optimistic update on error
+        queryClient.setQueryData(
+          [`/api/trips/${trip.id}/activities`],
+          (old: Activity[] | undefined) => {
+            if (!old) return [originalEvent];
+            return old.map(activity => 
+              activity.id === originalEvent.id ? originalEvent : activity
+            );
+          }
+        );
+        throw new Error("Failed to update activity");
+      }
 
-      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${trip.id}/activities`] });
+      const updatedActivity = await res.json();
+      
+      // Update cache with server response
+      queryClient.setQueryData(
+        [`/api/trips/${trip.id}/activities`],
+        (old: Activity[] | undefined) => {
+          if (!old) return [updatedActivity];
+          return old.map(activity => 
+            activity.id === updatedActivity.id ? updatedActivity : activity
+          );
+        }
+      );
       
       // Sync updated activity to Google Calendar
       const googleCalendarSync = (window as any)[`googleCalendarSync_${trip.id}`];
-      if (googleCalendarSync && originalEvent) {
-        googleCalendarSync({
-          ...originalEvent,
-          startTime: newStartTime.toISOString(),
-          endTime: newEndTime.toISOString(),
-        });
+      if (googleCalendarSync && updatedActivity) {
+        googleCalendarSync(updatedActivity);
       }
+      
+      toast({ title: "Event moved successfully" });
     } catch (error) {
       toast({
         variant: "destructive",
-        title: "Failed to update event",
+        title: "Failed to move event",
         description: error instanceof Error ? error.message : "An error occurred",
       });
     }

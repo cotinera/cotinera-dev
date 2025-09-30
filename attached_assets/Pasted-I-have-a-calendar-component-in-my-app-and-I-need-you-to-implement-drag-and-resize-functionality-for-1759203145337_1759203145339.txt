@@ -1,0 +1,34 @@
+I have a calendar component in my app, and I need you to implement drag-and-resize functionality for calendar events that exactly replicates how Notion’s calendar works.
+
+Here’s the behavior I need:
+
+EXPECTED BEHAVIOR:
+
+1. Resizing Events:
+- When I drag the top edge of an event block upward, it should adjust the start time earlier and visually extend the block upward.
+- When I drag the bottom edge downward, it should adjust the end time later and visually extend downward.
+- Both top and bottom resizing actions must snap to 15-minute intervals while dragging.
+- When I release the mouse or touch input, the event’s start and end times should update and persist in state or database, and the block should visually reflect the new duration.
+
+2. Dragging Entire Events:
+- I should be able to click and drag the full event block vertically to change its start and end time.
+- While dragging, the block must snap to 15-minute increments.
+- On release, the event’s start and end times must be updated and reflected both visually and in the backend or state.
+
+CURRENT BUGS:
+
+- When I drag the top edge of an event block, the bottom edge gets longer instead of adjusting the top.
+- When I drag the bottom edge, it stretches visually but does not save the new time after I release — it resets to its original time.
+- When I drag the entire block to move it, it appears to move during the drag, but snaps back to its original position when released.
+- In all cases, I see a message saying the time was successfully set, but the event times do not actually update.
+
+IMPLEMENTATION NOTES:
+
+- I’m using React with Tailwind CSS and ShadCN components.
+- Events are rendered in a vertical scrollable day view, with hour slots broken into 15-minute increments.
+- Event start and end times are stored in state and/or synced with backend or local storage.
+- You can use `onMouseDown`, `onMouseMove`, and `onMouseUp` or `pointer` events to implement the interaction.
+- Snapping can be handled by rounding timestamps to the nearest 15-minute mark.
+- Ensure that the changes persist in state and any backend the app is connected to.
+
+Your task is to fix the bugs listed above and implement this functionality as described. It should feel identical to how resizing and dragging works in Notion’s calendar. Please write clean, modular, and bug-free code.
