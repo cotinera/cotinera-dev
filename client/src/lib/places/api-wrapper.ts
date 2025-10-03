@@ -401,7 +401,10 @@ export class PlacesApiWrapper {
       console.log('Map bounds:', this.map.getBounds()?.toString());
 
       // Use new Places API if available, fallback to old API
-      if (typeof google.maps.places.Place?.searchNearby === 'function') {
+      const hasNewApi = typeof google.maps.places.Place?.searchNearby === 'function';
+      console.log('Using new API:', hasNewApi);
+      
+      if (hasNewApi) {
         const result = await this.performNewApiSearch(options, requestId, startTime);
         console.groupEnd();
         return result;
@@ -630,24 +633,46 @@ export class PlacesApiWrapper {
 
   private buildLocationRestriction(options: SearchOptions): google.maps.places.SearchNearbyRequest['locationRestriction'] {
     if (options.withinMap && options.bounds) {
-      // Use rectangle bounds if searching within map
+      // Use circle at map center when "within map" is enabled
+      const center = options.bounds.getCenter();
       const ne = options.bounds.getNorthEast();
       const sw = options.bounds.getSouthWest();
       
+      // Calculate approximate radius to cover the map bounds
+      const latDiff = Math.abs(ne.lat() - sw.lat());
+      const lngDiff = Math.abs(ne.lng() - sw.lng());
+      const diagonal = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+      const radiusInDegrees = diagonal / 2;
+      const radiusInMeters = Math.min(radiusInDegrees * 111000, 10000); // Cap at 10km
+      
       return {
-        west: sw.lng(),
-        north: ne.lat(),
-        east: ne.lng(),
-        south: sw.lat()
+        circle: {
+          center: { 
+            latitude: center.lat(), 
+            longitude: center.lng() 
+          },
+          radius: {
+            value: radiusInMeters,
+            unit: 'METERS'
+          }
+        }
       } as any;
     } else {
       // Use circle with center and radius if not restricted to map bounds
       const center = this.map!.getCenter();
       if (center) {
         return {
-          center: center,
-          radius: 5000 // 5km radius
-        };
+          circle: {
+            center: { 
+              latitude: center.lat(), 
+              longitude: center.lng() 
+            },
+            radius: {
+              value: 5000,
+              unit: 'METERS'
+            }
+          }
+        } as any;
       }
     }
     
