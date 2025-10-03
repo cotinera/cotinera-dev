@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
-import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus, ChevronDown, ChevronUp, Image, Building2, Calendar, Utensils, Hotel, Camera, Building, DollarSign } from "lucide-react";
+import { Loader2, Search, MapPin, Phone, Globe, Star, Clock, X, Plus, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Image, Building2, Calendar, Utensils, Hotel, Camera, Building, DollarSign } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -912,6 +912,8 @@ export function MapView({
                     alt={`${selectedPlaceDetails.name} - photo ${selectedPhotoIndex + 1}`}
                     className="w-full h-full object-cover"
                   />
+                  
+                  {/* Close button */}
                   <Button 
                     variant="ghost" 
                     size="sm" 
@@ -920,6 +922,38 @@ export function MapView({
                   >
                     <X className="h-4 w-4" />
                   </Button>
+                  
+                  {/* Photo counter */}
+                  {photos.length > 1 && (
+                    <div className="absolute bottom-2 right-2 bg-black/60 text-white px-2 py-1 rounded-md text-xs flex items-center gap-1">
+                      <Camera className="h-3 w-3" />
+                      {selectedPhotoIndex + 1} / {photos.length}
+                    </div>
+                  )}
+                  
+                  {/* Navigation arrows */}
+                  {photos.length > 1 && (
+                    <>
+                      <button
+                        onClick={() => setSelectedPhotoIndex((prev) => 
+                          prev === null ? 0 : (prev === 0 ? photos.length - 1 : prev - 1)
+                        )}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition-colors"
+                        aria-label="Previous photo"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setSelectedPhotoIndex((prev) => 
+                          prev === null ? 0 : (prev === photos.length - 1 ? 0 : prev + 1)
+                        )}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition-colors"
+                        aria-label="Next photo"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="grid grid-cols-3 gap-1 h-full">
