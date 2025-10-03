@@ -297,6 +297,7 @@ export const pinnedPlaces = pgTable("pinned_places", {
     lat: number;
     lng: number;
   }>(),
+  placeId: text("place_id"), // Google Places ID for fetching detailed information
   destinationId: integer("destination_id").references(() => destinations.id),
   addedToChecklist: boolean("added_to_checklist").notNull().default(false),
   category: text("category").notNull().default('other'),

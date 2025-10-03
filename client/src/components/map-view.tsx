@@ -454,9 +454,15 @@ export function MapView({
     }
     
     if (place.placeId) {
-      fetchDetails(place.placeId);
+      // If we have a callback to show place details in sidebar, use it
+      if (onShowPlaceDetails) {
+        onShowPlaceDetails(place.placeId);
+      } else {
+        // Fallback to local details for backward compatibility
+        fetchDetails(place.placeId);
+      }
     }
-  }, [fetchDetails, coordinates]);
+  }, [fetchDetails, coordinates, onShowPlaceDetails]);
 
   const handleMarkerClick = useCallback((item: PinnedPlace | Accommodation | Activity) => {
     if (mapRef.current && 'coordinates' in item && item.coordinates) {
@@ -469,7 +475,13 @@ export function MapView({
     }
 
     if ('placeId' in item && item.placeId) {
-      fetchDetails(item.placeId);
+      // If we have a callback to show place details in sidebar, use it
+      if (onShowPlaceDetails) {
+        onShowPlaceDetails(item.placeId);
+      } else {
+        // Fallback to local details for backward compatibility
+        fetchDetails(item.placeId);
+      }
     } else {
       setSelectedPlaceDetails({
         name: 'title' in item ? item.title : ('name' in item ? item.name : 'Unnamed Place'),
@@ -497,7 +509,7 @@ export function MapView({
     if ('placeId' in item) {
       onPinClick?.(item as PinnedPlace);
     }
-  }, [onPinClick, fetchDetails, coordinates]);
+  }, [onPinClick, fetchDetails, coordinates, onShowPlaceDetails]);
 
   const handleLocalPlaceNameClick = useCallback((place: PinnedPlace) => {
     handlePlaceNameClick(place);

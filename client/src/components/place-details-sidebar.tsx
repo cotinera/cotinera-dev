@@ -76,7 +76,7 @@ interface PlaceDetailsData {
 
 interface PlaceDetailsSidebarProps {
   placeId: string | null;
-  onSelectPlace?: (address: string, coordinates: { lat: number; lng: number }, name: string) => void;
+  onSelectPlace?: (address: string, coordinates: { lat: number; lng: number }, name: string, placeId?: string) => void;
   onClose?: () => void;
 }
 
@@ -179,7 +179,7 @@ export function PlaceDetailsSidebar({ placeId, onSelectPlace, onClose }: PlaceDe
         lat: placeDetails.geometry.location.lat(),
         lng: placeDetails.geometry.location.lng()
       };
-      onSelectPlace(placeDetails.formatted_address, coordinates, placeDetails.name);
+      onSelectPlace(placeDetails.formatted_address, coordinates, placeDetails.name, placeId || undefined);
       if (onClose) onClose();
     }
   };

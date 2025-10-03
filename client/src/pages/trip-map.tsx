@@ -56,9 +56,31 @@ export default function TripMap() {
     setSelectedPlaceForDetails(placeId);
   };
 
-  const handleSelectPlaceFromDetails = (address: string, coordinates: { lat: number; lng: number }, name: string) => {
-    // Handle place selection from details sidebar
-    console.log('Selected place from details:', { address, coordinates, name });
+  const handleSelectPlaceFromDetails = async (address: string, coordinates: { lat: number; lng: number }, name: string, placeId?: string) => {
+    if (!tripId) return;
+    
+    try {
+      const res = await fetch(`/api/trips/${tripId}/pinned-places`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          address,
+          coordinates,
+          placeId, // Include placeId for fetching detailed info later
+          category: 'tourist',
+          icon: '📍'
+        }),
+      });
+      
+      if (res.ok) {
+        // Invalidate pinned places query to refresh the list
+        window.location.reload(); // Simple refresh to show the new pin
+      }
+    } catch (error) {
+      console.error('Failed to pin place:', error);
+    }
+    
     setSelectedPlaceForDetails(null);
   };
 

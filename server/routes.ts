@@ -2280,7 +2280,7 @@ export function registerRoutes(app: Express): Server {
   app.post("/api/trips/:tripId/pinned-places", async (req, res) => {
     try {
       const tripId = parseInt(req.params.tripId);
-      const { name, address, notes, coordinates, destinationId, category, icon } = req.body;
+      const { name, address, notes, coordinates, destinationId, category, icon, placeId } = req.body;
 
       const [newPlace] = await db.insert(pinnedPlaces).values({
         tripId,
@@ -2288,6 +2288,7 @@ export function registerRoutes(app: Express): Server {
         address,
         notes,
         coordinates,
+        placeId: placeId || null, // Save Google Places ID for fetching details
         destinationId: destinationId || null,
         category: category || 'tourist',
         icon: icon || '📍', // Use provided icon or default pin
