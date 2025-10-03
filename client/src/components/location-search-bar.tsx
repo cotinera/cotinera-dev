@@ -58,7 +58,12 @@ const getPlaceCategory = (types: string[]) => {
     }
   }
   
-  return types[0]?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Place';
+  // Filter out technical types like 'geocode', 'establishment', 'point_of_interest'
+  const filteredTypes = types.filter(type => 
+    !['geocode', 'establishment', 'point_of_interest'].includes(type)
+  );
+  
+  return filteredTypes[0]?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || null;
 };
 
 export function LocationSearchBar({
@@ -540,7 +545,7 @@ export function LocationSearchBar({
                           <span className="text-xs text-muted-foreground truncate">
                             {prediction.structured_formatting.secondary_text}
                           </span>
-                          {prediction.types.length > 0 && (
+                          {prediction.types.length > 0 && getPlaceCategory(prediction.types) && (
                             <Badge variant="secondary" className="text-xs px-1.5 py-0.5 h-auto">
                               {getPlaceCategory(prediction.types)}
                             </Badge>
