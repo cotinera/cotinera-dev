@@ -17,7 +17,9 @@ import {
   DollarSign,
   ExternalLink,
   User,
-  X
+  X,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -217,36 +219,103 @@ export function PlaceDetailsSidebar({ placeId, onSelectPlace, onClose }: PlaceDe
 
             {placeDetails && (
               <>
-                {/* Place Photo */}
-                {placeDetails.photos && placeDetails.photos.length > 0 && (
-                  <div className="relative aspect-video overflow-hidden rounded-lg">
-                    <img
-                      src={getPhotoUrl(placeDetails.photos[selectedPhotoIndex], 400)}
-                      alt={placeDetails.name}
-                      className="w-full h-full object-cover"
-                    />
-                    {placeDetails.photos.length > 1 && (
-                      <div className="absolute bottom-2 right-2 bg-black/60 text-white px-2 py-1 rounded-md text-xs flex items-center gap-1">
-                        <Camera className="h-3 w-3" />
-                        {selectedPhotoIndex + 1} / {placeDetails.photos.length}
-                      </div>
-                    )}
-                    {placeDetails.photos.length > 1 && (
-                      <div className="absolute bottom-2 left-2 flex gap-1">
-                        {placeDetails.photos.slice(0, 5).map((_, index) => (
+                {/* Place Photo Carousel */}
+                <div className="relative aspect-video overflow-hidden rounded-lg bg-muted">
+                  {placeDetails.photos && placeDetails.photos.length > 0 ? (
+                    <>
+                      <img
+                        src={getPhotoUrl(placeDetails.photos[selectedPhotoIndex], 800)}
+                        alt={placeDetails.name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Fallback to Street View if photo fails to load
+                          const target = e.target as HTMLImageElement;
+                          target.src = `https://maps.googleapis.com/maps/api/streetview?size=800x450&location=${placeDetails.geometry.location.lat()},${placeDetails.geometry.location.lng()}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`;
+                        }}
+                      />
+                      
+                      {/* Photo Counter */}
+                      {placeDetails.photos.length > 1 && (
+                        <div className="absolute bottom-2 right-2 bg-black/60 text-white px-2 py-1 rounded-md text-xs flex items-center gap-1">
+                          <Camera className="h-3 w-3" />
+                          {selectedPhotoIndex + 1} / {placeDetails.photos.length}
+                        </div>
+                      )}
+                      
+                      {/* Navigation Arrows */}
+                      {placeDetails.photos.length > 1 && (
+                        <>
                           <button
-                            key={index}
-                            onClick={() => setSelectedPhotoIndex(index)}
-                            className={cn(
-                              "w-2 h-2 rounded-full transition-colors",
-                              index === selectedPhotoIndex ? "bg-white" : "bg-white/50"
+                            onClick={() => setSelectedPhotoIndex((prev) => 
+                              prev === 0 ? placeDetails.photos!.length - 1 : prev - 1
                             )}
-                          />
-                        ))}
+                            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition-colors"
+                            aria-label="Previous photo"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => setSelectedPhotoIndex((prev) => 
+                              prev === placeDetails.photos!.length - 1 ? 0 : prev + 1
+                            )}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition-colors"
+                            aria-label="Next photo"
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
+                      
+                      {/* Photo Indicators */}
+                      {placeDetails.photos.length > 1 && (
+                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
+                          {placeDetails.photos.slice(0, 5).map((_, index) => (
+                            <button
+                              key={index}
+                              onClick={() => setSelectedPhotoIndex(index)}
+                              className={cn(
+                                "w-2 h-2 rounded-full transition-colors",
+                                index === selectedPhotoIndex ? "bg-white" : "bg-white/50"
+                              )}
+                              aria-label={`Go to photo ${index + 1}`}
+                            />
+                          ))}
+                          {placeDetails.photos.length > 5 && (
+                            <span className="text-white/70 text-xs ml-1">+{placeDetails.photos.length - 5}</span>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    // Fallback to Street View when no photos available
+                    <div className="relative w-full h-full">
+                      <img
+                        src={`https://maps.googleapis.com/maps/api/streetview?size=800x450&location=${placeDetails.geometry.location.lat()},${placeDetails.geometry.location.lng()}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`}
+                        alt={`Street view of ${placeDetails.name}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Ultimate fallback to a placeholder
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const parent = target.parentElement;
+                          if (parent) {
+                            parent.innerHTML = `
+                              <div class="w-full h-full flex items-center justify-center bg-muted">
+                                <div class="text-center text-muted-foreground">
+                                  <Camera class="h-12 w-12 mx-auto mb-2 opacity-20" />
+                                  <p class="text-sm">No photos available</p>
+                                </div>
+                              </div>
+                            `;
+                          }
+                        }}
+                      />
+                      <div className="absolute bottom-2 right-2 bg-black/60 text-white px-2 py-1 rounded-md text-xs">
+                        Street View
                       </div>
-                    )}
-                  </div>
-                )}
+                    </div>
+                  )}
+                </div>
 
                 {/* Place Header */}
                 <div className="space-y-2">
