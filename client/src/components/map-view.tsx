@@ -838,6 +838,11 @@ export function MapView({
     }
   }, []);
 
+  // Create a stable key for selectedPlace to ensure effect runs on every click
+  const selectedPlaceKey = selectedPlace 
+    ? `${selectedPlace.id}:${selectedPlace.placeId || ''}:${selectedPlace.coordinates?.lat},${selectedPlace.coordinates?.lng}`
+    : null;
+
   // Effect to simulate a search based on a place name if provided
   useEffect(() => {
     if (selectedPlace && mapRef.current && placesServiceRef.current && isLoaded) {
@@ -853,35 +858,61 @@ export function MapView({
 
       // If we have a placeId, fetch details directly
       if (selectedPlace.placeId) {
+        console.log('Fetching place details with placeId:', selectedPlace.placeId);
         fetchDetails(selectedPlace.placeId);
       } 
-      // Otherwise, try to find place by name + coordinates
+      // Otherwise, try to find place by name + coordinates using Nearby Search
       else if (selectedPlace.name && selectedPlace.coordinates) {
-        findPlaceByQuery(
-          selectedPlace.name,
-          new google.maps.LatLng(selectedPlace.coordinates.lat, selectedPlace.coordinates.lng),
-          (placeId) => {
-            if (placeId) {
-              fetchDetails(placeId);
+        console.log('No placeId, searching for place:', selectedPlace.name);
+        
+        // Use Nearby Search to find the place by location and name
+        if (placesServiceRef.current) {
+          const request = {
+            location: new google.maps.LatLng(selectedPlace.coordinates.lat, selectedPlace.coordinates.lng),
+            radius: 50, // Very small radius since we have exact coordinates
+            keyword: selectedPlace.name
+          };
+          
+          placesServiceRef.current.nearbySearch(request, (results, status) => {
+            if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
+              // Found the place, now get full details with photos
+              const foundPlace = results[0];
+              console.log('Found place via nearby search:', foundPlace.name, foundPlace.place_id);
+              if (foundPlace.place_id) {
+                fetchDetails(foundPlace.place_id);
+              }
             } else {
-              // If place not found, just show basic info
-              setSelectedPlaceDetails({
-                name: selectedPlace.name,
-                formatted_address: '',
-                geometry: {
-                  location: new google.maps.LatLng(
-                    selectedPlace.coordinates?.lat || 0,
-                    selectedPlace.coordinates?.lng || 0
-                  )
-                },
-                types: ['point_of_interest']
-              } as PlaceDetails);
+              // Still try findPlaceByQuery as fallback
+              console.log('Nearby search failed, trying findPlaceByQuery');
+              findPlaceByQuery(
+                selectedPlace.name,
+                new google.maps.LatLng(selectedPlace.coordinates.lat, selectedPlace.coordinates.lng),
+                (placeId) => {
+                  if (placeId) {
+                    fetchDetails(placeId);
+                  } else {
+                    console.log('All place lookups failed for:', selectedPlace.name);
+                    // Last resort: show basic info without photos
+                    setSelectedPlaceDetails({
+                      name: selectedPlace.name,
+                      formatted_address: selectedPlace.address || '',
+                      geometry: {
+                        location: new google.maps.LatLng(
+                          selectedPlace.coordinates?.lat || 0,
+                          selectedPlace.coordinates?.lng || 0
+                        )
+                      },
+                      types: ['point_of_interest']
+                    } as PlaceDetails);
+                  }
+                }
+              );
             }
-          }
-        );
+          });
+        }
       }
     }
-  }, [selectedPlace, isLoaded, fetchDetails, findPlaceByQuery, coordinates, searchedLocation]);
+  }, [selectedPlaceKey, isLoaded, fetchDetails, findPlaceByQuery, coordinates, searchedLocation]);
 
   // Function for rendering the place details panel
   const renderPlaceDetails = () => {
@@ -908,7 +939,7 @@ export function MapView({
               {selectedPhotoIndex !== null ? (
                 <div className="relative h-full">
                   <img 
-                    src={photos[selectedPhotoIndex].getUrl()} 
+                    src={photos[selectedPhotoIndex].getUrl({ maxWidth: 800, maxHeight: 600 })} 
                     alt={`${selectedPlaceDetails.name} - photo ${selectedPhotoIndex + 1}`}
                     className="w-full h-full object-cover"
                   />
