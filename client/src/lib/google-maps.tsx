@@ -17,17 +17,13 @@ export const MAP_CONTAINER_STYLE = {
   position: "relative" as const,
 };
 
-// Vector Map ID for enhanced performance and features
-export const VECTOR_MAP_ID = 'DEMO_MAP_ID'; // Using demo ID, should be replaced with actual vector map ID
-
-// Default map options with vector map configuration
+// Default map options
 export const DEFAULT_MAP_OPTIONS = {
   disableDefaultUI: true,
   zoomControl: true,
   scrollwheel: true,
   clickableIcons: true,
   streetViewControl: false,
-  mapId: VECTOR_MAP_ID, // Enable vector rendering for better performance
   gestureHandling: 'greedy',
   restriction: {
     // Restrict to world bounds for better performance
