@@ -281,7 +281,6 @@ export function MapView({
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
   const [openNow, setOpenNow] = useState(false);
   const [withinMap, setWithinMap] = useState(true);
-  const [keyword, setKeyword] = useState('');
   
   // Search results state
   const [searchResults, setSearchResults] = useState<SearchServiceResult[]>([]);
@@ -519,8 +518,8 @@ export function MapView({
   const performSearch = useCallback(async () => {
     if (!placesSearchServiceRef.current || !mapRef.current) return;
     
-    // Only search if we have a category or keyword
-    if (!selectedCategory && !keyword.trim()) {
+    // Only search if we have a category
+    if (!selectedCategory) {
       setSearchResults([]);
       return;
     }
@@ -535,7 +534,7 @@ export function MapView({
         category: selectedCategory,
         openNow,
         withinMap,
-        keyword: keyword.trim(),
+        keyword: '',
         bounds,
         map: mapRef.current
       };
@@ -553,7 +552,7 @@ export function MapView({
     } finally {
       setIsLoadingSearch(false);
     }
-  }, [selectedCategory, openNow, withinMap, keyword, toast]);
+  }, [selectedCategory, openNow, withinMap, toast]);
 
   // Load more results
   const loadMoreResults = useCallback(async () => {
@@ -583,7 +582,7 @@ export function MapView({
     if (placesSearchServiceRef.current && mapRef.current) {
       performSearch();
     }
-  }, [selectedCategory, openNow, withinMap, keyword, performSearch]);
+  }, [selectedCategory, openNow, withinMap, performSearch]);
 
   // Handler for category filter changes
   const handleCategoryChange = useCallback((category: CategoryId | null) => {
@@ -600,10 +599,6 @@ export function MapView({
     setWithinMap(withinMapValue);
   }, []);
 
-  // Handler for keyword search changes
-  const handleKeywordChange = useCallback((keywordValue: string) => {
-    setKeyword(keywordValue);
-  }, []);
 
   // Throttle utility for map move events
   const throttleRef = useRef<NodeJS.Timeout | null>(null);
@@ -1101,8 +1096,6 @@ export function MapView({
                 onOpenNowChange={handleOpenNowChange}
                 withinMap={withinMap}
                 onWithinMapChange={handleWithinMapChange}
-                keyword={keyword}
-                onKeywordChange={handleKeywordChange}
                 className="bg-background/90 backdrop-blur-sm rounded-lg p-3"
               />
             </div>
