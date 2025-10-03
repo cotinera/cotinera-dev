@@ -643,35 +643,21 @@ export class PlacesApiWrapper {
       const lngDiff = Math.abs(ne.lng() - sw.lng());
       const diagonal = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
       const radiusInDegrees = diagonal / 2;
-      const radiusInMeters = Math.min(radiusInDegrees * 111000, 10000); // Cap at 10km
+      const radiusInMeters = Math.min(radiusInDegrees * 111000, 50000); // Cap at 50km (API maximum)
       
+      // JavaScript API format: no 'circle' wrapper, use lat/lng (not latitude/longitude)
       return {
-        circle: {
-          center: { 
-            latitude: center.lat(), 
-            longitude: center.lng() 
-          },
-          radius: {
-            value: radiusInMeters,
-            unit: 'METERS'
-          }
-        }
+        center: new google.maps.LatLng(center.lat(), center.lng()),
+        radius: radiusInMeters
       } as any;
     } else {
       // Use circle with center and radius if not restricted to map bounds
       const center = this.map!.getCenter();
       if (center) {
+        // JavaScript API format: no 'circle' wrapper, use lat/lng (not latitude/longitude)
         return {
-          circle: {
-            center: { 
-              latitude: center.lat(), 
-              longitude: center.lng() 
-            },
-            radius: {
-              value: 5000,
-              unit: 'METERS'
-            }
-          }
+          center: new google.maps.LatLng(center.lat(), center.lng()),
+          radius: 5000 // 5km default radius
         } as any;
       }
     }
