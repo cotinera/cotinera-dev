@@ -274,6 +274,11 @@ export function MapView({
   const queryClient = useQueryClient();
   const mapRef = useRef<google.maps.Map | null>(null);
   const [selectedPlaceDetails, setSelectedPlaceDetails] = useState<PlaceDetails | null>(null);
+  const [internalSelectedPlace, setInternalSelectedPlace] = useState<string | null>(null);
+  
+  // Use internal state if parent doesn't control selection
+  const effectiveSelectedPlace = selectedPlaceForDetails !== undefined ? selectedPlaceForDetails : internalSelectedPlace;
+  const effectiveOnClose = onClosePlaceDetails || (() => setInternalSelectedPlace(null));
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [expandedReviews, setExpandedReviews] = useState(false);
   const [selectedIcon, setSelectedIcon] = useState('📍'); // Icon for pinning places
@@ -1134,7 +1139,7 @@ export function MapView({
   // Left panel shows when there are search results, active filters, or user is searching
   const hasActiveSearch = searchValue.trim().length > 0 || selectedCategory !== null || searchResults.length > 0 || isLoadingSearch;
   const showLeftPanel = !hideSearchAndFilters && hasActiveSearch;
-  const showRightPanel = !!selectedPlaceDetails || (showPlaceDetailsSidebar && !!selectedPlaceForDetails);
+  const showRightPanel = !!selectedPlaceDetails || (showPlaceDetailsSidebar && !!effectiveSelectedPlace);
 
   // Dynamic grid layout based on panel visibility
   const getGridClasses = () => {
@@ -1412,15 +1417,15 @@ export function MapView({
               <ScrollArea className="h-full">
                 {renderPlaceDetails()}
               </ScrollArea>
-            ) : showPlaceDetailsSidebar && selectedPlaceForDetails ? (
+            ) : showPlaceDetailsSidebar && effectiveSelectedPlace ? (
               <PlaceDetailsPanel
-                placeId={selectedPlaceForDetails}
+                placeId={effectiveSelectedPlace}
                 tripId={tripId}
-                isPinned={allPinnedPlaces.some(p => p.placeId === selectedPlaceForDetails)}
-                pinnedPlaceId={allPinnedPlaces.find(p => p.placeId === selectedPlaceForDetails)?.id}
-                markerIcon={allPinnedPlaces.find(p => p.placeId === selectedPlaceForDetails)?.icon}
+                isPinned={allPinnedPlaces.some(p => p.placeId === effectiveSelectedPlace)}
+                pinnedPlaceId={allPinnedPlaces.find(p => p.placeId === effectiveSelectedPlace)?.id}
+                markerIcon={allPinnedPlaces.find(p => p.placeId === effectiveSelectedPlace)?.icon}
                 onSelectPlace={onSelectPlaceFromDetails}
-                onClose={onClosePlaceDetails}
+                onClose={effectiveOnClose}
                 onSave={async (placeData) => {
                   if (!tripId) return;
                   const res = await fetch(`/api/trips/${tripId}/pinned-places`, {
