@@ -12,7 +12,7 @@ import { useGoogleMapsScript, useMapCoordinates, GoogleMap, MarkerF, PlaceDetail
 import type { PlaceSearchResult } from "@/lib/google-maps";
 import { LocationSearchBar } from "@/components/location-search-bar";
 import { IconPicker } from "@/components/icon-picker";
-import { PlaceDetailsPanel } from "@/components/map/PlaceDetailsPanel";
+import { PlaceDetailsSidebar } from "@/components/place-details-sidebar";
 import { CategoryPills, CategoryId } from "@/components/map/CategoryPills";
 import { ResultsList } from "@/components/map/ResultsList";
 import { SearchResultsPanel } from "@/components/map/SearchResultsPanel";
@@ -274,11 +274,6 @@ export function MapView({
   const queryClient = useQueryClient();
   const mapRef = useRef<google.maps.Map | null>(null);
   const [selectedPlaceDetails, setSelectedPlaceDetails] = useState<PlaceDetails | null>(null);
-  const [internalSelectedPlace, setInternalSelectedPlace] = useState<string | null>(null);
-  
-  // Use internal state if parent doesn't control selection
-  const effectiveSelectedPlace = selectedPlaceForDetails !== undefined ? selectedPlaceForDetails : internalSelectedPlace;
-  const effectiveOnClose = onClosePlaceDetails || (() => setInternalSelectedPlace(null));
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [expandedReviews, setExpandedReviews] = useState(false);
   const [selectedIcon, setSelectedIcon] = useState('📍'); // Icon for pinning places
@@ -502,66 +497,61 @@ export function MapView({
   }, [fetchDetails, coordinates, onShowPlaceDetails]);
 
   const handleMarkerClick = useCallback(async (item: PinnedPlace | Accommodation | Activity) => {
-    // Light pan to marker (no zoom)
     if (mapRef.current && 'coordinates' in item && item.coordinates) {
-      mapRef.current.panTo(item.coordinates);
+      // Use our shared animation function with easing and better spatial context
+      smoothMapAnimation(
+        mapRef, 
+        coordinates, 
+        item.coordinates
+      );
     }
 
-    // For pinned places, try to show full details
+    // For pinned places, always try to show the details sidebar
     if ('placeId' in item) {
       if (item.placeId) {
-        // Have placeId - show details immediately
+        // If we have a placeId, show details directly
         if (onShowPlaceDetails) {
           onShowPlaceDetails(item.placeId);
         } else {
           fetchDetails(item.placeId);
         }
-      } else if (item.coordinates && item.name && placesServiceRef.current) {
-        // No placeId - resolve it via nearby search
-        const request = {
-          location: new google.maps.LatLng(item.coordinates.lat, item.coordinates.lng),
-          radius: 50,
-          keyword: item.name
-        };
-        
-        placesServiceRef.current.nearbySearch(request, (results, status) => {
-          if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
-            const foundPlace = results[0];
-            if (foundPlace.place_id) {
-              if (onShowPlaceDetails) {
-                onShowPlaceDetails(foundPlace.place_id);
-              } else {
-                fetchDetails(foundPlace.place_id);
-              }
-              return;
+      } else if (item.coordinates && onShowPlaceDetails) {
+        // If no placeId but have coordinates, try reverse geocoding to find it
+        try {
+          const geocoder = new google.maps.Geocoder();
+          const result = await geocoder.geocode({ location: item.coordinates });
+          
+          if (result.results && result.results.length > 0) {
+            const firstResult = result.results[0];
+            if (firstResult.place_id) {
+              onShowPlaceDetails(firstResult.place_id);
             }
           }
-          
-          // Fallback: try findPlace
-          findPlaceByQuery(
-            item.name,
-            new google.maps.LatLng(item.coordinates.lat, item.coordinates.lng),
-            (placeId) => {
-              if (placeId) {
-                if (onShowPlaceDetails) {
-                  onShowPlaceDetails(placeId);
-                } else {
-                  fetchDetails(placeId);
-                }
-              } else {
-                toast({
-                  title: 'Details unavailable',
-                  description: 'Could not find details for this location'
-                });
-              }
+        } catch (error) {
+          console.error('Error reverse geocoding:', error);
+          // Fallback to legacy details if reverse geocoding fails
+          setSelectedPlaceDetails({
+            place_id: '',
+            name: item.name || 'Unnamed Place',
+            formatted_address: '',
+            geometry: {
+              location: new google.maps.LatLng(
+                item.coordinates?.lat || 0,
+                item.coordinates?.lng || 0
+              )
+            },
+            types: ['point_of_interest'],
+            opening_hours: {
+              weekday_text: [],
+              isOpen: () => true
             }
-          );
-        });
+          } as PlaceDetails);
+        }
       }
       
       onPinClick?.(item as PinnedPlace);
     } else {
-      // For accommodations/activities, keep legacy fallback
+      // For accommodations/activities without placeId, show legacy details
       setSelectedPlaceDetails({
         name: 'title' in item ? item.title : ('name' in item ? item.name : 'Unnamed Place'),
         formatted_address: 'location' in item ? item.location || '' : ('address' in item ? item.address || '' : ''),
@@ -584,7 +574,7 @@ export function MapView({
         }
       } as PlaceDetails);
     }
-  }, [onPinClick, fetchDetails, coordinates, onShowPlaceDetails, findPlaceByQuery, toast]);
+  }, [onPinClick, fetchDetails, coordinates, onShowPlaceDetails]);
 
   const handleLocalPlaceNameClick = useCallback((place: PinnedPlace) => {
     handlePlaceNameClick(place);
@@ -1139,7 +1129,7 @@ export function MapView({
   // Left panel shows when there are search results, active filters, or user is searching
   const hasActiveSearch = searchValue.trim().length > 0 || selectedCategory !== null || searchResults.length > 0 || isLoadingSearch;
   const showLeftPanel = !hideSearchAndFilters && hasActiveSearch;
-  const showRightPanel = !!selectedPlaceDetails || (showPlaceDetailsSidebar && !!effectiveSelectedPlace);
+  const showRightPanel = !!selectedPlaceDetails || (showPlaceDetailsSidebar && !!selectedPlaceForDetails);
 
   // Dynamic grid layout based on panel visibility
   const getGridClasses = () => {
@@ -1178,60 +1168,15 @@ export function MapView({
               hoveredResultId={hoveredResultId}
               onResultClick={handleResultClick}
               onResultHover={setHoveredResultId}
-              onSavePlace={async (place, e) => {
+              onSavePlace={(place, e) => {
                 e.stopPropagation();
-                if (!tripId) {
-                  toast({ 
-                    title: "Cannot save", 
-                    description: "Trip ID is required",
-                    variant: "destructive"
-                  });
-                  return;
-                }
-                
-                try {
-                  const res = await fetch(`/api/trips/${tripId}/pinned-places`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                      name: place.name,
-                      address: place.formatted_address,
-                      coordinates: {
-                        lat: place.geometry.location.lat,
-                        lng: place.geometry.location.lng
-                      },
-                      placeId: place.place_id,
-                      phone: place.formatted_phone_number,
-                      website: place.website,
-                      rating: place.rating,
-                      category: place.types?.[0] || 'place'
-                    }),
-                  });
-                  if (!res.ok) throw new Error("Failed to save place");
-                  
-                  queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "pinned-places"] });
-                  toast({ 
-                    title: "Place saved", 
-                    description: `${place.name} added to trip` 
-                  });
-                } catch (error) {
-                  console.error('Failed to save place:', error);
-                  toast({ 
-                    title: "Error", 
-                    description: "Failed to save place",
-                    variant: "destructive" 
-                  });
-                }
+                // TODO: Implement save place functionality
+                toast({ title: "Save feature coming soon!" });
               }}
-              onAddToItinerary={async (place, e) => {
+              onAddToItinerary={(place, e) => {
                 e.stopPropagation();
-                // Show place details panel for adding to itinerary
-                if (onShowPlaceDetails) {
-                  onShowPlaceDetails(place.place_id);
-                } else {
-                  toast({ title: "Add to itinerary feature coming soon!" });
-                }
+                // TODO: Implement add to itinerary functionality
+                toast({ title: "Add to itinerary feature coming soon!" });
               }}
               onLoadMore={loadMoreResults}
               onSortChange={(sort) => {
@@ -1413,64 +1358,19 @@ export function MapView({
         {/* RIGHT PANEL: Place Details - Only visible when a place is selected */}
         {showRightPanel && (
           <div className="border-l bg-background h-[600px]">
-            {selectedPlaceDetails ? (
-              <ScrollArea className="h-full">
-                {renderPlaceDetails()}
-              </ScrollArea>
-            ) : showPlaceDetailsSidebar && effectiveSelectedPlace ? (
-              <PlaceDetailsPanel
-                placeId={effectiveSelectedPlace}
-                tripId={tripId}
-                isPinned={allPinnedPlaces.some(p => p.placeId === effectiveSelectedPlace)}
-                pinnedPlaceId={allPinnedPlaces.find(p => p.placeId === effectiveSelectedPlace)?.id}
-                markerIcon={allPinnedPlaces.find(p => p.placeId === effectiveSelectedPlace)?.icon}
-                onSelectPlace={onSelectPlaceFromDetails}
-                onClose={effectiveOnClose}
-                onSave={async (placeData) => {
-                  if (!tripId) return;
-                  const res = await fetch(`/api/trips/${tripId}/pinned-places`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    credentials: 'include',
-                    body: JSON.stringify({
-                      name: placeData.name,
-                      address: placeData.formatted_address,
-                      coordinates: {
-                        lat: placeData.geometry.location.lat(),
-                        lng: placeData.geometry.location.lng()
-                      },
-                      placeId: placeData.place_id,
-                      phone: placeData.formatted_phone_number,
-                      website: placeData.website,
-                      rating: placeData.rating,
-                      category: placeData.types[0]
-                    }),
-                  });
-                  if (!res.ok) throw new Error("Failed to save place");
-                  queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "pinned-places"] });
-                }}
-                onUnsave={async (pinnedPlaceId) => {
-                  if (!tripId) return;
-                  const res = await fetch(`/api/trips/${tripId}/pinned-places/${pinnedPlaceId}`, {
-                    method: "DELETE",
-                    credentials: 'include',
-                  });
-                  if (!res.ok) throw new Error("Failed to remove place");
-                  queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "pinned-places"] });
-                }}
-                onIconChange={async (pinnedPlaceId, icon) => {
-                  if (!tripId) return;
-                  const res = await fetch(`/api/trips/${tripId}/pinned-places/${pinnedPlaceId}`, {
-                    method: "PATCH",
-                    headers: { "Content-Type": "application/json" },
-                    credentials: 'include',
-                    body: JSON.stringify({ icon }),
-                  });
-                  if (!res.ok) throw new Error("Failed to update icon");
-                  queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "pinned-places"] });
-                }}
-              />
-            ) : null}
+            <ScrollArea className="h-full">
+              {selectedPlaceDetails ? (
+                renderPlaceDetails()
+              ) : showPlaceDetailsSidebar && selectedPlaceForDetails ? (
+                <div className="p-4">
+                  <PlaceDetailsSidebar
+                    placeId={selectedPlaceForDetails}
+                    onSelectPlace={onSelectPlaceFromDetails}
+                    onClose={onClosePlaceDetails}
+                  />
+                </div>
+              ) : null}
+            </ScrollArea>
           </div>
         )}
       </div>

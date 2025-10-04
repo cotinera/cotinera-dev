@@ -97,16 +97,6 @@ export interface PinnedPlace {
   };
   category?: PlaceCategory;
   placeId?: string;
-  icon?: string;
-  address?: string;
-  notes?: string;
-  phone?: string;
-  website?: string;
-  rating?: number;
-  openingHours?: string[];
-  tripId?: number;
-  destinationId?: number;
-  status?: "places" | "pending" | "booked";
 }
 
 // Interface for detailed place information
