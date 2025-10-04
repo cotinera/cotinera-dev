@@ -123,7 +123,7 @@ export default function TripDetail() {
         title: "Success",
         description: "Trip deleted successfully",
       });
-      setLocation("/");
+      setLocation("/dashboard");
     },
     onError: (error: Error) => {
       console.error("Delete trip error:", error);
@@ -162,7 +162,7 @@ export default function TripDetail() {
             <h1 className="text-2xl font-bold mb-4">Unable to Load Trip</h1>
             <p className="text-white/90 mb-6">{(error as Error).message}</p>
             <Button 
-              onClick={() => setLocation("/")}
+              onClick={() => setLocation("/dashboard")}
               variant="secondary"
               className="bg-white text-primary hover:bg-white/90"
             >
@@ -183,7 +183,7 @@ export default function TripDetail() {
             <h1 className="text-2xl font-bold mb-4">Trip Not Found</h1>
             <p className="text-white/90 mb-6">The trip you're looking for doesn't exist or you don't have access to it.</p>
             <Button 
-              onClick={() => setLocation("/")}
+              onClick={() => setLocation("/dashboard")}
               variant="secondary"
               className="bg-white text-primary hover:bg-white/90"
             >
@@ -218,7 +218,7 @@ export default function TripDetail() {
             <div className="flex justify-between items-center absolute left-6 top-4">
               <Button
                 variant="ghost"
-                onClick={() => setLocation("/")}
+                onClick={() => setLocation("/dashboard")}
                 className="text-white hover:bg-white/20 backdrop-blur-sm transition-all duration-300"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
@@ -237,7 +237,7 @@ export default function TripDetail() {
             <div className="pt-16">
               <TripHeaderEdit 
                 trip={trip} 
-                onBack={() => setLocation("/")} 
+                onBack={() => setLocation("/dashboard")} 
               />
             </div>
           </div>

@@ -66,7 +66,7 @@ export default function TripCalendar() {
             <h1 className="text-2xl font-bold mb-4">Trip Not Found</h1>
             <p className="text-white/90 mb-6">The calendar you're looking for doesn't exist or you don't have access to it.</p>
             <Button 
-              onClick={() => setLocation("/")}
+              onClick={() => setLocation("/dashboard")}
               variant="secondary"
               className="bg-white text-primary hover:bg-white/90"
             >
@@ -100,7 +100,7 @@ export default function TripCalendar() {
           <div className="container mx-auto px-6 relative z-10">
             <Button 
               variant="ghost" 
-              onClick={() => setLocation("/")} 
+              onClick={() => setLocation("/dashboard")} 
               className="absolute left-6 top-4 text-white hover:bg-white/20 border border-white/20 backdrop-blur-sm transition-all duration-300"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -110,7 +110,7 @@ export default function TripCalendar() {
             <div className="pt-16">
               <TripHeaderEdit 
                 trip={trip} 
-                onBack={() => setLocation("/")} 
+                onBack={() => setLocation("/dashboard")} 
               />
             </div>
           </div>

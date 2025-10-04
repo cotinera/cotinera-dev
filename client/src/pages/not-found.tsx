@@ -42,7 +42,7 @@ export default function NotFound() {
             
             <div className="space-y-3">
               <Button 
-                onClick={() => setLocation("/")}
+                onClick={() => setLocation("/dashboard")}
                 variant="ocean"
                 className="w-full"
               >

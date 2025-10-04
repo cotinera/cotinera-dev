@@ -1,6 +1,7 @@
 export { default as AuthPage } from "./auth-page";
 export { default as Dashboard } from "./dashboard";
 export { default as DestinationDetail } from "./destination-detail";
+export { default as LandingPage } from "./landing-page";
 export { default as NotFound } from "./not-found";
 export { default as SharedTrip } from "./shared-trip";
 export { default as TravelPreferencesPage } from "./travel-preferences";

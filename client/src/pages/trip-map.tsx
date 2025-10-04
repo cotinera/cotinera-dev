@@ -113,7 +113,7 @@ export default function TripMap() {
               {error ? "There was an issue loading the map data." : "The trip you're looking for doesn't exist or you don't have access to it."}
             </p>
             <Button 
-              onClick={() => setLocation("/")}
+              onClick={() => setLocation("/dashboard")}
               variant="secondary"
               className="bg-white text-primary hover:bg-white/90"
             >
@@ -147,7 +147,7 @@ export default function TripMap() {
           <div className="container mx-auto px-6 relative z-10">
             <Button
               variant="ghost"
-              onClick={() => setLocation("/")}
+              onClick={() => setLocation("/dashboard")}
               className="absolute left-6 top-4 text-white hover:bg-white/20 border border-white/20 backdrop-blur-sm transition-all duration-300"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -155,7 +155,7 @@ export default function TripMap() {
             </Button>
             
             <div className="pt-16">
-              <TripHeaderEdit trip={trip} onBack={() => setLocation("/")} />
+              <TripHeaderEdit trip={trip} onBack={() => setLocation("/dashboard")} />
             </div>
           </div>
         </div>

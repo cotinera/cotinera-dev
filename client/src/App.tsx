@@ -11,6 +11,7 @@ import { ThemeToggle } from "@/components/shared/theme-toggle";
 import {
   NotFound,
   Dashboard,
+  LandingPage,
   SharedTrip,
   TripDetail,
   TripCalendar,
@@ -26,9 +27,10 @@ import { ProtectedRoute } from "@/lib";
 function Router() {
   return (
     <Switch>
+      <Route path="/" component={LandingPage} />
       <Route path="/auth" component={AuthPage} />
       <Route path="/share/:token" component={SharedTrip} />
-      <ProtectedRoute path="/" component={Dashboard} />
+      <ProtectedRoute path="/dashboard" component={Dashboard} />
       <ProtectedRoute path="/trips/:id" component={TripDetail} />
       <ProtectedRoute path="/trips/:id/calendar" component={TripCalendar} />
       <ProtectedRoute path="/trips/:id/map" component={TripMap} />
