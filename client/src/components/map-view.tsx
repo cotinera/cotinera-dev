@@ -15,8 +15,10 @@ import { IconPicker } from "@/components/icon-picker";
 import { PlaceDetailsSidebar } from "@/components/place-details-sidebar";
 import { CategoryPills, CategoryId } from "@/components/map/CategoryPills";
 import { ResultsList } from "@/components/map/ResultsList";
+import { SearchResultsPanel } from "@/components/map/SearchResultsPanel";
 import { PlacesSearchService } from "@/lib/places/search";
 import type { PlaceSearchResult as SearchServiceResult, SearchFilters } from "@/lib/places/search";
+import { useSearchStateAdapter } from "@/hooks/use-search-state-adapter";
 
 // Helpers and components
 function calculateDistance(point1: { lat: number; lng: number }, point2: { lat: number; lng: number }): number {
@@ -281,13 +283,7 @@ export function MapView({
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
   const [openNow, setOpenNow] = useState(false);
   const [withinMap, setWithinMap] = useState(true);
-  
-  // Search results state
-  const [searchResults, setSearchResults] = useState<SearchServiceResult[]>([]);
-  const [isLoadingSearch, setIsLoadingSearch] = useState(false);
-  const [hasNextPage, setHasNextPage] = useState(false);
-  const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hoveredResultId, setHoveredResultId] = useState<string | null>(null);
   
   // Legacy state removed - using only new search flow
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -298,7 +294,33 @@ export function MapView({
   // Places search service
   const placesSearchServiceRef = useRef<PlacesSearchService | null>(null);
   
-  // Search result markers management - updated to use new search results
+  // Handle both string locations and coordinate objects
+  const locationObj = typeof location === 'string' 
+    ? undefined  // Will use default in useMapCoordinates
+    : location;  // Pass through lat/lng object directly
+  
+  const { coordinates, setCoordinates } = useMapCoordinates(locationObj || "");
+  
+  // Search state adapter - provides stable state machine with legacy compatibility
+  const {
+    searchResults,
+    isLoadingSearch,
+    hasNextPage,
+    selectedResultId,
+    isLoadingMore,
+    setSelectedResultId,
+    performSearch: controllerPerformSearch,
+    loadMore: controllerLoadMore,
+    sortBy,
+    setSortBy,
+    updateOnMapMove,
+    setUpdateOnMapMove,
+    getSortedResults,
+    searchState,
+    error: searchError,
+  } = useSearchStateAdapter(mapRef.current, coordinates);
+  
+  // Search result markers management - updated to use adapter state
   const {
     markers: searchMarkers,
     selectedPlaceId: selectedSearchPlaceId,
@@ -321,13 +343,6 @@ export function MapView({
 
   // Load Google Maps script
   const { isLoaded, loadError, errorMessage } = useGoogleMapsScript();
-  
-  // Handle both string locations and coordinate objects
-  const locationObj = typeof location === 'string' 
-    ? undefined  // Will use default in useMapCoordinates
-    : location;  // Pass through lat/lng object directly
-  
-  const { coordinates, setCoordinates } = useMapCoordinates(locationObj || "");
   
   // If Google Maps fails to load, display an error message
   if (loadError || errorMessage) {
@@ -575,66 +590,25 @@ export function MapView({
     fetchDetails(event.placeId);
   }, [fetchDetails]);
 
-  // New search functionality using PlacesSearchService
+  // Search functionality using adapter with stable state machine
   const performSearch = useCallback(async () => {
-    if (!placesSearchServiceRef.current || !mapRef.current) return;
+    if (!mapRef.current) return;
     
-    // Only search if we have a category
-    if (!selectedCategory) {
-      setSearchResults([]);
-      return;
-    }
+    const bounds = withinMap ? mapRef.current.getBounds() : null;
+    
+    await controllerPerformSearch({
+      category: selectedCategory,
+      openNow,
+      withinMap,
+      keyword: '',
+      bounds,
+    });
+  }, [selectedCategory, openNow, withinMap, controllerPerformSearch]);
 
-    setIsLoadingSearch(true);
-    setSelectedResultId(null);
-
-    try {
-      const bounds = withinMap ? mapRef.current.getBounds() : null;
-      
-      const searchOptions: SearchFilters & { map: google.maps.Map } = {
-        category: selectedCategory,
-        openNow,
-        withinMap,
-        keyword: '',
-        bounds,
-        map: mapRef.current
-      };
-
-      const result = await placesSearchServiceRef.current.searchDebounced(searchOptions);
-      setSearchResults(result.results);
-      setHasNextPage(result.hasNextPage);
-    } catch (error) {
-      console.error('Search error:', error);
-      toast({
-        title: "Search Error",
-        description: "Failed to search for places. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoadingSearch(false);
-    }
-  }, [selectedCategory, openNow, withinMap, toast]);
-
-  // Load more results
+  // Load more results using adapter
   const loadMoreResults = useCallback(async () => {
-    if (!placesSearchServiceRef.current || !hasNextPage || isLoadingMore) return;
-
-    setIsLoadingMore(true);
-    try {
-      const result = await placesSearchServiceRef.current.getNextPage();
-      setSearchResults(prev => [...prev, ...result.results]);
-      setHasNextPage(result.hasNextPage);
-    } catch (error) {
-      console.error('Load more error:', error);
-      toast({
-        title: "Load More Error", 
-        description: "Failed to load more results. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoadingMore(false);
-    }
-  }, [hasNextPage, isLoadingMore, toast]);
+    await controllerLoadMore();
+  }, [controllerLoadMore]);
 
   // Legacy refreshPlaces function removed - using new search flow with PlacesSearchService
 
