@@ -189,7 +189,6 @@ export function LocationSearchBar({
           sessionToken: sessionToken.current!,
           types: ['establishment', 'geocode'],
           language: 'en-US',
-          componentRestrictions: { country: 'us' },
         };
 
         // Add location bias if provided

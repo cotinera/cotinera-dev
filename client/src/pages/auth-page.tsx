@@ -55,7 +55,7 @@ export default function AuthPage() {
       if (redirectPath) {
         window.location.href = redirectPath;
       } else {
-        window.location.href = "/";
+        window.location.href = "/dashboard";
       }
     }
   }, [user, redirectPath]);
@@ -69,7 +69,7 @@ export default function AuthPage() {
     });
     
     // Honor redirect path if present
-    window.location.href = redirectPath || "/";
+    window.location.href = redirectPath || "/dashboard";
   };
 
   const form = useForm<FormData>({
