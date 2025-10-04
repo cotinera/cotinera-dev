@@ -25,7 +25,7 @@ export const CATEGORY_TYPES = {
     id: 'clubs',
     label: 'Clubs', 
     type: 'night_club',
-    icon: Moon,
+    icon: '🪩',
     color: 'bg-purple-500',
   },
   cafes: {
@@ -101,7 +101,11 @@ export function CategoryPills({
                 isSelected && `${category.color} text-white border-transparent hover:opacity-90`
               )}
             >
-              <Icon className="h-4 w-4" />
+              {typeof Icon === 'string' ? (
+                <span className="text-base leading-none">{Icon}</span>
+              ) : (
+                <Icon className="h-4 w-4" />
+              )}
               {category.label}
             </Button>
           );
