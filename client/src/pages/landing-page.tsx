@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, MapPin } from "lucide-react";
+import { useGoogleMapsScript } from "@/lib/google-maps";
 
 export default function LandingPage() {
   const [, setLocation] = useLocation();
@@ -14,6 +15,7 @@ export default function LandingPage() {
   const [participants, setParticipants] = useState("2");
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isLoaded } = useGoogleMapsScript();
 
   const createTripMutation = useMutation({
     mutationFn: async (tripData: any) => {
@@ -94,17 +96,24 @@ export default function LandingPage() {
           {/* Search Input and Participants Selector */}
           <div className="flex flex-col md:flex-row gap-4 items-stretch">
             <div className="flex-1">
-              <LocationSearchBar
-                value={searchLocation}
-                onChange={(address, coords) => {
-                  setSearchLocation(address);
-                  if (coords) {
-                    setCoordinates(coords);
-                  }
-                }}
-                placeholder="Where do you want to go?"
-                className="w-full h-14 text-lg bg-white/20 backdrop-blur-md border-white/30 text-white placeholder:text-white/70 shadow-xl"
-              />
+              {isLoaded ? (
+                <LocationSearchBar
+                  value={searchLocation}
+                  onChange={(address, coords) => {
+                    setSearchLocation(address);
+                    if (coords) {
+                      setCoordinates(coords);
+                    }
+                  }}
+                  placeholder="Where do you want to go?"
+                  className="w-full h-14 text-lg bg-white/20 backdrop-blur-md border-white/30 text-white placeholder:text-white/70 shadow-xl"
+                />
+              ) : (
+                <div className="w-full h-14 flex items-center justify-center bg-white/20 backdrop-blur-md border border-white/30 text-white/70 rounded-md shadow-xl">
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                  Loading map...
+                </div>
+              )}
             </div>
             <div className="md:w-48">
               <Select value={participants} onValueChange={setParticipants}>
