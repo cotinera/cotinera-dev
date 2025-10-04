@@ -415,6 +415,7 @@ export function MapView({
 
   const [searchValue, setSearchValue] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [categorySuggestions, setCategorySuggestions] = useState<SearchResult[]>([]);
 
   const allPinnedPlaces = useMemo(() => {
     if (!pinnedPlaces) return [];
@@ -672,11 +673,7 @@ export function MapView({
   // Category click handler using new search flow
   const handleCategoryClick = useCallback((category: CategoryButton) => {
     setSelectedCategory(currentCategory => {
-      const newCategory = currentCategory === category.id ? null : category.id;
-      // Don't call performSearch here - let the useEffect handle it
-      if (!newCategory) {
-        setSearchResults([]);
-      }
+      const newCategory: CategoryId | null = currentCategory === category.id ? null : (category.id as CategoryId);
       return newCategory;
     });
   }, []);
@@ -733,7 +730,7 @@ export function MapView({
       // Handle category selection
       const category = categoryButtons.find(c => c.id === result.id);
       if (category) {
-        setSelectedCategory(category.id);
+        setSelectedCategory(category.id as CategoryId);
         setSearchValue(category.label);
         setShowSearchResults(false);
       }
@@ -852,10 +849,10 @@ export function MapView({
         icon: category.icon
       }));
       
-      setSearchResults(categoryResults);
+      setCategorySuggestions(categoryResults);
       setShowSearchResults(true);
     } else {
-      setSearchResults([]);
+      setCategorySuggestions([]);
       setShowSearchResults(false);
     }
   }, []);
@@ -917,7 +914,7 @@ export function MapView({
                     // Last resort: show basic info without photos
                     setSelectedPlaceDetails({
                       name: selectedPlace.name,
-                      formatted_address: selectedPlace.address || '',
+                      formatted_address: selectedPlace.placeId || `${selectedPlace.coordinates.lat}, ${selectedPlace.coordinates.lng}`,
                       geometry: {
                         location: new google.maps.LatLng(
                           selectedPlace.coordinates?.lat || 0,
@@ -1160,10 +1157,10 @@ export function MapView({
                 />
                 
                 {/* Show category suggestions only when typing */}
-                {showSearchResults && searchResults.length > 0 && (
+                {showSearchResults && categorySuggestions.length > 0 && (
                   <Card className="absolute top-full left-0 right-0 mt-1 max-h-60 overflow-y-auto shadow-lg z-20">
                     <ScrollArea className="p-2">
-                      {searchResults.map((result) => (
+                      {categorySuggestions.map((result) => (
                         <div
                           key={`${result.type}-${result.id}`}
                           className="flex items-center p-2 hover:bg-muted rounded cursor-pointer"
@@ -1228,7 +1225,7 @@ export function MapView({
                     url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
                       <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
                         <circle cx="16" cy="16" r="15" fill="${selectedPlace?.id === place.id ? '#22c55e' : '#ffffff'}" stroke="#333" stroke-width="2"/>
-                        <text x="16" y="22" text-anchor="middle" font-size="16" fill="black">${place.icon || '📍'}</text>
+                        <text x="16" y="22" text-anchor="middle" font-size="16" fill="black">📍</text>
                       </svg>
                     `)}`,
                     scaledSize: new google.maps.Size(32, 32),
