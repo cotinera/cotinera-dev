@@ -1122,6 +1122,7 @@ export function MapView({
                 clickableIcons: true,
                 scrollwheel: true,
                 streetViewControl: false,
+                mapId: "pgc_travel_map", // Required for AdvancedMarkerElement
               }}
               center={coordinates}
               zoom={12}
