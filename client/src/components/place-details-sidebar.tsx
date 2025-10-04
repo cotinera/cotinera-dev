@@ -17,62 +17,11 @@ import {
   DollarSign,
   ExternalLink,
   User,
-  X,
-  ChevronLeft,
-  ChevronRight
+  X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-interface PlacePhoto {
-  photo_reference: string;
-  height: number;
-  width: number;
-  html_attributions: string[];
-}
-
-interface PlaceReview {
-  author_name: string;
-  author_url?: string;
-  language: string;
-  profile_photo_url?: string;
-  rating: number;
-  relative_time_description: string;
-  text: string;
-  time: number;
-}
-
-interface PlaceOpeningHours {
-  open_now: boolean;
-  periods: Array<{
-    close?: { day: number; time: string };
-    open: { day: number; time: string };
-  }>;
-  weekday_text: string[];
-}
-
-interface PlaceDetailsData {
-  place_id: string;
-  name: string;
-  formatted_address: string;
-  formatted_phone_number?: string;
-  international_phone_number?: string;
-  website?: string;
-  rating?: number;
-  user_ratings_total?: number;
-  price_level?: number;
-  opening_hours?: PlaceOpeningHours;
-  photos?: PlacePhoto[];
-  reviews?: PlaceReview[];
-  types: string[];
-  geometry: {
-    location: {
-      lat: () => number;
-      lng: () => number;
-    };
-  };
-  business_status?: string;
-  url?: string;
-}
+import { placesDetailsService, PlaceDetailsData } from '@/lib/places/details-service';
+import { PhotoCarousel } from '@/components/map/PhotoCarousel';
 
 interface PlaceDetailsSidebarProps {
   placeId: string | null;
@@ -111,11 +60,12 @@ export function PlaceDetailsSidebar({ placeId, onSelectPlace, onClose }: PlaceDe
   const [placeDetails, setPlaceDetails] = useState<PlaceDetailsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
+  const [currentRequestId, setCurrentRequestId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!placeId) {
       setPlaceDetails(null);
+      setCurrentRequestId(null);
       return;
     }
 
@@ -124,47 +74,19 @@ export function PlaceDetailsSidebar({ placeId, onSelectPlace, onClose }: PlaceDe
       setError(null);
 
       try {
-        // Initialize Google Places service
-        const mapDiv = document.createElement('div');
-        const placesService = new google.maps.places.PlacesService(mapDiv);
-
-        const placeData = await new Promise<PlaceDetailsData>((resolve, reject) => {
-          placesService.getDetails(
-            {
-              placeId: placeId,
-              fields: [
-                'place_id',
-                'name',
-                'formatted_address',
-                'formatted_phone_number',
-                'international_phone_number',
-                'website',
-                'rating',
-                'user_ratings_total',
-                'price_level',
-                'opening_hours',
-                'photos',
-                'reviews',
-                'types',
-                'geometry',
-                'business_status',
-                'url'
-              ],
-            },
-            (result, status) => {
-              if (status === google.maps.places.PlacesServiceStatus.OK && result) {
-                resolve(result as PlaceDetailsData);
-              } else {
-                reject(new Error(`Failed to fetch place details: ${status}`));
-              }
-            }
-          );
-        });
-
-        setPlaceDetails(placeData);
+        const result = await placesDetailsService.fetchPlaceDetails(placeId);
+        
+        // Only update state if this request is still current
+        if (result && placesDetailsService.isRequestCurrent(result.requestId)) {
+          setPlaceDetails(result.data);
+          setCurrentRequestId(result.requestId);
+        }
       } catch (err) {
         console.error('Error fetching place details:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load place details');
+        // Only show error if this request is still current
+        if (err instanceof Error && !err.message.includes('superseded')) {
+          setError(err.message || 'Failed to load place details');
+        }
       } finally {
         setLoading(false);
       }
@@ -184,8 +106,8 @@ export function PlaceDetailsSidebar({ placeId, onSelectPlace, onClose }: PlaceDe
     }
   };
 
-  const getPhotoUrl = (photo: PlacePhoto, maxWidth: number = 300) => {
-    return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxWidth}&photo_reference=${photo.photo_reference}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`;
+  const getStreetViewUrl = (lat: number, lng: number) => {
+    return `https://maps.googleapis.com/maps/api/streetview?size=800x450&location=${lat},${lng}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`;
   };
 
   if (!placeId) return null;
@@ -219,103 +141,68 @@ export function PlaceDetailsSidebar({ placeId, onSelectPlace, onClose }: PlaceDe
 
             {placeDetails && (
               <>
-                {/* Place Photo Carousel */}
-                <div className="relative aspect-video overflow-hidden rounded-lg bg-muted">
-                  {placeDetails.photos && placeDetails.photos.length > 0 ? (
-                    <>
-                      <img
-                        src={getPhotoUrl(placeDetails.photos[selectedPhotoIndex], 800)}
-                        alt={placeDetails.name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          // Fallback to Street View if photo fails to load
-                          const target = e.target as HTMLImageElement;
-                          target.src = `https://maps.googleapis.com/maps/api/streetview?size=800x450&location=${placeDetails.geometry.location.lat()},${placeDetails.geometry.location.lng()}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`;
-                        }}
-                      />
-                      
-                      {/* Photo Counter */}
-                      {placeDetails.photos.length > 1 && (
-                        <div className="absolute bottom-2 right-2 bg-black/60 text-white px-2 py-1 rounded-md text-xs flex items-center gap-1">
-                          <Camera className="h-3 w-3" />
-                          {selectedPhotoIndex + 1} / {placeDetails.photos.length}
-                        </div>
-                      )}
-                      
-                      {/* Navigation Arrows */}
-                      {placeDetails.photos.length > 1 && (
-                        <>
-                          <button
-                            onClick={() => setSelectedPhotoIndex((prev) => 
-                              prev === 0 ? placeDetails.photos!.length - 1 : prev - 1
-                            )}
-                            className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition-colors"
-                            aria-label="Previous photo"
-                          >
-                            <ChevronLeft className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => setSelectedPhotoIndex((prev) => 
-                              prev === placeDetails.photos!.length - 1 ? 0 : prev + 1
-                            )}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition-colors"
-                            aria-label="Next photo"
-                          >
-                            <ChevronRight className="h-4 w-4" />
-                          </button>
-                        </>
-                      )}
-                      
-                      {/* Photo Indicators */}
-                      {placeDetails.photos.length > 1 && (
-                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
-                          {placeDetails.photos.slice(0, 5).map((_, index) => (
-                            <button
-                              key={index}
-                              onClick={() => setSelectedPhotoIndex(index)}
-                              className={cn(
-                                "w-2 h-2 rounded-full transition-colors",
-                                index === selectedPhotoIndex ? "bg-white" : "bg-white/50"
-                              )}
-                              aria-label={`Go to photo ${index + 1}`}
-                            />
-                          ))}
-                          {placeDetails.photos.length > 5 && (
-                            <span className="text-white/70 text-xs ml-1">+{placeDetails.photos.length - 5}</span>
+                {/* Photo Carousel - shows only if 2+ photos exist */}
+                {placeDetails.photos && placeDetails.photos.length >= 2 && (
+                  <PhotoCarousel 
+                    photos={placeDetails.photos} 
+                    placeName={placeDetails.name}
+                    maxPhotos={10}
+                  />
+                )}
+
+                {/* Single Photo or Street View Fallback */}
+                {(!placeDetails.photos || placeDetails.photos.length < 2) && (
+                  <div className="relative aspect-video overflow-hidden rounded-lg bg-muted">
+                    {placeDetails.photos && placeDetails.photos.length === 1 ? (
+                      <>
+                        <img
+                          src={`https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${placeDetails.photos[0].photo_reference}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`}
+                          alt={placeDetails.name}
+                          className="w-full h-full object-cover"
+                        />
+                        {placeDetails.photos[0].html_attributions?.[0] && (
+                          <div 
+                            className="absolute top-2 left-2 bg-black/60 text-white px-2 py-1 rounded-md text-xs max-w-[80%]"
+                            dangerouslySetInnerHTML={{ __html: placeDetails.photos[0].html_attributions[0] }}
+                          />
+                        )}
+                      </>
+                    ) : (
+                      // Street View only when NO photos available
+                      <div className="relative w-full h-full">
+                        <img
+                          src={getStreetViewUrl(
+                            placeDetails.geometry.location.lat(),
+                            placeDetails.geometry.location.lng()
                           )}
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    // Fallback to Street View when no photos available
-                    <div className="relative w-full h-full">
-                      <img
-                        src={`https://maps.googleapis.com/maps/api/streetview?size=800x450&location=${placeDetails.geometry.location.lat()},${placeDetails.geometry.location.lng()}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`}
-                        alt={`Street view of ${placeDetails.name}`}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          // Ultimate fallback to a placeholder
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          const parent = target.parentElement;
-                          if (parent) {
-                            parent.innerHTML = `
-                              <div class="w-full h-full flex items-center justify-center bg-muted">
-                                <div class="text-center text-muted-foreground">
-                                  <Camera class="h-12 w-12 mx-auto mb-2 opacity-20" />
-                                  <p class="text-sm">No photos available</p>
+                          alt={`Street view of ${placeDetails.name}`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            const parent = target.parentElement;
+                            if (parent) {
+                              parent.innerHTML = `
+                                <div class="w-full h-full flex items-center justify-center bg-muted">
+                                  <div class="text-center text-muted-foreground">
+                                    <svg class="h-12 w-12 mx-auto mb-2 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    </svg>
+                                    <p class="text-sm">No photos available</p>
+                                  </div>
                                 </div>
-                              </div>
-                            `;
-                          }
-                        }}
-                      />
-                      <div className="absolute bottom-2 right-2 bg-black/60 text-white px-2 py-1 rounded-md text-xs">
-                        Street View
+                              `;
+                            }
+                          }}
+                        />
+                        <div className="absolute bottom-2 right-2 bg-black/60 text-white px-2 py-1 rounded-md text-xs">
+                          Street View
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Place Header */}
                 <div className="space-y-2">
