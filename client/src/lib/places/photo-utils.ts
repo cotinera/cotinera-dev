@@ -83,7 +83,8 @@ export function getPhotosForReviewer(
   
   // Try case-insensitive match
   const lowerReviewerName = reviewerName.toLowerCase();
-  for (const [contributor, photos] of contributorPhotosMap.entries()) {
+  const entries = Array.from(contributorPhotosMap.entries());
+  for (const [contributor, photos] of entries) {
     if (contributor.toLowerCase() === lowerReviewerName) {
       return photos;
     }

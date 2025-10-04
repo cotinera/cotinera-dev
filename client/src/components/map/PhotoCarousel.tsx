@@ -1,16 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, Camera } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-interface PlacePhoto {
-  photo_reference: string;
-  height: number;
-  width: number;
-  html_attributions: string[];
-}
+import { getPhotoUrl } from '@/lib/places/photo-utils';
 
 interface PhotoCarouselProps {
-  photos: PlacePhoto[];
+  photos: google.maps.places.PlacePhoto[];
   placeName: string;
   maxPhotos?: number;
   className?: string;
@@ -25,6 +19,7 @@ export function PhotoCarousel({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [loadedImages, setLoadedImages] = useState<Set<number>>(new Set());
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
 
@@ -36,22 +31,26 @@ export function PhotoCarousel({
     return null;
   }
 
-  const getPhotoUrl = (photo: PlacePhoto, maxWidth: number = 800) => {
-    return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxWidth}&photo_reference=${photo.photo_reference}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`;
-  };
+  // Generate photo URLs using getUrl() method
+  useEffect(() => {
+    const urls = displayPhotos.map(photo => getPhotoUrl(photo));
+    setPhotoUrls(urls);
+  }, [photos]);
 
   // Preload adjacent images
   useEffect(() => {
+    if (photoUrls.length === 0) return;
+    
     const imagesToPreload = [
       selectedIndex,
-      (selectedIndex + 1) % displayPhotos.length,
-      (selectedIndex - 1 + displayPhotos.length) % displayPhotos.length
+      (selectedIndex + 1) % photoUrls.length,
+      (selectedIndex - 1 + photoUrls.length) % photoUrls.length
     ];
 
     imagesToPreload.forEach(index => {
-      if (!loadedImages.has(index) && !failedImages.has(index)) {
+      if (!loadedImages.has(index) && !failedImages.has(index) && photoUrls[index]) {
         const img = new Image();
-        img.src = getPhotoUrl(displayPhotos[index]);
+        img.src = photoUrls[index];
         img.onload = () => {
           setLoadedImages(prev => new Set(prev).add(index));
         };
@@ -60,7 +59,7 @@ export function PhotoCarousel({
         };
       }
     });
-  }, [selectedIndex, displayPhotos, loadedImages, failedImages]);
+  }, [selectedIndex, photoUrls, loadedImages, failedImages]);
 
   // Reset selected index when photos change
   useEffect(() => {
@@ -104,7 +103,13 @@ export function PhotoCarousel({
   };
 
   const currentPhoto = displayPhotos[selectedIndex];
+  const currentPhotoUrl = photoUrls[selectedIndex];
   const currentAttribution = currentPhoto?.html_attributions?.[0];
+  const [showAttribution, setShowAttribution] = useState(false);
+
+  if (!currentPhotoUrl) {
+    return null;
+  }
 
   return (
     <div className={cn("relative aspect-video overflow-hidden rounded-lg bg-muted", className)} data-testid="photo-carousel">
@@ -116,11 +121,19 @@ export function PhotoCarousel({
         onTouchEnd={handleTouchEnd}
       >
         <img
-          src={getPhotoUrl(currentPhoto, 800)}
+          src={currentPhotoUrl}
           alt={`${placeName} - Photo ${selectedIndex + 1}`}
           className="w-full h-full object-cover"
           loading="eager"
           data-testid="carousel-image"
+          onLoad={() => {
+            setLoadedImages(prev => new Set(prev).add(selectedIndex));
+            setShowAttribution(true);
+          }}
+          onError={() => {
+            setFailedImages(prev => new Set(prev).add(selectedIndex));
+            setShowAttribution(false);
+          }}
         />
       </div>
 
@@ -169,8 +182,8 @@ export function PhotoCarousel({
         )}
       </div>
 
-      {/* Photo Attribution */}
-      {currentAttribution && (
+      {/* Photo Attribution - only show after image loads */}
+      {showAttribution && currentAttribution && loadedImages.has(selectedIndex) && (
         <div 
           className="absolute top-2 left-2 bg-black/60 text-white px-2 py-1 rounded-md text-xs max-w-[80%]"
           dangerouslySetInnerHTML={{ __html: currentAttribution }}

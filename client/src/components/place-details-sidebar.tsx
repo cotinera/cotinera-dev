@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -13,7 +13,6 @@ import {
   Navigation, 
   Bookmark, 
   Share2,
-  Camera,
   DollarSign,
   ExternalLink,
   User,
@@ -22,6 +21,8 @@ import {
 import { cn } from '@/lib/utils';
 import { placesDetailsService, PlaceDetailsData } from '@/lib/places/details-service';
 import { PhotoCarousel } from '@/components/map/PhotoCarousel';
+import { ReviewPhotoGrid } from '@/components/map/ReviewPhotoGrid';
+import { mapPhotosToContributors, getPhotosForReviewer, getPhotoUrl } from '@/lib/places/photo-utils';
 
 interface PlaceDetailsSidebarProps {
   placeId: string | null;
@@ -61,6 +62,12 @@ export function PlaceDetailsSidebar({ placeId, onSelectPlace, onClose }: PlaceDe
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentRequestId, setCurrentRequestId] = useState<string | null>(null);
+
+  // Map photos to contributors for review photo matching
+  const contributorPhotosMap = useMemo(() => {
+    if (!placeDetails?.photos) return new Map<string, string[]>();
+    return mapPhotosToContributors(placeDetails.photos);
+  }, [placeDetails?.photos]);
 
   useEffect(() => {
     if (!placeId) {
@@ -156,16 +163,22 @@ export function PlaceDetailsSidebar({ placeId, onSelectPlace, onClose }: PlaceDe
                     {placeDetails.photos && placeDetails.photos.length === 1 ? (
                       <>
                         <img
-                          src={`https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${placeDetails.photos[0].photo_reference}&key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}`}
+                          src={getPhotoUrl(placeDetails.photos[0])}
                           alt={placeDetails.name}
                           className="w-full h-full object-cover"
+                          onLoad={(e) => {
+                            const attribution = placeDetails.photos?.[0]?.html_attributions?.[0];
+                            if (attribution) {
+                              const parent = (e.target as HTMLImageElement).parentElement;
+                              if (parent && !parent.querySelector('.photo-attribution')) {
+                                const attrDiv = document.createElement('div');
+                                attrDiv.className = 'photo-attribution absolute top-2 left-2 bg-black/60 text-white px-2 py-1 rounded-md text-xs max-w-[80%]';
+                                attrDiv.innerHTML = attribution;
+                                parent.appendChild(attrDiv);
+                              }
+                            }
+                          }}
                         />
-                        {placeDetails.photos[0].html_attributions?.[0] && (
-                          <div 
-                            className="absolute top-2 left-2 bg-black/60 text-white px-2 py-1 rounded-md text-xs max-w-[80%]"
-                            dangerouslySetInnerHTML={{ __html: placeDetails.photos[0].html_attributions[0] }}
-                          />
-                        )}
                       </>
                     ) : (
                       // Street View only when NO photos available
@@ -283,12 +296,12 @@ export function PlaceDetailsSidebar({ placeId, onSelectPlace, onClose }: PlaceDe
                         </Badge>
                       </div>
                       <div className="space-y-1">
-                        {placeDetails.opening_hours.weekday_text.slice(0, 3).map((day, index) => (
+                        {placeDetails.opening_hours.weekday_text?.slice(0, 3).map((day, index) => (
                           <div key={index} className="text-sm text-muted-foreground">
                             {day}
                           </div>
                         ))}
-                        {placeDetails.opening_hours.weekday_text.length > 3 && (
+                        {placeDetails.opening_hours.weekday_text && placeDetails.opening_hours.weekday_text.length > 3 && (
                           <div className="text-xs text-muted-foreground">
                             +{placeDetails.opening_hours.weekday_text.length - 3} more days
                           </div>
@@ -328,53 +341,67 @@ export function PlaceDetailsSidebar({ placeId, onSelectPlace, onClose }: PlaceDe
                   </>
                 )}
 
-                {/* Reviews */}
+                {/* Reviews with Photo Grids */}
                 {placeDetails.reviews && placeDetails.reviews.length > 0 && (
                   <>
                     <Separator />
                     <div className="space-y-3">
                       <h3 className="font-medium">Reviews</h3>
-                      {placeDetails.reviews.slice(0, 2).map((review, index) => (
-                        <Card key={index}>
-                          <CardContent className="p-3">
-                            <div className="flex items-start gap-3">
-                              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                                {review.profile_photo_url ? (
-                                  <img 
-                                    src={review.profile_photo_url} 
-                                    alt={review.author_name}
-                                    className="w-full h-full rounded-full object-cover"
-                                  />
-                                ) : (
-                                  <User className="h-4 w-4" />
-                                )}
-                              </div>
-                              <div className="flex-1 space-y-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium text-sm">{review.author_name}</span>
-                                  <span className="text-xs text-muted-foreground">{review.relative_time_description}</span>
-                                </div>
-                                <div className="flex items-center gap-1">
-                                  {Array.from({ length: 5 }, (_, i) => (
-                                    <Star 
-                                      key={i} 
-                                      className={cn(
-                                        "h-3 w-3",
-                                        i < review.rating 
-                                          ? "fill-yellow-400 text-yellow-400" 
-                                          : "text-muted-foreground"
-                                      )} 
+                      {placeDetails.reviews.slice(0, 2).map((review, index) => {
+                        const reviewerPhotos = getPhotosForReviewer(review.author_name, contributorPhotosMap);
+                        
+                        return (
+                          <Card key={index}>
+                            <CardContent className="p-3">
+                              <div className="flex items-start gap-3">
+                                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                                  {review.profile_photo_url ? (
+                                    <img 
+                                      src={review.profile_photo_url} 
+                                      alt={review.author_name}
+                                      className="w-full h-full rounded-full object-cover"
                                     />
-                                  ))}
+                                  ) : (
+                                    <User className="h-4 w-4" />
+                                  )}
                                 </div>
-                                <p className="text-sm text-muted-foreground line-clamp-3">
-                                  {review.text}
-                                </p>
+                                <div className="flex-1 space-y-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium text-sm">{review.author_name}</span>
+                                    <span className="text-xs text-muted-foreground">{review.relative_time_description}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    {Array.from({ length: 5 }, (_, i) => (
+                                      <Star 
+                                        key={i} 
+                                        className={cn(
+                                          "h-3 w-3",
+                                          i < (review.rating || 0)
+                                            ? "fill-yellow-400 text-yellow-400" 
+                                            : "text-muted-foreground"
+                                        )} 
+                                      />
+                                    ))}
+                                  </div>
+                                  <p className="text-sm text-muted-foreground line-clamp-3">
+                                    {review.text}
+                                  </p>
+                                  
+                                  {/* Reviewer's photos */}
+                                  {reviewerPhotos.length > 0 && (
+                                    <ReviewPhotoGrid
+                                      photos={reviewerPhotos}
+                                      reviewerName={review.author_name}
+                                      placeName={placeDetails.name}
+                                      maxThumbnails={4}
+                                    />
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
                       {placeDetails.reviews.length > 2 && (
                         <p className="text-xs text-muted-foreground text-center">
                           +{placeDetails.reviews.length - 2} more reviews
