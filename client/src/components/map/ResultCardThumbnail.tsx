@@ -58,26 +58,42 @@ export function ResultCardThumbnail({
   useEffect(() => {
     if (photos && photos.length > photoIndex && !hasError) {
       try {
-        const url = photos[photoIndex].getUrl({ maxWidth: 160, maxHeight: 160 });
-        setPhotoUrl(url);
-        setIsLoading(false);
-        return;
+        const photo = photos[photoIndex];
+        // Check if the photo has getUrl method (from Details API)
+        if (photo && typeof photo.getUrl === 'function') {
+          const url = photo.getUrl({ maxWidth: 160, maxHeight: 160 });
+          setPhotoUrl(url);
+          setIsLoading(false);
+          return;
+        } else {
+          // Photo doesn't have getUrl method (from Search API)
+          // Will fall through to lazy fetching
+          console.log('Photo does not have getUrl method, will use lazy fetch');
+        }
       } catch (error) {
         console.error('Error getting photo URL:', error);
         // Try next photo
         if (photoIndex < photos.length - 1) {
           setPhotoIndex(photoIndex + 1);
-        } else {
-          setHasError(true);
-          setIsLoading(false);
+          return;
         }
       }
+    }
+    // If no valid photos or getUrl not available, mark as ready for lazy fetch
+    if (photos && photos.length > 0 && !hasError) {
+      setIsLoading(true); // Will trigger lazy fetch
     }
   }, [photos, photoIndex, hasError]);
 
   // Lazy fetch photos using IntersectionObserver
   useEffect(() => {
-    if (!map || hasAttemptedFetch.current || photoUrl || (photos && photos.length > 0)) {
+    // Skip if no map, already attempted fetch, or already have a photo URL
+    if (!map || hasAttemptedFetch.current || photoUrl) {
+      return;
+    }
+    
+    // Skip if we have photos with valid getUrl method
+    if (photos && photos.length > 0 && photos[0] && typeof photos[0].getUrl === 'function') {
       return;
     }
 
