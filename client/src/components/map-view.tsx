@@ -1124,7 +1124,48 @@ export function MapView({
   return (
     <Card className={cn("w-full shadow-md relative", className)}>
       <div className="flex flex-col md:flex-row">
-        <div className={`w-full ${selectedPlaceDetails ? "md:w-3/5" : "md:w-full"} relative`}>
+        {/* Left Results Panel - shows when search results exist */}
+        {searchResults.length > 0 && !hideSearchAndFilters && (
+          <div className="w-full md:w-2/5 lg:w-1/3 border-r">
+            <SearchResultsPanel
+              searchState={isLoadingSearch ? 'LOADING' : searchResults.length > 0 ? 'RENDERED' : 'EMPTY'}
+              results={searchResults}
+              sortedResults={searchResults}
+              isLoading={isLoadingSearch}
+              hasNextPage={hasNextPage}
+              error={null}
+              selectedCategoryLabel={selectedCategory ? categoryButtons.find(c => c.id === selectedCategory)?.label || null : null}
+              sortBy="recommended"
+              updateOnMapMove={withinMap}
+              selectedResultId={selectedResultId}
+              hoveredResultId={hoveredResultId}
+              onResultClick={handleResultClick}
+              onResultHover={setHoveredResultId}
+              onSavePlace={(place, e) => {
+                e.stopPropagation();
+                // TODO: Implement save place functionality
+                toast({ title: "Save feature coming soon!" });
+              }}
+              onAddToItinerary={(place, e) => {
+                e.stopPropagation();
+                // TODO: Implement add to itinerary functionality
+                toast({ title: "Add to itinerary feature coming soon!" });
+              }}
+              onLoadMore={loadMoreResults}
+              onSortChange={(sort) => {
+                // TODO: Implement sorting
+                console.log("Sort by:", sort);
+              }}
+              onUpdateOnMapMoveChange={setWithinMap}
+              onUpdateResultsClick={() => {
+                performSearch();
+              }}
+              mapCenter={coordinates}
+            />
+          </div>
+        )}
+        
+        <div className={`w-full ${searchResults.length > 0 && !hideSearchAndFilters ? "md:w-3/5 lg:w-2/3" : selectedPlaceDetails ? "md:w-3/5" : "md:w-full"} relative`}>
           {!hideSearchAndFilters && (
             <div className="absolute top-4 left-4 right-4 z-10 flex flex-col gap-2">
               <div className="relative w-full">
@@ -1249,12 +1290,13 @@ export function MapView({
                 />
               )}
               
-              {/* Render place search results using AdvancedMarkerElement */}
+              {/* Render place search results using regular Markers */}
               <SearchResultMarkers
                 markers={searchMarkers}
                 map={mapRef.current}
                 onMarkerClick={handleSearchMarkerClick}
                 selectedMarkerId={selectedSearchPlaceId}
+                hoveredMarkerId={hoveredResultId}
               />
 
               {/* Render accommodations */}

@@ -34,8 +34,16 @@ export function PlaceResultCard({
   useEffect(() => {
     if (place.photos && place.photos.length > 0 && !photoError) {
       try {
-        const url = place.photos[0].getUrl({ maxWidth: 200, maxHeight: 150 });
-        setPhotoUrl(url);
+        const photo = place.photos[0];
+        // Check if getUrl method exists (PlacePhoto from Details API)
+        if (typeof photo.getUrl === 'function') {
+          const url = photo.getUrl({ maxWidth: 200, maxHeight: 150 });
+          setPhotoUrl(url);
+        } else {
+          // For search results, photos might not have getUrl method
+          // In this case, we'll skip showing photos
+          setPhotoError(true);
+        }
       } catch (error) {
         console.error('Error loading photo:', error);
         setPhotoError(true);

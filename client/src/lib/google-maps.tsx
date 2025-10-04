@@ -595,12 +595,14 @@ export const SearchResultMarkers = ({
   markers,
   map,
   onMarkerClick,
-  selectedMarkerId
+  selectedMarkerId,
+  hoveredMarkerId
 }: {
   markers: SearchResultMarker[];
   map: google.maps.Map | null;
   onMarkerClick?: (marker: SearchResultMarker) => void;
   selectedMarkerId?: string | null;
+  hoveredMarkerId?: string | null;
 }) => {
   const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
 
@@ -619,11 +621,12 @@ export const SearchResultMarkers = ({
     markers.forEach((markerData) => {
       const { category, icon: categoryIcon } = getPrimaryCategory(markerData.place.types);
       const isSelected = selectedMarkerId === markerData.id;
+      const isHovered = hoveredMarkerId === markerData.id;
       
-      // Create custom icon URL with emoji
+      // Create custom icon URL with emoji - different colors for selected, hovered, and default
       const iconSvg = `
         <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
-          <circle cx="20" cy="20" r="18" fill="${isSelected ? '#22c55e' : '#a855f7'}" stroke="#ffffff" stroke-width="3"/>
+          <circle cx="20" cy="20" r="18" fill="${isSelected ? '#22c55e' : isHovered ? '#ec4899' : '#a855f7'}" stroke="#ffffff" stroke-width="3"/>
           <text x="20" y="26" text-anchor="middle" font-size="18" fill="white">${categoryIcon}</text>
         </svg>
       `;
@@ -637,7 +640,7 @@ export const SearchResultMarkers = ({
           scaledSize: new google.maps.Size(40, 40),
           anchor: new google.maps.Point(20, 20),
         },
-        zIndex: isSelected ? 1000 : undefined,
+        zIndex: isSelected ? 1000 : isHovered ? 900 : undefined,
       });
 
       // Add click handler
@@ -657,20 +660,21 @@ export const SearchResultMarkers = ({
       });
       markersRef.current.clear();
     };
-  }, [markers, map, onMarkerClick, selectedMarkerId]);
+  }, [markers, map, onMarkerClick, selectedMarkerId, hoveredMarkerId]);
 
-  // Update marker icons when selectedMarkerId changes
+  // Update marker icons when selectedMarkerId or hoveredMarkerId changes
   useEffect(() => {
     markersRef.current.forEach((marker, markerId) => {
       const markerData = markers.find(m => m.id === markerId);
       if (markerData) {
         const { category, icon: categoryIcon } = getPrimaryCategory(markerData.place.types);
         const isSelected = selectedMarkerId === markerId;
+        const isHovered = hoveredMarkerId === markerId;
         
-        // Update the marker icon to reflect selection state
+        // Update the marker icon to reflect selection and hover state
         const iconSvg = `
           <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
-            <circle cx="20" cy="20" r="18" fill="${isSelected ? '#22c55e' : '#a855f7'}" stroke="#ffffff" stroke-width="3"/>
+            <circle cx="20" cy="20" r="18" fill="${isSelected ? '#22c55e' : isHovered ? '#ec4899' : '#a855f7'}" stroke="#ffffff" stroke-width="3"/>
             <text x="20" y="26" text-anchor="middle" font-size="18" fill="white">${categoryIcon}</text>
           </svg>
         `;
@@ -681,10 +685,10 @@ export const SearchResultMarkers = ({
           anchor: new google.maps.Point(20, 20),
         });
         
-        marker.setZIndex(isSelected ? 1000 : undefined);
+        marker.setZIndex(isSelected ? 1000 : isHovered ? 900 : undefined);
       }
     });
-  }, [selectedMarkerId, markers]);
+  }, [selectedMarkerId, hoveredMarkerId, markers]);
 
   return null; // This component doesn't render React elements
 };
