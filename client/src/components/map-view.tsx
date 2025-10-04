@@ -1188,6 +1188,7 @@ export function MapView({
                 performSearch();
               }}
               mapCenter={coordinates}
+              map={mapRef.current}
             />
           </div>
         )}

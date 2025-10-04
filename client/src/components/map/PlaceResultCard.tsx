@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
-import { Star, MapPin, Phone, Globe, Clock, ExternalLink, Plus, Navigation } from 'lucide-react';
+import { Star, MapPin, Navigation, Clock, Plus, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import type { PlaceSearchResult } from '@/lib/places/search';
+import { ResultCardThumbnail } from './ResultCardThumbnail';
 import { cn } from '@/lib/utils';
 
 interface PlaceResultCardProps {
@@ -15,6 +15,7 @@ interface PlaceResultCardProps {
   onAddToItinerary?: (e: React.MouseEvent) => void;
   onMouseEnter?: () => void;
   onMouseLeave?: () => void;
+  map?: google.maps.Map | null;
 }
 
 export function PlaceResultCard({
@@ -26,31 +27,8 @@ export function PlaceResultCard({
   onAddToItinerary,
   onMouseEnter,
   onMouseLeave,
+  map,
 }: PlaceResultCardProps) {
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [photoError, setPhotoError] = useState(false);
-
-  // Get photo URL
-  useEffect(() => {
-    if (place.photos && place.photos.length > 0 && !photoError) {
-      try {
-        const photo = place.photos[0];
-        // Check if getUrl method exists (PlacePhoto from Details API)
-        if (typeof photo.getUrl === 'function') {
-          const url = photo.getUrl({ maxWidth: 200, maxHeight: 150 });
-          setPhotoUrl(url);
-        } else {
-          // For search results, photos might not have getUrl method
-          // In this case, we'll skip showing photos
-          setPhotoError(true);
-        }
-      } catch (error) {
-        console.error('Error loading photo:', error);
-        setPhotoError(true);
-      }
-    }
-  }, [place.photos, photoError]);
-
   // Get primary category
   const getPrimaryCategory = () => {
     if (!place.types || place.types.length === 0) return 'Place';
@@ -77,23 +55,21 @@ export function PlaceResultCard({
     return place.types[0].replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
-  // Get price level display
+  // Get price level display (prevent NaN)
   const getPriceLevel = () => {
-    if (!place.price_level) return null;
-    return '$'.repeat(place.price_level);
+    if (!place.price_level || place.price_level < 1) return null;
+    return '$'.repeat(Math.min(place.price_level, 4));
   };
 
   // Get opening status
   const getOpeningStatus = () => {
     if (!place.opening_hours) return null;
     return place.opening_hours.open_now ? (
-      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300">
-        <Clock className="h-3 w-3 mr-1" />
-        Open Now
+      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300 text-xs">
+        Open
       </Badge>
     ) : (
-      <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-300">
-        <Clock className="h-3 w-3 mr-1" />
+      <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-300 text-xs">
         Closed
       </Badge>
     );
@@ -104,6 +80,14 @@ export function PlaceResultCard({
     const { lat, lng } = place.geometry.location;
     return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
   };
+
+  // Format rating (prevent NaN)
+  const formatRating = (rating: number | undefined) => {
+    if (!rating || isNaN(rating)) return null;
+    return rating.toFixed(1);
+  };
+
+  const formattedRating = formatRating(place.rating);
 
   return (
     <Card
@@ -124,45 +108,100 @@ export function PlaceResultCard({
       }}
       aria-label={`View details for ${place.name}`}
     >
-      <div className="flex gap-3 p-3">
-        {/* Thumbnail */}
-        <div className="flex-shrink-0">
-          {photoUrl && !photoError ? (
-            <img
-              src={photoUrl}
-              alt={place.name}
-              className="w-20 h-20 object-cover rounded-md"
-              loading="lazy"
-              onError={() => setPhotoError(true)}
-            />
-          ) : (
-            <div className="w-20 h-20 bg-muted rounded-md flex items-center justify-center">
-              <MapPin className="h-8 w-8 text-muted-foreground/40" />
+      <div className="p-3">
+        {/* Desktop: horizontal layout with thumbnail on right */}
+        <div className="hidden sm:flex gap-3">
+          {/* Content - left side */}
+          <div className="flex-1 min-w-0 space-y-1">
+            {/* Name */}
+            <h4 className="font-semibold text-sm line-clamp-1 group-hover:text-primary transition-colors">
+              {place.name}
+            </h4>
+
+            {/* Rating and Category */}
+            <div className="flex items-center gap-2 flex-wrap text-xs">
+              {formattedRating && (
+                <div className="flex items-center gap-1">
+                  <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                  <span className="font-medium">{formattedRating}</span>
+                  {place.user_ratings_total && place.user_ratings_total > 0 && (
+                    <span className="text-muted-foreground">({place.user_ratings_total})</span>
+                  )}
+                </div>
+              )}
+              
+              {getPriceLevel() && (
+                <span className="text-green-600 font-medium">{getPriceLevel()}</span>
+              )}
+              
+              <Badge variant="secondary" className="text-xs">
+                {getPrimaryCategory()}
+              </Badge>
             </div>
-          )}
+
+            {/* Address */}
+            {place.vicinity && (
+              <p className="text-xs text-muted-foreground line-clamp-1">
+                {place.vicinity}
+              </p>
+            )}
+
+            {/* Distance and Status */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Navigation className="h-3 w-3" />
+                {distance < 1 
+                  ? `${(distance * 1000).toFixed(0)}m` 
+                  : `${distance.toFixed(1)}km`}
+              </span>
+              
+              {getOpeningStatus()}
+            </div>
+          </div>
+
+          {/* Thumbnail - right side */}
+          <ResultCardThumbnail
+            placeId={place.place_id}
+            placeName={place.name}
+            placeTypes={place.types}
+            photos={place.photos}
+            map={map ?? null}
+            className="w-20 h-20"
+          />
         </div>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0 space-y-1">
-          {/* Name */}
-          <h4 className="font-semibold text-sm line-clamp-1 group-hover:text-primary transition-colors">
-            {place.name}
-          </h4>
+        {/* Mobile: vertical layout with thumbnail below */}
+        <div className="sm:hidden space-y-2">
+          {/* Name and thumbnail */}
+          <div className="space-y-2">
+            <h4 className="font-semibold text-sm line-clamp-1 group-hover:text-primary transition-colors">
+              {place.name}
+            </h4>
+            
+            <ResultCardThumbnail
+              placeId={place.place_id}
+              placeName={place.name}
+              placeTypes={place.types}
+              photos={place.photos}
+              map={map ?? null}
+              className="w-full h-32"
+            />
+          </div>
 
           {/* Rating and Category */}
           <div className="flex items-center gap-2 flex-wrap text-xs">
-            {place.rating && (
+            {formattedRating && (
               <div className="flex items-center gap-1">
                 <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                <span className="font-medium">{place.rating.toFixed(1)}</span>
-                {place.user_ratings_total && (
+                <span className="font-medium">{formattedRating}</span>
+                {place.user_ratings_total && place.user_ratings_total > 0 && (
                   <span className="text-muted-foreground">({place.user_ratings_total})</span>
                 )}
               </div>
             )}
             
             {getPriceLevel() && (
-              <span className="text-muted-foreground">{getPriceLevel()}</span>
+              <span className="text-green-600 font-medium">{getPriceLevel()}</span>
             )}
             
             <Badge variant="secondary" className="text-xs">

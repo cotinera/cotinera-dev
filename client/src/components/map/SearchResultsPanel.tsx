@@ -48,6 +48,9 @@ interface SearchResultsPanelProps {
   // Map center for distance calculation
   mapCenter: { lat: number; lng: number };
   
+  // Map instance for photo loading
+  map?: google.maps.Map | null;
+  
   // Mobile
   isMobile?: boolean;
 }
@@ -73,6 +76,7 @@ export function SearchResultsPanel({
   onUpdateOnMapMoveChange,
   onUpdateResultsClick,
   mapCenter,
+  map,
   isMobile = false,
 }: SearchResultsPanelProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -162,12 +166,12 @@ export function SearchResultsPanel({
         {[1, 2, 3].map((i) => (
           <Card key={i} className="p-3 animate-pulse">
             <div className="flex gap-3">
-              <div className="w-20 h-20 bg-muted rounded-md flex-shrink-0" />
               <div className="flex-1 space-y-2">
                 <div className="h-4 bg-muted rounded w-3/4" />
                 <div className="h-3 bg-muted rounded w-1/2" />
                 <div className="h-3 bg-muted rounded w-2/3" />
               </div>
+              <div className="w-20 h-20 bg-muted rounded-xl flex-shrink-0" />
             </div>
           </Card>
         ))}
@@ -288,6 +292,7 @@ export function SearchResultsPanel({
                 onAddToItinerary={onAddToItinerary ? (e) => onAddToItinerary(place, e) : undefined}
                 onMouseEnter={() => onResultHover(place.place_id)}
                 onMouseLeave={() => onResultHover(null)}
+                map={map}
               />
             </div>
           ))}
