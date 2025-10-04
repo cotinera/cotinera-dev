@@ -273,9 +273,6 @@ export function MapView({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const mapRef = useRef<google.maps.Map | null>(null);
-  const [selectedPlaceDetails, setSelectedPlaceDetails] = useState<PlaceDetails | null>(null);
-  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
-  const [expandedReviews, setExpandedReviews] = useState(false);
   const [selectedIcon, setSelectedIcon] = useState('📍'); // Icon for pinning places
   const numericTripId = tripId && !isNaN(Number(tripId)) ? Number(tripId) : 0;
   const { accommodations = [] } = useAccommodations(numericTripId || 0);
@@ -506,75 +503,52 @@ export function MapView({
       );
     }
 
-    // For pinned places, always try to show the details sidebar
-    if ('placeId' in item) {
-      if (item.placeId) {
-        // If we have a placeId, show details directly
-        if (onShowPlaceDetails) {
-          onShowPlaceDetails(item.placeId);
+    // Resolve to place_id for all items
+    if ('placeId' in item && item.placeId) {
+      // Already has place_id - show details
+      if (onShowPlaceDetails) {
+        onShowPlaceDetails(item.placeId);
+      }
+      onPinClick?.(item as PinnedPlace);
+    } else if (item.coordinates) {
+      // Try to find place_id via reverse geocoding or findPlaceByQuery
+      try {
+        const query = 'title' in item ? item.title : ('name' in item ? item.name : 'Unnamed Place');
+        const place = await findPlaceByQuery(query, item.coordinates);
+        
+        if (place && place.place_id && onShowPlaceDetails) {
+          onShowPlaceDetails(place.place_id);
         } else {
-          fetchDetails(item.placeId);
-        }
-      } else if (item.coordinates && onShowPlaceDetails) {
-        // If no placeId but have coordinates, try reverse geocoding to find it
-        try {
+          // Fallback to reverse geocoding
           const geocoder = new google.maps.Geocoder();
           const result = await geocoder.geocode({ location: item.coordinates });
           
-          if (result.results && result.results.length > 0) {
-            const firstResult = result.results[0];
-            if (firstResult.place_id) {
-              onShowPlaceDetails(firstResult.place_id);
+          if (result.results && result.results.length > 0 && result.results[0].place_id) {
+            if (onShowPlaceDetails) {
+              onShowPlaceDetails(result.results[0].place_id);
             }
+          } else {
+            toast({
+              title: "No details available",
+              description: "Could not find details for this location",
+              variant: "default",
+            });
           }
-        } catch (error) {
-          console.error('Error reverse geocoding:', error);
-          // Fallback to legacy details if reverse geocoding fails
-          setSelectedPlaceDetails({
-            place_id: '',
-            name: item.name || 'Unnamed Place',
-            formatted_address: '',
-            geometry: {
-              location: new google.maps.LatLng(
-                item.coordinates?.lat || 0,
-                item.coordinates?.lng || 0
-              )
-            },
-            types: ['point_of_interest'],
-            opening_hours: {
-              weekday_text: [],
-              isOpen: () => true
-            }
-          } as PlaceDetails);
         }
+      } catch (error) {
+        console.error('Error finding place_id:', error);
+        toast({
+          title: "Error",
+          description: "Could not load place details",
+          variant: "destructive",
+        });
       }
       
-      onPinClick?.(item as PinnedPlace);
-    } else {
-      // For accommodations/activities without placeId, show legacy details
-      setSelectedPlaceDetails({
-        name: 'title' in item ? item.title : ('name' in item ? item.name : 'Unnamed Place'),
-        formatted_address: 'location' in item ? item.location || '' : ('address' in item ? item.address || '' : ''),
-        geometry: {
-          location: new google.maps.LatLng(
-            item.coordinates?.lat || 0,
-            item.coordinates?.lng || 0
-          )
-        },
-        types: ['activity' in item ? 'event' : 'lodging'],
-        opening_hours: {
-          weekday_text: 'startTime' in item ? [
-            `Start: ${new Date(item.startTime).toLocaleTimeString()}`,
-            `End: ${new Date(item.endTime).toLocaleTimeString()}`
-          ] : [
-            `Check-in: ${('checkInTime' in item) ? item.checkInTime || 'Not specified' : 'Not specified'}`,
-            `Check-out: ${('checkOutTime' in item) ? item.checkOutTime || 'Not specified' : 'Not specified'}`
-          ],
-          isOpen: () => true
-        }
-      } as PlaceDetails);
+      if ('placeId' in item) {
+        onPinClick?.(item as PinnedPlace);
+      }
     }
-  }, [onPinClick, fetchDetails, coordinates, onShowPlaceDetails]);
+  }, [onPinClick, findPlaceByQuery, coordinates, onShowPlaceDetails, toast]);
 
   const handleLocalPlaceNameClick = useCallback((place: PinnedPlace) => {
     handlePlaceNameClick(place);
@@ -585,11 +559,15 @@ export function MapView({
     const event = e as unknown as { placeId?: string; stop?: () => void };
     if (event.stop) event.stop();
     if (!event.placeId) {
-      setSelectedPlaceDetails(null);
+      if (onClosePlaceDetails) {
+        onClosePlaceDetails();
+      }
       return;
     }
-    fetchDetails(event.placeId);
-  }, [fetchDetails]);
+    if (onShowPlaceDetails) {
+      onShowPlaceDetails(event.placeId);
+    }
+  }, [onShowPlaceDetails, onClosePlaceDetails]);
 
   // Search functionality using adapter with stable state machine
   const performSearch = useCallback(async () => {
@@ -774,14 +752,14 @@ export function MapView({
     setShowSearchResults(false);
   }, [setCoordinates, coordinates, fetchDetails]);
 
-  const handlePinPlace = useCallback(async () => {
-    if (!selectedPlaceDetails || !tripId) return;
+  const handleSavePlace = useCallback(async (placeDetails: any) => {
+    if (!tripId) return;
 
     try {
-      const placeCoordinates = selectedPlaceDetails.geometry?.location
+      const placeCoordinates = placeDetails.geometry?.location
         ? {
-            lat: selectedPlaceDetails.geometry.location.lat(),
-            lng: selectedPlaceDetails.geometry.location.lng(),
+            lat: placeDetails.geometry.location.lat(),
+            lng: placeDetails.geometry.location.lng(),
           }
         : coordinates;
 
@@ -791,36 +769,45 @@ export function MapView({
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          name: selectedPlaceDetails.name,
-          placeId: selectedPlaceDetails.place_id,
+          name: placeDetails.name,
+          placeId: placeDetails.place_id,
           coordinates: placeCoordinates,
-          category: selectedPlaceDetails.types?.[0] || "attraction",
-          address: selectedPlaceDetails.formatted_address,
-          icon: selectedIcon, // Include the selected icon
+          category: placeDetails.types?.[0] || "attraction",
+          address: placeDetails.formatted_address,
+          icon: selectedIcon,
         }),
       });
 
       if (!response.ok) {
-        throw new Error("Failed to pin place");
+        throw new Error("Failed to save place");
       }
 
-      // Invalidate pinned places query to refresh the list
-      queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/pinned-places`] });
-
+      await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/pinned-places`] });
       toast({
-        title: "Place pinned successfully",
-        description: `${selectedPlaceDetails.name} has been added to your pinned places.`,
+        title: "Place saved",
+        description: `${placeDetails.name} has been added to your trip.`,
       });
-
-      setSelectedPlaceDetails(null);
     } catch (error) {
       toast({
-        title: "Error pinning place",
-        description: "An error occurred while trying to pin this place.",
         variant: "destructive",
+        title: "Error",
+        description: "Failed to save the place. Please try again.",
       });
     }
-  }, [selectedPlaceDetails, tripId, coordinates, queryClient, toast]);
+  }, [tripId, coordinates, selectedIcon, queryClient, toast]);
+
+  const handleAddToItinerary = useCallback(async (placeDetails: any) => {
+    toast({
+      title: "Coming soon",
+      description: "Add to itinerary feature will be available soon!",
+    });
+  }, [toast]);
+
+  // Check if a place is already pinned
+  const isPlacePinned = useCallback((placeId: string) => {
+    if (!allPinnedPlaces || allPinnedPlaces.length === 0) return false;
+    return allPinnedPlaces.some(p => p.placeId === placeId);
+  }, [allPinnedPlaces]);
 
   const handleFilterChange = useCallback((filterId: string, value: any) => {
     // Legacy filter handling removed - using new CategoryPills component for filters
@@ -937,199 +924,13 @@ export function MapView({
     }
   }, [selectedPlaceKey, isLoaded, fetchDetails, findPlaceByQuery, coordinates, searchedLocation]);
 
-  // Function for rendering the place details panel
-  const renderPlaceDetails = () => {
-    if (!selectedPlaceDetails) return null;
-
-    // Get photos or show a placeholder
-    const photos = selectedPlaceDetails.photos || [];
-    
-    return (
-      <div className="p-4 border-t">
-        <div className="flex justify-between items-start mb-4">
-          <div>
-            <h3 className="text-xl font-bold">{selectedPlaceDetails.name}</h3>
-            <p className="text-sm text-muted-foreground">{selectedPlaceDetails.formatted_address}</p>
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => setSelectedPlaceDetails(null)}>
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-
-        {photos.length > 0 && (
-          <div className="mb-4 relative">
-            <div className="aspect-video overflow-hidden rounded-md">
-              {selectedPhotoIndex !== null ? (
-                <div className="relative h-full">
-                  <img 
-                    src={photos[selectedPhotoIndex].getUrl({ maxWidth: 800, maxHeight: 600 })} 
-                    alt={`${selectedPlaceDetails.name} - photo ${selectedPhotoIndex + 1}`}
-                    className="w-full h-full object-cover"
-                  />
-                  
-                  {/* Close button */}
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="absolute top-2 right-2 bg-background/80 rounded-full p-1"
-                    onClick={() => setSelectedPhotoIndex(null)}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                  
-                  {/* Photo counter */}
-                  {photos.length > 1 && (
-                    <div className="absolute bottom-2 right-2 bg-black/60 text-white px-2 py-1 rounded-md text-xs flex items-center gap-1">
-                      <Camera className="h-3 w-3" />
-                      {selectedPhotoIndex + 1} / {photos.length}
-                    </div>
-                  )}
-                  
-                  {/* Navigation arrows */}
-                  {photos.length > 1 && (
-                    <>
-                      <button
-                        onClick={() => setSelectedPhotoIndex((prev) => 
-                          prev === null ? 0 : (prev === 0 ? photos.length - 1 : prev - 1)
-                        )}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition-colors"
-                        aria-label="Previous photo"
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => setSelectedPhotoIndex((prev) => 
-                          prev === null ? 0 : (prev === photos.length - 1 ? 0 : prev + 1)
-                        )}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition-colors"
-                        aria-label="Next photo"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <div className="grid grid-cols-3 gap-1 h-full">
-                  {photos.slice(0, 3).map((photo, idx) => (
-                    <div 
-                      key={idx} 
-                      className="relative aspect-video cursor-pointer"
-                      onClick={() => setSelectedPhotoIndex(idx)}
-                    >
-                      <img 
-                        src={photo.getUrl({ maxWidth: 400 })} 
-                        alt={`${selectedPlaceDetails.name} - thumbnail ${idx + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                      {idx === 2 && photos.length > 3 && (
-                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white font-medium">
-                          +{photos.length - 3}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-          {selectedPlaceDetails.rating && (
-            <div className="flex items-center gap-2">
-              <Star className="h-4 w-4 text-yellow-500" />
-              <span className="font-medium">{selectedPlaceDetails.rating}</span>
-              <span className="text-sm text-muted-foreground">
-                ({selectedPlaceDetails.user_ratings_total} reviews)
-              </span>
-            </div>
-          )}
-
-          {selectedPlaceDetails.formatted_phone_number && (
-            <div className="flex items-center gap-2">
-              <Phone className="h-4 w-4" />
-              <span>{selectedPlaceDetails.formatted_phone_number}</span>
-            </div>
-          )}
-
-          {selectedPlaceDetails.website && (
-            <div className="flex items-center gap-2 col-span-2">
-              <Globe className="h-4 w-4" />
-              <a 
-                href={selectedPlaceDetails.website} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:underline truncate"
-              >
-                {selectedPlaceDetails.website.replace(/^https?:\/\//, '')}
-              </a>
-            </div>
-          )}
-        </div>
-
-        {selectedPlaceDetails.opening_hours?.weekday_text && (
-          <div className="mb-4">
-            <div className="flex items-center justify-between">
-              <h4 className="font-medium flex items-center">
-                <Clock className="h-4 w-4 mr-2" />
-                Hours
-              </h4>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => setExpandedReviews(!expandedReviews)}
-              >
-                {expandedReviews ? (
-                  <ChevronUp className="h-4 w-4" />
-                ) : (
-                  <ChevronDown className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-            {expandedReviews && (
-              <div className="mt-2 text-sm space-y-1">
-                {selectedPlaceDetails.opening_hours.weekday_text.map((day, idx) => (
-                  <div key={idx} className="flex justify-between">
-                    <span className="text-muted-foreground">
-                      {day.split(': ')[0]}:
-                    </span>
-                    <span>{day.split(': ')[1]}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {tripId && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Choose an icon:</span>
-              <IconPicker
-                selectedIcon={selectedIcon}
-                onIconSelect={setSelectedIcon}
-                className="flex-shrink-0"
-              />
-            </div>
-            <Button 
-              onClick={handlePinPlace} 
-              className="w-full"
-            >
-              <span className="mr-2">{selectedIcon}</span>
-              Pin to Trip
-            </Button>
-          </div>
-        )}
-      </div>
-    );
-  };
+  // Removed legacy renderPlaceDetails() - now using PlaceDetailsSidebar exclusively
 
   // Determine if panels should be visible
   // Left panel shows when there are search results, active filters, or user is searching
   const hasActiveSearch = searchValue.trim().length > 0 || selectedCategory !== null || searchResults.length > 0 || isLoadingSearch;
   const showLeftPanel = !hideSearchAndFilters && hasActiveSearch;
-  const showRightPanel = !!selectedPlaceDetails || (showPlaceDetailsSidebar && !!selectedPlaceForDetails);
+  const showRightPanel = showPlaceDetailsSidebar && !!selectedPlaceForDetails;
 
   // Dynamic grid layout based on panel visibility
   const getGridClasses = () => {
@@ -1356,20 +1157,20 @@ export function MapView({
         </div>
 
         {/* RIGHT PANEL: Place Details - Only visible when a place is selected */}
-        {showRightPanel && (
+        {showRightPanel && selectedPlaceForDetails && (
           <div className="border-l bg-background h-[600px]">
             <ScrollArea className="h-full">
-              {selectedPlaceDetails ? (
-                renderPlaceDetails()
-              ) : showPlaceDetailsSidebar && selectedPlaceForDetails ? (
-                <div className="p-4">
-                  <PlaceDetailsSidebar
-                    placeId={selectedPlaceForDetails}
-                    onSelectPlace={onSelectPlaceFromDetails}
-                    onClose={onClosePlaceDetails}
-                  />
-                </div>
-              ) : null}
+              <div className="p-4">
+                <PlaceDetailsSidebar
+                  placeId={selectedPlaceForDetails}
+                  tripId={tripId}
+                  isPinned={isPlacePinned(selectedPlaceForDetails)}
+                  onSelectPlace={onSelectPlaceFromDetails}
+                  onClose={onClosePlaceDetails}
+                  onSave={handleSavePlace}
+                  onAddToItinerary={handleAddToItinerary}
+                />
+              </div>
             </ScrollArea>
           </div>
         )}
