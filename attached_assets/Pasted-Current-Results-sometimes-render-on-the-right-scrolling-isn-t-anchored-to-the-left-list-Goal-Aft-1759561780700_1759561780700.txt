@@ -1,0 +1,123 @@
+Current: Results sometimes render on the right; scrolling isn’t anchored to the left list.
+Goal: After any search/filter, the left panel shows a persistent, scrollable results list. The right panel is only the place details view when an item/marker is selected.
+
+1) Layout (desktop first)
+
+Implement a 3-pane layout (CSS grid or flex):
+
+Left: Results panel, fixed width 360–420px, its own scroll container.
+
+Center: Map (fills remaining width).
+
+Right: Details panel, fixed width 360–420px; hidden by default until a place is selected.
+
+Mobile: left panel becomes a bottom sheet (scrolls), right details becomes a full-height slide-over.
+
+2) State & data flow
+
+Single source of truth:
+
+results[] (array of Places search results for current query/viewport)
+
+selectedPlaceId (null | place_id)
+
+searchSessionId (increment per new search to prevent stale overwrites)
+
+Results list always renders from results[] into the LEFT panel.
+Right panel renders only when selectedPlaceId !== null.
+
+3) Search → Left list behavior
+
+Any filter/text search populates results[]; do not open the right panel automatically.
+
+Keep list persistent across panning/zooming:
+
+Debounce re-queries on map.idle (400–600ms).
+
+Use searchSessionId to discard stale responses (fixes “flash then disappear”).
+
+Keep prior list visible with skeleton rows until commit.
+
+Preserve left list scroll position between updates; diff by place_id.
+
+4) Left list card spec (Google-Maps-like)
+
+Each card shows:
+
+Thumbnail (Places photo, lazy-loaded), name, rating (stars + count), price level (if any),
+
+Category (e.g., Restaurant), distance from map center, address, open/closed today,
+
+Actions: Save/Pin, Itinerary, Directions.
+
+Never show “NaN”—if rating or count missing, hide that element.
+
+Selected card gets a blue outline; hover highlights the corresponding marker.
+
+5) Interactions & sync
+
+Click card (left) → set selectedPlaceId, open RIGHT details panel; pan map slightly if needed (no over-zoom).
+
+Click marker (map) → select matching card; scroll left list to it.
+
+Hover card ↔ marker mutual highlight.
+
+Closing the right panel keeps the left list intact.
+
+6) Right details panel (only details)
+
+Populate via getDetails(fields: ["place_id","name","formatted_address","geometry","rating","user_ratings_total","opening_hours","photos","website","international_phone_number","url"]).
+
+Photos carousel (prev/next; hide controls if <2).
+
+Actions mirrored from the card (Pin/Itinerary/Directions).
+
+Its scroll is independent from the left list.
+
+7) Performance & hygiene
+
+Cache search pages by (filterKey + viewportHash + zoomBucket) for 1–2 min.
+
+Only call getDetails on selection; cache by place_id (10–30 min).
+
+Lazy-load images in the left list; consider list virtualization if >100 rows.
+
+Marker clustering when dense.
+
+8) Error & empty states
+
+Friendly empty state in left panel (ZERO_RESULTS: “No places here—try moving the map”).
+
+Handle OVER_QUERY_LIMIT with 1–2s backoff + one retry; no uncaught errors.
+
+Dev logs: method, params, status, result count; retain UI stability on failures.
+
+9) A11y & polish
+
+Left list is keyboard navigable; Enter opens details on the right.
+
+Announce loading/empty states with aria-live="polite".
+
+On opening right panel, move focus to its header; ESC/Close returns focus to the originating card.
+
+✅ Acceptance checklist
+
+After applying a filter, left panel shows a scrollable list; right panel stays closed until selection.
+
+Clicking a left item or a marker opens details on the right, while the left remains scrollable.
+
+Panning/zooming (with “Update results when map moves” ON) refreshes the left list without flicker; scroll position is preserved when feasible.
+
+No “NaN reviews” anywhere; missing fields are gracefully hidden.
+
+No console errors; performance remains snappy; quotas are respected.
+
+Deliverables
+
+Left ResultsPanel that is the only scroll container for results.
+
+Right DetailsPanel that only renders on selection.
+
+Search controller updates (debounce, session id, diffed updates, caching).
+
+README note documenting the 3-pane layout and state flow.
