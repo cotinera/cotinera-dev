@@ -330,6 +330,13 @@ export function MapView({
     (place) => {
       if (place.place_id) {
         setSelectedResultId(place.place_id);
+        
+        // Set highlighted location and animate
+        if (place.geometry?.location) {
+          setHighlightedLocation(place.geometry.location);
+          smoothMapAnimation(mapRef, coordinates, place.geometry.location);
+        }
+        
         if (onShowPlaceDetails) {
           onShowPlaceDetails(place.place_id);
         } else {
@@ -494,6 +501,9 @@ export function MapView({
 
   const handleMarkerClick = useCallback(async (item: PinnedPlace | Accommodation | Activity) => {
     if (mapRef.current && 'coordinates' in item && item.coordinates) {
+      // Set highlighted location to show pin
+      setHighlightedLocation(item.coordinates);
+      
       // Use our shared animation function with easing and better spatial context
       smoothMapAnimation(
         mapRef, 
@@ -625,9 +635,12 @@ export function MapView({
   const handleResultClick = useCallback((result: SearchServiceResult) => {
     setSelectedResultId(result.place_id);
     
+    // Set highlighted location to show pin
+    const resultCoords = result.geometry.location;
+    setHighlightedLocation(resultCoords);
+    
     // Animate to result location
     if (mapRef.current) {
-      const resultCoords = result.geometry.location;
       smoothMapAnimation(mapRef, coordinates, resultCoords);
     }
     
@@ -852,10 +865,10 @@ export function MapView({
       console.log("Trip coordinates:", coordinates);
       console.log("Selected coordinates:", searchedLocation);
 
-      // Center map on the selected place (without animation)
+      // Set highlighted location and animate to selected place
       if (selectedPlace.coordinates) {
-        mapRef.current.setCenter(selectedPlace.coordinates);
-        mapRef.current.setZoom(16);
+        setHighlightedLocation(selectedPlace.coordinates);
+        smoothMapAnimation(mapRef, coordinates, selectedPlace.coordinates);
       }
 
       // If we have a placeId, fetch details directly
@@ -1146,6 +1159,31 @@ export function MapView({
                     strokeColor: '#ffffff',
                     scale: 8,
                   }}
+                />
+              )}
+              
+              {/* Render highlighted location pin - shown when clicking any place */}
+              {highlightedLocation && (
+                <MarkerF
+                  position={highlightedLocation}
+                  icon={{
+                    url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`
+                      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48">
+                        <defs>
+                          <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+                            <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.3"/>
+                          </filter>
+                        </defs>
+                        <path d="M24 2 C15 2 8 9 8 18 C8 27 24 46 24 46 S40 27 40 18 C40 9 33 2 24 2 Z" 
+                          fill="#3b82f6" stroke="#ffffff" stroke-width="2" filter="url(#shadow)"/>
+                        <circle cx="24" cy="18" r="6" fill="#ffffff"/>
+                        <circle cx="24" cy="18" r="3" fill="#3b82f6"/>
+                      </svg>
+                    `)}`,
+                    scaledSize: new google.maps.Size(48, 48),
+                    anchor: new google.maps.Point(24, 46),
+                  }}
+                  animation={google.maps.Animation.DROP}
                 />
               )}
               
