@@ -1,29 +1,7 @@
-interface PlacePhoto {
-  photo_reference: string;
-  height: number;
-  width: number;
-  html_attributions: string[];
-}
-
-interface PlaceReview {
-  author_name: string;
-  author_url?: string;
-  language: string;
-  profile_photo_url?: string;
-  rating: number;
-  relative_time_description: string;
-  text: string;
-  time: number;
-}
-
-interface PlaceOpeningHours {
-  open_now: boolean;
-  periods: Array<{
-    close?: { day: number; time: string };
-    open: { day: number; time: string };
-  }>;
-  weekday_text: string[];
-}
+// Google Maps API native types
+export type GoogleMapsPhoto = google.maps.places.PlacePhoto;
+export type GoogleMapsReview = google.maps.places.PlaceReview;
+export type GoogleMapsOpeningHours = google.maps.places.PlaceOpeningHours;
 
 export interface PlaceDetailsData {
   place_id: string;
@@ -35,15 +13,12 @@ export interface PlaceDetailsData {
   rating?: number;
   user_ratings_total?: number;
   price_level?: number;
-  opening_hours?: PlaceOpeningHours;
-  photos?: PlacePhoto[];
-  reviews?: PlaceReview[];
+  opening_hours?: GoogleMapsOpeningHours;
+  photos?: GoogleMapsPhoto[];
+  reviews?: GoogleMapsReview[];
   types: string[];
   geometry: {
-    location: {
-      lat: () => number;
-      lng: () => number;
-    };
+    location: google.maps.LatLng;
   };
   business_status?: string;
   url?: string;
@@ -60,11 +35,17 @@ export class PlacesDetailsService {
   private readonly CACHE_DURATION_MS = 12 * 60 * 1000; // 12 minutes (between 10-15 min)
   private currentRequestId: string | null = null;
   private placesService: google.maps.places.PlacesService | null = null;
+  private forceRefreshPhotos: boolean = false; // Dev flag
 
   constructor() {
     if (typeof google !== 'undefined' && google.maps?.places?.PlacesService) {
       const mapDiv = document.createElement('div');
       this.placesService = new google.maps.places.PlacesService(mapDiv);
+    }
+    
+    // Check for dev flag
+    if (typeof window !== 'undefined') {
+      this.forceRefreshPhotos = (window as any).FORCE_REFRESH_PLACES_PHOTOS || false;
     }
   }
 
@@ -91,8 +72,8 @@ export class PlacesDetailsService {
     const requestId = this.generateRequestId();
     this.currentRequestId = requestId;
 
-    // Check cache first (unless force refresh)
-    if (!forceRefresh) {
+    // Check cache first (unless force refresh or dev flag)
+    if (!forceRefresh && !this.forceRefreshPhotos) {
       const cached = this.cache.get(placeId);
       if (cached && this.isCacheValid(cached)) {
         return { data: cached.data, requestId: cached.requestId };
@@ -182,6 +163,13 @@ export class PlacesDetailsService {
       isCached: true,
       age: Date.now() - cached.timestamp
     };
+  }
+
+  setForceRefreshPhotos(value: boolean): void {
+    this.forceRefreshPhotos = value;
+    if (typeof window !== 'undefined') {
+      (window as any).FORCE_REFRESH_PLACES_PHOTOS = value;
+    }
   }
 }
 
