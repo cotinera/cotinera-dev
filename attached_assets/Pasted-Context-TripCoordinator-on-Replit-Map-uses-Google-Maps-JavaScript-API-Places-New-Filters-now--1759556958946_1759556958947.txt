@@ -1,0 +1,159 @@
+Context:
+TripCoordinator on Replit. Map uses Google Maps JavaScript API + Places (New). Filters now run, the map pins update, but the results list/panel is not stable—it appears briefly and then disappears. I want a Google Maps–like left panel that lists results and stays in sync with the map and filters.
+
+Goal:
+Implement a left-side results panel that (a) persists across map interactions, (b) supports scrolling + pagination, (c) stays in sync with markers, and (d) drives the right-hand place details panel when a result is clicked. Match Google Maps feel.
+
+1) Layout & Responsiveness
+
+Add a fixed left column (≈ 360–420px) for Results; map occupies the remaining width.
+
+Top of the left column: a small header bar with:
+
+current query/filter label (e.g., “Restaurants”),
+
+Sort by dropdown (Rating, Distance, Popularity*),
+
+Update results when map moves toggle (default ON).
+
+Below header: a scrollable list area with its own scrollbar; height = viewport minus header.
+
+Mobile: collapse the left panel into a bottom sheet with drag handle; same list content; map behind.
+
+(If “Popularity” not implemented yet, hide it.)
+
+2) Stable State Machine (fix the “flash then disappear”)
+
+Implement a tiny search state machine and request versioning to prevent stale overwrites:
+
+searchSessionId (UUID/increment) increases for each user action (filter click, text search, or map idle re-query).
+
+Each network call carries sessionId; when responses return, discard any whose sessionId ≠ current.
+
+States: IDLE → LOADING → RENDERED (or EMPTY/ERROR).
+
+Never clear the list on LOADING; show skeleton items and keep the prior list visible until new results are committed (unless it’s a brand-new query).
+
+Preserve scroll position across incremental updates and re-renders.
+
+3) Query Orchestration (types vs text, pagination)
+
+Types (Restaurant/Hotel/Bar/etc.) → nearbySearch(location + radiusFromZoom).
+
+Text queries → textSearch(query + bounds) to localize results.
+
+Pagination: Respect nextPageToken and fetch up to 2 pages max. Provide “Load more” at the bottom if more pages exist.
+
+Debounce re-queries on map.idle by 400–600ms. If “Update results when map moves” is OFF, don’t re-query; show a button: “Update results for this area”.
+
+4) Rendering Each Result (Google Maps–like cards)
+
+For each place, render a compact card with:
+
+Thumbnail: first Places photo (photo.getUrl({maxWidth:…})), lazy-loaded.
+
+Name (clickable), rating (stars + count), price level if available.
+
+Category (e.g., Restaurant) and distance from map center (km/mi).
+
+Address (one line) and Open/Closed (today’s hours summary).
+
+Actions:
+
+Save/Pin (toggles app’s pinned list),
+
+Add to itinerary (stub if itinerary flow not finished),
+
+Directions (deep-link: https://www.google.com/maps/dir/?api=1&destination=lat,lng),
+
+(Optional) Call and Website if provided by getDetails.
+
+Selected styling when the item is the current open place.
+
+A11y: each card is a button or a with proper labels; focus ring visible; arrow keys navigate list; Enter opens details.
+
+5) Interactions & Sync with Map
+
+Hover card → highlight corresponding marker (and vice versa); scroll the list to the hovered/selected item when needed.
+
+Click card → open the existing right-hand details panel, centered on that place; do not auto over-zoom (cap zoom change).
+
+Click marker → select and scroll the list to that item (if present).
+
+Keep selection stable across light re-queries; if place disappears from new results, clear selection politely.
+
+6) Performance & Quota Hygiene
+
+Virtualize the list (if >100 items): only render visible rows.
+
+Cache search pages per (filterKey + viewportHash + zoomBucket) for 1–2 minutes to avoid refetches on minor pans.
+
+Cache getDetails by place_id for 10–30 minutes; only fetch on card click or marker click.
+
+Lazy-load images (IntersectionObserver).
+
+Single in-flight search at a time; abort/ignore stale responses using searchSessionId.
+
+7) Error Handling & Empty States
+
+Translate Places statuses to friendly messages:
+
+ZERO_RESULTS → “No results here—try zooming out or moving the map.”
+
+OVER_QUERY_LIMIT → backoff 1–2s, retry once; if still failing, “Too many requests. Try again shortly.”
+
+Show a non-blocking toast; keep the list stable when possible (don’t clear on transient errors).
+
+Log diagnostic info in dev: method, params, status, result count.
+
+8) Sorting
+
+Implement Sort by:
+
+Recommended (default): Places rank order (or by rating * reviews volume).
+
+Rating: desc by rating then reviews.
+
+Distance: asc by distance from map center.
+
+Sorting runs client-side on the current result set; reflect selection in the UI.
+
+9) “Update when map moves” Toggle
+
+When ON: re-query on map.idle (debounced), diff results to avoid list flicker (keep stable keys by place_id).
+
+When OFF: don’t auto re-query; show sticky “Update results for this area” button at the top of the list.
+
+10) Non-Regression with Details Panel & Photos
+
+Clicking a list item still opens the right-hand details panel using getDetails(fields: ["place_id","name","formatted_address","geometry","rating","user_ratings_total","opening_hours","photos","website","international_phone_number","url"]).
+
+Photo carousel remains functional; Places photos first, Street View fallback only if no photos.
+
+Pinned places flow unaffected.
+
+11) Acceptance Checklist
+
+The left Results panel is always visible (desktop), scrollable, and keeps content stable during searches (no more flash/disappear).
+
+Clicking Restaurant shows cards + pins; panning/zooming (with toggle ON) updates results with minimal flicker and preserved scroll position.
+
+Hover sync (card↔marker) works; click opens the right details panel.
+
+Load more fetches next pages; infinite scroll optional.
+
+Sorting changes reorder the current list instantly.
+
+Empty states and errors are graceful; no uncaught exceptions in console.
+
+Performance feels snappy; images lazy-load; quotas aren’t spammed.
+
+Deliverables
+
+Left panel UI with header, toggle, sort, scrollable list, item cards.
+
+Search controller with debounce, pagination, caching, request versioning, and diffed updates.
+
+Marker/list synchronization and a11y.
+
+README note: architecture (state machine, versioning, caching), known limits.
