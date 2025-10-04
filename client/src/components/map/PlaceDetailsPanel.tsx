@@ -215,10 +215,16 @@ export function PlaceDetailsPanel({
   return (
     <div className="w-full h-full flex flex-col bg-background">
       {/* Header with close button */}
-      <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b">
+      <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b relative z-10">
         <h2 className="text-lg font-semibold">Place Details</h2>
         {onClose && (
-          <Button variant="ghost" size="icon" onClick={onClose}>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={onClose}
+            aria-label="Close place details"
+            className="hover:bg-secondary"
+          >
             <X className="h-4 w-4" />
           </Button>
         )}

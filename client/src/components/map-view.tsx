@@ -1173,15 +1173,60 @@ export function MapView({
               hoveredResultId={hoveredResultId}
               onResultClick={handleResultClick}
               onResultHover={setHoveredResultId}
-              onSavePlace={(place, e) => {
+              onSavePlace={async (place, e) => {
                 e.stopPropagation();
-                // TODO: Implement save place functionality
-                toast({ title: "Save feature coming soon!" });
+                if (!tripId) {
+                  toast({ 
+                    title: "Cannot save", 
+                    description: "Trip ID is required",
+                    variant: "destructive"
+                  });
+                  return;
+                }
+                
+                try {
+                  const res = await fetch(`/api/trips/${tripId}/pinned-places`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                      name: place.name,
+                      address: place.formatted_address,
+                      coordinates: {
+                        lat: place.geometry.location.lat,
+                        lng: place.geometry.location.lng
+                      },
+                      placeId: place.place_id,
+                      phone: place.formatted_phone_number,
+                      website: place.website,
+                      rating: place.rating,
+                      category: place.types?.[0] || 'place'
+                    }),
+                  });
+                  if (!res.ok) throw new Error("Failed to save place");
+                  
+                  queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "pinned-places"] });
+                  toast({ 
+                    title: "Place saved", 
+                    description: `${place.name} added to trip` 
+                  });
+                } catch (error) {
+                  console.error('Failed to save place:', error);
+                  toast({ 
+                    title: "Error", 
+                    description: "Failed to save place",
+                    variant: "destructive" 
+                  });
+                }
               }}
-              onAddToItinerary={(place, e) => {
+              onAddToItinerary={async (place, e) => {
                 e.stopPropagation();
-                // TODO: Implement add to itinerary functionality
-                toast({ title: "Add to itinerary feature coming soon!" });
+                // Show place details panel for adding to itinerary
+                if (onShowPlaceDetails) {
+                  onShowPlaceDetails(place.place_id);
+                } else {
+                  toast({ title: "Add to itinerary feature coming soon!" });
+                }
               }}
               onLoadMore={loadMoreResults}
               onSortChange={(sort) => {
