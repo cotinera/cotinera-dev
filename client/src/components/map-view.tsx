@@ -854,6 +854,10 @@ export function MapView({
     } else {
       setCategorySuggestions([]);
       setShowSearchResults(false);
+      // Clear category when search is cleared
+      if (value.trim() === '') {
+        setSelectedCategory(null);
+      }
     }
   }, []);
 
@@ -1121,16 +1125,35 @@ export function MapView({
     );
   };
 
+  // Determine if panels should be visible
+  // Left panel shows when there are search results, active filters, or user is searching
+  const hasActiveSearch = searchValue.trim().length > 0 || selectedCategory !== null || searchResults.length > 0 || isLoadingSearch;
+  const showLeftPanel = !hideSearchAndFilters && hasActiveSearch;
+  const showRightPanel = !!selectedPlaceDetails || (showPlaceDetailsSidebar && !!selectedPlaceForDetails);
+
+  // Dynamic grid layout based on panel visibility
+  const getGridClasses = () => {
+    if (showLeftPanel && showRightPanel) {
+      // Both panels: 3-column layout
+      return "grid grid-cols-1 md:grid-cols-[380px_minmax(0,1fr)] lg:grid-cols-[380px_minmax(0,1fr)_380px]";
+    } else if (showLeftPanel) {
+      // Only left panel: 2-column layout
+      return "grid grid-cols-1 md:grid-cols-[380px_minmax(0,1fr)]";
+    } else if (showRightPanel) {
+      // Only right panel: 2-column layout
+      return "grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px]";
+    }
+    // No panels: full-width centered map
+    return "grid grid-cols-1";
+  };
+
   return (
     <Card className={cn("w-full shadow-md relative overflow-hidden", className)}>
-      {/* 3-Pane Grid Layout: Left (Results) | Center (Map) | Right (Details) */}
-      <div className="grid grid-cols-1 md:grid-cols-[380px_minmax(0,1fr)] lg:grid-cols-[380px_minmax(0,1fr)_380px]">
-        {/* LEFT PANEL: Search Results - Always visible when search is active */}
-        {!hideSearchAndFilters && (
-          <div className={cn(
-            "border-r bg-background h-[600px] md:block",
-            searchState === 'IDLE' && "hidden md:hidden"
-          )}>
+      {/* Dynamic Grid Layout: Centered map by default, panels appear when needed */}
+      <div className={getGridClasses()}>
+        {/* LEFT PANEL: Search Results - Only visible when search is active */}
+        {showLeftPanel && (
+          <div className="border-r bg-background h-[600px]">
             <SearchResultsPanel
               searchState={isLoadingSearch ? 'LOADING' : searchResults.length > 0 ? 'RENDERED' : 'EMPTY'}
               results={searchResults}
@@ -1332,8 +1355,8 @@ export function MapView({
         </div>
 
         {/* RIGHT PANEL: Place Details - Only visible when a place is selected */}
-        {(selectedPlaceDetails || (showPlaceDetailsSidebar && selectedPlaceForDetails)) && (
-          <div className="hidden lg:block border-l bg-background h-[600px]">
+        {showRightPanel && (
+          <div className="border-l bg-background h-[600px]">
             <ScrollArea className="h-full">
               {selectedPlaceDetails ? (
                 renderPlaceDetails()
