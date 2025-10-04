@@ -74,10 +74,10 @@ export default function LandingPage() {
       <div className="absolute inset-0 bg-gradient-adventure" />
       
       {/* Top Right Auth Button */}
-      <div className="absolute top-6 right-6 z-10">
+      <div className="absolute top-6 right-6 z-50">
         <Button
           variant="outline"
-          className="bg-white/20 backdrop-blur-md border-white/30 text-white hover:bg-white/30"
+          className="bg-white/90 backdrop-blur-md border-2 border-white text-primary hover:bg-white hover:scale-105 shadow-xl transition-all duration-200 cursor-pointer font-semibold"
           onClick={() => window.location.href = "/api/auth/google"}
         >
           <SiGoogle className="mr-2 h-4 w-4" />
