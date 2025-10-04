@@ -74,7 +74,7 @@ export default function LandingPage() {
       <div className="absolute top-6 right-6 z-10">
         <Button
           variant="outline"
-          className="bg-white/90 backdrop-blur-sm hover:bg-white"
+          className="bg-white/20 backdrop-blur-md border-white/30 text-white hover:bg-white/30"
           onClick={() => setLocation("/auth")}
         >
           Sign Up / Log In
@@ -103,15 +103,15 @@ export default function LandingPage() {
                   }
                 }}
                 placeholder="Where do you want to go?"
-                className="w-full h-14 text-lg bg-white/95 backdrop-blur-sm shadow-xl border-0"
+                className="w-full h-14 text-lg bg-white/20 backdrop-blur-md border-white/30 text-white placeholder:text-white/70 shadow-xl"
               />
             </div>
             <div className="md:w-48">
               <Select value={participants} onValueChange={setParticipants}>
-                <SelectTrigger className="h-14 text-lg bg-white/95 backdrop-blur-sm shadow-xl border-0">
+                <SelectTrigger className="h-14 text-lg bg-white/20 backdrop-blur-md border-white/30 text-white shadow-xl">
                   <SelectValue placeholder="Participants" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white/90 backdrop-blur-md border-white/30">
                   <SelectItem value="1">1 Person</SelectItem>
                   <SelectItem value="2">2 People</SelectItem>
                   <SelectItem value="3">3 People</SelectItem>
@@ -131,7 +131,7 @@ export default function LandingPage() {
           <div>
             <Button
               size="lg"
-              className="h-14 px-12 text-lg font-semibold bg-white text-purple-600 hover:bg-white/90 shadow-2xl"
+              className="h-14 px-12 text-lg font-semibold bg-white/20 backdrop-blur-md border border-white/30 text-white hover:bg-white/30 shadow-2xl"
               onClick={handleCreateTrip}
               disabled={createTripMutation.isPending}
             >
