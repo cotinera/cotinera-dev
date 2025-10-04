@@ -1,0 +1,56 @@
+Make the right panel look/behave exactly like the filtered → click → Place Details panel (see second screenshot) for:
+
+Roam & click (clicking any marker without first filtering)
+
+Pinned places
+
+Filtered results (already correct)
+
+Do:
+
+Create a single component PlaceDetailsPanel and reuse it for all three paths.
+
+Always fetch data by place_id via Places getDetails with fields:
+["place_id","name","formatted_address","geometry","rating","user_ratings_total","price_level","opening_hours","photos","website","international_phone_number","url","types"]
+
+If roam/pinned selection starts with only lat/lng or partial data, resolve place_id first (findPlace/nearby), then render the panel.
+
+Adopt the “second image” layout (exact spec):
+
+Top: full-width photo carousel (arrows, dots, count; hide controls if <2). Uses Details → photos (no Street View unless photos empty). Show attributions.
+
+Header row: name (bold), category, rating ★ + reviews count, price chips.
+
+Meta row: address (with icon), Open/Closed + collapsible Hours.
+
+Action grid (2×2): Select, Call, Website, Share.
+
+Include Save/Unsave (bookmark) in the header area.
+
+For pinned items, include Add to Itinerary in the grid (or as primary just below grid), and a compact Marker icon picker (popover) — match styling.
+
+Tokens: same spacing, radius, shadows, fonts as the filtered panel.
+
+Remove / replace legacy UIs:
+
+Delete the old pinned layout (three small photos strip, standalone “Pin to Trip” slab, big “Choose an icon” block).
+
+Replace roam & click popups with PlaceDetailsPanel (no alternate style).
+
+Behavior:
+
+Selecting any marker or list item opens this same panel; do not over-zoom the map (light pan only).
+
+Keep our existing photo caching + detailsRequestId and error handling.
+
+Save/Unsave syncs with Pinned Places immediately.
+
+Acceptance checks:
+
+Clicking a marker (no filter), clicking a pinned place, or clicking a filtered result all open the identical panel (carousel, header, actions, hours).
+
+Price chips, rating, and address appear in the same positions/styles across all paths.
+
+“Add to Itinerary” + marker-icon picker are present for pinned items within the unified panel styling.
+
+No legacy pinned/roam layouts remain; no console errors; performance unchanged.
