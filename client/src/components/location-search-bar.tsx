@@ -349,6 +349,13 @@ export function LocationSearchBar({
       // 1. Show place details immediately with minimal data
       if (showDetailedView && onShowPlaceDetails) {
         onShowPlaceDetails(placeId);
+      } else if (!showDetailedView && !onShowPlaceDetails) {
+        // If onShowPlaceDetails is not provided, just call onChange immediately (simple mode)
+        onChange(
+          minimalPlaceDetails.formatted_address || minimalPlaceDetails.name || '',
+          coordinates,
+          minimalPlaceDetails.name || minimalPlaceDetails.formatted_address || ''
+        );
       } else {
         setSelectedPlaceId(placeId);
         setIsPlaceDetailsOpen(true);

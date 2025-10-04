@@ -59,11 +59,11 @@ export default function LandingPage() {
     }
 
     createTripMutation.mutate({
-      name: searchLocation,
-      destination: searchLocation,
+      title: searchLocation,
+      location: searchLocation,
+      coordinates: coordinates,
       startDate: new Date().toISOString().split("T")[0],
       endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
-      participants: parseInt(participants),
     });
   };
 
