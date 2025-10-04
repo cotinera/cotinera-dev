@@ -128,6 +128,7 @@ interface TripIdeasAndPlacesProps {
     avatar?: string;
   }>;
   tripCoordinates?: { lat: number; lng: number };
+  onShowPlaceDetails?: (placeId: string) => void;
 }
 
 // Draggable Card Component
@@ -136,13 +137,15 @@ function DraggableCard({
   type,
   onEditIdea,
   onEditPlace,
-  onAddToCalendar
+  onAddToCalendar,
+  onShowPlaceDetails
 }: { 
   item: TripIdea | PinnedPlace; 
   type: 'idea' | 'place';
   onEditIdea?: (idea: TripIdea) => void;
   onEditPlace?: (place: PinnedPlace) => void;
   onAddToCalendar?: (place: PinnedPlace) => void;
+  onShowPlaceDetails?: (placeId: string) => void;
 }) {
   const {
     attributes,
@@ -173,14 +176,40 @@ function DraggableCard({
   const createdAt = isIdea ? idea!.createdAt : place!.createdAt;
   const ownerName = isIdea ? idea!.ownerName : null;
 
-  const handleCardClick = (e: React.MouseEvent) => {
+  const handleCardClick = async (e: React.MouseEvent) => {
     // Handle clicks if we're not dragging
     if (!isDragging) {
       e.stopPropagation();
       if (isIdea && onEditIdea) {
         onEditIdea(idea!);
-      } else if (!isIdea && onEditPlace) {
-        onEditPlace(place!);
+      } else if (!isIdea && place) {
+        // For places, show details sidebar instead of edit dialog
+        if (place.placeId && onShowPlaceDetails) {
+          // If place has a placeId, show full details
+          onShowPlaceDetails(place.placeId);
+        } else if (place.coordinates && onShowPlaceDetails) {
+          // If no placeId, try reverse geocoding to find it
+          try {
+            const geocoder = new google.maps.Geocoder();
+            const result = await geocoder.geocode({ location: place.coordinates });
+            
+            if (result.results && result.results.length > 0) {
+              const firstResult = result.results[0];
+              if (firstResult.place_id) {
+                onShowPlaceDetails(firstResult.place_id);
+              }
+            }
+          } catch (error) {
+            console.error('Error reverse geocoding:', error);
+            // Fallback to edit dialog if reverse geocoding fails
+            if (onEditPlace) {
+              onEditPlace(place);
+            }
+          }
+        } else if (onEditPlace) {
+          // Fallback if no callback is provided
+          onEditPlace(place);
+        }
       }
     }
   };
@@ -277,7 +306,8 @@ function DroppableColumn({
   type,
   onEditIdea,
   onEditPlace,
-  onAddToCalendar
+  onAddToCalendar,
+  onShowPlaceDetails
 }: { 
   column: Column; 
   items: (TripIdea | PinnedPlace)[]; 
@@ -285,6 +315,7 @@ function DroppableColumn({
   onEditIdea?: (idea: TripIdea) => void;
   onEditPlace?: (place: PinnedPlace) => void;
   onAddToCalendar?: (place: PinnedPlace) => void;
+  onShowPlaceDetails?: (placeId: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
@@ -322,6 +353,7 @@ function DroppableColumn({
                 onEditIdea={onEditIdea}
                 onEditPlace={onEditPlace}
                 onAddToCalendar={onAddToCalendar}
+                onShowPlaceDetails={onShowPlaceDetails}
               />
             ))}
             {items.length === 0 && (
@@ -339,7 +371,8 @@ function DroppableColumn({
 export function TripIdeasAndPlaces({ 
   tripId, 
   participants,
-  tripCoordinates
+  tripCoordinates,
+  onShowPlaceDetails
 }: TripIdeasAndPlacesProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -1376,6 +1409,7 @@ export function TripIdeasAndPlaces({
               type="place"
               onEditPlace={handleEditPlace}
               onAddToCalendar={handleAddToCalendar}
+              onShowPlaceDetails={onShowPlaceDetails}
             />
           ))}
         </div>

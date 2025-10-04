@@ -441,7 +441,7 @@ export function MapView({
     });
   }, [getPlaceDetails]);
 
-  const handlePlaceNameClick = useCallback((place: PinnedPlace) => {
+  const handlePlaceNameClick = useCallback(async (place: PinnedPlace) => {
     if (mapRef.current && place.coordinates) {
       // Use our shared animation function for better spatial context
       smoothMapAnimation(
@@ -454,17 +454,33 @@ export function MapView({
     }
     
     if (place.placeId) {
-      // If we have a callback to show place details in sidebar, use it
+      // If we have a placeId, show details directly
       if (onShowPlaceDetails) {
         onShowPlaceDetails(place.placeId);
       } else {
-        // Fallback to local details for backward compatibility
         fetchDetails(place.placeId);
+      }
+    } else if (place.coordinates && onShowPlaceDetails) {
+      // If no placeId but have coordinates, try to find placeId via reverse geocoding
+      try {
+        const geocoder = new google.maps.Geocoder();
+        const result = await geocoder.geocode({ location: place.coordinates });
+        
+        if (result.results && result.results.length > 0) {
+          const firstResult = result.results[0];
+          if (firstResult.place_id) {
+            onShowPlaceDetails(firstResult.place_id);
+          }
+        }
+      } catch (error) {
+        console.error('Error reverse geocoding:', error);
+        // Fallback to legacy details if reverse geocoding fails
+        fetchDetails(place.placeId || '');
       }
     }
   }, [fetchDetails, coordinates, onShowPlaceDetails]);
 
-  const handleMarkerClick = useCallback((item: PinnedPlace | Accommodation | Activity) => {
+  const handleMarkerClick = useCallback(async (item: PinnedPlace | Accommodation | Activity) => {
     if (mapRef.current && 'coordinates' in item && item.coordinates) {
       // Use our shared animation function with easing and better spatial context
       smoothMapAnimation(
@@ -474,15 +490,52 @@ export function MapView({
       );
     }
 
-    if ('placeId' in item && item.placeId) {
-      // If we have a callback to show place details in sidebar, use it
-      if (onShowPlaceDetails) {
-        onShowPlaceDetails(item.placeId);
-      } else {
-        // Fallback to local details for backward compatibility
-        fetchDetails(item.placeId);
+    // For pinned places, always try to show the details sidebar
+    if ('placeId' in item) {
+      if (item.placeId) {
+        // If we have a placeId, show details directly
+        if (onShowPlaceDetails) {
+          onShowPlaceDetails(item.placeId);
+        } else {
+          fetchDetails(item.placeId);
+        }
+      } else if (item.coordinates && onShowPlaceDetails) {
+        // If no placeId but have coordinates, try reverse geocoding to find it
+        try {
+          const geocoder = new google.maps.Geocoder();
+          const result = await geocoder.geocode({ location: item.coordinates });
+          
+          if (result.results && result.results.length > 0) {
+            const firstResult = result.results[0];
+            if (firstResult.place_id) {
+              onShowPlaceDetails(firstResult.place_id);
+            }
+          }
+        } catch (error) {
+          console.error('Error reverse geocoding:', error);
+          // Fallback to legacy details if reverse geocoding fails
+          setSelectedPlaceDetails({
+            place_id: '',
+            name: item.name || 'Unnamed Place',
+            formatted_address: '',
+            geometry: {
+              location: new google.maps.LatLng(
+                item.coordinates?.lat || 0,
+                item.coordinates?.lng || 0
+              )
+            },
+            types: ['point_of_interest'],
+            opening_hours: {
+              weekday_text: [],
+              isOpen: () => true
+            }
+          } as PlaceDetails);
+        }
       }
+      
+      onPinClick?.(item as PinnedPlace);
     } else {
+      // For accommodations/activities without placeId, show legacy details
       setSelectedPlaceDetails({
         name: 'title' in item ? item.title : ('name' in item ? item.name : 'Unnamed Place'),
         formatted_address: 'location' in item ? item.location || '' : ('address' in item ? item.address || '' : ''),
@@ -504,10 +557,6 @@ export function MapView({
           isOpen: () => true
         }
       } as PlaceDetails);
-    }
-
-    if ('placeId' in item) {
-      onPinClick?.(item as PinnedPlace);
     }
   }, [onPinClick, fetchDetails, coordinates, onShowPlaceDetails]);
 

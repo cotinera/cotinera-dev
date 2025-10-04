@@ -211,6 +211,7 @@ export default function TripMap() {
                 tripId={trip.id}
                 participants={participantsData || []}
                 tripCoordinates={trip.coordinates || undefined}
+                onShowPlaceDetails={handleShowPlaceDetails}
               />
             </CardContent>
           </Card>
