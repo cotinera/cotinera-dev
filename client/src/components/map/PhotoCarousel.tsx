@@ -107,7 +107,7 @@ export function PhotoCarousel({
   const currentAttribution = currentPhoto?.html_attributions?.[0];
 
   return (
-    <div className={cn("relative aspect-video overflow-hidden rounded-lg bg-muted", className)}>
+    <div className={cn("relative aspect-video overflow-hidden rounded-lg bg-muted", className)} data-testid="photo-carousel">
       {/* Main Image */}
       <div
         className="w-full h-full"
@@ -120,13 +120,17 @@ export function PhotoCarousel({
           alt={`${placeName} - Photo ${selectedIndex + 1}`}
           className="w-full h-full object-cover"
           loading="eager"
+          data-testid="carousel-image"
         />
       </div>
 
       {/* Photo Counter */}
-      <div className="absolute bottom-2 right-2 bg-black/60 text-white px-2 py-1 rounded-md text-xs flex items-center gap-1">
+      <div 
+        className="absolute bottom-2 right-2 bg-black/60 text-white px-2 py-1 rounded-md text-xs flex items-center gap-1"
+        data-testid="photo-counter"
+      >
         <Camera className="h-3 w-3" />
-        {selectedIndex + 1} / {displayPhotos.length}
+        <span data-testid="photo-counter-text">{selectedIndex + 1} / {displayPhotos.length}</span>
       </div>
 
       {/* Navigation Arrows */}
@@ -134,6 +138,7 @@ export function PhotoCarousel({
         onClick={goToPrevious}
         className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition-colors"
         aria-label="Previous photo"
+        data-testid="photo-prev-button"
       >
         <ChevronLeft className="h-5 w-5" />
       </button>
@@ -141,6 +146,7 @@ export function PhotoCarousel({
         onClick={goToNext}
         className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition-colors"
         aria-label="Next photo"
+        data-testid="photo-next-button"
       >
         <ChevronRight className="h-5 w-5" />
       </button>
