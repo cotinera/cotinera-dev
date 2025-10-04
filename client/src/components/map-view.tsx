@@ -447,12 +447,10 @@ export function MapView({
   }, []);
 
   const fetchDetails = useCallback((placeId: string) => {
-    getPlaceDetails(placeId, (place, status) => {
-      if (status === google.maps.places.PlacesServiceStatus.OK && place) {
-        setSelectedPlaceDetails(place);
-      }
-    });
-  }, [getPlaceDetails]);
+    if (onShowPlaceDetails) {
+      onShowPlaceDetails(placeId);
+    }
+  }, [onShowPlaceDetails]);
 
   const handlePlaceNameClick = useCallback(async (place: PinnedPlace) => {
     if (mapRef.current && place.coordinates) {
@@ -512,37 +510,30 @@ export function MapView({
       onPinClick?.(item as PinnedPlace);
     } else if (item.coordinates) {
       // Try to find place_id via reverse geocoding or findPlaceByQuery
-      try {
-        const query = 'title' in item ? item.title : ('name' in item ? item.name : 'Unnamed Place');
-        const place = await findPlaceByQuery(query, item.coordinates);
-        
-        if (place && place.place_id && onShowPlaceDetails) {
-          onShowPlaceDetails(place.place_id);
+      const query = 'title' in item ? item.title : ('name' in item ? item.name : 'Unnamed Place');
+      const latlng = new google.maps.LatLng(item.coordinates.lat, item.coordinates.lng);
+      
+      findPlaceByQuery(query, latlng, (placeId) => {
+        if (placeId && onShowPlaceDetails) {
+          onShowPlaceDetails(placeId);
         } else {
           // Fallback to reverse geocoding
           const geocoder = new google.maps.Geocoder();
-          const result = await geocoder.geocode({ location: item.coordinates });
-          
-          if (result.results && result.results.length > 0 && result.results[0].place_id) {
-            if (onShowPlaceDetails) {
-              onShowPlaceDetails(result.results[0].place_id);
+          geocoder.geocode({ location: item.coordinates }, (results, status) => {
+            if (status === 'OK' && results && results.length > 0 && results[0].place_id) {
+              if (onShowPlaceDetails) {
+                onShowPlaceDetails(results[0].place_id);
+              }
+            } else {
+              toast({
+                title: "No details available",
+                description: "Could not find details for this location",
+                variant: "default",
+              });
             }
-          } else {
-            toast({
-              title: "No details available",
-              description: "Could not find details for this location",
-              variant: "default",
-            });
-          }
+          });
         }
-      } catch (error) {
-        console.error('Error finding place_id:', error);
-        toast({
-          title: "Error",
-          description: "Could not load place details",
-          variant: "destructive",
-        });
-      }
+      });
       
       if ('placeId' in item) {
         onPinClick?.(item as PinnedPlace);
@@ -902,18 +893,11 @@ export function MapView({
                     fetchDetails(placeId);
                   } else {
                     console.log('All place lookups failed for:', selectedPlace.name);
-                    // Last resort: show basic info without photos
-                    setSelectedPlaceDetails({
-                      name: selectedPlace.name,
-                      formatted_address: selectedPlace.placeId || `${selectedPlace.coordinates.lat}, ${selectedPlace.coordinates.lng}`,
-                      geometry: {
-                        location: new google.maps.LatLng(
-                          selectedPlace.coordinates?.lat || 0,
-                          selectedPlace.coordinates?.lng || 0
-                        )
-                      },
-                      types: ['point_of_interest']
-                    } as PlaceDetails);
+                    toast({
+                      title: "Place not found",
+                      description: "Could not find details for this location",
+                      variant: "default",
+                    });
                   }
                 }
               );
@@ -969,10 +953,53 @@ export function MapView({
               hoveredResultId={hoveredResultId}
               onResultClick={handleResultClick}
               onResultHover={setHoveredResultId}
-              onSavePlace={(place, e) => {
+              onSavePlace={async (place, e) => {
                 e.stopPropagation();
-                // TODO: Implement save place functionality
-                toast({ title: "Save feature coming soon!" });
+                if (!tripId) {
+                  toast({
+                    variant: "destructive",
+                    title: "Error",
+                    description: "No trip selected",
+                  });
+                  return;
+                }
+
+                try {
+                  const placeCoordinates = place.geometry?.location 
+                    ? { lat: place.geometry.location.lat, lng: place.geometry.location.lng }
+                    : coordinates;
+
+                  const response = await fetch(`/api/trips/${tripId}/pinned-places`, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      name: place.name,
+                      placeId: place.place_id,
+                      coordinates: placeCoordinates,
+                      category: place.types?.[0] || "attraction",
+                      address: place.formatted_address || place.vicinity,
+                      icon: selectedIcon,
+                    }),
+                  });
+
+                  if (!response.ok) {
+                    throw new Error("Failed to save place");
+                  }
+
+                  await queryClient.invalidateQueries({ queryKey: [`/api/trips/${tripId}/pinned-places`] });
+                  toast({
+                    title: "Place saved",
+                    description: `${place.name} has been added to your trip.`,
+                  });
+                } catch (error) {
+                  toast({
+                    variant: "destructive",
+                    title: "Error",
+                    description: "Failed to save the place. Please try again.",
+                  });
+                }
               }}
               onAddToItinerary={(place, e) => {
                 e.stopPropagation();
