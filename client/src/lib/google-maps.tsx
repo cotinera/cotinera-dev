@@ -588,7 +588,8 @@ export const createAdvancedMarkerContent = (
 };
 
 /**
- * Component for rendering search result markers using AdvancedMarkerElement
+ * Component for rendering search result markers using regular Google Maps Markers
+ * (fallback from AdvancedMarkerElement to avoid Map ID requirement)
  */
 export const SearchResultMarkers = ({
   markers,
@@ -601,137 +602,89 @@ export const SearchResultMarkers = ({
   onMarkerClick?: (marker: SearchResultMarker) => void;
   selectedMarkerId?: string | null;
 }) => {
-  const markersRef = useRef<Map<string, google.maps.marker.AdvancedMarkerElement>>(new Map());
-  const clustererRef = useRef<MarkerClusterer | null>(null);
+  const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
 
   useEffect(() => {
-    if (!map || !window.google?.maps?.marker) {
+    if (!map || !window.google?.maps) {
       return;
     }
 
     // Clear existing markers
     markersRef.current.forEach(marker => {
-      marker.map = null;
+      marker.setMap(null);
     });
     markersRef.current.clear();
 
-    // Destroy existing clusterer
-    if (clustererRef.current) {
-      clustererRef.current.clearMarkers();
-      clustererRef.current = null;
-    }
-
-    // Create new markers
-    const advancedMarkers: google.maps.marker.AdvancedMarkerElement[] = [];
-
+    // Create new markers with custom icons
     markers.forEach((markerData) => {
-      const { category } = getPrimaryCategory(markerData.place.types);
+      const { category, icon: categoryIcon } = getPrimaryCategory(markerData.place.types);
       const isSelected = selectedMarkerId === markerData.id;
       
-      const content = createAdvancedMarkerContent(
-        category,
-        isSelected,
-        markerData.place.name
-      );
+      // Create custom icon URL with emoji
+      const iconSvg = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+          <circle cx="20" cy="20" r="18" fill="${isSelected ? '#22c55e' : '#a855f7'}" stroke="#ffffff" stroke-width="3"/>
+          <text x="20" y="26" text-anchor="middle" font-size="18" fill="white">${categoryIcon}</text>
+        </svg>
+      `;
 
-      const advancedMarker = new google.maps.marker.AdvancedMarkerElement({
-        map: null, // Don't add to map yet, clusterer will handle it
+      const marker = new google.maps.Marker({
+        map: map,
         position: markerData.position,
-        content: content,
         title: markerData.place.name,
+        icon: {
+          url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(iconSvg)}`,
+          scaledSize: new google.maps.Size(40, 40),
+          anchor: new google.maps.Point(20, 20),
+        },
+        zIndex: isSelected ? 1000 : undefined,
       });
 
       // Add click handler
-      content.addEventListener('click', () => {
+      marker.addListener('click', () => {
         if (onMarkerClick) {
           onMarkerClick(markerData);
         }
       });
 
-      markersRef.current.set(markerData.id, advancedMarker);
-      advancedMarkers.push(advancedMarker);
+      markersRef.current.set(markerData.id, marker);
     });
-
-    // Initialize clusterer only if we have many markers (>50)
-    if (advancedMarkers.length > 50) {
-      clustererRef.current = new MarkerClusterer({
-        map,
-        markers: advancedMarkers,
-        renderer: {
-          render: ({ count, position }) => {
-            // Custom cluster styling
-            const clusterDiv = document.createElement('div');
-            clusterDiv.style.cssText = `
-              width: 50px;
-              height: 50px;
-              border-radius: 50%;
-              background: linear-gradient(45deg, #3b82f6, #1d4ed8);
-              color: white;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-weight: bold;
-              font-size: 14px;
-              border: 2px solid white;
-              box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-              cursor: pointer;
-            `;
-            clusterDiv.textContent = count.toString();
-
-            return new google.maps.marker.AdvancedMarkerElement({
-              position,
-              content: clusterDiv,
-            });
-          },
-        },
-      });
-    } else {
-      // For smaller numbers, add markers directly to map
-      advancedMarkers.forEach(marker => {
-        marker.map = map;
-      });
-    }
 
     // Cleanup function
     return () => {
       markersRef.current.forEach(marker => {
-        marker.map = null;
+        marker.setMap(null);
       });
       markersRef.current.clear();
-      
-      if (clustererRef.current) {
-        clustererRef.current.clearMarkers();
-        clustererRef.current = null;
-      }
     };
   }, [markers, map, onMarkerClick, selectedMarkerId]);
 
-  // Update marker selection when selectedMarkerId changes
+  // Update marker icons when selectedMarkerId changes
   useEffect(() => {
     markersRef.current.forEach((marker, markerId) => {
       const markerData = markers.find(m => m.id === markerId);
-      if (markerData && marker.content instanceof HTMLElement) {
-        const { category } = getPrimaryCategory(markerData.place.types);
+      if (markerData) {
+        const { category, icon: categoryIcon } = getPrimaryCategory(markerData.place.types);
         const isSelected = selectedMarkerId === markerId;
         
-        // Update the marker content to reflect selection state
-        const newContent = createAdvancedMarkerContent(
-          category,
-          isSelected,
-          markerData.place.name
-        );
-        
-        // Add click handler to new content
-        newContent.addEventListener('click', () => {
-          if (onMarkerClick) {
-            onMarkerClick(markerData);
-          }
+        // Update the marker icon to reflect selection state
+        const iconSvg = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
+            <circle cx="20" cy="20" r="18" fill="${isSelected ? '#22c55e' : '#a855f7'}" stroke="#ffffff" stroke-width="3"/>
+            <text x="20" y="26" text-anchor="middle" font-size="18" fill="white">${categoryIcon}</text>
+          </svg>
+        `;
+
+        marker.setIcon({
+          url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(iconSvg)}`,
+          scaledSize: new google.maps.Size(40, 40),
+          anchor: new google.maps.Point(20, 20),
         });
         
-        marker.content = newContent;
+        marker.setZIndex(isSelected ? 1000 : undefined);
       }
     });
-  }, [selectedMarkerId, markers, onMarkerClick]);
+  }, [selectedMarkerId, markers]);
 
   return null; // This component doesn't render React elements
 };
