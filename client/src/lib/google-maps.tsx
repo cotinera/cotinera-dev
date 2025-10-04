@@ -481,111 +481,6 @@ export interface PlaceSearchResult {
   business_status?: string;
 }
 
-/**
- * Creates an HTML element for AdvancedMarkerElement content
- * @param category - Place category for icon selection
- * @param isSelected - Whether the marker is currently selected
- * @param name - Place name for tooltip
- * @returns HTMLElement to be used as marker content
- */
-export const createAdvancedMarkerContent = (
-  category: PlaceCategory, 
-  isSelected: boolean = false,
-  name: string = ''
-): HTMLElement => {
-  const markerDiv = document.createElement('div');
-  markerDiv.className = 'advanced-marker-content';
-  markerDiv.title = name;
-  
-  // Set up the marker styles
-  markerDiv.style.cssText = `
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 20px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: 2px solid white;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    position: relative;
-    ${isSelected 
-      ? 'background: linear-gradient(45deg, #22c55e, #16a34a); transform: scale(1.2); z-index: 1000;'
-      : 'background: linear-gradient(45deg, #a855f7, #8b5cf6);'
-    }
-  `;
-
-  // Get icon for the category
-  const IconComponent = CATEGORY_ICONS[category];
-  if (IconComponent && typeof IconComponent === 'function') {
-    // Create icon element
-    const iconElement = document.createElement('span');
-    iconElement.style.cssText = `
-      color: white;
-      font-size: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    `;
-    
-    // Create a simple icon representation for the category
-    let iconText = '';
-    switch (category) {
-      case 'restaurant':
-        iconText = '🍽️';
-        break;
-      case 'hotel':
-        iconText = '🏨';
-        break;
-      case 'attraction':
-        iconText = '🎯';
-        break;
-      case 'shopping':
-        iconText = '🛍️';
-        break;
-      case 'beach':
-        iconText = '🏖️';
-        break;
-      case 'nightlife':
-        iconText = '🍻';
-        break;
-      case 'store':
-        iconText = '🏪';
-        break;
-      case 'park':
-        iconText = '🌳';
-        break;
-      default:
-        iconText = '📍';
-    }
-    
-    iconElement.textContent = iconText;
-    markerDiv.appendChild(iconElement);
-  } else {
-    // Fallback icon
-    markerDiv.textContent = '📍';
-    markerDiv.style.color = 'white';
-  }
-
-  // Add hover effects
-  markerDiv.addEventListener('mouseenter', () => {
-    if (!isSelected) {
-      markerDiv.style.transform = 'scale(1.1)';
-      markerDiv.style.zIndex = '999';
-    }
-  });
-
-  markerDiv.addEventListener('mouseleave', () => {
-    if (!isSelected) {
-      markerDiv.style.transform = 'scale(1)';
-      markerDiv.style.zIndex = 'auto';
-    }
-  });
-
-  return markerDiv;
-};
 
 /**
  * Component for rendering search result markers using regular Google Maps Markers
@@ -617,31 +512,32 @@ export const SearchResultMarkers = ({
     });
     markersRef.current.clear();
 
-    // Create new markers with custom icons
+    // Create new markers with default Google pins (selected markers get green color)
     markers.forEach((markerData) => {
-      const { category, icon: categoryIcon } = getPrimaryCategory(markerData.place.types);
       const isSelected = selectedMarkerId === markerData.id;
-      const isHovered = hoveredMarkerId === markerData.id;
       
-      // Create custom icon URL with emoji - different colors for selected, hovered, and default
-      const iconSvg = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
-          <circle cx="20" cy="20" r="18" fill="${isSelected ? '#22c55e' : isHovered ? '#ec4899' : '#a855f7'}" stroke="#ffffff" stroke-width="3"/>
-          <text x="20" y="26" text-anchor="middle" font-size="18" fill="white">${categoryIcon}</text>
-        </svg>
-      `;
-
-      const marker = new google.maps.Marker({
+      // Use default Google pin, but customize color for selected marker
+      const markerOptions: google.maps.MarkerOptions = {
         map: map,
         position: markerData.position,
         title: markerData.place.name,
-        icon: {
-          url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(iconSvg)}`,
-          scaledSize: new google.maps.Size(40, 40),
-          anchor: new google.maps.Point(20, 20),
-        },
-        zIndex: isSelected ? 1000 : isHovered ? 900 : undefined,
-      });
+        zIndex: isSelected ? 1000 : undefined,
+      };
+
+      // Only add custom icon for selected state (green pin)
+      if (isSelected) {
+        markerOptions.icon = {
+          path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+          fillColor: '#22c55e',
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 2,
+          scale: 6,
+        };
+      }
+      // Otherwise use default red pin
+
+      const marker = new google.maps.Marker(markerOptions);
 
       // Add click handler
       marker.addListener('click', () => {
@@ -662,30 +558,26 @@ export const SearchResultMarkers = ({
     };
   }, [markers, map, onMarkerClick, selectedMarkerId, hoveredMarkerId]);
 
-  // Update marker icons when selectedMarkerId or hoveredMarkerId changes
+  // Update marker icons when selectedMarkerId changes
   useEffect(() => {
     markersRef.current.forEach((marker, markerId) => {
-      const markerData = markers.find(m => m.id === markerId);
-      if (markerData) {
-        const { category, icon: categoryIcon } = getPrimaryCategory(markerData.place.types);
-        const isSelected = selectedMarkerId === markerId;
-        const isHovered = hoveredMarkerId === markerId;
-        
-        // Update the marker icon to reflect selection and hover state
-        const iconSvg = `
-          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40">
-            <circle cx="20" cy="20" r="18" fill="${isSelected ? '#22c55e' : isHovered ? '#ec4899' : '#a855f7'}" stroke="#ffffff" stroke-width="3"/>
-            <text x="20" y="26" text-anchor="middle" font-size="18" fill="white">${categoryIcon}</text>
-          </svg>
-        `;
-
+      const isSelected = selectedMarkerId === markerId;
+      
+      // Update icon - default pin for unselected, green arrow for selected
+      if (isSelected) {
         marker.setIcon({
-          url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(iconSvg)}`,
-          scaledSize: new google.maps.Size(40, 40),
-          anchor: new google.maps.Point(20, 20),
+          path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+          fillColor: '#22c55e',
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 2,
+          scale: 6,
         });
-        
-        marker.setZIndex(isSelected ? 1000 : isHovered ? 900 : undefined);
+        marker.setZIndex(1000);
+      } else {
+        // Reset to default red pin
+        marker.setIcon(null as any);
+        marker.setZIndex(undefined);
       }
     });
   }, [selectedMarkerId, hoveredMarkerId, markers]);
