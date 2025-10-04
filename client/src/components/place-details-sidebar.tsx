@@ -16,7 +16,8 @@ import {
   DollarSign,
   ExternalLink,
   User,
-  X
+  X,
+  Plus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { placesDetailsService, PlaceDetailsData } from '@/lib/places/details-service';
@@ -26,8 +27,12 @@ import { mapPhotosToContributors, getPhotosForReviewer, getPhotoUrl } from '@/li
 
 interface PlaceDetailsSidebarProps {
   placeId: string | null;
+  tripId?: string | number;
+  isPinned?: boolean;
   onSelectPlace?: (address: string, coordinates: { lat: number; lng: number }, name: string, placeId?: string) => void;
   onClose?: () => void;
+  onSave?: (placeDetails: PlaceDetailsData) => void;
+  onAddToItinerary?: (placeDetails: PlaceDetailsData) => void;
 }
 
 const formatPriceLevel = (priceLevel: number) => {
@@ -57,7 +62,7 @@ const getPlaceCategory = (types: string[]) => {
   return types[0]?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Place';
 };
 
-export function PlaceDetailsSidebar({ placeId, onSelectPlace, onClose }: PlaceDetailsSidebarProps) {
+export function PlaceDetailsSidebar({ placeId, tripId, isPinned = false, onSelectPlace, onClose, onSave, onAddToItinerary }: PlaceDetailsSidebarProps) {
   const [placeDetails, setPlaceDetails] = useState<PlaceDetailsData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -224,9 +229,16 @@ export function PlaceDetailsSidebar({ placeId, onSelectPlace, onClose }: PlaceDe
                       <h2 className="text-xl font-bold">{placeDetails.name}</h2>
                       <p className="text-muted-foreground text-sm">{getPlaceCategory(placeDetails.types)}</p>
                     </div>
-                    <Button variant="outline" size="icon">
-                      <Bookmark className="h-4 w-4" />
-                    </Button>
+                    {tripId && onSave && (
+                      <Button 
+                        variant={isPinned ? "default" : "outline"} 
+                        size="icon"
+                        onClick={() => onSave(placeDetails)}
+                        title={isPinned ? "Saved" : "Save to trip"}
+                      >
+                        <Bookmark className={cn("h-4 w-4", isPinned && "fill-current")} />
+                      </Button>
+                    )}
                   </div>
 
                   {/* Rating and Reviews */}
@@ -257,10 +269,26 @@ export function PlaceDetailsSidebar({ placeId, onSelectPlace, onClose }: PlaceDe
 
                 {/* Action Buttons */}
                 <div className="grid grid-cols-2 gap-2">
-                  <Button className="flex flex-col h-16 gap-1" onClick={handleSelectPlace}>
-                    <Navigation className="h-4 w-4" />
-                    <span className="text-xs">Select</span>
-                  </Button>
+                  {tripId && onSave && (
+                    <Button 
+                      variant={isPinned ? "outline" : "default"}
+                      className="flex flex-col h-16 gap-1"
+                      onClick={() => onSave(placeDetails)}
+                    >
+                      <Bookmark className={cn("h-4 w-4", isPinned && "fill-current")} />
+                      <span className="text-xs">{isPinned ? "Saved" : "Save"}</span>
+                    </Button>
+                  )}
+                  {tripId && onAddToItinerary && (
+                    <Button 
+                      variant="outline"
+                      className="flex flex-col h-16 gap-1"
+                      onClick={() => onAddToItinerary(placeDetails)}
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span className="text-xs">Add to Itinerary</span>
+                    </Button>
+                  )}
                   {placeDetails.formatted_phone_number && (
                     <Button variant="outline" className="flex flex-col h-16 gap-1" asChild>
                       <a href={`tel:${placeDetails.formatted_phone_number}`}>
