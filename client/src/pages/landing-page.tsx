@@ -68,7 +68,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen w-full relative overflow-hidden">
       {/* Gradient Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400" />
+      <div className="absolute inset-0 bg-gradient-adventure" />
       
       {/* Top Right Auth Button */}
       <div className="absolute top-6 right-6 z-10">
@@ -86,12 +86,9 @@ export default function LandingPage() {
         <div className="w-full max-w-3xl mx-auto text-center space-y-8">
           {/* Title */}
           <div className="space-y-4">
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-white drop-shadow-lg">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white drop-shadow-lg">
               Create your Perfect Trip
             </h1>
-            <p className="text-xl md:text-2xl text-white/90 drop-shadow">
-              Plan, explore, and coordinate your next adventure
-            </p>
           </div>
 
           {/* Search Input and Participants Selector */}
