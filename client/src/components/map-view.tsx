@@ -286,6 +286,7 @@ export function MapView({
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [searchedLocation, setSearchedLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [highlightedLocation, setHighlightedLocation] = useState<{ lat: number; lng: number } | null>(null);
   const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null);
   
   // Places search service
