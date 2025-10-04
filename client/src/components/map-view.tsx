@@ -497,61 +497,66 @@ export function MapView({
   }, [fetchDetails, coordinates, onShowPlaceDetails]);
 
   const handleMarkerClick = useCallback(async (item: PinnedPlace | Accommodation | Activity) => {
+    // Light pan to marker (no zoom)
     if (mapRef.current && 'coordinates' in item && item.coordinates) {
-      // Use our shared animation function with easing and better spatial context
-      smoothMapAnimation(
-        mapRef, 
-        coordinates, 
-        item.coordinates
-      );
+      mapRef.current.panTo(item.coordinates);
     }
 
-    // For pinned places, always try to show the details sidebar
+    // For pinned places, try to show full details
     if ('placeId' in item) {
       if (item.placeId) {
-        // If we have a placeId, show details directly
+        // Have placeId - show details immediately
         if (onShowPlaceDetails) {
           onShowPlaceDetails(item.placeId);
         } else {
           fetchDetails(item.placeId);
         }
-      } else if (item.coordinates && onShowPlaceDetails) {
-        // If no placeId but have coordinates, try reverse geocoding to find it
-        try {
-          const geocoder = new google.maps.Geocoder();
-          const result = await geocoder.geocode({ location: item.coordinates });
-          
-          if (result.results && result.results.length > 0) {
-            const firstResult = result.results[0];
-            if (firstResult.place_id) {
-              onShowPlaceDetails(firstResult.place_id);
+      } else if (item.coordinates && item.name && placesServiceRef.current) {
+        // No placeId - resolve it via nearby search
+        const request = {
+          location: new google.maps.LatLng(item.coordinates.lat, item.coordinates.lng),
+          radius: 50,
+          keyword: item.name
+        };
+        
+        placesServiceRef.current.nearbySearch(request, (results, status) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK && results && results.length > 0) {
+            const foundPlace = results[0];
+            if (foundPlace.place_id) {
+              if (onShowPlaceDetails) {
+                onShowPlaceDetails(foundPlace.place_id);
+              } else {
+                fetchDetails(foundPlace.place_id);
+              }
+              return;
             }
           }
-        } catch (error) {
-          console.error('Error reverse geocoding:', error);
-          // Fallback to legacy details if reverse geocoding fails
-          setSelectedPlaceDetails({
-            place_id: '',
-            name: item.name || 'Unnamed Place',
-            formatted_address: '',
-            geometry: {
-              location: new google.maps.LatLng(
-                item.coordinates?.lat || 0,
-                item.coordinates?.lng || 0
-              )
-            },
-            types: ['point_of_interest'],
-            opening_hours: {
-              weekday_text: [],
-              isOpen: () => true
+          
+          // Fallback: try findPlace
+          findPlaceByQuery(
+            item.name,
+            new google.maps.LatLng(item.coordinates.lat, item.coordinates.lng),
+            (placeId) => {
+              if (placeId) {
+                if (onShowPlaceDetails) {
+                  onShowPlaceDetails(placeId);
+                } else {
+                  fetchDetails(placeId);
+                }
+              } else {
+                toast({
+                  title: 'Details unavailable',
+                  description: 'Could not find details for this location'
+                });
+              }
             }
-          } as PlaceDetails);
-        }
+          );
+        });
       }
       
       onPinClick?.(item as PinnedPlace);
     } else {
-      // For accommodations/activities without placeId, show legacy details
+      // For accommodations/activities, keep legacy fallback
       setSelectedPlaceDetails({
         name: 'title' in item ? item.title : ('name' in item ? item.name : 'Unnamed Place'),
         formatted_address: 'location' in item ? item.location || '' : ('address' in item ? item.address || '' : ''),
@@ -574,7 +579,7 @@ export function MapView({
         }
       } as PlaceDetails);
     }
-  }, [onPinClick, fetchDetails, coordinates, onShowPlaceDetails]);
+  }, [onPinClick, fetchDetails, coordinates, onShowPlaceDetails, findPlaceByQuery, toast]);
 
   const handleLocalPlaceNameClick = useCallback((place: PinnedPlace) => {
     handlePlaceNameClick(place);
