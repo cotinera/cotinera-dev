@@ -81,6 +81,51 @@ export function SearchResultsPanel({
 }: SearchResultsPanelProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [scrollPosition, setScrollPosition] = useState(0);
+  const [focusedIndex, setFocusedIndex] = useState<number>(-1);
+
+  // Keyboard navigation handler
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (sortedResults.length === 0) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setFocusedIndex((prev) => {
+          const next = Math.min(prev + 1, sortedResults.length - 1);
+          if (sortedResults[next]) {
+            onResultHover(sortedResults[next].place_id);
+          }
+          return next;
+        });
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setFocusedIndex((prev) => {
+          const next = Math.max(prev - 1, 0);
+          if (sortedResults[next]) {
+            onResultHover(sortedResults[next].place_id);
+          }
+          return next;
+        });
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (focusedIndex >= 0 && sortedResults[focusedIndex]) {
+          onResultClick(sortedResults[focusedIndex]);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setFocusedIndex(-1);
+        onResultHover(null);
+        break;
+    }
+  }, [sortedResults, focusedIndex, onResultHover, onResultClick]);
+
+  // Reset focus when results change
+  useEffect(() => {
+    setFocusedIndex(-1);
+  }, [sortedResults.length]);
 
   // Calculate distance from map center
   const calculateDistance = useCallback((lat: number, lng: number): number => {
@@ -94,15 +139,16 @@ export function SearchResultsPanel({
     return R * c;
   }, [mapCenter]);
 
-  // Scroll to selected result
+  // Scroll to selected or hovered result (for marker hover sync)
   useEffect(() => {
-    if (selectedResultId && scrollAreaRef.current) {
-      const selectedElement = scrollAreaRef.current.querySelector(`[data-result-id="${selectedResultId}"]`);
-      if (selectedElement) {
-        selectedElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const targetId = hoveredResultId || selectedResultId;
+    if (targetId && scrollAreaRef.current) {
+      const targetElement = scrollAreaRef.current.querySelector(`[data-result-id="${targetId}"]`);
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
     }
-  }, [selectedResultId]);
+  }, [selectedResultId, hoveredResultId]);
 
   // Render empty state
   const renderEmptyState = () => {
@@ -183,10 +229,14 @@ export function SearchResultsPanel({
   const showContent = hasResults || isLoading;
 
   return (
-    <div className={cn(
-      "flex flex-col h-full border-r bg-background",
-      isMobile ? "w-full" : "w-[380px]"
-    )}>
+    <div 
+      className={cn(
+        "flex flex-col h-full border-r bg-background outline-none",
+        isMobile ? "w-full" : "w-[380px]"
+      )}
+      onKeyDown={handleKeyDown}
+      tabIndex={0}
+    >
       {/* Header */}
       <div className="flex-shrink-0 border-b bg-muted/30">
         <div className="p-4 space-y-3">
