@@ -41,7 +41,14 @@ The application follows a modern full-stack JavaScript/TypeScript architecture w
 The frontend consolidates UI/UX components in `client/src/frontend.ts`, separating interface concerns from backend functionality. Key component categories include:
 
 - **UI Components**: Shadcn-based design system components
-- **Map Components**: Interactive mapping with Google Maps integration
+- **Map Components**: Interactive mapping with comprehensive 3-pane layout (as of Oct 2025):
+  - **3-Pane Layout** (`client/src/components/map-view.tsx`):
+    - Left Panel (380px fixed): SearchResultsPanel with filters, category pills, and result cards
+    - Center Panel (flexible): Interactive Google Map with overlays
+    - Right Panel (380px fixed, conditional): PlaceDetailsSidebar shown only when place selected
+  - Responsive grid: `md:grid-cols-[380px_minmax(0,1fr)] lg:grid-cols-[380px_minmax(0,1fr)_380px]`
+  - Search state management via `useSearchStateAdapter` with session-based stale response prevention
+  - Map viewport filtering controlled by "Update results when map moves" toggle
 - **Trip Management**: Trip creation, editing, and collaboration features
 - **Authentication**: Login/register forms and auth layouts
 - **Calendar**: Advanced scheduling with features including:
