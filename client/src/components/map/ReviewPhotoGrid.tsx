@@ -40,7 +40,11 @@ export function ReviewPhotoGrid({
   }
   
   return (
-    <div className="mt-3 -mx-3 px-3 py-2 bg-muted/30 rounded-md">
+    <div 
+      className="mt-3 -mx-3 px-3 py-2 bg-muted/30 rounded-md"
+      data-testid="review-photo-grid"
+      data-reviewer={reviewerName}
+    >
       <div className="grid grid-cols-4 gap-2">
         {displayPhotos.map((photoUrl, index) => {
           if (failedPhotos.has(index)) return null;

@@ -351,7 +351,7 @@ export function PlaceDetailsSidebar({ placeId, onSelectPlace, onClose }: PlaceDe
                         const reviewerPhotos = getPhotosForReviewer(review.author_name, contributorPhotosMap);
                         
                         return (
-                          <Card key={index}>
+                          <Card key={index} data-testid="review-card" data-reviewer={review.author_name}>
                             <CardContent className="p-3">
                               <div className="flex items-start gap-3">
                                 <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
