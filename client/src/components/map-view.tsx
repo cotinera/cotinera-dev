@@ -1187,13 +1187,14 @@ export function MapView({
                 />
               )}
               
-              {/* Render place search results using regular Markers */}
+              {/* Render place search results using AdvancedMarkerElement with hover effects */}
               <SearchResultMarkers
                 markers={searchMarkers}
                 map={mapRef.current}
                 onMarkerClick={handleSearchMarkerClick}
                 selectedMarkerId={selectedSearchPlaceId}
                 hoveredMarkerId={hoveredResultId}
+                onMarkerHover={setHoveredResultId}
               />
 
               {/* Render accommodations */}

@@ -483,61 +483,68 @@ export interface PlaceSearchResult {
 
 
 /**
- * Component for rendering search result markers using regular Google Maps Markers
- * (fallback from AdvancedMarkerElement to avoid Map ID requirement)
+ * Component for rendering search result markers using AdvancedMarkerElement + PinElement
+ * Supports hover and selection states with CSS animations
  */
 export const SearchResultMarkers = ({
   markers,
   map,
   onMarkerClick,
   selectedMarkerId,
-  hoveredMarkerId
+  hoveredMarkerId,
+  onMarkerHover
 }: {
   markers: SearchResultMarker[];
   map: google.maps.Map | null;
   onMarkerClick?: (marker: SearchResultMarker) => void;
   selectedMarkerId?: string | null;
   hoveredMarkerId?: string | null;
+  onMarkerHover?: (markerId: string | null) => void;
 }) => {
-  const markersRef = useRef<Map<string, google.maps.Marker>>(new Map());
+  const markersRef = useRef<Map<string, google.maps.marker.AdvancedMarkerElement>>(new Map());
+  const markerElementsRef = useRef<Map<string, HTMLElement>>(new Map());
 
   useEffect(() => {
-    if (!map || !window.google?.maps) {
+    if (!map || !window.google?.maps?.marker) {
       return;
     }
 
     // Clear existing markers
     markersRef.current.forEach(marker => {
-      marker.setMap(null);
+      marker.map = null;
     });
     markersRef.current.clear();
+    markerElementsRef.current.clear();
 
-    // Create new markers with default Google pins (selected markers get green color)
+    // Create new markers with AdvancedMarkerElement + PinElement
     markers.forEach((markerData) => {
       const isSelected = selectedMarkerId === markerData.id;
       
-      // Use default Google pin, but customize color for selected marker
-      const markerOptions: google.maps.MarkerOptions = {
+      // Create PinElement (default Google Maps pin style)
+      const pin = new google.maps.marker.PinElement({
+        background: isSelected ? '#22c55e' : '#ea4335', // Green if selected, red otherwise
+        borderColor: '#ffffff',
+        glyphColor: '#ffffff',
+      });
+
+      // Create the marker element
+      const markerElement = pin.element;
+      markerElement.classList.add('search-result-marker');
+      markerElement.setAttribute('data-marker-id', markerData.id);
+      
+      // Apply initial state classes
+      if (isSelected) {
+        markerElement.classList.add('is-selected');
+      }
+
+      // Create AdvancedMarkerElement
+      const marker = new google.maps.marker.AdvancedMarkerElement({
         map: map,
         position: markerData.position,
         title: markerData.place.name,
-        zIndex: isSelected ? 1000 : undefined,
-      };
-
-      // Only add custom icon for selected state (green pin)
-      if (isSelected) {
-        markerOptions.icon = {
-          path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-          fillColor: '#22c55e',
-          fillOpacity: 1,
-          strokeColor: '#ffffff',
-          strokeWeight: 2,
-          scale: 6,
-        };
-      }
-      // Otherwise use default red pin
-
-      const marker = new google.maps.Marker(markerOptions);
+        content: markerElement,
+        zIndex: isSelected ? google.maps.Marker.MAX_ZINDEX + 1 : undefined,
+      });
 
       // Add click handler
       marker.addListener('click', () => {
@@ -546,41 +553,55 @@ export const SearchResultMarkers = ({
         }
       });
 
+      // Add hover handlers for bidirectional sync
+      if (onMarkerHover) {
+        markerElement.addEventListener('mouseenter', () => {
+          onMarkerHover(markerData.id);
+        });
+        markerElement.addEventListener('mouseleave', () => {
+          onMarkerHover(null);
+        });
+      }
+
       markersRef.current.set(markerData.id, marker);
+      markerElementsRef.current.set(markerData.id, markerElement);
     });
 
     // Cleanup function
     return () => {
       markersRef.current.forEach(marker => {
-        marker.setMap(null);
+        marker.map = null;
       });
       markersRef.current.clear();
+      markerElementsRef.current.clear();
     };
-  }, [markers, map, onMarkerClick, selectedMarkerId, hoveredMarkerId]);
+  }, [markers, map, onMarkerClick, onMarkerHover]);
 
-  // Update marker icons when selectedMarkerId changes
+  // Update marker states when selectedMarkerId or hoveredMarkerId changes
   useEffect(() => {
-    markersRef.current.forEach((marker, markerId) => {
+    markerElementsRef.current.forEach((element, markerId) => {
+      const marker = markersRef.current.get(markerId);
+      if (!marker) return;
+
       const isSelected = selectedMarkerId === markerId;
-      
-      // Update icon - default pin for unselected, green arrow for selected
-      if (isSelected) {
-        marker.setIcon({
-          path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-          fillColor: '#22c55e',
-          fillOpacity: 1,
-          strokeColor: '#ffffff',
-          strokeWeight: 2,
-          scale: 6,
-        });
-        marker.setZIndex(1000);
-      } else {
-        // Reset to default red pin
-        marker.setIcon(null as any);
-        marker.setZIndex(undefined);
+      const isHovered = hoveredMarkerId === markerId;
+
+      // Update classes
+      element.classList.toggle('is-selected', isSelected);
+      element.classList.toggle('is-hovered', isHovered && !isSelected);
+
+      // Update z-index
+      marker.zIndex = isSelected || isHovered 
+        ? google.maps.Marker.MAX_ZINDEX + 1 
+        : undefined;
+
+      // Update pin color via PinElement
+      const pinElement = element.querySelector('.gm-ui-pin-background') as HTMLElement;
+      if (pinElement) {
+        pinElement.style.backgroundColor = isSelected ? '#22c55e' : '#ea4335';
       }
     });
-  }, [selectedMarkerId, hoveredMarkerId, markers]);
+  }, [selectedMarkerId, hoveredMarkerId]);
 
   return null; // This component doesn't render React elements
 };

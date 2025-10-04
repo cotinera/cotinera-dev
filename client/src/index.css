@@ -162,3 +162,19 @@ All colors MUST be HSL.
   border-radius: 8px;
   pointer-events: none;
 }
+
+/* Search result marker hover and selection animations */
+.search-result-marker {
+  transition: transform 0.12s ease, filter 0.12s ease;
+  will-change: transform, filter;
+}
+
+.search-result-marker.is-hovered {
+  transform: translateY(-4px) scale(1.08);
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.25));
+}
+
+.search-result-marker.is-selected {
+  transform: translateY(-6px) scale(1.12);
+  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.3));
+}
