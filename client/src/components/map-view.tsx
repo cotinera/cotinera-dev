@@ -12,7 +12,7 @@ import { useGoogleMapsScript, useMapCoordinates, GoogleMap, MarkerF, PlaceDetail
 import type { PlaceSearchResult } from "@/lib/google-maps";
 import { LocationSearchBar } from "@/components/location-search-bar";
 import { IconPicker } from "@/components/icon-picker";
-import { PlaceDetailsSidebar } from "@/components/place-details-sidebar";
+import { PlaceDetailsPanel } from "@/components/map/PlaceDetailsPanel";
 import { CategoryPills, CategoryId } from "@/components/map/CategoryPills";
 import { ResultsList } from "@/components/map/ResultsList";
 import { SearchResultsPanel } from "@/components/map/SearchResultsPanel";
@@ -1358,19 +1358,64 @@ export function MapView({
         {/* RIGHT PANEL: Place Details - Only visible when a place is selected */}
         {showRightPanel && (
           <div className="border-l bg-background h-[600px]">
-            <ScrollArea className="h-full">
-              {selectedPlaceDetails ? (
-                renderPlaceDetails()
-              ) : showPlaceDetailsSidebar && selectedPlaceForDetails ? (
-                <div className="p-4">
-                  <PlaceDetailsSidebar
-                    placeId={selectedPlaceForDetails}
-                    onSelectPlace={onSelectPlaceFromDetails}
-                    onClose={onClosePlaceDetails}
-                  />
-                </div>
-              ) : null}
-            </ScrollArea>
+            {selectedPlaceDetails ? (
+              <ScrollArea className="h-full">
+                {renderPlaceDetails()}
+              </ScrollArea>
+            ) : showPlaceDetailsSidebar && selectedPlaceForDetails ? (
+              <PlaceDetailsPanel
+                placeId={selectedPlaceForDetails}
+                tripId={tripId}
+                isPinned={allPinnedPlaces.some(p => p.placeId === selectedPlaceForDetails)}
+                pinnedPlaceId={allPinnedPlaces.find(p => p.placeId === selectedPlaceForDetails)?.id}
+                markerIcon={allPinnedPlaces.find(p => p.placeId === selectedPlaceForDetails)?.icon}
+                onSelectPlace={onSelectPlaceFromDetails}
+                onClose={onClosePlaceDetails}
+                onSave={async (placeData) => {
+                  if (!tripId) return;
+                  const res = await fetch(`/api/trips/${tripId}/pinned-places`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                      name: placeData.name,
+                      address: placeData.formatted_address,
+                      coordinates: {
+                        lat: placeData.geometry.location.lat(),
+                        lng: placeData.geometry.location.lng()
+                      },
+                      placeId: placeData.place_id,
+                      phone: placeData.formatted_phone_number,
+                      website: placeData.website,
+                      rating: placeData.rating,
+                      category: placeData.types[0]
+                    }),
+                  });
+                  if (!res.ok) throw new Error("Failed to save place");
+                  queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "pinned-places"] });
+                }}
+                onUnsave={async (pinnedPlaceId) => {
+                  if (!tripId) return;
+                  const res = await fetch(`/api/trips/${tripId}/pinned-places/${pinnedPlaceId}`, {
+                    method: "DELETE",
+                    credentials: 'include',
+                  });
+                  if (!res.ok) throw new Error("Failed to remove place");
+                  queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "pinned-places"] });
+                }}
+                onIconChange={async (pinnedPlaceId, icon) => {
+                  if (!tripId) return;
+                  const res = await fetch(`/api/trips/${tripId}/pinned-places/${pinnedPlaceId}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: 'include',
+                    body: JSON.stringify({ icon }),
+                  });
+                  if (!res.ok) throw new Error("Failed to update icon");
+                  queryClient.invalidateQueries({ queryKey: ["/api/trips", tripId, "pinned-places"] });
+                }}
+              />
+            ) : null}
           </div>
         )}
       </div>

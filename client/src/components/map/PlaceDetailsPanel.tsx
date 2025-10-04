@@ -247,7 +247,6 @@ export function PlaceDetailsPanel({
                     photos={placeDetails.photos} 
                     placeName={placeDetails.name}
                     maxPhotos={10}
-                    showControls={placeDetails.photos.length >= 2}
                   />
                 </div>
               )}
