@@ -911,8 +911,9 @@ export function MapView({
   // Removed legacy renderPlaceDetails() - now using PlaceDetailsSidebar exclusively
 
   // Determine if panels should be visible
-  // Left panel shows when there are search results, active filters, or user is searching
-  const hasActiveSearch = searchValue.trim().length > 0 || selectedCategory !== null || searchResults.length > 0 || isLoadingSearch;
+  // Left panel shows only when there are actual results, loading state, or category filter active
+  // Don't show panel just because user is typing - wait for actual search to be performed
+  const hasActiveSearch = selectedCategory !== null || searchResults.length > 0 || isLoadingSearch;
   const showLeftPanel = !hideSearchAndFilters && hasActiveSearch;
   const showRightPanel = showPlaceDetailsSidebar && !!selectedPlaceForDetails;
 
