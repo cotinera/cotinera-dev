@@ -277,8 +277,8 @@ export function MapView({
   const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
   const [expandedReviews, setExpandedReviews] = useState(false);
   const [selectedIcon, setSelectedIcon] = useState('📍'); // Icon for pinning places
-  const numericTripId = tripId && !isNaN(Number(tripId)) ? Number(tripId) : undefined;
-  const { accommodations = [] } = useAccommodations(numericTripId);
+  const numericTripId = tripId && !isNaN(Number(tripId)) ? Number(tripId) : 0;
+  const { accommodations = [] } = useAccommodations(numericTripId || 0);
   // Category filter state - using CategoryId type from CategoryPills
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
   const [openNow, setOpenNow] = useState(false);
@@ -1122,11 +1122,15 @@ export function MapView({
   };
 
   return (
-    <Card className={cn("w-full shadow-md relative", className)}>
-      <div className="flex flex-col md:flex-row">
-        {/* Left Results Panel - shows when search results exist */}
-        {searchResults.length > 0 && !hideSearchAndFilters && (
-          <div className="w-full md:w-2/5 lg:w-1/3 border-r">
+    <Card className={cn("w-full shadow-md relative overflow-hidden", className)}>
+      {/* 3-Pane Grid Layout: Left (Results) | Center (Map) | Right (Details) */}
+      <div className="grid grid-cols-1 md:grid-cols-[380px_minmax(0,1fr)] lg:grid-cols-[380px_minmax(0,1fr)_380px]">
+        {/* LEFT PANEL: Search Results - Always visible when search is active */}
+        {!hideSearchAndFilters && (
+          <div className={cn(
+            "border-r bg-background h-[600px] md:block",
+            searchState === 'IDLE' && "hidden md:hidden"
+          )}>
             <SearchResultsPanel
               searchState={isLoadingSearch ? 'LOADING' : searchResults.length > 0 ? 'RENDERED' : 'EMPTY'}
               results={searchResults}
@@ -1165,7 +1169,8 @@ export function MapView({
           </div>
         )}
         
-        <div className={`w-full ${searchResults.length > 0 && !hideSearchAndFilters ? "md:w-3/5 lg:w-2/3" : selectedPlaceDetails ? "md:w-3/5" : "md:w-full"} relative`}>
+        {/* CENTER PANEL: Map - Always visible */}
+        <div className="relative h-[600px]">
           {!hideSearchAndFilters && (
             <div className="absolute top-4 left-4 right-4 z-10 flex flex-col gap-2">
               <div className="relative w-full">
@@ -1324,89 +1329,23 @@ export function MapView({
             </div>
           )}
           
-          {/* Legacy loading overlay removed - using search loading state instead */}
         </div>
 
-        {selectedPlaceDetails ? (
-          <div className="w-full md:w-2/5 border-t md:border-t-0 md:border-l">
-            <ScrollArea className="h-[600px]">
-              {renderPlaceDetails()}
-            </ScrollArea>
-          </div>
-        ) : showPlaceDetailsSidebar && selectedPlaceForDetails ? (
-          <div className="w-full md:w-2/5 border-t md:border-t-0 md:border-l">
-            <div className="p-4">
-              <PlaceDetailsSidebar
-                placeId={selectedPlaceForDetails}
-                onSelectPlace={onSelectPlaceFromDetails}
-                onClose={onClosePlaceDetails}
-              />
-            </div>
-          </div>
-        ) : (
-          <div className={`w-full md:w-2/5 border-t md:border-t-0 md:border-l ${!hideSearchAndFilters ? 'block' : 'hidden'}`}>
-            <ScrollArea className="h-[600px]">
-              <div className="p-4">
-                {/* Search Results Section */}
-                {(searchResults.length > 0 || isLoadingSearch) && (
-                  <div className="mb-6">
-                    <h3 className="text-lg font-semibold mb-4 flex items-center">
-                      <Search className="h-5 w-5 mr-2" />
-                      Search Results
-                    </h3>
-                    <ResultsList
-                      results={searchResults}
-                      isLoading={isLoadingSearch}
-                      hasNextPage={hasNextPage}
-                      selectedResultId={selectedResultId}
-                      onResultClick={handleResultClick}
-                      onLoadMore={loadMoreResults}
-                      isLoadingMore={isLoadingMore}
-                    />
-                  </div>
-                )}
-
-                {/* Pinned Places Section */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-4 flex items-center">
-                    <MapPin className="h-5 w-5 mr-2" />
-                    Pinned Places
-                  </h3>
-                  {allPinnedPlaces.length > 0 ? (
-                    <div className="space-y-3">
-                      {allPinnedPlaces.map((place: PinnedPlace) => (
-                        <div
-                          key={place.id}
-                          className={`p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors ${
-                            selectedPlace?.id === place.id ? "border-primary bg-primary/10" : ""
-                          }`}
-                          onClick={() => handleLocalPlaceNameClick(place)}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <h4 className="font-medium">{place.name}</h4>
-                              <p className="text-sm text-muted-foreground truncate">
-                                {place.name}
-                              </p>
-                            </div>
-                            <MapPin className={`h-4 w-4 flex-shrink-0 ${
-                              selectedPlace?.id === place.id ? "text-primary" : "text-muted-foreground"
-                            }`} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8 text-muted-foreground">
-                      <MapPin className="h-10 w-10 mx-auto mb-2 opacity-20" />
-                      <p>No places pinned yet</p>
-                      <p className="text-sm mt-1">
-                        Search for places and pin them to your trip
-                      </p>
-                    </div>
-                  )}
+        {/* RIGHT PANEL: Place Details - Only visible when a place is selected */}
+        {(selectedPlaceDetails || (showPlaceDetailsSidebar && selectedPlaceForDetails)) && (
+          <div className="hidden lg:block border-l bg-background h-[600px]">
+            <ScrollArea className="h-full">
+              {selectedPlaceDetails ? (
+                renderPlaceDetails()
+              ) : showPlaceDetailsSidebar && selectedPlaceForDetails ? (
+                <div className="p-4">
+                  <PlaceDetailsSidebar
+                    placeId={selectedPlaceForDetails}
+                    onSelectPlace={onSelectPlaceFromDetails}
+                    onClose={onClosePlaceDetails}
+                  />
                 </div>
-              </div>
+              ) : null}
             </ScrollArea>
           </div>
         )}
