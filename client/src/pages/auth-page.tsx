@@ -183,7 +183,7 @@ export default function AuthPage() {
                   <Button
                     variant="secondary"
                     onClick={handleGoogleLogin}
-                    className="w-full bg-white dark:bg-card text-primary dark:text-foreground hover:bg-white/90 dark:hover:bg-card/80 shadow-soft border-0 dark:border dark:border-border"
+                    className="w-full bg-white dark:bg-card text-primary dark:text-foreground hover:bg-white hover:scale-105 shadow-soft border-0 dark:border dark:border-border transition-all duration-200 cursor-pointer font-semibold"
                   >
                     <SiGoogle className="mr-2 h-4 w-4" />
                     Continue with Google
@@ -253,7 +253,7 @@ export default function AuthPage() {
                   <Button
                     type="button"
                     variant="ghost"
-                    className="w-full text-white dark:text-foreground hover:bg-white/10 dark:hover:bg-accent border border-white/20 dark:border-border"
+                    className="w-full text-white dark:text-foreground hover:bg-white/20 dark:hover:bg-accent border border-white/30 dark:border-border transition-all duration-200 cursor-pointer hover:scale-102"
                     onClick={() => setIsLogin(!isLogin)}
                     disabled={isLoading}
                   >

@@ -142,7 +142,7 @@ export default function LandingPage() {
           <div>
             <Button
               size="lg"
-              className="h-14 px-12 text-lg font-semibold bg-white/20 backdrop-blur-md border border-white/30 text-white hover:bg-white/30 shadow-2xl"
+              className="h-14 px-12 text-lg font-semibold bg-white/90 backdrop-blur-md border-2 border-white text-primary hover:bg-white hover:scale-105 shadow-2xl transition-all duration-200 cursor-pointer"
               onClick={handleCreateTrip}
               disabled={createTripMutation.isPending}
             >
