@@ -650,14 +650,13 @@ export function MapView({
   const handleCategoryClick = useCallback((category: CategoryButton) => {
     setSelectedCategory(currentCategory => {
       const newCategory = currentCategory === category.id ? null : category.id;
-      if (newCategory) {
-        performSearch();
-      } else {
+      // Don't call performSearch here - let the useEffect handle it
+      if (!newCategory) {
         setSearchResults([]);
       }
       return newCategory;
     });
-  }, [performSearch]);
+  }, []);
 
   // Modern map bounds change handler with throttling
   const handleMapBoundsChanged = useCallback(() => {
