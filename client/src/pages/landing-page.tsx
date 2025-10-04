@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, MapPin } from "lucide-react";
+import { SiGoogle } from "react-icons/si";
 import { useGoogleMapsScript } from "@/lib/google-maps";
 
 export default function LandingPage() {
@@ -77,8 +78,9 @@ export default function LandingPage() {
         <Button
           variant="outline"
           className="bg-white/20 backdrop-blur-md border-white/30 text-white hover:bg-white/30"
-          onClick={() => setLocation("/auth")}
+          onClick={() => window.location.href = "/api/auth/google"}
         >
+          <SiGoogle className="mr-2 h-4 w-4" />
           Sign Up / Log In
         </Button>
       </div>

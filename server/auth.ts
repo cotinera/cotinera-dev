@@ -243,8 +243,8 @@ export function setupAuth(app: Express) {
         return res.redirect(state);
       }
       
-      // Default redirect to dashboard
-      res.redirect("/");
+      // Default redirect to dashboard after successful Google login
+      res.redirect("/dashboard");
     }
   );
 
