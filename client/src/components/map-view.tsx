@@ -16,6 +16,7 @@ import { PlaceDetailsSidebar } from "@/components/place-details-sidebar";
 import { CategoryPills, CategoryId } from "@/components/map/CategoryPills";
 import { ResultsList } from "@/components/map/ResultsList";
 import { SearchResultsPanel } from "@/components/map/SearchResultsPanel";
+import { PlaceSearchInput } from "@/components/map/PlaceSearchInput";
 import { PlacesSearchService } from "@/lib/places/search";
 import type { PlaceSearchResult as SearchServiceResult, SearchFilters } from "@/lib/places/search";
 import { useSearchStateAdapter } from "@/hooks/use-search-state-adapter";
@@ -281,6 +282,9 @@ export function MapView({
   const [openNow, setOpenNow] = useState(false);
   const [withinMap, setWithinMap] = useState(true);
   const [hoveredResultId, setHoveredResultId] = useState<string | null>(null);
+  
+  // Free-text search state
+  const [freeTextQuery, setFreeTextQuery] = useState('');
   
   // Legacy state removed - using only new search flow
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -574,8 +578,10 @@ export function MapView({
       withinMap,
       keyword: '',
       bounds,
+      query: freeTextQuery,
+      useTextSearch: !!freeTextQuery,
     });
-  }, [selectedCategory, openNow, withinMap, controllerPerformSearch]);
+  }, [selectedCategory, openNow, withinMap, freeTextQuery, controllerPerformSearch]);
 
   // Load more results using adapter
   const loadMoreResults = useCallback(async () => {
@@ -589,7 +595,7 @@ export function MapView({
     if (placesSearchServiceRef.current && mapRef.current) {
       performSearch();
     }
-  }, [selectedCategory, openNow, withinMap, performSearch]);
+  }, [selectedCategory, openNow, withinMap, freeTextQuery, performSearch]);
 
   // Handler for category filter changes
   const handleCategoryChange = useCallback((category: CategoryId | null) => {
@@ -610,6 +616,15 @@ export function MapView({
   const handleRefreshWithinMap = useCallback(() => {
     performSearch();
   }, [performSearch]);
+
+  // Handler for free-text search
+  const handleFreeTextSearch = useCallback((query: string) => {
+    setFreeTextQuery(query);
+    // Clear category selection when doing text search
+    if (query && selectedCategory) {
+      setSelectedCategory(null);
+    }
+  }, [selectedCategory]);
 
 
   // Throttle utility for map move events
@@ -1177,6 +1192,16 @@ export function MapView({
                   </Card>
                 )}
               </div>
+
+              {/* Free-text Place Search Input */}
+              <PlaceSearchInput
+                value={freeTextQuery}
+                onChange={setFreeTextQuery}
+                onSearch={handleFreeTextSearch}
+                bounds={mapRef.current?.getBounds()}
+                map={mapRef.current}
+                className="bg-background/90 backdrop-blur-sm rounded-lg"
+              />
 
               {/* Category Pills Component */}
               <CategoryPills
