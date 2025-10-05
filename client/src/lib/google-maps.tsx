@@ -543,7 +543,7 @@ export const SearchResultMarkers = ({
         position: markerData.position,
         title: markerData.place.name,
         content: markerElement,
-        zIndex: isSelected ? google.maps.Marker.MAX_ZINDEX + 1 : undefined,
+        zIndex: isSelected ? google.maps.Marker.MAX_ZINDEX + 2 : undefined,
       });
 
       // Add click handler
@@ -591,9 +591,9 @@ export const SearchResultMarkers = ({
       element.classList.toggle('is-hovered', isHovered && !isSelected);
 
       // Update z-index
-      marker.zIndex = isSelected || isHovered 
-        ? google.maps.Marker.MAX_ZINDEX + 1 
-        : undefined;
+      marker.zIndex = isSelected 
+        ? google.maps.Marker.MAX_ZINDEX + 2 
+        : (isHovered ? google.maps.Marker.MAX_ZINDEX + 1 : undefined);
 
       // Update pin color via PinElement
       const pinElement = element.querySelector('.gm-ui-pin-background') as HTMLElement;
