@@ -631,6 +631,99 @@ export function MapView({
     }, 400); // 400ms throttling for optimal performance
   }, [withinMap, performSearch]);
 
+  // Unified place selection handler - Google Maps-like behavior
+  const handlePlaceSelection = useCallback(async (
+    placeId: string, 
+    geometry?: { lat: number; lng: number }
+  ) => {
+    if (!mapRef.current || !placesServiceRef.current) return;
+
+    let targetCoords = geometry;
+
+    // If geometry not provided, fetch minimal place details to get it
+    if (!targetCoords) {
+      try {
+        const placeDetails = await new Promise<google.maps.places.PlaceResult>((resolve, reject) => {
+          placesServiceRef.current!.getDetails(
+            {
+              placeId: placeId,
+              fields: ['place_id', 'name', 'geometry']
+            },
+            (result, status) => {
+              if (status === google.maps.places.PlacesServiceStatus.OK && result) {
+                resolve(result);
+              } else {
+                reject(new Error(`Place details failed: ${status}`));
+              }
+            }
+          );
+        });
+
+        if (placeDetails.geometry?.location) {
+          targetCoords = {
+            lat: placeDetails.geometry.location.lat(),
+            lng: placeDetails.geometry.location.lng()
+          };
+        }
+      } catch (error) {
+        console.error('Error fetching place geometry:', error);
+        toast({
+          title: "Error",
+          description: "Could not load place location",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
+    if (!targetCoords) return;
+
+    // Set highlighted location to show pin
+    setHighlightedLocation(targetCoords);
+
+    // Set selected place id (this will trigger marker selection in SearchResultMarkers)
+    setSelectedResultId(placeId);
+
+    // Smart camera behavior: check if place is in current viewport
+    const map = mapRef.current;
+    const bounds = map.getBounds();
+    const placeLatLng = new google.maps.LatLng(targetCoords.lat, targetCoords.lng);
+    const isInViewport = bounds?.contains(placeLatLng);
+
+    if (isInViewport) {
+      // Place is in viewport: use fitBounds with padding
+      const newBounds = new google.maps.LatLngBounds();
+      newBounds.extend(placeLatLng);
+      
+      // Add some padding around the point to ensure it's visible and centered
+      const ne = newBounds.getNorthEast();
+      const sw = newBounds.getSouthWest();
+      const latOffset = 0.002;
+      const lngOffset = 0.002;
+      
+      newBounds.extend(new google.maps.LatLng(ne.lat() + latOffset, ne.lng() + lngOffset));
+      newBounds.extend(new google.maps.LatLng(sw.lat() - latOffset, sw.lng() - lngOffset));
+      
+      map.fitBounds(newBounds, { padding: 64 });
+    } else {
+      // Place is outside viewport: pan to center and zoom
+      map.panTo(targetCoords);
+      
+      // Set zoom to 16, capped at max 17
+      const targetZoom = 16;
+      setTimeout(() => {
+        map.setZoom(Math.min(targetZoom, 17));
+      }, 100);
+    }
+
+    // Open place details panel
+    if (onShowPlaceDetails) {
+      onShowPlaceDetails(placeId);
+    } else {
+      fetchDetails(placeId);
+    }
+  }, [onShowPlaceDetails, fetchDetails, toast]);
+
   // Handler for search result clicks
   const handleResultClick = useCallback((result: SearchServiceResult) => {
     setSelectedResultId(result.place_id);
