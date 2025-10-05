@@ -492,6 +492,9 @@ export function MapView({
 
   const handleMarkerClick = useCallback(async (item: PinnedPlace | Accommodation | Activity) => {
     if (mapRef.current && 'coordinates' in item && item.coordinates) {
+      // Clear the search location pin to avoid showing stale pins
+      setSearchedLocation(null);
+      
       // Set highlighted location to show pin
       setHighlightedLocation(item.coordinates);
       
@@ -633,6 +636,9 @@ export function MapView({
     geometry?: { lat: number; lng: number }
   ) => {
     if (!mapRef.current || !placesServiceRef.current) return;
+
+    // Clear the search location pin to avoid showing stale pins
+    setSearchedLocation(null);
 
     let targetCoords = geometry;
 
