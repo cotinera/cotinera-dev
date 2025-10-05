@@ -483,8 +483,91 @@ export interface PlaceSearchResult {
 
 
 /**
- * Component for rendering search result markers using AdvancedMarkerElement + PinElement
- * Supports hover and selection states with CSS animations
+ * Helper function to get the category icon for a place
+ */
+const getCategoryForPlace = (types: string[]): keyof typeof CATEGORY_ICONS | null => {
+  if (!types || types.length === 0) return null;
+  
+  for (const type of types) {
+    if (PLACE_TYPE_TO_CATEGORY[type]) {
+      return PLACE_TYPE_TO_CATEGORY[type];
+    }
+  }
+  return null;
+};
+
+/**
+ * Helper function to create category icon SVG
+ */
+const createCategoryIconSVG = (category: keyof typeof CATEGORY_ICONS | null, isSelected: boolean): string => {
+  const color = isSelected ? '#22c55e' : '#ea4335';
+  
+  // Icon path data for different categories
+  const iconPaths: Record<keyof typeof CATEGORY_ICONS, string> = {
+    restaurant: 'M8.1 13.34l2.83-2.83L3.91 3.5c-1.56 1.56-1.56 4.09 0 5.66l4.19 4.18zm6.78-1.81c1.53.71 3.68.21 5.27-1.38 1.91-1.91 2.28-4.65.81-6.12-1.46-1.46-4.2-1.1-6.12.81-1.59 1.59-2.09 3.74-1.38 5.27L3.7 19.87l1.41 1.41L12 14.41l6.88 6.88 1.41-1.41L13.41 13l1.47-1.47z',
+    hotel: 'M7 13c1.66 0 3-1.34 3-3S8.66 7 7 7s-3 1.34-3 3 1.34 3 3 3zm12-6h-8v7H3V5H1v15h2v-3h18v3h2v-9c0-2.21-1.79-4-4-4z',
+    attraction: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
+    shopping: 'M18 6h-2c0-2.21-1.79-4-4-4S8 3.79 8 6H6c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-6-2c1.1 0 2 .9 2 2h-4c0-1.1.9-2 2-2zm6 16H6V8h2v2c0 .55.45 1 1 1s1-.45 1-1V8h4v2c0 .55.45 1 1 1s1-.45 1-1V8h2v12z',
+    beach: 'M13.127 14.56l1.43-1.43 6.44 6.443L19.57 21zm4.293-5.73l2.86-2.86c-3.95-3.95-10.35-3.96-14.3-.02 3.93-1.3 8.31-.25 11.44 2.88zM5.95 5.98c-3.94 3.95-3.93 10.35.02 14.3l2.86-2.86C5.7 14.29 4.65 9.91 5.95 5.98zm.02-.02l-.01.01c-.38 3.01 1.17 6.88 4.3 10.02l5.73-5.73c-3.13-3.13-7.01-4.68-10.02-4.3z',
+    nightlife: 'M21 5V3H3v2l8 9v5H6v2h12v-2h-5v-5l8-9zM7.43 7L5.66 5h12.69l-1.78 2H7.43z',
+    store: 'M20 4H4v2h16V4zm1 10v-2l-1-5H4l-1 5v2h1v6h10v-6h4v6h2v-6h1zm-9 4H6v-4h6v4z',
+    park: 'M17 8C8 10 5.9 16.17 3.82 21.34l1.89.66.95-2.66c.48.17.98.26 1.34.26C19 20 22 3 22 3c-1 2-8 2.25-13 3.25S2 11.5 2 13.5s1.75 3.75 1.75 3.75C7 8 17 8 17 8z',
+  };
+
+  const path = category ? iconPaths[category] : '';
+  
+  return `
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="${color}" xmlns="http://www.w3.org/2000/svg">
+      ${path ? `<path d="${path}"/>` : ''}
+    </svg>
+  `;
+};
+
+/**
+ * Helper function to create pin icon SVG (for hover state)
+ */
+const createPinIconSVG = (isSelected: boolean): string => {
+  const color = isSelected ? '#22c55e' : '#ea4335';
+  return `
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="${color}" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+    </svg>
+  `;
+};
+
+/**
+ * Helper function to create custom marker element with category icon
+ */
+const createCustomMarkerElement = (
+  category: keyof typeof CATEGORY_ICONS | null,
+  isSelected: boolean,
+  isHovered: boolean
+): HTMLElement => {
+  const container = document.createElement('div');
+  container.style.cssText = `
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    background: white;
+    border-radius: 50%;
+    border: 3px solid ${isSelected ? '#22c55e' : '#ea4335'};
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    cursor: pointer;
+    position: relative;
+  `;
+  
+  // Use pin icon when hovered or selected, otherwise use category icon
+  const iconSVG = (isHovered || isSelected) ? createPinIconSVG(isSelected) : createCategoryIconSVG(category, isSelected);
+  container.innerHTML = iconSVG;
+  
+  return container;
+};
+
+/**
+ * Component for rendering search result markers using AdvancedMarkerElement with category icons
+ * Supports hover and selection states with CSS animations and icon swapping
  */
 export const SearchResultMarkers = ({
   markers,
@@ -503,6 +586,7 @@ export const SearchResultMarkers = ({
 }) => {
   const markersRef = useRef<Map<string, google.maps.marker.AdvancedMarkerElement>>(new Map());
   const markerElementsRef = useRef<Map<string, HTMLElement>>(new Map());
+  const markerCategoriesRef = useRef<Map<string, keyof typeof CATEGORY_ICONS | null>>(new Map());
 
   useEffect(() => {
     if (!map || !window.google?.maps?.marker) {
@@ -515,20 +599,15 @@ export const SearchResultMarkers = ({
     });
     markersRef.current.clear();
     markerElementsRef.current.clear();
+    markerCategoriesRef.current.clear();
 
-    // Create new markers with AdvancedMarkerElement + PinElement
+    // Create new markers with custom elements
     markers.forEach((markerData) => {
       const isSelected = selectedMarkerId === markerData.id;
+      const category = getCategoryForPlace(markerData.place.types);
       
-      // Create PinElement (default Google Maps pin style)
-      const pin = new google.maps.marker.PinElement({
-        background: isSelected ? '#22c55e' : '#ea4335', // Green if selected, red otherwise
-        borderColor: '#ffffff',
-        glyphColor: '#ffffff',
-      });
-
-      // Create the marker element
-      const markerElement = pin.element;
+      // Create custom marker element
+      const markerElement = createCustomMarkerElement(category, isSelected, false);
       markerElement.classList.add('search-result-marker');
       markerElement.setAttribute('data-marker-id', markerData.id);
       
@@ -565,6 +644,7 @@ export const SearchResultMarkers = ({
 
       markersRef.current.set(markerData.id, marker);
       markerElementsRef.current.set(markerData.id, markerElement);
+      markerCategoriesRef.current.set(markerData.id, category);
     });
 
     // Cleanup function
@@ -574,13 +654,15 @@ export const SearchResultMarkers = ({
       });
       markersRef.current.clear();
       markerElementsRef.current.clear();
+      markerCategoriesRef.current.clear();
     };
-  }, [markers, map, onMarkerClick, onMarkerHover]);
+  }, [markers, map, onMarkerClick, onMarkerHover, selectedMarkerId]);
 
   // Update marker states when selectedMarkerId or hoveredMarkerId changes
   useEffect(() => {
     markerElementsRef.current.forEach((element, markerId) => {
       const marker = markersRef.current.get(markerId);
+      const category = markerCategoriesRef.current.get(markerId) ?? null;
       if (!marker) return;
 
       const isSelected = selectedMarkerId === markerId;
@@ -595,11 +677,12 @@ export const SearchResultMarkers = ({
         ? google.maps.Marker.MAX_ZINDEX + 2 
         : (isHovered ? google.maps.Marker.MAX_ZINDEX + 1 : undefined);
 
-      // Update pin color via PinElement
-      const pinElement = element.querySelector('.gm-ui-pin-background') as HTMLElement;
-      if (pinElement) {
-        pinElement.style.backgroundColor = isSelected ? '#22c55e' : '#ea4335';
-      }
+      // Update the icon: show pin when hovered or selected, otherwise show category icon
+      const iconSVG = (isHovered || isSelected) ? createPinIconSVG(isSelected) : createCategoryIconSVG(category, isSelected);
+      element.innerHTML = iconSVG;
+      
+      // Update border color
+      element.style.borderColor = isSelected ? '#22c55e' : '#ea4335';
     });
   }, [selectedMarkerId, hoveredMarkerId]);
 
