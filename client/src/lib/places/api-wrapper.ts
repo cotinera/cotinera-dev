@@ -13,20 +13,6 @@ export interface SearchOptions {
   keyword?: string;
   withinMap?: boolean;
   maxResults?: number;
-  query?: string;
-  useTextSearch?: boolean;
-}
-
-export interface TextSearchOptions {
-  query: string;
-  bounds?: google.maps.LatLngBounds;
-  location?: google.maps.LatLng;
-  radius?: number;
-  openNow?: boolean;
-  maxResults?: number;
-  language?: string;
-  region?: string;
-  nextPageToken?: string;
 }
 
 export interface AutocompleteOptions {
@@ -75,8 +61,6 @@ export interface SearchResult {
   nextPageToken?: string;
   requestId: string;
   executionTime: number;
-  query?: string;
-  cacheKey?: string;
 }
 
 export interface AutocompleteResult {
@@ -100,20 +84,7 @@ export interface PerformanceMetrics {
     search: number;
     autocomplete: number;
     details: number;
-    textSearch: number;
   };
-}
-
-// Cache interfaces
-interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-  expiresAt: number;
-}
-
-interface SearchCache {
-  results: Map<string, CacheEntry<SearchResult>>;
-  details: Map<string, CacheEntry<PlaceDetailsResult>>;
 }
 
 // Error types for specific handling
@@ -213,19 +184,8 @@ export class PlacesApiWrapper {
       search: 0,
       autocomplete: 0,
       details: 0,
-      textSearch: 0,
     },
   };
-
-  // Cache storage
-  private cache: SearchCache = {
-    results: new Map(),
-    details: new Map(),
-  };
-
-  // Cache TTL settings (in milliseconds)
-  private readonly SEARCH_CACHE_TTL = 90000; // 90 seconds (60-120s range)
-  private readonly DETAILS_CACHE_TTL = 12 * 60 * 1000; // 12 minutes (10-15 min range)
 
   private responseTimes: number[] = [];
 
@@ -277,41 +237,7 @@ export class PlacesApiWrapper {
    * Search for places near the map center or within bounds
    */
   async searchNearby(options: SearchOptions): Promise<SearchResult> {
-    // Check if this should use text search based on query
-    if (options.query && options.useTextSearch) {
-      return this.searchText({
-        query: options.query,
-        bounds: options.bounds,
-        openNow: options.openNow,
-        maxResults: options.maxResults,
-      });
-    }
-    
     return this.debouncedSearch.execute(options);
-  }
-
-  /**
-   * Text search for places using free-form queries
-   * Supports caching, pagination, and type hinting
-   */
-  async searchText(options: TextSearchOptions): Promise<SearchResult> {
-    // Generate cache key based on query, viewport, and zoom
-    const cacheKey = this.generateSearchCacheKey(options);
-    
-    // Check cache first
-    const cachedResult = this.getFromCache(cacheKey);
-    if (cachedResult) {
-      console.log(`🎯 Using cached text search result for "${options.query}"`);
-      return cachedResult;
-    }
-
-    // Perform the text search
-    const result = await this.performTextSearch(options);
-    
-    // Cache the result
-    this.setInCache(cacheKey, result, this.SEARCH_CACHE_TTL);
-    
-    return result;
   }
 
   /**
@@ -444,241 +370,12 @@ export class PlacesApiWrapper {
         search: 0,
         autocomplete: 0,
         details: 0,
-        textSearch: 0,
       },
     };
     this.responseTimes = [];
   }
 
   // Private methods
-
-  /**
-   * Perform text search with retry logic for OVER_QUERY_LIMIT
-   */
-  private async performTextSearch(options: TextSearchOptions, retryCount = 0): Promise<SearchResult> {
-    if (!this.placesService) {
-      throw new PlacesApiError(
-        PlacesApiErrorType.API_KEY_INVALID,
-        'Places service not initialized'
-      );
-    }
-
-    const requestId = this.generateRequestId();
-    const startTime = performance.now();
-
-    return new Promise((resolve, reject) => {
-      const request: any = {
-        query: options.query,
-        location: options.location || (options.bounds ? options.bounds.getCenter() : this.map?.getCenter()),
-        radius: options.radius || 5000,
-        language: options.language || navigator.language || 'en-US',
-        region: options.region || 'us',
-      };
-
-      // Add openNow if specified (not in types but works in API)
-      if (options.openNow) {
-        request.openNow = true;
-      }
-
-      // Add pagination token if provided
-      if (options.nextPageToken) {
-        (request as any).pagetoken = options.nextPageToken;
-      }
-
-      console.group(`🔍 Text Search Request ${requestId}`);
-      console.log('Query:', options.query);
-      console.log('Options:', options);
-
-      this.placesService!.textSearch(request, (results, status, pagination) => {
-        const executionTime = performance.now() - startTime;
-        
-        this.logMetrics('textSearch', executionTime, status === google.maps.places.PlacesServiceStatus.OK);
-
-        if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-          const convertedResults = results.map(this.convertLegacyResult.bind(this));
-          
-          console.log(`✅ Found ${convertedResults.length} places in ${executionTime.toFixed(0)}ms`);
-          console.groupEnd();
-
-          const result: SearchResult = {
-            results: convertedResults,
-            hasNextPage: !!pagination?.hasNextPage,
-            nextPageToken: (pagination as any)?.pagetoken,
-            requestId,
-            executionTime,
-            query: options.query,
-          };
-
-          resolve(result);
-        } else if (status === google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
-          console.log(`ℹ️ No results found for "${options.query}"`);
-          console.groupEnd();
-          
-          resolve({
-            results: [],
-            hasNextPage: false,
-            requestId,
-            executionTime,
-            query: options.query,
-          });
-        } else if (status === google.maps.places.PlacesServiceStatus.OVER_QUERY_LIMIT && retryCount === 0) {
-          console.warn(`⚠️ Query limit exceeded, retrying in 1.5s...`);
-          console.groupEnd();
-          
-          // Retry once after 1.5 seconds
-          setTimeout(() => {
-            this.performTextSearch(options, 1)
-              .then(resolve)
-              .catch(reject);
-          }, 1500);
-        } else {
-          console.error(`❌ Text search failed:`, status);
-          console.groupEnd();
-          reject(this.handlePlacesServiceError(status, 'Text search failed', requestId));
-        }
-      });
-    });
-  }
-
-  /**
-   * Check if query matches a known place type
-   * Returns category type or null if it's a free-text query
-   */
-  private detectPlaceType(query: string): string | null {
-    const normalized = query.toLowerCase().trim();
-    
-    // Common type keywords
-    const typeMap: Record<string, string> = {
-      'restaurant': 'restaurant',
-      'restaurants': 'restaurant',
-      'hotel': 'lodging',
-      'hotels': 'lodging',
-      'motel': 'lodging',
-      'lodging': 'lodging',
-      'bar': 'bar',
-      'bars': 'bar',
-      'pub': 'bar',
-      'cafe': 'cafe',
-      'cafes': 'cafe',
-      'coffee': 'cafe',
-      'club': 'night_club',
-      'clubs': 'night_club',
-      'nightclub': 'night_club',
-      'attraction': 'tourist_attraction',
-      'attractions': 'tourist_attraction',
-      'museum': 'museum',
-      'park': 'park',
-      'shopping': 'shopping_mall',
-      'mall': 'shopping_mall',
-      'store': 'store',
-    };
-
-    // Check if query is just a type keyword
-    if (typeMap[normalized]) {
-      return typeMap[normalized];
-    }
-
-    // Check if query ends with a type keyword
-    for (const [keyword, type] of Object.entries(typeMap)) {
-      if (normalized.endsWith(keyword) || normalized.startsWith(keyword)) {
-        return type;
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * Generate cache key based on query, viewport bounds, and zoom level
-   */
-  private generateSearchCacheKey(options: TextSearchOptions): string {
-    const viewportHash = this.getViewportHash(options.bounds);
-    const zoomBucket = this.getZoomBucket();
-    const query = options.query.toLowerCase().trim();
-    const openNowFlag = options.openNow ? 'open' : 'all';
-    
-    return `search:${query}:${viewportHash}:z${zoomBucket}:${openNowFlag}`;
-  }
-
-  /**
-   * Get hash of viewport bounds for caching
-   */
-  private getViewportHash(bounds?: google.maps.LatLngBounds): string {
-    if (!bounds && !this.map) return 'default';
-    
-    const actualBounds = bounds || this.map!.getBounds();
-    if (!actualBounds) return 'default';
-
-    // Round to 3 decimal places for viewport hash
-    const ne = actualBounds.getNorthEast();
-    const sw = actualBounds.getSouthWest();
-    
-    return `${ne.lat().toFixed(3)},${ne.lng().toFixed(3)}-${sw.lat().toFixed(3)},${sw.lng().toFixed(3)}`;
-  }
-
-  /**
-   * Get zoom bucket for caching (groups zoom levels into buckets)
-   */
-  private getZoomBucket(): number {
-    if (!this.map) return 10;
-    
-    const zoom = this.map.getZoom() || 10;
-    // Bucket zoom levels: 0-9, 10-12, 13-15, 16-18, 19-22
-    if (zoom < 10) return 5;
-    if (zoom < 13) return 11;
-    if (zoom < 16) return 14;
-    if (zoom < 19) return 17;
-    return 20;
-  }
-
-  /**
-   * Get cached result
-   */
-  private getFromCache(key: string): SearchResult | null {
-    const entry = this.cache.results.get(key);
-    
-    if (!entry) return null;
-    
-    // Check if expired
-    if (Date.now() > entry.expiresAt) {
-      this.cache.results.delete(key);
-      return null;
-    }
-    
-    return entry.data;
-  }
-
-  /**
-   * Store result in cache
-   */
-  private setInCache(key: string, data: SearchResult, ttl: number): void {
-    const entry: CacheEntry<SearchResult> = {
-      data,
-      timestamp: Date.now(),
-      expiresAt: Date.now() + ttl,
-    };
-    
-    this.cache.results.set(key, entry);
-    
-    // Clean up old entries (keep max 50 entries)
-    if (this.cache.results.size > 50) {
-      const entries = Array.from(this.cache.results.entries());
-      entries.sort((a, b) => a[1].timestamp - b[1].timestamp);
-      
-      // Remove oldest 10 entries
-      for (let i = 0; i < 10; i++) {
-        this.cache.results.delete(entries[i][0]);
-      }
-    }
-  }
-
-  /**
-   * Clear all caches
-   */
-  clearCache(): void {
-    this.cache.results.clear();
-    this.cache.details.clear();
-  }
 
   private async performSearch(options: SearchOptions): Promise<SearchResult> {
     if (!this.map) {
@@ -1077,7 +774,7 @@ export class PlacesApiWrapper {
     }
   }
 
-  private logMetrics(operation: 'search' | 'autocomplete' | 'details' | 'textSearch', executionTime: number, success: boolean) {
+  private logMetrics(operation: 'search' | 'autocomplete' | 'details', executionTime: number, success: boolean) {
     this.metrics.totalRequests++;
     this.metrics.quotaUsage[operation]++;
     this.responseTimes.push(executionTime);

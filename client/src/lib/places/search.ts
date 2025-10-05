@@ -28,8 +28,6 @@ export interface SearchFilters {
   withinMap: boolean;
   keyword: string;
   bounds?: google.maps.LatLngBounds | null;
-  query?: string;
-  useTextSearch?: boolean;
 }
 
 export interface SearchOptions extends SearchFilters {
@@ -61,30 +59,11 @@ export class PlacesSearchService {
         keyword: options.keyword,
         withinMap: options.withinMap,
         maxResults: 20,
-        query: options.query,
-        useTextSearch: options.useTextSearch,
       };
 
       return await this.apiWrapper.searchNearby(apiOptions);
     } catch (error) {
       console.error('Search error:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Perform text search with free-form queries
-   */
-  async searchText(query: string, options?: Partial<SearchOptions>): Promise<SearchResult> {
-    try {
-      return await this.apiWrapper.searchText({
-        query,
-        bounds: options?.bounds || undefined,
-        openNow: options?.openNow,
-        maxResults: 20,
-      });
-    } catch (error) {
-      console.error('Text search error:', error);
       throw error;
     }
   }
