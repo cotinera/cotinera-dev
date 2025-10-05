@@ -176,5 +176,5 @@ All colors MUST be HSL.
 
 .search-result-marker.is-selected {
   transform: translateY(-6px) scale(1.12);
-  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.3));
+  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.28));
 }
