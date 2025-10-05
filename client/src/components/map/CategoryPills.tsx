@@ -132,15 +132,14 @@ export function CategoryPills({
         </Badge>
 
         {withinMap && onRefreshWithinMap && (
-          <Button
+          <Badge
             variant="outline"
-            size="sm"
+            className="cursor-pointer transition-all duration-200 hover:scale-105 flex items-center gap-1.5"
             onClick={onRefreshWithinMap}
-            className="flex items-center gap-2 transition-all duration-200 hover:scale-105"
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className="h-3.5 w-3.5" />
             Refresh
-          </Button>
+          </Badge>
         )}
       </div>
     </div>
