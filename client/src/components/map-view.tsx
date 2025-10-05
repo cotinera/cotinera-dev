@@ -551,20 +551,6 @@ export function MapView({
     onPlaceNameClick?.(place);
   }, [onPlaceNameClick, handlePlaceNameClick]);
 
-  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
-    const event = e as unknown as { placeId?: string; stop?: () => void };
-    if (event.stop) event.stop();
-    if (!event.placeId) {
-      if (onClosePlaceDetails) {
-        onClosePlaceDetails();
-      }
-      return;
-    }
-    if (onShowPlaceDetails) {
-      onShowPlaceDetails(event.placeId);
-    }
-  }, [onShowPlaceDetails, onClosePlaceDetails]);
-
   // Search functionality using adapter with stable state machine
   const performSearch = useCallback(async () => {
     if (!mapRef.current) return;
@@ -726,6 +712,71 @@ export function MapView({
     }
   }, [onShowPlaceDetails, fetchDetails, toast]);
 
+  // Map click handler - handles both named places and empty spots
+  const handleMapClick = useCallback(async (e: google.maps.MapMouseEvent) => {
+    const event = e as unknown as { placeId?: string; stop?: () => void };
+    if (event.stop) event.stop();
+    
+    // Clear search location pin
+    setSearchedLocation(null);
+    
+    if (event.placeId) {
+      // Named place clicked - use unified place selection
+      handlePlaceSelection(event.placeId);
+    } else if (e.latLng) {
+      // Empty spot clicked - drop pin and lookup place
+      const clickCoords = {
+        lat: e.latLng.lat(),
+        lng: e.latLng.lng()
+      };
+      
+      // Immediately show the blue pin at click location
+      setHighlightedLocation(clickCoords);
+      
+      // Pan camera to clicked location smoothly
+      if (mapRef.current) {
+        mapRef.current.panTo(clickCoords);
+      }
+      
+      // Try to find a place at this location using reverse geocoding
+      if (placesServiceRef.current) {
+        try {
+          const geocoder = new google.maps.Geocoder();
+          const response = await geocoder.geocode({ location: clickCoords });
+          
+          if (response.results && response.results.length > 0) {
+            // Find the first result with a place_id
+            const placeResult = response.results.find(r => r.place_id);
+            if (placeResult && placeResult.place_id) {
+              // Use the found place
+              handlePlaceSelection(placeResult.place_id, clickCoords);
+            } else {
+              // Show basic info panel with coordinates
+              if (onClosePlaceDetails) {
+                onClosePlaceDetails();
+              }
+              toast({
+                title: "Location selected",
+                description: `${clickCoords.lat.toFixed(6)}, ${clickCoords.lng.toFixed(6)}`,
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Reverse geocoding failed:', error);
+          // Still show the pin, just no details
+          if (onClosePlaceDetails) {
+            onClosePlaceDetails();
+          }
+        }
+      }
+    } else {
+      // Click with no location data - close details
+      if (onClosePlaceDetails) {
+        onClosePlaceDetails();
+      }
+    }
+  }, [handlePlaceSelection, onClosePlaceDetails, toast]);
+
   // Set marker click handler to use unified place selection
   markerClickHandlerRef.current = (place: PlaceSearchResult) => {
     if (place.place_id && place.geometry?.location) {
@@ -808,15 +859,6 @@ export function MapView({
   const handleLocationChange = useCallback((address: string, coords?: { lat: number; lng: number }, name?: string) => {
     if (coords) {
       setCoordinates(coords);
-      setSearchedLocation(coords);
-      
-      if (mapRef.current) {
-        smoothMapAnimation(
-          mapRef, 
-          coordinates, 
-          coords
-        );
-      }
       
       // Try to get place details if we have a name
       if (name && placesServiceRef.current) {
@@ -833,14 +875,27 @@ export function MapView({
           request,
           (results, status) => {
             if (status === google.maps.places.PlacesServiceStatus.OK && results && results[0] && results[0].place_id) {
-              fetchDetails(results[0].place_id);
+              // Use unified place selection with the found place_id
+              handlePlaceSelection(results[0].place_id, coords);
+            } else {
+              // No place_id found, just show blue pin and pan
+              setHighlightedLocation(coords);
+              if (mapRef.current) {
+                smoothMapAnimation(mapRef, coordinates, coords);
+              }
             }
           }
         );
+      } else {
+        // No name provided, just show blue pin and pan
+        setHighlightedLocation(coords);
+        if (mapRef.current) {
+          smoothMapAnimation(mapRef, coordinates, coords);
+        }
       }
     }
     setShowSearchResults(false);
-  }, [setCoordinates, coordinates, fetchDetails]);
+  }, [setCoordinates, coordinates, handlePlaceSelection]);
 
   const handleSavePlace = useCallback(async (placeDetails: any) => {
     if (!tripId) return;
