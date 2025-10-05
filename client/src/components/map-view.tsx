@@ -115,6 +115,35 @@ const smoothMapAnimation = (
   animate();
 };
 
+// Zoom-preserving pan function for place selections (keeps user's zoom level)
+const zoomPreservingPan = (
+  mapRef: React.RefObject<google.maps.Map>,
+  targetCoordinates: { lat: number; lng: number },
+  withOffset: boolean = false
+) => {
+  if (!mapRef.current) return;
+  
+  const map = mapRef.current;
+  const currentZoom = map.getZoom() || 12;
+  
+  let panTarget = targetCoordinates;
+  
+  if (withOffset) {
+    // Add x-offset so right panel doesn't cover the pin
+    const metersPerPixel = 156543.03392 * Math.cos(targetCoordinates.lat * Math.PI / 180) / Math.pow(2, currentZoom);
+    const offsetMeters = 150; // Offset to account for right panel
+    const lngOffset = (offsetMeters * metersPerPixel) / 111320;
+    
+    panTarget = {
+      lat: targetCoordinates.lat,
+      lng: targetCoordinates.lng - lngOffset
+    };
+  }
+  
+  // Just pan, don't change zoom
+  map.panTo(panTarget);
+};
+
 // Category buttons for map filtering
 const categoryButtons = [
   {
@@ -453,14 +482,8 @@ export function MapView({
 
   const handlePlaceNameClick = useCallback(async (place: PinnedPlace) => {
     if (mapRef.current && place.coordinates) {
-      // Use our shared animation function for better spatial context
-      smoothMapAnimation(
-        mapRef, 
-        coordinates, 
-        place.coordinates,
-        // Optional callback when animation completes
-        undefined
-      );
+      // Use zoom-preserving pan to respect user's zoom level
+      zoomPreservingPan(mapRef, place.coordinates, true);
     }
     
     if (place.placeId) {
@@ -498,12 +521,8 @@ export function MapView({
       // Set highlighted location to show pin
       setHighlightedLocation(item.coordinates);
       
-      // Use our shared animation function with easing and better spatial context
-      smoothMapAnimation(
-        mapRef, 
-        coordinates, 
-        item.coordinates
-      );
+      // Use zoom-preserving pan to respect user's zoom level
+      zoomPreservingPan(mapRef, item.coordinates, true);
     }
 
     // Resolve to place_id for all items
@@ -672,36 +691,43 @@ export function MapView({
     // Set selected place id (this will trigger marker selection in SearchResultMarkers)
     setSelectedResultId(placeId);
 
-    // Smart camera behavior: check if place is in current viewport
+    // Zoom-preserving camera behavior: only pan, don't change zoom
     const map = mapRef.current;
     const bounds = map.getBounds();
     const placeLatLng = new google.maps.LatLng(targetCoords.lat, targetCoords.lng);
     const isInViewport = bounds?.contains(placeLatLng);
 
     if (isInViewport) {
-      // Place is in viewport: use fitBounds with padding
-      const newBounds = new google.maps.LatLngBounds();
-      newBounds.extend(placeLatLng);
+      // Place is in viewport: just pan with x-offset so right panel doesn't cover it
+      const currentZoom = map.getZoom() || 12;
+      const metersPerPixel = 156543.03392 * Math.cos(targetCoords.lat * Math.PI / 180) / Math.pow(2, currentZoom);
+      const offsetMeters = 150; // Offset to account for right panel (roughly 300px / 2)
+      const lngOffset = (offsetMeters * metersPerPixel) / 111320;
       
-      // Add some padding around the point to ensure it's visible and centered
-      const ne = newBounds.getNorthEast();
-      const sw = newBounds.getSouthWest();
-      const latOffset = 0.002;
-      const lngOffset = 0.002;
-      
-      newBounds.extend(new google.maps.LatLng(ne.lat() + latOffset, ne.lng() + lngOffset));
-      newBounds.extend(new google.maps.LatLng(sw.lat() - latOffset, sw.lng() - lngOffset));
-      
-      map.fitBounds(newBounds, 64);
+      map.panTo({
+        lat: targetCoords.lat,
+        lng: targetCoords.lng - lngOffset
+      });
     } else {
-      // Place is outside viewport: pan to center and zoom
-      map.panTo(targetCoords);
+      // Place is outside viewport: pan to it and zoom ONLY if needed to reveal it
+      const currentZoom = map.getZoom() || 12;
       
-      // Set zoom to 16, capped at max 17
-      const targetZoom = 16;
-      setTimeout(() => {
-        map.setZoom(Math.min(targetZoom, 17));
-      }, 100);
+      // Pan to location with x-offset
+      const metersPerPixel = 156543.03392 * Math.cos(targetCoords.lat * Math.PI / 180) / Math.pow(2, currentZoom);
+      const offsetMeters = 150;
+      const lngOffset = (offsetMeters * metersPerPixel) / 111320;
+      
+      map.panTo({
+        lat: targetCoords.lat,
+        lng: targetCoords.lng - lngOffset
+      });
+      
+      // Only zoom if current zoom is too far out to see the place (< 14)
+      if (currentZoom < 14) {
+        setTimeout(() => {
+          map.setZoom(14); // Minimal zoom to reveal off-screen places
+        }, 100);
+      }
     }
 
     // Open place details panel
@@ -881,6 +907,7 @@ export function MapView({
               // No place_id found, just show blue pin and pan
               setHighlightedLocation(coords);
               if (mapRef.current) {
+                // Keep zoom for search - this is the initial search commit behavior
                 smoothMapAnimation(mapRef, coordinates, coords);
               }
             }
@@ -890,6 +917,7 @@ export function MapView({
         // No name provided, just show blue pin and pan
         setHighlightedLocation(coords);
         if (mapRef.current) {
+          // Keep zoom for search - this is the initial search commit behavior
           smoothMapAnimation(mapRef, coordinates, coords);
         }
       }
@@ -1005,10 +1033,10 @@ export function MapView({
       console.log("Trip coordinates:", coordinates);
       console.log("Selected coordinates:", searchedLocation);
 
-      // Set highlighted location and animate to selected place
+      // Set highlighted location and pan to selected place (zoom-preserving)
       if (selectedPlace.coordinates) {
         setHighlightedLocation(selectedPlace.coordinates);
-        smoothMapAnimation(mapRef, coordinates, selectedPlace.coordinates);
+        zoomPreservingPan(mapRef, selectedPlace.coordinates, true);
       }
 
       // If we have a placeId, fetch details directly
