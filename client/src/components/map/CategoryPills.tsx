@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Utensils, Hotel, Wine, Coffee, MapPin, Moon, Search } from 'lucide-react';
+import { Utensils, Hotel, Wine, Coffee, MapPin, Moon, Search, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Official Places API types mapping
@@ -61,6 +61,7 @@ interface CategoryPillsProps {
   onOpenNowChange: (openNow: boolean) => void;
   withinMap: boolean;
   onWithinMapChange: (withinMap: boolean) => void;
+  onRefreshWithinMap?: () => void;
   className?: string;
 }
 
@@ -71,6 +72,7 @@ export function CategoryPills({
   onOpenNowChange,
   withinMap,
   onWithinMapChange,
+  onRefreshWithinMap,
   className
 }: CategoryPillsProps) {
   const categories = Object.values(CATEGORY_TYPES);
@@ -128,6 +130,18 @@ export function CategoryPills({
         >
           Within map
         </Badge>
+
+        {withinMap && onRefreshWithinMap && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRefreshWithinMap}
+            className="flex items-center gap-2 transition-all duration-200 hover:scale-105"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </Button>
+        )}
       </div>
     </div>
   );

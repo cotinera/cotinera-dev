@@ -606,6 +606,11 @@ export function MapView({
     setWithinMap(withinMapValue);
   }, []);
 
+  // Handler for refreshing within map results
+  const handleRefreshWithinMap = useCallback(() => {
+    performSearch();
+  }, [performSearch]);
+
 
   // Throttle utility for map move events
   const throttleRef = useRef<NodeJS.Timeout | null>(null);
@@ -1181,6 +1186,7 @@ export function MapView({
                 onOpenNowChange={handleOpenNowChange}
                 withinMap={withinMap}
                 onWithinMapChange={handleWithinMapChange}
+                onRefreshWithinMap={handleRefreshWithinMap}
                 className="bg-background/90 backdrop-blur-sm rounded-lg p-3"
               />
             </div>
