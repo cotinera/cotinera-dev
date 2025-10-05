@@ -10,6 +10,7 @@ interface PlaceResultCardProps {
   place: PlaceSearchResult;
   distance: number; // in km
   isSelected: boolean;
+  isHovered?: boolean;
   onCardClick: () => void;
   onSaveClick: (e: React.MouseEvent) => void;
   onAddToItinerary?: (e: React.MouseEvent) => void;
@@ -22,6 +23,7 @@ export function PlaceResultCard({
   place,
   distance,
   isSelected,
+  isHovered = false,
   onCardClick,
   onSaveClick,
   onAddToItinerary,
@@ -93,7 +95,11 @@ export function PlaceResultCard({
     <Card
       className={cn(
         "group cursor-pointer transition-all hover:shadow-md border",
-        isSelected ? "border-primary ring-2 ring-primary/20 bg-primary/5" : "border-border hover:border-primary/50"
+        isSelected 
+          ? "border-primary ring-2 ring-primary/20 bg-primary/5" 
+          : isHovered
+            ? "border-primary/70 shadow-md bg-primary/5 ring-1 ring-primary/10"
+            : "border-border hover:border-primary/50"
       )}
       onClick={onCardClick}
       onMouseEnter={onMouseEnter}

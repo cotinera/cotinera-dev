@@ -337,6 +337,7 @@ export function SearchResultsPanel({
                   place.geometry.location.lng
                 )}
                 isSelected={selectedResultId === place.place_id}
+                isHovered={hoveredResultId === place.place_id}
                 onCardClick={() => onResultClick(place)}
                 onSaveClick={(e) => onSavePlace(place, e)}
                 onAddToItinerary={onAddToItinerary ? (e) => onAddToItinerary(place, e) : undefined}
