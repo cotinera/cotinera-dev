@@ -318,6 +318,9 @@ export function MapView({
     error: searchError,
   } = useSearchStateAdapter(mapRef.current, coordinates);
   
+  // Temporary marker click handler ref - will be updated after handlePlaceSelection is defined
+  const markerClickHandlerRef = useRef<((place: PlaceSearchResult) => void) | null>(null);
+  
   // Search result markers management - updated to use adapter state
   const {
     markers: searchMarkers,
@@ -328,20 +331,8 @@ export function MapView({
     mapRef.current,
     searchResults,
     (place) => {
-      if (place.place_id) {
-        setSelectedResultId(place.place_id);
-        
-        // Set highlighted location and animate
-        if (place.geometry?.location) {
-          setHighlightedLocation(place.geometry.location);
-          smoothMapAnimation(mapRef, coordinates, place.geometry.location);
-        }
-        
-        if (onShowPlaceDetails) {
-          onShowPlaceDetails(place.place_id);
-        } else {
-          fetchDetails(place.place_id);
-        }
+      if (markerClickHandlerRef.current) {
+        markerClickHandlerRef.current(place);
       }
     }
   );
@@ -704,7 +695,7 @@ export function MapView({
       newBounds.extend(new google.maps.LatLng(ne.lat() + latOffset, ne.lng() + lngOffset));
       newBounds.extend(new google.maps.LatLng(sw.lat() - latOffset, sw.lng() - lngOffset));
       
-      map.fitBounds(newBounds, { padding: 64 });
+      map.fitBounds(newBounds, 64);
     } else {
       // Place is outside viewport: pan to center and zoom
       map.panTo(targetCoords);
@@ -724,27 +715,17 @@ export function MapView({
     }
   }, [onShowPlaceDetails, fetchDetails, toast]);
 
+  // Set marker click handler to use unified place selection
+  markerClickHandlerRef.current = (place: PlaceSearchResult) => {
+    if (place.place_id && place.geometry?.location) {
+      handlePlaceSelection(place.place_id, place.geometry.location);
+    }
+  };
+
   // Handler for search result clicks
   const handleResultClick = useCallback((result: SearchServiceResult) => {
-    setSelectedResultId(result.place_id);
-    
-    // Set highlighted location to show pin
-    const resultCoords = result.geometry.location;
-    setHighlightedLocation(resultCoords);
-    
-    // Animate to result location
-    if (mapRef.current) {
-      smoothMapAnimation(mapRef, coordinates, resultCoords);
-    }
-    
-    // Show place details
-    if (onShowPlaceDetails) {
-      onShowPlaceDetails(result.place_id);
-    } else {
-      // Fallback to local place details
-      fetchDetails(result.place_id);
-    }
-  }, [coordinates, onShowPlaceDetails, fetchDetails]);
+    handlePlaceSelection(result.place_id, result.geometry.location);
+  }, [handlePlaceSelection]);
 
   // Category click handler using new search flow
   const handleCategoryClick = useCallback((category: CategoryButton) => {
@@ -1159,7 +1140,9 @@ export function MapView({
                     }
                   }}
                   showDetailedView={showPlaceDetailsSidebar}
-                  onShowPlaceDetails={onShowPlaceDetails}
+                  onShowPlaceDetails={(placeId) => {
+                    handlePlaceSelection(placeId);
+                  }}
                 />
                 
                 {/* Show category suggestions only when typing */}
