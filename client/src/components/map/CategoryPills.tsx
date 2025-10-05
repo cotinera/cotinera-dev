@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Utensils, Hotel, Wine, Coffee, MapPin, ShoppingCart, Moon, Search } from 'lucide-react';
+import { Utensils, Hotel, Wine, Coffee, MapPin, Moon, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Official Places API types mapping
@@ -48,13 +48,6 @@ export const CATEGORY_TYPES = {
     type: 'tourist_attraction',
     icon: MapPin,
     color: 'bg-green-500',
-  },
-  groceries: {
-    id: 'groceries',
-    label: 'Groceries',
-    type: 'grocery_or_supermarket', 
-    icon: ShoppingCart,
-    color: 'bg-teal-500',
   },
 } as const;
 
