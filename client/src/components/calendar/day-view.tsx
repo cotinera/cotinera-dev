@@ -568,6 +568,7 @@ export function DayView({ trip }: { trip: Trip }) {
   const [activeDropId, setActiveDropId] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [draggedEvent, setDraggedEvent] = useState<Activity | null>(null);
+  const [highlightedSlots, setHighlightedSlots] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -708,8 +709,30 @@ export function DayView({ trip }: { trip: Trip }) {
 
   const handleDragOver = (event: DragOverEvent) => {
     const { over } = event;
-    if (over) {
-      setActiveDropId(over.id as string);
+    if (over && draggedEvent) {
+      const dropId = over.id as string;
+      setActiveDropId(dropId);
+      
+      // Calculate event duration in hours (rounded up to nearest hour)
+      const eventStart = new Date(draggedEvent.startTime);
+      const eventEnd = new Date(draggedEvent.endTime);
+      const durationInMinutes = differenceInMinutes(eventEnd, eventStart);
+      const durationInHours = Math.ceil(durationInMinutes / 60);
+      
+      // Parse the drop target to get date and hour
+      const [dateStr, hourStr] = dropId.split("|");
+      const dropHour = parseInt(hourStr);
+      
+      // Calculate which slots to highlight based on event duration
+      const slotsToHighlight = new Set<string>();
+      for (let i = 0; i < durationInHours; i++) {
+        const slotHour = dropHour + i;
+        if (slotHour < 24) { // Don't exceed 24 hours in a day
+          slotsToHighlight.add(`${dateStr}|${slotHour}`);
+        }
+      }
+      
+      setHighlightedSlots(slotsToHighlight);
     }
   };
 
@@ -718,6 +741,7 @@ export function DayView({ trip }: { trip: Trip }) {
     document.body.classList.remove('select-none');
     setActiveDropId(null);
     setDraggedEvent(null);
+    setHighlightedSlots(new Set());
 
     if (!event.over) return;
 
@@ -1303,7 +1327,7 @@ export function DayView({ trip }: { trip: Trip }) {
                   {hours.map((hour) => {
                     const timeSlotEvents = getTimeSlotEvents(date, hour);
                     const timeSlotId = `${date.toISOString()}|${hour}`;
-                    const isOver = activeDropId === timeSlotId;
+                    const isOver = highlightedSlots.has(timeSlotId);
 
                     return (
                       <DroppableTimeSlot 
