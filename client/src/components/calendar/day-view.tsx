@@ -228,7 +228,7 @@ function DraggableEvent({
       const currentEnd = new Date(event.endTime);
       
       if (
-        Math.abs(currentStart.getTime() - previewStart.getTime()) < 1000 ||
+        Math.abs(currentStart.getTime() - previewStart.getTime()) < 1000 &&
         Math.abs(currentEnd.getTime() - previewEnd.getTime()) < 1000
       ) {
         setPreviewHeight(null);
