@@ -106,10 +106,10 @@ function DraggableEvent({
   onDelete,
   onResize,
 }: {
-  event: Activity;
+  event: Activity & { isSegment?: boolean; originalEvent?: Activity };
   onEdit: () => void;
   onDelete: () => void;
-  onResize: (edge: 'top' | 'bottom', newTime: Date) => void;
+  onResize: (eventId: number, edge: 'top' | 'bottom', newTime: Date) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: event.id.toString(),
@@ -118,17 +118,19 @@ function DraggableEvent({
   const [isResizing, setIsResizing] = useState(false);
   const [resizeEdge, setResizeEdge] = useState<'top' | 'bottom' | null>(null);
   const [previewHeight, setPreviewHeight] = useState<number | null>(null);
+  const [previewTop, setPreviewTop] = useState<number | null>(null);
   const [previewStart, setPreviewStart] = useState<Date | null>(null);
   const [previewEnd, setPreviewEnd] = useState<Date | null>(null);
   
   const elementRef = useRef<HTMLDivElement>(null);
   const initialMouseYRef = useRef<number>(0);
+  const initialTopOffsetRef = useRef<number>(0);
   const initialEventRef = useRef<Activity>(event);
 
   const eventStart = new Date(event.startTime);
   const eventEnd = new Date(event.endTime);
   const durationInMinutes = differenceInMinutes(eventEnd, eventStart);
-  const heightInPixels = Math.max((durationInMinutes / 60) * 48, 48);
+  const heightInPixels = Math.max((durationInMinutes / 60) * 48, 12);
 
   const handleResizeStart = (e: React.MouseEvent, edge: 'top' | 'bottom') => {
     e.preventDefault();
@@ -138,7 +140,13 @@ function DraggableEvent({
     setResizeEdge(edge);
     initialMouseYRef.current = e.clientY;
     initialEventRef.current = event;
+    
+    const startMinutes = eventStart.getMinutes();
+    const topOffset = (startMinutes / 60) * 48;
+    initialTopOffsetRef.current = topOffset;
+    
     setPreviewHeight(heightInPixels);
+    setPreviewTop(topOffset);
     setPreviewStart(eventStart);
     setPreviewEnd(eventEnd);
   };
@@ -148,37 +156,35 @@ function DraggableEvent({
 
     e.preventDefault();
     const deltaY = e.clientY - initialMouseYRef.current;
-    const deltaMinutes = Math.round((deltaY / 48) * 60 / 15) * 15; // Snap to 15-minute increments
+    const deltaMinutes = Math.round((deltaY / 48) * 60 / 15) * 15;
 
     if (resizeEdge === 'top') {
-      // Create new start time without mutating
       const originalStartTime = new Date(initialEventRef.current.startTime);
+      const originalEndTime = new Date(initialEventRef.current.endTime);
       const newStartTime = new Date(originalStartTime.getTime() + deltaMinutes * 60 * 1000);
       
-      // Ensure minimum 15-minute duration and doesn't go past end time
-      const originalEndTime = new Date(initialEventRef.current.endTime);
       const maxStartTime = new Date(originalEndTime.getTime() - 15 * 60 * 1000);
       
       if (newStartTime <= maxStartTime) {
         const newDurationMinutes = differenceInMinutes(originalEndTime, newStartTime);
-        const newHeight = Math.max((newDurationMinutes / 60) * 48, 12); // 12px minimum (15 minutes)
+        const newHeight = Math.max((newDurationMinutes / 60) * 48, 12);
+        const newTopOffset = (newStartTime.getMinutes() / 60) * 48;
         
         setPreviewHeight(newHeight);
+        setPreviewTop(newTopOffset);
         setPreviewStart(newStartTime);
         setPreviewEnd(originalEndTime);
       }
     } else {
-      // Create new end time without mutating
       const originalEndTime = new Date(initialEventRef.current.endTime);
+      const originalStartTime = new Date(initialEventRef.current.startTime);
       const newEndTime = new Date(originalEndTime.getTime() + deltaMinutes * 60 * 1000);
       
-      // Ensure minimum 15-minute duration and doesn't go before start time
-      const originalStartTime = new Date(initialEventRef.current.startTime);
       const minEndTime = new Date(originalStartTime.getTime() + 15 * 60 * 1000);
       
       if (newEndTime >= minEndTime) {
         const newDurationMinutes = differenceInMinutes(newEndTime, originalStartTime);
-        const newHeight = Math.max((newDurationMinutes / 60) * 48, 12); // 12px minimum (15 minutes)
+        const newHeight = Math.max((newDurationMinutes / 60) * 48, 12);
         
         setPreviewHeight(newHeight);
         setPreviewStart(originalStartTime);
@@ -189,20 +195,24 @@ function DraggableEvent({
 
   const handleResizeEnd = useCallback(() => {
     if (isResizing && resizeEdge && previewStart && previewEnd) {
-      // Always call onResize with the final preview time
+      const originalEvent = event.originalEvent || event;
+      const eventIdStr = String(originalEvent.id);
+      const originalEventId = typeof originalEvent.id === 'number' ? originalEvent.id : parseInt(eventIdStr.split('_')[0]);
+      
       if (resizeEdge === 'top') {
-        onResize('top', previewStart);
+        onResize(originalEventId, 'top', previewStart);
       } else if (resizeEdge === 'bottom') {
-        onResize('bottom', previewEnd);
+        onResize(originalEventId, 'bottom', previewEnd);
       }
     }
     
     setIsResizing(false);
     setResizeEdge(null);
     setPreviewHeight(null);
+    setPreviewTop(null);
     setPreviewStart(null);
     setPreviewEnd(null);
-  }, [isResizing, resizeEdge, previewStart, previewEnd, onResize]);
+  }, [isResizing, resizeEdge, previewStart, previewEnd, onResize, event]);
 
   useEffect(() => {
     if (isResizing) {
@@ -219,9 +229,9 @@ function DraggableEvent({
   const displayStart = previewStart ?? eventStart;
   const displayEnd = previewEnd ?? eventEnd;
 
-  // Calculate top position based on minutes offset from the start of the hour
   const startMinutes = displayStart.getMinutes();
-  const topOffset = (startMinutes / 60) * 48; // 48px per hour
+  const calculatedTopOffset = (startMinutes / 60) * 48;
+  const topOffset = previewTop ?? calculatedTopOffset;
 
   const style: React.CSSProperties = {
     transform: !isResizing && transform ? CSS.Transform.toString(transform) : undefined,
@@ -232,7 +242,7 @@ function DraggableEvent({
     top: `${topOffset}px`,
     backgroundColor: isResizing ? 'hsl(var(--primary)/0.8)' : isDragging ? 'hsl(var(--primary)/0.2)' : undefined,
     boxShadow: isDragging || isResizing ? 'var(--shadow-md)' : undefined,
-    opacity: 1, // Always keep visible
+    opacity: 1,
     zIndex: isDragging || isResizing ? 50 : 1,
     cursor: isResizing ? 'ns-resize' : 'move',
     transition: isResizing ? 'none' : undefined,
@@ -859,7 +869,6 @@ export function DayView({ trip }: { trip: Trip }) {
     }
   };
 
-  // Split multi-day events into daily segments
   const splitMultiDayEvents = (activities: Activity[]) => {
     const splitEvents: (Activity & { isSegment?: boolean; originalEvent?: Activity })[] = [];
     
@@ -867,7 +876,6 @@ export function DayView({ trip }: { trip: Trip }) {
       const eventStart = new Date(event.startTime);
       const eventEnd = new Date(event.endTime);
       
-      // Check if it's an all-day event
       const isAllDay = (
         eventStart.getHours() === 0 && 
         eventStart.getMinutes() === 0 &&
@@ -876,22 +884,15 @@ export function DayView({ trip }: { trip: Trip }) {
         eventEnd.getTime() - eventStart.getTime() >= 24 * 60 * 60 * 1000
       );
       
-      // If it's an all-day event or doesn't span multiple days, keep as is
       if (isAllDay || eventStart.toDateString() === eventEnd.toDateString()) {
         splitEvents.push(event);
         return;
       }
       
-      // Split multi-day event into daily segments
       const currentDate = new Date(eventStart);
-      currentDate.setHours(0, 0, 0, 0); // Start of the day
+      currentDate.setHours(0, 0, 0, 0);
       
       while (currentDate < eventEnd) {
-        const dayStart = new Date(currentDate);
-        const dayEnd = new Date(currentDate);
-        dayEnd.setHours(23, 59, 59, 999); // End of the day
-        
-        // Determine segment start and end times
         const segmentStart = currentDate.toDateString() === eventStart.toDateString() 
           ? new Date(eventStart) 
           : new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate(), 0, 0, 0, 0);
@@ -900,19 +901,17 @@ export function DayView({ trip }: { trip: Trip }) {
           ? new Date(eventEnd) 
           : new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate() + 1, 0, 0, 0, 0);
         
-        // Only create segment if it has valid duration
         if (segmentStart < segmentEnd) {
           splitEvents.push({
             ...event,
-            id: event.id + '_' + currentDate.toISOString().split('T')[0], // Unique ID for segment
-            startTime: segmentStart.toISOString(),
-            endTime: segmentEnd.toISOString(),
+            id: (event.id + '_' + currentDate.toISOString().split('T')[0]) as any,
+            startTime: new Date(segmentStart),
+            endTime: new Date(segmentEnd),
             isSegment: true,
             originalEvent: event
-          });
+          } as any);
         }
         
-        // Move to next day
         currentDate.setDate(currentDate.getDate() + 1);
       }
     });
@@ -1073,19 +1072,16 @@ export function DayView({ trip }: { trip: Trip }) {
     }
   };
 
-  const handleResize = async (eventId: string | number, edge: 'top' | 'bottom', newTime: Date) => {
-    // Find the event in the activities array
-    const event = activities.find((a) => a.id.toString() === eventId.toString());
+  const handleResize = async (eventId: number, edge: 'top' | 'bottom', newTime: Date) => {
+    const event = activities.find((a) => a.id === eventId);
     if (!event) return;
 
-    // Create optimistic update immediately
     const optimisticUpdate = {
       ...event,
       startTime: edge === 'top' ? newTime.toISOString() : event.startTime,
       endTime: edge === 'bottom' ? newTime.toISOString() : event.endTime,
     };
 
-    // Apply optimistic update to cache immediately
     queryClient.setQueryData(
       [`/api/trips/${trip.id}/activities`],
       (old: Activity[] | undefined) => {
@@ -1096,7 +1092,6 @@ export function DayView({ trip }: { trip: Trip }) {
       }
     );
 
-    // Prepare the server update data
     const updateData = {
       title: event.title,
       description: event.description,
@@ -1107,21 +1102,13 @@ export function DayView({ trip }: { trip: Trip }) {
     };
 
     try {
-      console.log('📤 Sending PATCH request:', {
-        url: `/api/trips/${trip.id}/activities/${event.id}`,
-        updateData
-      });
-
       const res = await fetch(`/api/trips/${trip.id}/activities/${event.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updateData),
       });
 
-      console.log('📥 PATCH response:', { status: res.status, ok: res.ok });
-
       if (!res.ok) {
-        // Revert optimistic update on error
         queryClient.setQueryData(
           [`/api/trips/${trip.id}/activities`],
           (old: Activity[] | undefined) => {
@@ -1136,7 +1123,6 @@ export function DayView({ trip }: { trip: Trip }) {
 
       const updatedActivity = await res.json();
       
-      // Update cache with server response (in case server modified the data)
       queryClient.setQueryData(
         [`/api/trips/${trip.id}/activities`],
         (old: Activity[] | undefined) => {
@@ -1147,7 +1133,6 @@ export function DayView({ trip }: { trip: Trip }) {
         }
       );
       
-      // Sync resized activity to Google Calendar
       const googleCalendarSync = (window as any)[`googleCalendarSync_${trip.id}`];
       if (googleCalendarSync && updatedActivity) {
         googleCalendarSync(updatedActivity);
@@ -1343,18 +1328,23 @@ export function DayView({ trip }: { trip: Trip }) {
                         onMouseDown={(e) => handleTimeSlotMouseDown(e, date, hour)}
                         onMouseEnter={(e) => handleTimeSlotMouseEnter(e, date, hour)}
                       >
-                        {timeSlotEvents.map((event) => (
-                          <DraggableEvent
-                            key={event.id}
-                            event={event}
-                            onEdit={() => {
-                              setSelectedEvent(event);
-                              setIsEditDialogOpen(true);
-                            }}
-                            onDelete={() => deleteEvent(event.id)}
-                            onResize={(edge, newTime) => handleResize(event.id, edge, newTime)}
-                          />
-                        ))}
+                        {timeSlotEvents.map((event) => {
+                          const originalEvent = event.originalEvent || event;
+                          const eventIdStr = String(originalEvent.id);
+                          const originalEventId = typeof originalEvent.id === 'number' ? originalEvent.id : parseInt(eventIdStr.split('_')[0]);
+                          return (
+                            <DraggableEvent
+                              key={event.id}
+                              event={event}
+                              onEdit={() => {
+                                setSelectedEvent(originalEvent);
+                                setIsEditDialogOpen(true);
+                              }}
+                              onDelete={() => deleteEvent(originalEventId)}
+                              onResize={handleResize}
+                            />
+                          );
+                        })}
                         {/* Show selection overlay during drag */}
                         {dragSelectedSlots.has(timeSlotId) && isDragSelecting && (
                           <div className="absolute inset-0 bg-blue-100 dark:bg-blue-900/30 pointer-events-none" />
