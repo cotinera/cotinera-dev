@@ -141,8 +141,8 @@ function DraggableEvent({
     initialMouseYRef.current = e.clientY;
     initialEventRef.current = event;
     
-    const startMinutes = eventStart.getMinutes();
-    const topOffset = (startMinutes / 60) * 48;
+    const minutesFromMidnight = eventStart.getHours() * 60 + eventStart.getMinutes();
+    const topOffset = (minutesFromMidnight / 60) * 48;
     initialTopOffsetRef.current = topOffset;
     
     setPreviewHeight(heightInPixels);
@@ -168,7 +168,8 @@ function DraggableEvent({
       if (newStartTime <= maxStartTime) {
         const newDurationMinutes = differenceInMinutes(originalEndTime, newStartTime);
         const newHeight = Math.max((newDurationMinutes / 60) * 48, 12);
-        const newTopOffset = (newStartTime.getMinutes() / 60) * 48;
+        const minutesFromMidnight = newStartTime.getHours() * 60 + newStartTime.getMinutes();
+        const newTopOffset = (minutesFromMidnight / 60) * 48;
         
         setPreviewHeight(newHeight);
         setPreviewTop(newTopOffset);
@@ -208,10 +209,6 @@ function DraggableEvent({
     
     setIsResizing(false);
     setResizeEdge(null);
-    setPreviewHeight(null);
-    setPreviewTop(null);
-    setPreviewStart(null);
-    setPreviewEnd(null);
   }, [isResizing, resizeEdge, previewStart, previewEnd, onResize, event]);
 
   useEffect(() => {
@@ -225,12 +222,29 @@ function DraggableEvent({
     }
   }, [isResizing, resizeEdge, handleResizeMove, handleResizeEnd]);
 
+  useEffect(() => {
+    if (!isResizing && previewStart && previewEnd) {
+      const currentStart = new Date(event.startTime);
+      const currentEnd = new Date(event.endTime);
+      
+      if (
+        Math.abs(currentStart.getTime() - previewStart.getTime()) < 1000 ||
+        Math.abs(currentEnd.getTime() - previewEnd.getTime()) < 1000
+      ) {
+        setPreviewHeight(null);
+        setPreviewTop(null);
+        setPreviewStart(null);
+        setPreviewEnd(null);
+      }
+    }
+  }, [event.startTime, event.endTime, isResizing, previewStart, previewEnd]);
+
   const displayHeight = previewHeight ?? heightInPixels;
   const displayStart = previewStart ?? eventStart;
   const displayEnd = previewEnd ?? eventEnd;
 
-  const startMinutes = displayStart.getMinutes();
-  const calculatedTopOffset = (startMinutes / 60) * 48;
+  const minutesFromMidnight = displayStart.getHours() * 60 + displayStart.getMinutes();
+  const calculatedTopOffset = (minutesFromMidnight / 60) * 48;
   const topOffset = previewTop ?? calculatedTopOffset;
 
   const style: React.CSSProperties = {
