@@ -219,13 +219,17 @@ function DraggableEvent({
   const displayStart = previewStart ?? eventStart;
   const displayEnd = previewEnd ?? eventEnd;
 
+  // Calculate top position based on minutes offset from the start of the hour
+  const startMinutes = displayStart.getMinutes();
+  const topOffset = (startMinutes / 60) * 48; // 48px per hour
+
   const style: React.CSSProperties = {
     transform: !isResizing && transform ? CSS.Transform.toString(transform) : undefined,
     width: '90%',
     height: `${displayHeight}px`,
     position: 'absolute',
     left: '0',
-    top: '0',
+    top: `${topOffset}px`,
     backgroundColor: isResizing ? 'hsl(var(--primary)/0.8)' : isDragging ? 'hsl(var(--primary)/0.2)' : undefined,
     boxShadow: isDragging || isResizing ? 'var(--shadow-md)' : undefined,
     opacity: 1, // Always keep visible
