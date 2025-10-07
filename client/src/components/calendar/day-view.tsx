@@ -248,15 +248,14 @@ function DraggableEvent({
   const topOffset = previewTop ?? calculatedTopOffset;
 
   const style: React.CSSProperties = {
-    transform: !isResizing && transform ? CSS.Transform.toString(transform) : undefined,
     width: '90%',
     height: `${displayHeight}px`,
     position: 'absolute',
     left: '0',
     top: `${topOffset}px`,
-    backgroundColor: isResizing ? 'hsl(var(--primary)/0.8)' : isDragging ? 'hsl(var(--primary)/0.2)' : undefined,
+    backgroundColor: isResizing ? 'hsl(var(--primary)/0.8)' : undefined,
     boxShadow: isDragging || isResizing ? 'var(--shadow-md)' : undefined,
-    opacity: 1,
+    opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging || isResizing ? 50 : 1,
     cursor: isResizing ? 'ns-resize' : 'move',
     transition: isResizing ? 'none' : undefined,
@@ -774,9 +773,7 @@ export function DayView({ trip }: { trip: Trip }) {
     if (!event.over) return;
 
     const draggedId = event.active.id as string;
-    const [dateStr, hourStr] = (event.over.id as string).split("|");
-    const newDate = new Date(dateStr);
-    const newHour = parseInt(hourStr);
+    const [dateStr] = (event.over.id as string).split("|");
 
     // Find the dragged event (could be original or split segment)
     const splitEvent = splitActivities.find((a) => a.id.toString() === draggedId);
@@ -788,7 +785,17 @@ export function DayView({ trip }: { trip: Trip }) {
     const originalEnd = new Date(originalEvent.endTime);
     const fullDurationInMinutes = differenceInMinutes(originalEnd, originalStart);
 
-    const newStartTime = snapToQuarterHour(new Date(newDate.setHours(newHour, 0, 0)));
+    // Calculate new time based on pixel movement (delta.y)
+    // 48 pixels = 1 hour, so deltaY pixels = (deltaY / 48) hours
+    const deltaMinutes = Math.round((event.delta.y / 48) * 60 / 15) * 15; // Snap to 15 minutes
+    const newStartTime = new Date(originalStart.getTime() + deltaMinutes * 60 * 1000);
+    
+    // Update the date if dropped on a different day
+    const droppedDate = new Date(dateStr);
+    if (droppedDate.toDateString() !== originalStart.toDateString()) {
+      newStartTime.setFullYear(droppedDate.getFullYear(), droppedDate.getMonth(), droppedDate.getDate());
+    }
+    
     const newEndTime = new Date(newStartTime.getTime() + fullDurationInMinutes * 60 * 1000);
 
     const tripStart = startOfDay(new Date(trip.startDate));
