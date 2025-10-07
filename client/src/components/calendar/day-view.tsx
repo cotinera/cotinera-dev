@@ -105,11 +105,13 @@ function DraggableEvent({
   onEdit,
   onDelete,
   onResize,
+  onDragStart,
 }: {
   event: Activity & { isSegment?: boolean; originalEvent?: Activity };
   onEdit: () => void;
   onDelete: () => void;
   onResize: (eventId: number, edge: 'top' | 'bottom', newTime: Date) => void;
+  onDragStart?: (clickOffsetY: number, originalTopPixels: number, originalEvent: Activity) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: event.id.toString(),
@@ -277,6 +279,22 @@ function DraggableEvent({
     if (isResizing) return;
     clickRef.current = { x: e.clientX, y: e.clientY };
     setMouseDown(true);
+    
+    // Capture click offset for drag behavior fix
+    if (onDragStart && elementRef.current) {
+      const rect = elementRef.current.getBoundingClientRect();
+      const clickOffsetY = e.clientY - rect.top;
+      
+      // Calculate original top position in pixels based on event start time
+      const eventStart = new Date(event.startTime);
+      const minutesFromMidnight = eventStart.getHours() * 60 + eventStart.getMinutes();
+      const originalTopPixels = (minutesFromMidnight / 60) * 48;
+      
+      // Get the original event (not a segment)
+      const originalEvent = event.originalEvent || event;
+      
+      onDragStart(clickOffsetY, originalTopPixels, originalEvent);
+    }
   };
   
   // Handle mouseup to detect if it was a click (not much movement) or a drag
@@ -599,6 +617,13 @@ export function DayView({ trip }: { trip: Trip }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
+  // Store drag metadata to fix positioning
+  const dragMetadataRef = useRef<{
+    clickOffsetY: number;
+    originalTopPixels: number;
+    originalEvent: Activity;
+  } | null>(null);
+  
   // Drag selection state
   const [isDragSelecting, setIsDragSelecting] = useState(false);
   const [dragStartSlot, setDragStartSlot] = useState<{ date: Date; hour: number } | null>(null);
@@ -733,6 +758,15 @@ export function DayView({ trip }: { trip: Trip }) {
       setDraggedEvent(originalEvent);
     }
   };
+  
+  // Callback to capture drag metadata from DraggableEvent
+  const handleEventDragStart = (clickOffsetY: number, originalTopPixels: number, originalEvent: Activity) => {
+    dragMetadataRef.current = {
+      clickOffsetY,
+      originalTopPixels,
+      originalEvent,
+    };
+  };
 
   const handleDragOver = (event: DragOverEvent) => {
     const { over } = event;
@@ -764,37 +798,40 @@ export function DayView({ trip }: { trip: Trip }) {
   };
 
   const handleDragEnd = async (event: DragEndEvent) => {
+    const metadata = dragMetadataRef.current;
+    
     setIsDragging(false);
     document.body.classList.remove('select-none');
     setActiveDropId(null);
     setDraggedEvent(null);
     setHighlightedSlots(new Set());
+    dragMetadataRef.current = null;
 
-    if (!event.over) return;
+    if (!event.over || !metadata) return;
 
-    const draggedId = event.active.id as string;
     const [dateStr] = (event.over.id as string).split("|");
 
-    // Find the dragged event (could be original or split segment)
-    const splitEvent = splitActivities.find((a) => a.id.toString() === draggedId);
-    if (!splitEvent) return;
-
-    // Get the original event and its duration
-    const originalEvent = splitEvent.originalEvent || splitEvent;
+    // Use metadata to get the original event
+    const originalEvent = metadata.originalEvent;
     const originalStart = new Date(originalEvent.startTime);
     const originalEnd = new Date(originalEvent.endTime);
     const fullDurationInMinutes = differenceInMinutes(originalEnd, originalStart);
 
-    // Calculate new time based on pixel movement (delta.y)
-    // 48 pixels = 1 hour, so deltaY pixels = (deltaY / 48) hours
-    const deltaMinutes = Math.round((event.delta.y / 48) * 60 / 15) * 15; // Snap to 15 minutes
-    const newStartTime = new Date(originalStart.getTime() + deltaMinutes * 60 * 1000);
+    // Calculate new top position accounting for click offset
+    // newTop = originalTop + (delta.y - clickOffset)
+    const newTopPixels = metadata.originalTopPixels + (event.delta.y - metadata.clickOffsetY);
     
-    // Update the date if dropped on a different day
+    // Convert pixels to minutes (48px = 1 hour = 60 minutes)
+    const newMinutesFromMidnight = Math.round((newTopPixels / 48) * 60 / 15) * 15; // Snap to 15 minutes
+    
+    // Ensure within valid range (0-1440 minutes in a day)
+    const clampedMinutes = Math.max(0, Math.min(1440 - fullDurationInMinutes, newMinutesFromMidnight));
+    
+    // Create new start time with the calculated minutes
     const droppedDate = new Date(dateStr);
-    if (droppedDate.toDateString() !== originalStart.toDateString()) {
-      newStartTime.setFullYear(droppedDate.getFullYear(), droppedDate.getMonth(), droppedDate.getDate());
-    }
+    const newStartTime = new Date(droppedDate);
+    newStartTime.setHours(0, 0, 0, 0);
+    newStartTime.setMinutes(clampedMinutes);
     
     const newEndTime = new Date(newStartTime.getTime() + fullDurationInMinutes * 60 * 1000);
 
@@ -1363,6 +1400,7 @@ export function DayView({ trip }: { trip: Trip }) {
                               }}
                               onDelete={() => deleteEvent(originalEventId)}
                               onResize={handleResize}
+                              onDragStart={handleEventDragStart}
                             />
                           );
                         })}
