@@ -15,7 +15,7 @@ import { emitTripUpdate } from "./utils/socket";
 // Configure multer for handling file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadDir = path.join(process.cwd(), 'uploads');
+    const uploadDir = path.join(process.cwd(), 'server', 'uploads');
     // Create uploads directory if it doesn't exist
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
@@ -1133,7 +1133,7 @@ export function registerRoutes(app: Express): Server {
 
 
   // Serve static files for uploads
-  app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+  app.use('/uploads', express.static(path.join(process.cwd(), 'server', 'uploads')));
 
   // Handle image upload for trips
   app.post("/api/trips/:tripId/image", upload.single('image'), async (req, res) => {
