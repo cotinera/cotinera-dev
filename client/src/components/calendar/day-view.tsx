@@ -667,7 +667,7 @@ export function DayView({ trip }: { trip: Trip }) {
     // Only support single day selection for now
     if (start.date.toDateString() === end.date.toDateString()) {
       for (let hour = startHour; hour <= endHour; hour++) {
-        newSelectedSlots.add(`${start.date.toISOString()}|${hour}`);
+        newSelectedSlots.add(`${format(start.date, 'yyyy-MM-dd')}|${hour}`);
       }
     }
     
@@ -683,7 +683,7 @@ export function DayView({ trip }: { trip: Trip }) {
     setIsDragSelecting(true);
     setDragStartSlot({ date, hour });
     setDragEndSlot({ date, hour });
-    setDragSelectedSlots(new Set([`${date.toISOString()}|${hour}`]));
+    setDragSelectedSlots(new Set([`${format(date, 'yyyy-MM-dd')}|${hour}`]));
   };
   
   const handleTimeSlotMouseEnter = (e: React.MouseEvent, date: Date, hour: number) => {
@@ -817,9 +817,8 @@ export function DayView({ trip }: { trip: Trip }) {
     const originalEnd = new Date(originalEvent.endTime);
     const fullDurationInMinutes = differenceInMinutes(originalEnd, originalStart);
 
-    // Calculate new top position accounting for click offset
-    // newTop = originalTop + (delta.y - clickOffset)
-    const newTopPixels = metadata.originalTopPixels + (event.delta.y - metadata.clickOffsetY);
+    // Calculate new top position using delta.y (which already accounts for movement)
+    const newTopPixels = metadata.originalTopPixels + event.delta.y;
     
     // Convert pixels to minutes (48px = 1 hour = 60 minutes)
     const newMinutesFromMidnight = Math.round((newTopPixels / 48) * 60 / 15) * 15; // Snap to 15 minutes
@@ -827,8 +826,8 @@ export function DayView({ trip }: { trip: Trip }) {
     // Ensure within valid range (0-1440 minutes in a day)
     const clampedMinutes = Math.max(0, Math.min(1440 - fullDurationInMinutes, newMinutesFromMidnight));
     
-    // Create new start time with the calculated minutes
-    const droppedDate = new Date(dateStr);
+    // Create new start time with the calculated minutes (parse as local date to avoid timezone shift)
+    const droppedDate = parse(dateStr, 'yyyy-MM-dd', new Date());
     const newStartTime = new Date(droppedDate);
     newStartTime.setHours(0, 0, 0, 0);
     newStartTime.setMinutes(clampedMinutes);
@@ -962,7 +961,7 @@ export function DayView({ trip }: { trip: Trip }) {
         if (segmentStart < segmentEnd) {
           splitEvents.push({
             ...event,
-            id: (event.id + '_' + currentDate.toISOString().split('T')[0]) as any,
+            id: (event.id + '_' + format(currentDate, 'yyyy-MM-dd')) as any,
             startTime: new Date(segmentStart),
             endTime: new Date(segmentEnd),
             isSegment: true,
@@ -1297,7 +1296,7 @@ export function DayView({ trip }: { trip: Trip }) {
               <div className="w-16 flex-none border-r sticky left-0 z-40 bg-background p-4" />
               {dates.map((date) => (
                 <div
-                  key={date.toISOString()}
+                  key={format(date, 'yyyy-MM-dd')}
                   className="w-[300px] p-4 border-l first:border-l-0 font-semibold text-center bg-background"
                 >
                   {format(date, "EEEE, MMMM d")}
@@ -1314,7 +1313,7 @@ export function DayView({ trip }: { trip: Trip }) {
               const allDayEvents = getAllDayEvents(date);
               return (
                 <div
-                  key={`allday-${date.toISOString()}`}
+                  key={`allday-${format(date, 'yyyy-MM-dd')}`}
                   className="w-[300px] border-l first:border-l-0 p-2 min-h-[30px] relative bg-background"
                 >
                   <div className="space-y-1">
@@ -1368,12 +1367,12 @@ export function DayView({ trip }: { trip: Trip }) {
             <div className="flex">
               {dates.map((date) => (
                 <div
-                  key={date.toISOString()}
+                  key={format(date, 'yyyy-MM-dd')}
                   className="w-[300px] border-l first:border-l-0"
                 >
                   {hours.map((hour) => {
                     const timeSlotEvents = getTimeSlotEvents(date, hour);
-                    const timeSlotId = `${date.toISOString()}|${hour}`;
+                    const timeSlotId = `${format(date, 'yyyy-MM-dd')}|${hour}`;
                     const isOver = highlightedSlots.has(timeSlotId);
 
                     return (
