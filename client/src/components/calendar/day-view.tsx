@@ -33,6 +33,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   format,
   addHours,
@@ -60,6 +61,20 @@ import {
   DragOverlay,
 } from "@dnd-kit/core";
 import type { Trip, Activity, User } from "@db/schema";
+
+// Extended types with relations
+type TripWithParticipants = Trip & {
+  participants?: Array<{
+    id: number;
+    user?: User | null;
+  }> | null;
+};
+
+type ActivityWithParticipants = Activity & {
+  participants?: Array<{
+    userId: number;
+  }> | null;
+};
 import { Pencil, Trash2, Loader2, Users } from "lucide-react";
 import { CSS } from "@dnd-kit/utilities";
 import { useToast } from "@/hooks/use-toast";
@@ -415,7 +430,7 @@ function EventForm({
   defaultValues: EventFormValues;
   onSubmit: (values: EventFormValues) => void;
   submitLabel: string;
-  trip: Trip;
+  trip: TripWithParticipants;
 }) {
   const form = useForm<EventFormValues>({
     resolver: zodResolver(eventFormSchema),
@@ -429,7 +444,7 @@ function EventForm({
   // Get all participants from the trip, ensuring we have valid user objects
   const participants = (trip.participants || [])
     .map(p => p.user)
-    .filter((user): user is User => !!user);
+    .filter((user): user is User => user != null);
 
   return (
     <Form {...form}>
@@ -524,7 +539,7 @@ function EventForm({
               <FormControl>
                 <div className="h-[200px] rounded-md overflow-hidden">
                   <MapPicker
-                    value={field.value}
+                    value={field.value || ""}
                     onChange={(address, coordinates) => {
                       field.onChange(address);
                       if (coordinates) {
@@ -532,8 +547,8 @@ function EventForm({
                       }
                     }}
                     placeholder="Search for a location..."
-                    initialCenter={form.getValues('coordinates') || trip.coordinates}
-                    searchBias={trip.coordinates}
+                    initialCenter={form.getValues('coordinates') ?? trip.coordinates ?? undefined}
+                    searchBias={trip.coordinates ?? undefined}
                   />
                 </div>
               </FormControl>
@@ -569,29 +584,34 @@ function EventForm({
                   <span>Participants (optional)</span>
                 </div>
               </FormLabel>
-              <Select
-                defaultValue={field.value.map(String)}
-                onValueChange={(values) => {
-                  field.onChange(values.map(Number));
-                }}
-                multiple
-              >
-                <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select participants" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent>
-                  {participants.map((participant) => (
-                    <SelectItem
-                      key={participant.id}
-                      value={participant.id.toString()}
-                    >
-                      {participant.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <FormControl>
+                <div className="space-y-3 rounded-md border p-3">
+                  {participants.length > 0 ? (
+                    participants.map((participant) => (
+                      <div key={participant.id} className="flex items-center space-x-3">
+                        <Checkbox
+                          id={`participant-${participant.id}`}
+                          checked={field.value.includes(participant.id)}
+                          onCheckedChange={(checked) => {
+                            const newValue = checked
+                              ? [...field.value, participant.id]
+                              : field.value.filter((id: number) => id !== participant.id);
+                            field.onChange(newValue);
+                          }}
+                        />
+                        <label 
+                          htmlFor={`participant-${participant.id}`} 
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                        >
+                          {participant.name || participant.username || participant.email}
+                        </label>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No participants in this trip</p>
+                  )}
+                </div>
+              </FormControl>
               <FormMessage />
             </FormItem>
           )}
@@ -604,7 +624,7 @@ function EventForm({
 }
 
 // Component exports
-export function DayView({ trip }: { trip: Trip }) {
+export function DayView({ trip }: { trip: TripWithParticipants }) {
   const [newEventTitle, setNewEventTitle] = useState("");
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<TimeSlot | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<Activity | null>(null);
@@ -1244,7 +1264,7 @@ export function DayView({ trip }: { trip: Trip }) {
     };
   };
 
-  const getEditFormDefaults = (event: Activity): EventFormValues => {
+  const getEditFormDefaults = (event: ActivityWithParticipants): EventFormValues => {
     const startTime = new Date(event.startTime);
     const endTime = new Date(event.endTime);
     
@@ -1264,7 +1284,7 @@ export function DayView({ trip }: { trip: Trip }) {
       date: format(startTime, "yyyy-MM-dd"),
       location: event.location || "",
       description: event.description || "",
-      participants: event.participants?.map(p => p.userId) || [],
+      participants: (event.participants || []).map(p => p.userId),
       coordinates: event.coordinates || null,
       isAllDay
     };
