@@ -117,7 +117,7 @@ function DraggableEvent({
   event: Activity & { isSegment?: boolean; originalEvent?: Activity };
   onEdit: () => void;
   onDelete: () => void;
-  onResize: (eventId: number, edge: 'top' | 'bottom', newTime: Date) => void;
+  onResize: (eventId: number, edge: 'top' | 'bottom' | 'move', newTime: Date) => void;
   onDragStart?: (clickOffsetY: number, originalTopPixels: number, originalEvent: Activity) => void;
 }) {
 
@@ -328,9 +328,9 @@ function DraggableEvent({
     left: '0',
     top: `${topOffset}px`,
     backgroundColor: isResizing ? 'hsl(var(--primary)/0.8)' : undefined,
-    boxShadow: isDragging || isResizing ? 'var(--shadow-md)' : undefined,
-    opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging || isResizing ? 50 : 1,
+    boxShadow: isDraggingBlock || isResizing ? 'var(--shadow-md)' : undefined,
+    opacity: isDraggingBlock ? 0.5 : 1,
+    zIndex: isDraggingBlock || isResizing ? 50 : 1,
     cursor: isResizing ? 'ns-resize' : 'move',
     transition: isResizing ? 'none' : undefined,
   };
@@ -370,13 +370,13 @@ function DraggableEvent({
   
   // Handle mouseup to detect if it was a click (not much movement) or a drag
   const handleMouseUp = (e: React.MouseEvent) => {
-    if (!clickRef.current || isResizing || isDragging) return;
+    if (!clickRef.current || isResizing || isDraggingBlock) return;
     
     const deltaX = Math.abs(e.clientX - clickRef.current.x);
     const deltaY = Math.abs(e.clientY - clickRef.current.y);
     
     // If minimal movement (less than 5px) and not dragging, treat as a click and open edit
-    if (deltaX < 5 && deltaY < 5 && mouseDown && !isDragging) {
+    if (deltaX < 5 && deltaY < 5 && mouseDown && !isDraggingBlock) {
       onEdit();
     }
     
@@ -450,7 +450,6 @@ function DraggableEvent({
 function DroppableTimeSlot({
   id,
   isOver,
-  isDragging,
   isSelected,
   onMouseDown,
   onMouseEnter,
@@ -458,7 +457,6 @@ function DroppableTimeSlot({
 }: {
   id: string;
   isOver: boolean;
-  isDragging: boolean;
   isSelected: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
   onMouseEnter: (e: React.MouseEvent) => void;
@@ -707,6 +705,9 @@ export function DayView({ trip }: { trip: TripWithParticipants }) {
   
   // Store the drag selection range for the create dialog
   const [dragSelectionRange, setDragSelectionRange] = useState<{ startHour: number; endHour: number; date: Date } | null>(null);
+
+  // Ref to store drag metadata from DraggableEvent
+  const dragMetadataRef = useRef<{ clickOffsetY: number; originalTopPixels: number; originalEvent: Activity } | null>(null);
 
 
   const tripStartDate = new Date(trip.startDate);
@@ -1282,7 +1283,6 @@ export function DayView({ trip }: { trip: TripWithParticipants }) {
                         key={timeSlotId} 
                         id={timeSlotId} 
                         isOver={isOver} 
-                        isDragging={isDragging}
                         isSelected={dragSelectedSlots.has(timeSlotId)}
                         onMouseDown={(e) => handleTimeSlotMouseDown(e, date, hour)}
                         onMouseEnter={(e) => handleTimeSlotMouseEnter(e, date, hour)}
@@ -1311,7 +1311,7 @@ export function DayView({ trip }: { trip: TripWithParticipants }) {
                         )}
                         
                         {/* Original add event button (hidden during drag selection) */}
-                        {timeSlotEvents.length === 0 && !isDragging && !isDragSelecting && (
+                        {timeSlotEvents.length === 0 && !isDragSelecting && (
                           <div 
                             className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity cursor-pointer bg-blue-100 dark:bg-blue-900/30"
                             onClick={() => {
