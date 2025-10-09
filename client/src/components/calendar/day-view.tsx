@@ -133,6 +133,7 @@ function DraggableEvent({
   const initialTopOffsetRef = useRef<number>(0);
   const initialEventRef = useRef<Activity>(event);
 
+  // Fix timezone issues by using local time consistently
   const eventStart = new Date(event.startTime);
   const eventEnd = new Date(event.endTime);
   const durationInMinutes = differenceInMinutes(eventEnd, eventStart);
@@ -147,6 +148,7 @@ function DraggableEvent({
     initialMouseYRef.current = e.clientY;
     initialEventRef.current = event;
     
+    // Use the actual event times without timezone adjustments
     const minutesFromMidnight = eventStart.getHours() * 60 + eventStart.getMinutes();
     const topOffset = (minutesFromMidnight / 60) * 48;
     initialTopOffsetRef.current = topOffset;
@@ -224,10 +226,17 @@ function DraggableEvent({
   const originalEndRef = useRef(new Date(event.endTime));
 
   const handleBlockPointerDown = (e: React.PointerEvent) => {
+    // Don't start drag if we're resizing or clicking on buttons
     if (isResizing) return;
+    const target = e.target as HTMLElement;
+    if (target.closest('button')) return;
+    
     const el = elementRef.current;
     if (!el) return;
 
+    // Prevent text selection during drag
+    e.preventDefault();
+    
     el.setPointerCapture(e.pointerId);
     const rect = el.getBoundingClientRect();
     clickOffsetYRef.current = e.clientY - rect.top;
@@ -242,21 +251,30 @@ function DraggableEvent({
     if (!colEl) return;
     const colRect = colEl.getBoundingClientRect();
 
+    // Calculate position within column accounting for click offset
     let yInCol = e.clientY - colRect.top - clickOffsetYRef.current;
     const durationMin = differenceInMinutes(originalEndRef.current, originalStartRef.current);
     const durationPx = (durationMin / 60) * 48;
     const dayPx = 24 * 48;
+    
+    // Constrain movement within day bounds
     yInCol = Math.max(0, Math.min(dayPx - durationPx, yInCol));
 
+    // Convert pixels to minutes and snap to 15-minute intervals
     const rawMin = (yInCol / 48) * 60;
     const snappedMin = Math.round(rawMin / 15) * 15;
 
-    const baseDate = new Date(originalStartRef.current);
-    baseDate.setHours(0, 0, 0, 0);
+    // Calculate new times based on the date column we're in
+    const dateStr = colEl.getAttribute('data-date-column');
+    if (!dateStr) return;
+    
+    const baseDate = new Date(dateStr);
     const newStart = new Date(baseDate);
+    newStart.setHours(0, 0, 0, 0);
     newStart.setMinutes(snappedMin);
     const newEnd = new Date(newStart.getTime() + durationMin * 60000);
 
+    // Update preview state
     setPreviewStart(newStart);
     setPreviewEnd(newEnd);
     setPreviewTop((snappedMin / 60) * 48);
@@ -296,22 +314,27 @@ function DraggableEvent({
     }
   }, [isResizing, resizeEdge, handleResizeMove, handleResizeEnd]);
 
+  // Clear preview only when the event has been successfully updated
   useEffect(() => {
-    if (!isResizing && previewStart && previewEnd) {
+    if (!isResizing && !isDraggingBlock) {
+      // Only clear preview if it matches the current event times (update was successful)
       const currentStart = new Date(event.startTime);
       const currentEnd = new Date(event.endTime);
       
-      if (
-        Math.abs(currentStart.getTime() - previewStart.getTime()) < 1000 &&
-        Math.abs(currentEnd.getTime() - previewEnd.getTime()) < 1000
-      ) {
-        setPreviewHeight(null);
-        setPreviewTop(null);
-        setPreviewStart(null);
-        setPreviewEnd(null);
+      if (previewStart && previewEnd) {
+        const startDiff = Math.abs(currentStart.getTime() - previewStart.getTime());
+        const endDiff = Math.abs(currentEnd.getTime() - previewEnd.getTime());
+        
+        // Clear preview only if the event was successfully updated to match preview
+        if (startDiff < 60000 && endDiff < 60000) { // Within 1 minute tolerance
+          setPreviewHeight(null);
+          setPreviewTop(null);
+          setPreviewStart(null);
+          setPreviewEnd(null);
+        }
       }
     }
-  }, [event.startTime, event.endTime, isResizing, previewStart, previewEnd]);
+  }, [event.startTime, event.endTime, isResizing, isDraggingBlock, previewStart, previewEnd]);
 
   const displayHeight = previewHeight ?? heightInPixels;
   const displayStart = previewStart ?? eventStart;
@@ -1272,6 +1295,7 @@ export function DayView({ trip }: { trip: TripWithParticipants }) {
                 <div
                   key={format(date, 'yyyy-MM-dd')}
                   className="w-[300px] border-l first:border-l-0"
+                  data-date-column={format(date, 'yyyy-MM-dd')}
                 >
                   {hours.map((hour) => {
                     const timeSlotEvents = getTimeSlotEvents(date, hour);
