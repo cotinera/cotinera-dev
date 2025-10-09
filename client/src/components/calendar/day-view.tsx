@@ -340,7 +340,11 @@ function DraggableEvent({
   const displayStart = previewStart ?? eventStart;
   const displayEnd = previewEnd ?? eventEnd;
 
-  const minutesFromMidnight = displayStart.getHours() * 60 + displayStart.getMinutes();
+  // Calculate position based on the local time components, not the date object
+  // This fixes the 3-hour offset issue
+  const startHours = displayStart.getHours();
+  const startMinutes = displayStart.getMinutes();
+  const minutesFromMidnight = startHours * 60 + startMinutes;
   const calculatedTopOffset = (minutesFromMidnight / 60) * 48;
   const topOffset = previewTop ?? calculatedTopOffset;
 
@@ -364,47 +368,16 @@ function DraggableEvent({
     }
   };
 
-  // Store the initial click position to determine if it's a click or drag
-  const clickRef = useRef<{ x: number; y: number } | null>(null);
-  const [mouseDown, setMouseDown] = useState(false);
-  
-  // Handle mousedown to detect the start of a potential click or drag
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (isResizing) return;
-    clickRef.current = { x: e.clientX, y: e.clientY };
-    setMouseDown(true);
+  // Handle click to open edit dialog (only if not dragging or resizing)
+  const handleClick = (e: React.MouseEvent) => {
+    // Don't open edit if we're clicking on buttons or currently dragging/resizing
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || isResizing || isDraggingBlock) return;
     
-    // Capture click offset for drag behavior fix
-    if (onDragStart && elementRef.current) {
-      const rect = elementRef.current.getBoundingClientRect();
-      const clickOffsetY = e.clientY - rect.top;
-      
-      // Calculate original top position in pixels based on event start time
-      const eventStart = new Date(event.startTime);
-      const minutesFromMidnight = eventStart.getHours() * 60 + eventStart.getMinutes();
-      const originalTopPixels = (minutesFromMidnight / 60) * 48;
-      
-      // Get the original event (not a segment)
-      const originalEvent = event.originalEvent || event;
-      
-      onDragStart(clickOffsetY, originalTopPixels, originalEvent);
-    }
-  };
-  
-  // Handle mouseup to detect if it was a click (not much movement) or a drag
-  const handleMouseUp = (e: React.MouseEvent) => {
-    if (!clickRef.current || isResizing || isDraggingBlock) return;
-    
-    const deltaX = Math.abs(e.clientX - clickRef.current.x);
-    const deltaY = Math.abs(e.clientY - clickRef.current.y);
-    
-    // If minimal movement (less than 5px) and not dragging, treat as a click and open edit
-    if (deltaX < 5 && deltaY < 5 && mouseDown && !isDraggingBlock) {
+    // Check if this was a simple click (not a drag)
+    if (!isResizing && !isDraggingBlock) {
       onEdit();
     }
-    
-    setMouseDown(false);
-    clickRef.current = null;
   };
 
   return (
@@ -413,10 +386,11 @@ function DraggableEvent({
       style={style}
       className={`bg-blue-500/90 hover:bg-blue-600/90 rounded-sm group/event select-none ${
         isDraggingBlock ? 'ring-2 ring-primary/50' : ''
-      } ${isResizing ? 'cursor-ns-resize' : 'cursor-grab'}`}
+      } ${isResizing ? 'cursor-ns-resize' : isDraggingBlock ? 'cursor-grabbing' : 'cursor-grab'}`}
       onPointerDown={handleBlockPointerDown}
       onPointerMove={handleBlockPointerMove}
       onPointerUp={handleBlockPointerUp}
+      onClick={handleClick}
     >
       {/* Top resize handle */}
       <div
