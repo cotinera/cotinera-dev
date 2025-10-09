@@ -4,18 +4,10 @@ import {
   useEffect,
   useCallback,
 } from "react";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -48,18 +40,19 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import {
-  DndContext,
-  DragEndEvent,
-  useSensor,
-  useSensors,
-  PointerSensor,
-  useDraggable,
-  useDroppable,
-  DragStartEvent,
-  DragOverEvent,
-  DragOverlay,
-} from "@dnd-kit/core";
+// import {
+//   DndContext,
+//   DragEndEvent,
+//   useSensor,
+//   useSensors,
+//   PointerSensor,
+//   useDraggable,
+//   useDroppable,
+//   DragStartEvent,
+//   DragOverEvent,
+//   DragOverlay,
+// } from "@dnd-kit/core";
+import { useDroppable } from "@dnd-kit/core"; // keep droppable for slot highlighting
 import type { Trip, Activity, User } from "@db/schema";
 
 // Extended types with relations
@@ -76,7 +69,6 @@ type ActivityWithParticipants = Activity & {
   }> | null;
 };
 import { Pencil, Trash2, Loader2, Users } from "lucide-react";
-import { CSS } from "@dnd-kit/utilities";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MapPicker } from "@/components/map-picker";
@@ -128,9 +120,6 @@ function DraggableEvent({
   onResize: (eventId: number, edge: 'top' | 'bottom', newTime: Date) => void;
   onDragStart?: (clickOffsetY: number, originalTopPixels: number, originalEvent: Activity) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
-    id: event.id.toString(),
-  });
 
   const [isResizing, setIsResizing] = useState(false);
   const [resizeEdge, setResizeEdge] = useState<'top' | 'bottom' | null>(null);
@@ -228,6 +217,74 @@ function DraggableEvent({
     setResizeEdge(null);
   }, [isResizing, resizeEdge, previewStart, previewEnd, onResize, event]);
 
+  // ===== NEW DRAG LOGIC (replaces DnD-based movement) =====
+  const [isDraggingBlock, setIsDraggingBlock] = useState(false);
+  const clickOffsetYRef = useRef(0);
+  const originalStartRef = useRef(new Date(event.startTime));
+  const originalEndRef = useRef(new Date(event.endTime));
+
+  const handleBlockPointerDown = (e: React.PointerEvent) => {
+    if (isResizing) return;
+    const el = elementRef.current;
+    if (!el) return;
+
+    el.setPointerCapture(e.pointerId);
+    const rect = el.getBoundingClientRect();
+    clickOffsetYRef.current = e.clientY - rect.top;
+    originalStartRef.current = new Date(event.startTime);
+    originalEndRef.current = new Date(event.endTime);
+    setIsDraggingBlock(true);
+  };
+
+  const handleBlockPointerMove = (e: React.PointerEvent) => {
+    if (!isDraggingBlock) return;
+    const colEl = elementRef.current?.closest('[data-date-column]');
+    if (!colEl) return;
+    const colRect = colEl.getBoundingClientRect();
+
+    let yInCol = e.clientY - colRect.top - clickOffsetYRef.current;
+    const durationMin = differenceInMinutes(originalEndRef.current, originalStartRef.current);
+    const durationPx = (durationMin / 60) * 48;
+    const dayPx = 24 * 48;
+    yInCol = Math.max(0, Math.min(dayPx - durationPx, yInCol));
+
+    const rawMin = (yInCol / 48) * 60;
+    const snappedMin = Math.round(rawMin / 15) * 15;
+
+    const baseDate = new Date(originalStartRef.current);
+    baseDate.setHours(0, 0, 0, 0);
+    const newStart = new Date(baseDate);
+    newStart.setMinutes(snappedMin);
+    const newEnd = new Date(newStart.getTime() + durationMin * 60000);
+
+    setPreviewStart(newStart);
+    setPreviewEnd(newEnd);
+    setPreviewTop((snappedMin / 60) * 48);
+    setPreviewHeight((durationMin / 60) * 48);
+  };
+
+  const handleBlockPointerUp = (e: React.PointerEvent) => {
+    if (!isDraggingBlock) return;
+    const el = elementRef.current;
+    if (el) {
+      try { el.releasePointerCapture(e.pointerId); } catch {}
+    }
+    setIsDraggingBlock(false);
+
+    if (previewStart && previewEnd) {
+      const original = event.originalEvent || event;
+      const eventIdStr = String(original.id);
+      const eventId =
+        typeof original.id === "number" ? original.id : parseInt(eventIdStr.split("_")[0]);
+      onResize(eventId, "move", previewStart); // reuse resize function to persist move
+    }
+
+    setPreviewStart(null);
+    setPreviewEnd(null);
+    setPreviewTop(null);
+    setPreviewHeight(null);
+  };
+
   useEffect(() => {
     if (isResizing) {
       window.addEventListener('mousemove', handleResizeMove);
@@ -279,7 +336,6 @@ function DraggableEvent({
   };
 
   const combinedRef = (el: HTMLDivElement | null) => {
-    if (!isResizing) setNodeRef(el);
     if (elementRef.current !== el) {
       (elementRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
     }
@@ -331,21 +387,25 @@ function DraggableEvent({
   return (
     <div
       ref={combinedRef}
-      {...(!isResizing ? { ...attributes, ...listeners } : {})}
       style={style}
-      onMouseDown={handleMouseDown}
-      onMouseUp={handleMouseUp}
-      className={`bg-blue-500/90 hover:bg-blue-600/90 rounded-sm group/event ${
-        isDragging ? 'ring-1 ring-primary/50' : ''
-      } ${!isResizing && !isDragging ? 'cursor-pointer' : ''}`}
+      className={`bg-blue-500/90 hover:bg-blue-600/90 rounded-sm group/event select-none ${
+        isDraggingBlock ? 'ring-2 ring-primary/50' : ''
+      } ${isResizing ? 'cursor-ns-resize' : 'cursor-grab'}`}
+      onPointerDown={handleBlockPointerDown}
+      onPointerMove={handleBlockPointerMove}
+      onPointerUp={handleBlockPointerUp}
     >
+      {/* Top resize handle */}
       <div
         className="absolute top-0 left-0 w-full h-2 cursor-ns-resize hover:bg-black/30 transition-colors"
         onMouseDown={(e) => handleResizeStart(e, 'top')}
       />
 
+      {/* Title and edit/delete buttons */}
       <div className="relative h-[18px] px-2 mt-1">
-        <span className="font-medium text-sm text-white truncate max-w-[180px] block">{event.title}</span>
+        <span className="font-medium text-sm text-white truncate max-w-[180px] block">
+          {event.title}
+        </span>
         <div className="absolute right-2 top-0 hidden group-hover/event:flex items-center gap-1">
           <Button
             variant="ghost"
@@ -371,16 +431,20 @@ function DraggableEvent({
           </Button>
         </div>
       </div>
+
+      {/* Time display */}
       <span className="text-xs text-white/80 block px-2">
-        {format(displayStart, "h:mm a")} - {format(displayEnd, "h:mm a")}
+        {format(displayStart, 'h:mm a')} - {format(displayEnd, 'h:mm a')}
       </span>
 
+      {/* Bottom resize handle */}
       <div
         className="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize hover:bg-black/30 transition-colors"
         onMouseDown={(e) => handleResizeStart(e, 'bottom')}
       />
     </div>
   );
+
 }
 
 function DroppableTimeSlot({
@@ -630,19 +694,10 @@ export function DayView({ trip }: { trip: TripWithParticipants }) {
   const [selectedEvent, setSelectedEvent] = useState<Activity | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [activeDropId, setActiveDropId] = useState<string | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [draggedEvent, setDraggedEvent] = useState<Activity | null>(null);
   const [highlightedSlots, setHighlightedSlots] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  
-  // Store drag metadata to fix positioning
-  const dragMetadataRef = useRef<{
-    clickOffsetY: number;
-    originalTopPixels: number;
-    originalEvent: Activity;
-  } | null>(null);
+
   
   // Drag selection state
   const [isDragSelecting, setIsDragSelecting] = useState(false);
@@ -653,13 +708,6 @@ export function DayView({ trip }: { trip: TripWithParticipants }) {
   // Store the drag selection range for the create dialog
   const [dragSelectionRange, setDragSelectionRange] = useState<{ startHour: number; endHour: number; date: Date } | null>(null);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 4,
-      },
-    })
-  );
 
   const tripStartDate = new Date(trip.startDate);
   const tripEndDate = new Date(trip.endDate);
@@ -766,18 +814,7 @@ export function DayView({ trip }: { trip: TripWithParticipants }) {
     },
   });
 
-  const handleDragStart = (event: DragStartEvent) => {
-    setIsDragging(true);
-    document.body.classList.add('select-none');
-    
-    // Find the dragged event
-    const draggedId = event.active.id as string;
-    const splitEvent = splitActivities.find((a) => a.id.toString() === draggedId);
-    if (splitEvent) {
-      const originalEvent = splitEvent.originalEvent || splitEvent;
-      setDraggedEvent(originalEvent);
-    }
-  };
+  
   
   // Callback to capture drag metadata from DraggableEvent
   const handleEventDragStart = (clickOffsetY: number, originalTopPixels: number, originalEvent: Activity) => {
@@ -788,163 +825,6 @@ export function DayView({ trip }: { trip: TripWithParticipants }) {
     };
   };
 
-  const handleDragOver = (event: DragOverEvent) => {
-    const { over } = event;
-    if (over && draggedEvent) {
-      const dropId = over.id as string;
-      setActiveDropId(dropId);
-      
-      // Calculate event duration in hours (rounded up to nearest hour)
-      const eventStart = new Date(draggedEvent.startTime);
-      const eventEnd = new Date(draggedEvent.endTime);
-      const durationInMinutes = differenceInMinutes(eventEnd, eventStart);
-      const durationInHours = Math.ceil(durationInMinutes / 60);
-      
-      // Parse the drop target to get date and hour
-      const [dateStr, hourStr] = dropId.split("|");
-      const dropHour = parseInt(hourStr);
-      
-      // Calculate which slots to highlight based on event duration
-      const slotsToHighlight = new Set<string>();
-      for (let i = 0; i < durationInHours; i++) {
-        const slotHour = dropHour + i;
-        if (slotHour < 24) { // Don't exceed 24 hours in a day
-          slotsToHighlight.add(`${dateStr}|${slotHour}`);
-        }
-      }
-      
-      setHighlightedSlots(slotsToHighlight);
-    }
-  };
-
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const metadata = dragMetadataRef.current;
-    
-    setIsDragging(false);
-    document.body.classList.remove('select-none');
-    setActiveDropId(null);
-    setDraggedEvent(null);
-    setHighlightedSlots(new Set());
-    dragMetadataRef.current = null;
-
-    if (!event.over || !metadata) return;
-
-    const [dateStr] = (event.over.id as string).split("|");
-
-    // Use metadata to get the original event
-    const originalEvent = metadata.originalEvent;
-    const originalStart = new Date(originalEvent.startTime);
-    const originalEnd = new Date(originalEvent.endTime);
-    const fullDurationInMinutes = differenceInMinutes(originalEnd, originalStart);
-
-    // Calculate new top position using delta.y (which already accounts for movement)
-    const newTopPixels = metadata.originalTopPixels + event.delta.y;
-    
-    // Convert pixels to minutes (48px = 1 hour = 60 minutes)
-    const newMinutesFromMidnight = Math.round((newTopPixels / 48) * 60 / 15) * 15; // Snap to 15 minutes
-    
-    // Ensure within valid range (0-1440 minutes in a day)
-    const clampedMinutes = Math.max(0, Math.min(1440 - fullDurationInMinutes, newMinutesFromMidnight));
-    
-    // Create new start time with the calculated minutes (parse as local date to avoid timezone shift)
-    const droppedDate = parse(dateStr, 'yyyy-MM-dd', new Date());
-    const newStartTime = new Date(droppedDate);
-    newStartTime.setHours(0, 0, 0, 0);
-    newStartTime.setMinutes(clampedMinutes);
-    
-    const newEndTime = new Date(newStartTime.getTime() + fullDurationInMinutes * 60 * 1000);
-
-    const tripStart = startOfDay(new Date(trip.startDate));
-    const tripEnd = endOfDay(new Date(trip.endDate));
-
-    if (newStartTime < tripStart || newEndTime > tripEnd) {
-      toast({
-        variant: "destructive",
-        title: "Invalid move",
-        description: "Event must stay within trip dates",
-      });
-      return;
-    }
-
-    // Check if position actually changed
-    if (originalStart.getTime() === newStartTime.getTime()) {
-      return; // No change, don't update
-    }
-
-    // Create optimistic update
-    const optimisticUpdate = {
-      ...originalEvent,
-      startTime: newStartTime.toISOString(),
-      endTime: newEndTime.toISOString(),
-    };
-
-    // Apply optimistic update to cache immediately
-    queryClient.setQueryData(
-      [`/api/trips/${trip.id}/activities`],
-      (old: Activity[] | undefined) => {
-        if (!old) return [optimisticUpdate];
-        return old.map(activity => 
-          activity.id === originalEvent.id ? optimisticUpdate : activity
-        );
-      }
-    );
-
-    try {
-      const res = await fetch(`/api/trips/${trip.id}/activities/${originalEvent.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: originalEvent.title,
-          description: originalEvent.description,
-          location: originalEvent.location,
-          startTime: newStartTime.toISOString(),
-          endTime: newEndTime.toISOString(),
-          coordinates: originalEvent.coordinates || null,
-        }),
-      });
-
-      if (!res.ok) {
-        // Revert optimistic update on error
-        queryClient.setQueryData(
-          [`/api/trips/${trip.id}/activities`],
-          (old: Activity[] | undefined) => {
-            if (!old) return [originalEvent];
-            return old.map(activity => 
-              activity.id === originalEvent.id ? originalEvent : activity
-            );
-          }
-        );
-        throw new Error("Failed to update activity");
-      }
-
-      const updatedActivity = await res.json();
-      
-      // Update cache with server response
-      queryClient.setQueryData(
-        [`/api/trips/${trip.id}/activities`],
-        (old: Activity[] | undefined) => {
-          if (!old) return [updatedActivity];
-          return old.map(activity => 
-            activity.id === updatedActivity.id ? updatedActivity : activity
-          );
-        }
-      );
-      
-      // Sync updated activity to Google Calendar
-      const googleCalendarSync = (window as any)[`googleCalendarSync_${trip.id}`];
-      if (googleCalendarSync && updatedActivity) {
-        googleCalendarSync(updatedActivity);
-      }
-      
-      toast({ title: "Event moved successfully" });
-    } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Failed to move event",
-        description: error instanceof Error ? error.message : "An error occurred",
-      });
-    }
-  };
 
   const splitMultiDayEvents = (activities: Activity[]) => {
     const splitEvents: (Activity & { isSegment?: boolean; originalEvent?: Activity })[] = [];
@@ -1149,81 +1029,89 @@ export function DayView({ trip }: { trip: TripWithParticipants }) {
     }
   };
 
-  const handleResize = async (eventId: number, edge: 'top' | 'bottom', newTime: Date) => {
+  const handleResize = async (
+    eventId: number,
+    edge: 'top' | 'bottom' | 'move',
+    newTime: Date
+  ) => {
     const event = activities.find((a) => a.id === eventId);
     if (!event) return;
 
+    // Determine new start and end times
+    let newStart = new Date(event.startTime);
+    let newEnd = new Date(event.endTime);
+
+    if (edge === 'top') {
+      newStart = newTime;
+    } else if (edge === 'bottom') {
+      newEnd = newTime;
+    } else if (edge === 'move') {
+      const duration = differenceInMinutes(newEnd, newStart);
+      newStart = newTime;
+      newEnd = new Date(newTime.getTime() + duration * 60000);
+    }
+
+    // Optimistic update so UI feels instant
     const optimisticUpdate = {
       ...event,
-      startTime: edge === 'top' ? newTime.toISOString() : event.startTime,
-      endTime: edge === 'bottom' ? newTime.toISOString() : event.endTime,
+      startTime: newStart.toISOString(),
+      endTime: newEnd.toISOString(),
     };
 
     queryClient.setQueryData(
       [`/api/trips/${trip.id}/activities`],
       (old: Activity[] | undefined) => {
         if (!old) return [optimisticUpdate];
-        return old.map(activity => 
-          activity.id === event.id ? optimisticUpdate : activity
-        );
+        return old.map((a) => (a.id === event.id ? optimisticUpdate : a));
       }
     );
-
-    const updateData = {
-      title: event.title,
-      description: event.description,
-      location: event.location,  
-      startTime: optimisticUpdate.startTime,
-      endTime: optimisticUpdate.endTime,
-      coordinates: event.coordinates || null,
-    };
 
     try {
       const res = await fetch(`/api/trips/${trip.id}/activities/${event.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updateData),
+        body: JSON.stringify({
+          title: event.title,
+          description: event.description,
+          location: event.location,
+          startTime: optimisticUpdate.startTime,
+          endTime: optimisticUpdate.endTime,
+          coordinates: event.coordinates || null,
+        }),
       });
 
-      if (!res.ok) {
-        queryClient.setQueryData(
-          [`/api/trips/${trip.id}/activities`],
-          (old: Activity[] | undefined) => {
-            if (!old) return [event];
-            return old.map(activity => 
-              activity.id === event.id ? event : activity
-            );
-          }
-        );
-        throw new Error("Failed to update activity");
-      }
+      if (!res.ok) throw new Error("Failed to update activity");
+      const updated = await res.json();
 
-      const updatedActivity = await res.json();
-      
+      // Replace event in cache with updated one
       queryClient.setQueryData(
         [`/api/trips/${trip.id}/activities`],
         (old: Activity[] | undefined) => {
-          if (!old) return [updatedActivity];
-          return old.map(activity => 
-            activity.id === updatedActivity.id ? updatedActivity : activity
-          );
+          if (!old) return [updated];
+          return old.map((a) => (a.id === updated.id ? updated : a));
         }
       );
-      
+
+      // Google Calendar sync if enabled
       const googleCalendarSync = (window as any)[`googleCalendarSync_${trip.id}`];
-      if (googleCalendarSync && updatedActivity) {
-        googleCalendarSync(updatedActivity);
-      }
-      
-      toast({ title: "Event resized successfully" });
+      if (googleCalendarSync) googleCalendarSync(updated);
+
+      toast({
+        title:
+          edge === "move"
+            ? "Event moved successfully"
+            : "Event resized successfully",
+      });
     } catch (error) {
       toast({
         variant: "destructive",
-        title: "Failed to resize event",
-        description: error instanceof Error ? error.message : "An error occurred",
+        title: "Failed to update event",
+        description:
+          error instanceof Error ? error.message : "An error occurred",
       });
     }
   };
+
 
   const getCreateFormDefaults = (date: Date, hour: number): EventFormValues => {
     if (hour === -1) {
@@ -1302,12 +1190,6 @@ export function DayView({ trip }: { trip: TripWithParticipants }) {
   return (
     <ScrollArea className="border rounded-md max-w-full h-[calc(100vh-120px)]">
       
-      <DndContext
-        sensors={sensors}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        onDragOver={handleDragOver}
-      >
         <div className="min-w-fit relative">
           {/* Combined sticky header with dates and all-day section */}
           <div className="sticky top-0 z-30 bg-background">
@@ -1449,31 +1331,7 @@ export function DayView({ trip }: { trip: TripWithParticipants }) {
           </div>
         </div>
         
-        <DragOverlay>
-          {draggedEvent && (
-            <div 
-              className="bg-primary text-primary-foreground rounded-sm p-2 text-sm font-medium shadow-lg border"
-              style={{
-                width: '270px', // Match the calendar column width minus padding
-                height: `${Math.max((differenceInMinutes(new Date(draggedEvent.endTime), new Date(draggedEvent.startTime)) / 60) * 48, 48)}px`,
-                opacity: 0.95
-              }}
-            >
-              <div className="truncate font-medium">
-                {draggedEvent.title}
-              </div>
-              <div className="text-xs opacity-90 mt-1">
-                {format(new Date(draggedEvent.startTime), "h:mm a")} - {format(new Date(draggedEvent.endTime), "h:mm a")}
-              </div>
-              {draggedEvent.location && (
-                <div className="text-xs opacity-75 mt-1 truncate">
-                  📍 {draggedEvent.location}
-                </div>
-              )}
-            </div>
-          )}
-        </DragOverlay>
-      </DndContext>
+
       <ScrollBar orientation="horizontal" />
 
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
