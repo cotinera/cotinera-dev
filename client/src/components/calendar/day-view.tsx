@@ -72,6 +72,7 @@ import { Pencil, Trash2, Loader2, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { MapPicker } from "@/components/map-picker";
+import { cn } from "@/lib/utils";
 
 // Update the event form schema to include location coordinates
 const eventFormSchema = z.object({
@@ -91,15 +92,49 @@ const eventFormSchema = z.object({
 
 type EventFormValues = z.infer<typeof eventFormSchema>;
 
+// Constants for pixel calculations - using 60px per hour for better spacing
+const PIXELS_PER_HOUR = 60;
+const MINUTES_PER_SLOT = 15;
+const PIXELS_PER_SLOT = PIXELS_PER_HOUR / (60 / MINUTES_PER_SLOT);
+
 function snapToQuarterHour(date: Date): Date {
   const minutes = date.getMinutes();
   const snappedMinutes = Math.round(minutes / 15) * 15;
   return new Date(date.setMinutes(snappedMinutes, 0, 0));
 }
 
+// Snap to 15-minute intervals
+function snapToSlot(minutes: number): number {
+  return Math.round(minutes / MINUTES_PER_SLOT) * MINUTES_PER_SLOT;
+}
+
+// Convert pixel offset to minutes
 function pixelsToMinutes(pixels: number): number {
-  const minutes = (pixels / 48) * 60;
-  return Math.round(minutes / 15) * 15;
+  return Math.round((pixels / PIXELS_PER_HOUR) * 60);
+}
+
+// Convert minutes to pixel offset
+function minutesToPixels(minutes: number): number {
+  return (minutes / 60) * PIXELS_PER_HOUR;
+}
+
+// Get time in minutes from a date
+function getTimeInMinutes(date: Date): number {
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+// Set time in minutes for a date
+function setTimeInMinutes(date: Date, minutes: number): Date {
+  const newDate = new Date(date);
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  newDate.setHours(hours, mins, 0, 0);
+  return newDate;
+}
+
+// Clamp minutes to valid range (0-1440 for a day)
+function clampMinutes(minutes: number): number {
+  return Math.max(0, Math.min(1440, minutes));
 }
 
 interface TimeSlot {
@@ -112,336 +147,229 @@ function DraggableEvent({
   onEdit,
   onDelete,
   onResize,
-  onDragStart,
 }: {
   event: Activity & { isSegment?: boolean; originalEvent?: Activity };
   onEdit: () => void;
   onDelete: () => void;
   onResize: (eventId: number, edge: 'top' | 'bottom' | 'move', newTime: Date) => void;
-  onDragStart?: (clickOffsetY: number, originalTopPixels: number, originalEvent: Activity) => void;
 }) {
-
-  const [isResizing, setIsResizing] = useState(false);
-  const [resizeEdge, setResizeEdge] = useState<'top' | 'bottom' | null>(null);
-  const [previewHeight, setPreviewHeight] = useState<number | null>(null);
-  const [previewTop, setPreviewTop] = useState<number | null>(null);
-  const [previewStart, setPreviewStart] = useState<Date | null>(null);
-  const [previewEnd, setPreviewEnd] = useState<Date | null>(null);
+  const eventRef = useRef<HTMLDivElement>(null);
+  const tempStartRef = useRef<Date>(new Date(event.startTime));
+  const tempEndRef = useRef<Date>(new Date(event.endTime));
+  const hasDraggedRef = useRef(false);
   
-  const elementRef = useRef<HTMLDivElement>(null);
-  const initialMouseYRef = useRef<number>(0);
-  const initialTopOffsetRef = useRef<number>(0);
-  const initialEventRef = useRef<Activity>(event);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragType, setDragType] = useState<'move' | 'resize-top' | 'resize-bottom' | null>(null);
+  const [tempStartTime, setTempStartTime] = useState<Date>(new Date(event.startTime));
+  const [tempEndTime, setTempEndTime] = useState<Date>(new Date(event.endTime));
 
-  // Fix timezone issues by using local time consistently
-  const eventStart = new Date(event.startTime);
-  const eventEnd = new Date(event.endTime);
-  const durationInMinutes = differenceInMinutes(eventEnd, eventStart);
-  const heightInPixels = Math.max((durationInMinutes / 60) * 48, 12);
+  // Reset temp times when event prop changes
+  useEffect(() => {
+    setTempStartTime(new Date(event.startTime));
+    setTempEndTime(new Date(event.endTime));
+    tempStartRef.current = new Date(event.startTime);
+    tempEndRef.current = new Date(event.endTime);
+  }, [event.startTime, event.endTime]);
 
-  const handleResizeStart = (e: React.MouseEvent, edge: 'top' | 'bottom') => {
-    e.preventDefault();
+  const startMinutes = getTimeInMinutes(tempStartTime);
+  const endMinutes = getTimeInMinutes(tempEndTime);
+  const duration = endMinutes - startMinutes;
+
+  const top = minutesToPixels(startMinutes);
+  const height = minutesToPixels(duration);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent, type: 'move' | 'resize-top' | 'resize-bottom') => {
     e.stopPropagation();
-
-    setIsResizing(true);
-    setResizeEdge(edge);
-    initialMouseYRef.current = e.clientY;
-    initialEventRef.current = event;
-    
-    // Use the actual event times without timezone adjustments
-    const minutesFromMidnight = eventStart.getHours() * 60 + eventStart.getMinutes();
-    const topOffset = (minutesFromMidnight / 60) * 48;
-    initialTopOffsetRef.current = topOffset;
-    
-    setPreviewHeight(heightInPixels);
-    setPreviewTop(topOffset);
-    setPreviewStart(eventStart);
-    setPreviewEnd(eventEnd);
-  };
-
-  const handleResizeMove = useCallback((e: MouseEvent) => {
-    if (!isResizing || !resizeEdge) return;
-
     e.preventDefault();
-    const deltaY = e.clientY - initialMouseYRef.current;
-    const deltaMinutes = Math.round((deltaY / 48) * 60 / 15) * 15;
+    
+    hasDraggedRef.current = false;
+    setIsDragging(true);
+    setDragType(type);
 
-    if (resizeEdge === 'top') {
-      const originalStartTime = new Date(initialEventRef.current.startTime);
-      const originalEndTime = new Date(initialEventRef.current.endTime);
-      const newStartTime = new Date(originalStartTime.getTime() + deltaMinutes * 60 * 1000);
-      
-      const maxStartTime = new Date(originalEndTime.getTime() - 15 * 60 * 1000);
-      
-      if (newStartTime <= maxStartTime) {
-        const newDurationMinutes = differenceInMinutes(originalEndTime, newStartTime);
-        const newHeight = Math.max((newDurationMinutes / 60) * 48, 12);
-        const minutesFromMidnight = newStartTime.getHours() * 60 + newStartTime.getMinutes();
-        const newTopOffset = (minutesFromMidnight / 60) * 48;
-        
-        setPreviewHeight(newHeight);
-        setPreviewTop(newTopOffset);
-        setPreviewStart(newStartTime);
-        setPreviewEnd(originalEndTime);
-      }
-    } else {
-      const originalEndTime = new Date(initialEventRef.current.endTime);
-      const originalStartTime = new Date(initialEventRef.current.startTime);
-      const newEndTime = new Date(originalEndTime.getTime() + deltaMinutes * 60 * 1000);
-      
-      const minEndTime = new Date(originalStartTime.getTime() + 15 * 60 * 1000);
-      
-      if (newEndTime >= minEndTime) {
-        const newDurationMinutes = differenceInMinutes(newEndTime, originalStartTime);
-        const newHeight = Math.max((newDurationMinutes / 60) * 48, 12);
-        
-        setPreviewHeight(newHeight);
-        setPreviewStart(originalStartTime);
-        setPreviewEnd(newEndTime);
-      }
-    }
-  }, [isResizing, resizeEdge]);
+    const startY = e.clientY;
+    const initialStartTime = new Date(tempStartTime);
+    const initialEndTime = new Date(tempEndTime);
 
-  const handleResizeEnd = useCallback(() => {
-    if (isResizing && resizeEdge && previewStart && previewEnd) {
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      const deltaY = moveEvent.clientY - startY;
+      
+      // Mark as dragged if moved more than 3 pixels
+      if (Math.abs(deltaY) > 3) {
+        hasDraggedRef.current = true;
+      }
+      
+      const deltaMinutes = snapToSlot(pixelsToMinutes(deltaY));
+
+      if (type === 'move') {
+        // Get the column element to support cross-day dragging
+        const colEl = eventRef.current?.closest('[data-date-column]');
+        const newColEl = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY)?.closest('[data-date-column]');
+        
+        if (newColEl && newColEl !== colEl) {
+          // Cross-day dragging
+          const newDateStr = newColEl.getAttribute('data-date-column');
+          if (newDateStr) {
+            const newDate = new Date(newDateStr);
+            const newStartMinutes = clampMinutes(getTimeInMinutes(initialStartTime) + deltaMinutes);
+            const newEndMinutes = clampMinutes(getTimeInMinutes(initialEndTime) + deltaMinutes);
+            
+            const newStart = setTimeInMinutes(newDate, newStartMinutes);
+            const newEnd = setTimeInMinutes(newDate, newEndMinutes);
+            
+            tempStartRef.current = newStart;
+            tempEndRef.current = newEnd;
+            setTempStartTime(newStart);
+            setTempEndTime(newEnd);
+          }
+        } else {
+          // Same-day dragging
+          const newStartMinutes = clampMinutes(getTimeInMinutes(initialStartTime) + deltaMinutes);
+          const newEndMinutes = clampMinutes(getTimeInMinutes(initialEndTime) + deltaMinutes);
+          
+          const newStart = setTimeInMinutes(event.startTime, newStartMinutes);
+          const newEnd = setTimeInMinutes(event.endTime, newEndMinutes);
+          
+          tempStartRef.current = newStart;
+          tempEndRef.current = newEnd;
+          setTempStartTime(newStart);
+          setTempEndTime(newEnd);
+        }
+      } else if (type === 'resize-top') {
+        const newStartMinutes = clampMinutes(getTimeInMinutes(initialStartTime) + deltaMinutes);
+        const currentEndMinutes = getTimeInMinutes(initialEndTime);
+        
+        // Ensure minimum 15 minutes duration
+        if (currentEndMinutes - newStartMinutes >= 15) {
+          const newStart = setTimeInMinutes(event.startTime, newStartMinutes);
+          tempStartRef.current = newStart;
+          setTempStartTime(newStart);
+        }
+      } else if (type === 'resize-bottom') {
+        const newEndMinutes = clampMinutes(getTimeInMinutes(initialEndTime) + deltaMinutes);
+        const currentStartMinutes = getTimeInMinutes(initialStartTime);
+        
+        // Ensure minimum 15 minutes duration
+        if (newEndMinutes - currentStartMinutes >= 15) {
+          const newEnd = setTimeInMinutes(event.endTime, newEndMinutes);
+          tempEndRef.current = newEnd;
+          setTempEndTime(newEnd);
+        }
+      }
+    };
+
+    const handlePointerUp = () => {
+      setIsDragging(false);
+      setDragType(null);
+      
+      // Commit changes using refs - get the original event ID
       const originalEvent = event.originalEvent || event;
       const eventIdStr = String(originalEvent.id);
       const originalEventId = typeof originalEvent.id === 'number' ? originalEvent.id : parseInt(eventIdStr.split('_')[0]);
       
-      if (resizeEdge === 'top') {
-        onResize(originalEventId, 'top', previewStart);
-      } else if (resizeEdge === 'bottom') {
-        onResize(originalEventId, 'bottom', previewEnd);
+      if (type === 'move') {
+        onResize(originalEventId, 'move', tempStartRef.current);
+      } else if (type === 'resize-top') {
+        onResize(originalEventId, 'top', tempStartRef.current);
+      } else if (type === 'resize-bottom') {
+        onResize(originalEventId, 'bottom', tempEndRef.current);
       }
-    }
-    
-    setIsResizing(false);
-    setResizeEdge(null);
-  }, [isResizing, resizeEdge, previewStart, previewEnd, onResize, event]);
 
-  // ===== NEW DRAG LOGIC (replaces DnD-based movement) =====
-  const [isDraggingBlock, setIsDraggingBlock] = useState(false);
-  const clickOffsetYRef = useRef(0);
-  const originalStartRef = useRef(new Date(event.startTime));
-  const originalEndRef = useRef(new Date(event.endTime));
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('pointerup', handlePointerUp);
+    };
 
-  const handleBlockPointerDown = (e: React.PointerEvent) => {
-    // Don't start drag if we're resizing or clicking on buttons
-    if (isResizing) return;
-    const target = e.target as HTMLElement;
-    if (target.closest('button')) return;
-    
-    const el = elementRef.current;
-    if (!el) return;
+    document.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('pointerup', handlePointerUp);
+  }, [event, tempStartTime, tempEndTime, onResize]);
 
-    // Prevent text selection during drag
-    e.preventDefault();
-    
-    el.setPointerCapture(e.pointerId);
-    const rect = el.getBoundingClientRect();
-    clickOffsetYRef.current = e.clientY - rect.top;
-    originalStartRef.current = new Date(event.startTime);
-    originalEndRef.current = new Date(event.endTime);
-    setIsDraggingBlock(true);
-  };
-
-  const handleBlockPointerMove = (e: React.PointerEvent) => {
-    if (!isDraggingBlock) return;
-    const colEl = elementRef.current?.closest('[data-date-column]');
-    if (!colEl) return;
-    const colRect = colEl.getBoundingClientRect();
-
-    // Calculate position within column accounting for click offset
-    let yInCol = e.clientY - colRect.top - clickOffsetYRef.current;
-    const durationMin = differenceInMinutes(originalEndRef.current, originalStartRef.current);
-    const durationPx = (durationMin / 60) * 48;
-    const dayPx = 24 * 48;
-    
-    // Constrain movement within day bounds
-    yInCol = Math.max(0, Math.min(dayPx - durationPx, yInCol));
-
-    // Convert pixels to minutes and snap to 15-minute intervals
-    const rawMin = (yInCol / 48) * 60;
-    const snappedMin = Math.round(rawMin / 15) * 15;
-
-    // Calculate new times based on the date column we're in
-    const dateStr = colEl.getAttribute('data-date-column');
-    if (!dateStr) return;
-    
-    const baseDate = new Date(dateStr);
-    const newStart = new Date(baseDate);
-    newStart.setHours(0, 0, 0, 0);
-    newStart.setMinutes(snappedMin);
-    const newEnd = new Date(newStart.getTime() + durationMin * 60000);
-
-    // Update preview state
-    setPreviewStart(newStart);
-    setPreviewEnd(newEnd);
-    setPreviewTop((snappedMin / 60) * 48);
-    setPreviewHeight((durationMin / 60) * 48);
-  };
-
-  const handleBlockPointerUp = (e: React.PointerEvent) => {
-    if (!isDraggingBlock) return;
-    const el = elementRef.current;
-    if (el) {
-      try { el.releasePointerCapture(e.pointerId); } catch {}
-    }
-    setIsDraggingBlock(false);
-
-    if (previewStart && previewEnd) {
-      const original = event.originalEvent || event;
-      const eventIdStr = String(original.id);
-      const eventId =
-        typeof original.id === "number" ? original.id : parseInt(eventIdStr.split("_")[0]);
-      onResize(eventId, "move", previewStart); // reuse resize function to persist move
-    }
-
-    setPreviewStart(null);
-    setPreviewEnd(null);
-    setPreviewTop(null);
-    setPreviewHeight(null);
-  };
-
-  useEffect(() => {
-    if (isResizing) {
-      window.addEventListener('mousemove', handleResizeMove);
-      window.addEventListener('mouseup', handleResizeEnd);
-      return () => {
-        window.removeEventListener('mousemove', handleResizeMove);
-        window.removeEventListener('mouseup', handleResizeEnd);
-      };
-    }
-  }, [isResizing, resizeEdge, handleResizeMove, handleResizeEnd]);
-
-  // Clear preview only when the event has been successfully updated
-  useEffect(() => {
-    if (!isResizing && !isDraggingBlock) {
-      // Only clear preview if it matches the current event times (update was successful)
-      const currentStart = new Date(event.startTime);
-      const currentEnd = new Date(event.endTime);
-      
-      if (previewStart && previewEnd) {
-        const startDiff = Math.abs(currentStart.getTime() - previewStart.getTime());
-        const endDiff = Math.abs(currentEnd.getTime() - previewEnd.getTime());
-        
-        // Clear preview only if the event was successfully updated to match preview
-        if (startDiff < 60000 && endDiff < 60000) { // Within 1 minute tolerance
-          setPreviewHeight(null);
-          setPreviewTop(null);
-          setPreviewStart(null);
-          setPreviewEnd(null);
-        }
-      }
-    }
-  }, [event.startTime, event.endTime, isResizing, isDraggingBlock, previewStart, previewEnd]);
-
-  const displayHeight = previewHeight ?? heightInPixels;
-  const displayStart = previewStart ?? eventStart;
-  const displayEnd = previewEnd ?? eventEnd;
-
-  // Calculate position based on the local time components, not the date object
-  // This fixes the 3-hour offset issue
-  const startHours = displayStart.getHours();
-  const startMinutes = displayStart.getMinutes();
-  const minutesFromMidnight = startHours * 60 + startMinutes;
-  const calculatedTopOffset = (minutesFromMidnight / 60) * 48;
-  const topOffset = previewTop ?? calculatedTopOffset;
-
-  const style: React.CSSProperties = {
-    width: '90%',
-    height: `${displayHeight}px`,
-    position: 'absolute',
-    left: '0',
-    top: `${topOffset}px`,
-    backgroundColor: isResizing ? 'hsl(var(--primary)/0.8)' : undefined,
-    boxShadow: isDraggingBlock || isResizing ? 'var(--shadow-md)' : undefined,
-    opacity: isDraggingBlock ? 0.5 : 1,
-    zIndex: isDraggingBlock || isResizing ? 50 : 1,
-    cursor: isResizing ? 'ns-resize' : 'move',
-    transition: isResizing ? 'none' : undefined,
-  };
-
-  const combinedRef = (el: HTMLDivElement | null) => {
-    if (elementRef.current !== el) {
-      (elementRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
-    }
-  };
-
-  // Handle click to open edit dialog (only if not dragging or resizing)
-  const handleClick = (e: React.MouseEvent) => {
-    // Don't open edit if we're clicking on buttons or currently dragging/resizing
-    const target = e.target as HTMLElement;
-    if (target.closest('button') || isResizing || isDraggingBlock) return;
-    
-    // Check if this was a simple click (not a drag)
-    if (!isResizing && !isDraggingBlock) {
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    // Only open edit dialog if we didn't drag
+    if (!hasDraggedRef.current) {
       onEdit();
     }
+  }, [onEdit]);
+
+  // Apply the light blue transparent styling from Lovable.ai
+  const style: React.CSSProperties = {
+    position: 'absolute',
+    top: `${top}px`,
+    height: `${Math.max(height, 15)}px`,
+    left: '8px',
+    right: '8px'
   };
 
   return (
     <div
-      ref={combinedRef}
+      ref={eventRef}
+      className={cn(
+        "absolute rounded-md border border-primary/20 bg-primary/10 overflow-hidden transition-shadow select-none",
+        isDragging ? "shadow-lg ring-2 ring-primary/30" : "hover:shadow-md hover:border-primary/40",
+        dragType === 'move' && "cursor-move",
+        dragType === 'resize-top' && "cursor-ns-resize",
+        dragType === 'resize-bottom' && "cursor-ns-resize"
+      )}
       style={style}
-      className={`bg-blue-500/90 hover:bg-blue-600/90 rounded-sm group/event select-none ${
-        isDraggingBlock ? 'ring-2 ring-primary/50' : ''
-      } ${isResizing ? 'cursor-ns-resize' : isDraggingBlock ? 'cursor-grabbing' : 'cursor-grab'}`}
-      onPointerDown={handleBlockPointerDown}
-      onPointerMove={handleBlockPointerMove}
-      onPointerUp={handleBlockPointerUp}
-      onClick={handleClick}
     >
-      {/* Top resize handle */}
+      {/* Resize handle - top */}
       <div
-        className="absolute top-0 left-0 w-full h-2 cursor-ns-resize hover:bg-black/30 transition-colors"
-        onMouseDown={(e) => handleResizeStart(e, 'top')}
+        className="absolute inset-x-0 top-0 h-1 cursor-ns-resize hover:bg-primary/30 transition-colors"
+        onPointerDown={(e) => handlePointerDown(e, 'resize-top')}
       />
 
-      {/* Title and edit/delete buttons */}
-      <div className="relative h-[18px] px-2 mt-1">
-        <span className="font-medium text-sm text-white truncate max-w-[180px] block">
-          {event.title}
-        </span>
-        <div className="absolute right-2 top-0 hidden group-hover/event:flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 text-white hover:bg-white/20"
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit();
-            }}
-          >
-            <Pencil className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 text-white hover:bg-white/20 hover:text-red-300"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-          >
-            <Trash2 className="h-3 w-3" />
-          </Button>
+      {/* Event content */}
+      <div
+        className="px-2 py-1 h-full overflow-hidden cursor-pointer select-none"
+        onPointerDown={(e) => handlePointerDown(e, 'move')}
+        onClick={handleClick}
+      >
+        <div className="flex justify-between items-start">
+          <div className="flex-1 overflow-hidden">
+            <div className="text-xs font-medium text-primary truncate">
+              {event.title}
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {format(tempStartTime, 'h:mm a')} - {format(tempEndTime, 'h:mm a')}
+            </div>
+            {event.location && height > 40 && (
+              <div className="text-xs text-muted-foreground truncate mt-0.5">
+                {event.location}
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-0.5 opacity-0 hover:opacity-100 transition-opacity ml-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 hover:bg-primary/20"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+            >
+              <Pencil className="h-3 w-3" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-5 w-5 hover:bg-destructive/20 hover:text-destructive"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Time display */}
-      <span className="text-xs text-white/80 block px-2">
-        {format(displayStart, 'h:mm a')} - {format(displayEnd, 'h:mm a')}
-      </span>
-
-      {/* Bottom resize handle */}
+      {/* Resize handle - bottom */}
       <div
-        className="absolute bottom-0 left-0 w-full h-2 cursor-ns-resize hover:bg-black/30 transition-colors"
-        onMouseDown={(e) => handleResizeStart(e, 'bottom')}
+        className="absolute inset-x-0 bottom-0 h-1 cursor-ns-resize hover:bg-primary/30 transition-colors"
+        onPointerDown={(e) => handlePointerDown(e, 'resize-bottom')}
       />
     </div>
   );
-
 }
 
 function DroppableTimeSlot({
@@ -466,11 +394,11 @@ function DroppableTimeSlot({
   return (
     <div
       ref={setNodeRef}
-      className={`h-12 relative border-t transition-colors ${
+      className={`h-[60px] relative border-t transition-colors ${
         isOver ? 'bg-primary/20' : ''
       } ${
-        isSelected ? 'bg-blue-100 dark:bg-blue-900/30' : ''
-      } hover:bg-blue-50 dark:hover:bg-blue-900/20`}
+        isSelected ? 'bg-primary/5' : ''
+      } hover:bg-primary/5`}
       onMouseDown={onMouseDown}
       onMouseEnter={onMouseEnter}
       style={{ userSelect: 'none', cursor: 'pointer' }}
@@ -1252,7 +1180,7 @@ export function DayView({ trip }: { trip: TripWithParticipants }) {
               {hours.map((hour, index) => (
                 <div
                   key={hour}
-                  className="h-12 relative"
+                  className="h-[60px] relative"
                 >
                   {/* Time label positioned on the divider line at the top - skip label for hour 0 (12 AM) */}
                   {hour > 0 && (
@@ -1299,7 +1227,6 @@ export function DayView({ trip }: { trip: TripWithParticipants }) {
                               }}
                               onDelete={() => deleteEvent(originalEventId)}
                               onResize={handleResize}
-                              onDragStart={handleEventDragStart}
                             />
                           );
                         })}
