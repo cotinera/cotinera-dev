@@ -321,6 +321,7 @@ function DraggableEvent({
         className="px-2 py-1 h-full overflow-hidden cursor-pointer select-none"
         onPointerDown={(e) => handlePointerDown(e, 'move')}
         onClick={handleClick}
+        style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
       >
         <div className="flex justify-between items-start">
           <div className="flex-1 overflow-hidden">
@@ -336,30 +337,33 @@ function DraggableEvent({
               </div>
             )}
           </div>
-          <div className="flex items-center gap-0.5 opacity-0 hover:opacity-100 transition-opacity ml-1">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-5 w-5 hover:bg-primary/20"
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit();
-              }}
-            >
-              <Pencil className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-5 w-5 hover:bg-destructive/20 hover:text-destructive"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-            >
-              <Trash2 className="h-3 w-3" />
-            </Button>
-          </div>
+          {/* Hide buttons during drag/resize to prevent accidental deletion */}
+          {!isDragging && (
+            <div className="flex items-center gap-0.5 opacity-0 hover:opacity-100 transition-opacity ml-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 hover:bg-primary/20"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+              >
+                <Pencil className="h-3 w-3" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 hover:bg-destructive/20 hover:text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
