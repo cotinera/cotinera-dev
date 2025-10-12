@@ -302,8 +302,8 @@ function DraggableEvent({
     <div
       ref={eventRef}
       className={cn(
-        "absolute rounded-md border border-primary/20 bg-primary/10 overflow-hidden transition-shadow select-none",
-        isDragging ? "shadow-lg ring-2 ring-primary/30" : "hover:shadow-md hover:border-primary/40",
+        "absolute rounded-md border border-primary/20 bg-primary/10 overflow-hidden transition-shadow select-none z-10",
+        isDragging ? "shadow-lg ring-2 ring-primary/30 z-20" : "hover:shadow-md hover:border-primary/40",
         dragType === 'move' && "cursor-move",
         dragType === 'resize-top' && "cursor-ns-resize",
         dragType === 'resize-bottom' && "cursor-ns-resize"
@@ -321,7 +321,6 @@ function DraggableEvent({
         className="px-2 py-1 h-full overflow-hidden cursor-pointer select-none"
         onPointerDown={(e) => handlePointerDown(e, 'move')}
         onClick={handleClick}
-        style={{ pointerEvents: isDragging ? 'none' : 'auto' }}
       >
         <div className="flex justify-between items-start">
           <div className="flex-1 overflow-hidden">
@@ -872,8 +871,14 @@ export function DayView({ trip }: { trip: TripWithParticipants }) {
         endTime.setDate(endTime.getDate() + 1);
         endTime.setHours(0, 0, 0, 0);
       } else {
-        startTime = new Date(`${values.date}T${values.startTime}:00`);
-        endTime = new Date(`${values.date}T${values.endTime}:00`);
+        // Parse date and time components
+        const [year, month, day] = values.date.split('-').map(Number);
+        const [startHour, startMin] = (values.startTime || "00:00").split(':').map(Number);
+        const [endHour, endMin] = (values.endTime || "00:00").split(':').map(Number);
+        
+        // Create dates using local timezone by setting components individually
+        startTime = new Date(year, month - 1, day, startHour, startMin, 0, 0);
+        endTime = new Date(year, month - 1, day, endHour, endMin, 0, 0);
       }
 
       const tripStart = startOfDay(new Date(trip.startDate));
@@ -1044,6 +1049,8 @@ export function DayView({ trip }: { trip: TripWithParticipants }) {
 
 
   const getCreateFormDefaults = (date: Date, hour: number): EventFormValues => {
+    console.log('getCreateFormDefaults called with:', { date, hour });
+    
     if (hour === -1) {
       // All-day event
       const startTime = new Date(date);
@@ -1068,8 +1075,8 @@ export function DayView({ trip }: { trip: TripWithParticipants }) {
     const startTime = new Date(date);
     startTime.setHours(hour, 0, 0, 0);
     const endTime = addHours(startTime, 1);
-
-    return {
+    
+    const defaults = {
       title: "",
       startTime: format(startTime, "HH:mm"),
       endTime: format(endTime, "HH:mm"),
@@ -1080,6 +1087,9 @@ export function DayView({ trip }: { trip: TripWithParticipants }) {
       coordinates: null,
       isAllDay: false
     };
+    
+    console.log('Returning defaults:', defaults);
+    return defaults;
   };
 
   const getEditFormDefaults = (event: ActivityWithParticipants): EventFormValues => {
@@ -1284,8 +1294,14 @@ export function DayView({ trip }: { trip: TripWithParticipants }) {
                     endTime.setDate(endTime.getDate() + 1);
                     endTime.setHours(0, 0, 0, 0);
                   } else {
-                    startTime = new Date(`${values.date}T${values.startTime}:00`);
-                    endTime = new Date(`${values.date}T${values.endTime}:00`);
+                    // Parse date and time components
+                    const [year, month, day] = values.date.split('-').map(Number);
+                    const [startHour, startMin] = (values.startTime || "00:00").split(':').map(Number);
+                    const [endHour, endMin] = (values.endTime || "00:00").split(':').map(Number);
+                    
+                    // Create dates using local timezone by setting components individually
+                    startTime = new Date(year, month - 1, day, startHour, startMin, 0, 0);
+                    endTime = new Date(year, month - 1, day, endHour, endMin, 0, 0);
                   }
 
                   const res = await fetch(`/api/trips/${trip.id}/activities/${selectedEvent.id}`, {
@@ -1346,6 +1362,7 @@ export function DayView({ trip }: { trip: TripWithParticipants }) {
           </DialogHeader>
           {selectedTimeSlot && (
             <EventForm
+              key={`create-${selectedTimeSlot.date.toISOString()}-${selectedTimeSlot.hour}`}
               defaultValues={
                 dragSelectionRange && dragSelectionRange.date.toDateString() === selectedTimeSlot.date.toDateString()
                   ? {
