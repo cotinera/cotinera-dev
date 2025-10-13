@@ -40,8 +40,7 @@
 │   └── vite.ts              # Vite dev/prod setup
 ├── db/                       # Database layer
 │   ├── schema.ts            # Drizzle ORM schema
-│   ├── index.ts             # DB connection
-│   └── mongodb.ts           # Legacy MongoDB (if used)
+│   └── index.ts             # DB connection
 ├── dist/                     # Build output (created during build)
 │   ├── public/              # Vite build output
 │   └── index.js             # Bundled server
@@ -174,34 +173,43 @@ CMD ["npm", "start"]
 
 ## Environment Variables
 
-### Required Variables
+> **📋 For detailed environment variable documentation, see [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md)**
+
+### Required Variables (Core Functionality)
 
 ```bash
-# Database
+# Database (REQUIRED)
 DATABASE_URL=postgresql://user:password@host:5432/dbname
 
-# Session Secret (generate with: openssl rand -base64 32)
-SESSION_SECRET=your-session-secret-here
+# Session Secret (REQUIRED - generate with: openssl rand -base64 32)
+SESSION_SECRET=your-random-secret-here
 
-# Google OAuth (for authentication)
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
+# Google OAuth Authentication (REQUIRED)
+GOOGLE_CLIENT_ID=your-google-oauth-client-id
+GOOGLE_CLIENT_SECRET=your-google-oauth-client-secret
 
-# Frontend Environment Variables (VITE_ prefix required)
-VITE_GOOGLE_CLIENT_ID=your-google-client-id
+# Frontend Google Integration (REQUIRED - must use VITE_ prefix)
+VITE_GOOGLE_CLIENT_ID=your-google-oauth-client-id
 VITE_GOOGLE_MAPS_API_KEY=your-google-maps-api-key
-
-# Email Service
-SENDGRID_API_KEY=your-sendgrid-api-key
-
-# AI Features (optional)
-OPENAI_API_KEY=your-openai-api-key
-
-# Application URL (for OAuth callbacks)
-APP_URL=https://your-app.run.app
 ```
 
-### Cloud Run Specific Variables
+### Optional Variables (Enhanced Features)
+
+```bash
+# Email Invitations (OPTIONAL - app works without it)
+SENDGRID_API_KEY=your-sendgrid-api-key
+
+# AI Event Parsing & Recommendations (OPTIONAL - has fallback)
+OPENAI_API_KEY=your-openai-api-key
+
+# Flight Information Lookup (OPTIONAL)
+AVIATION_STACK_API_KEY=your-aviationstack-api-key
+
+# Application URL (OPTIONAL - auto-detected from headers)
+BASE_URL=https://your-app.run.app
+```
+
+### Cloud Run Auto-Managed Variables
 
 ```bash
 # Port (Cloud Run provides this automatically)
@@ -213,6 +221,23 @@ NODE_ENV=production
 # Cloud Run service account for Cloud SQL
 INSTANCE_CONNECTION_NAME=project:region:instance
 ```
+
+### What Works Without Optional Variables
+
+**Minimum setup (6 required variables):**
+- ✅ User authentication (Google OAuth)
+- ✅ Trip creation and management
+- ✅ Interactive maps with Google Places
+- ✅ Calendar with manual event creation
+- ✅ Google Calendar sync
+- ✅ Expense tracking
+- ✅ Real-time collaboration
+
+**Without optional variables:**
+- ❌ Email invitations (in-app sharing still works)
+- ❌ AI event parsing (manual date/time entry required)
+- ❌ AI travel recommendations
+- ❌ Flight status lookup
 
 ---
 
@@ -291,15 +316,19 @@ gcloud config set project $PROJECT_ID
 ### 4. Store Secrets in Secret Manager
 
 ```bash
-# Create secrets
+# REQUIRED SECRETS (Core functionality)
 echo -n "your-database-url" | gcloud secrets create DATABASE_URL --data-file=-
 echo -n "your-session-secret" | gcloud secrets create SESSION_SECRET --data-file=-
 echo -n "your-google-client-id" | gcloud secrets create GOOGLE_CLIENT_ID --data-file=-
 echo -n "your-google-client-secret" | gcloud secrets create GOOGLE_CLIENT_SECRET --data-file=-
+
+# OPTIONAL SECRETS (Enhanced features - can skip if not using)
 echo -n "your-sendgrid-key" | gcloud secrets create SENDGRID_API_KEY --data-file=-
 echo -n "your-openai-key" | gcloud secrets create OPENAI_API_KEY --data-file=-
-echo -n "your-maps-key" | gcloud secrets create VITE_GOOGLE_MAPS_API_KEY --data-file=-
+echo -n "your-aviationstack-key" | gcloud secrets create AVIATION_STACK_API_KEY --data-file=-
 ```
+
+**Note:** `VITE_GOOGLE_CLIENT_ID` and `VITE_GOOGLE_MAPS_API_KEY` must be set as environment variables (not secrets) since they're exposed to the frontend.
 
 ### 5. Build Container Image
 
@@ -314,7 +343,7 @@ docker push gcr.io/$PROJECT_ID/$SERVICE_NAME
 
 ### 6. Deploy to Cloud Run
 
-#### Basic Deployment
+#### Minimum Deployment (Required Secrets Only)
 
 ```bash
 gcloud run deploy $SERVICE_NAME \
@@ -328,8 +357,26 @@ gcloud run deploy $SERVICE_NAME \
   --timeout 300 \
   --max-instances 10 \
   --min-instances 0 \
-  --set-env-vars "NODE_ENV=production" \
-  --set-secrets "DATABASE_URL=DATABASE_URL:latest,SESSION_SECRET=SESSION_SECRET:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,SENDGRID_API_KEY=SENDGRID_API_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,VITE_GOOGLE_MAPS_API_KEY=VITE_GOOGLE_MAPS_API_KEY:latest"
+  --set-env-vars "NODE_ENV=production,VITE_GOOGLE_CLIENT_ID=your-google-client-id,VITE_GOOGLE_MAPS_API_KEY=your-google-maps-key" \
+  --set-secrets "DATABASE_URL=DATABASE_URL:latest,SESSION_SECRET=SESSION_SECRET:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest"
+```
+
+#### Full Deployment (With Optional Features)
+
+```bash
+gcloud run deploy $SERVICE_NAME \
+  --image gcr.io/$PROJECT_ID/$SERVICE_NAME \
+  --platform managed \
+  --region $REGION \
+  --allow-unauthenticated \
+  --port 5000 \
+  --memory 1Gi \
+  --cpu 1 \
+  --timeout 300 \
+  --max-instances 10 \
+  --min-instances 1 \
+  --set-env-vars "NODE_ENV=production,VITE_GOOGLE_CLIENT_ID=your-google-client-id,VITE_GOOGLE_MAPS_API_KEY=your-google-maps-key" \
+  --set-secrets "DATABASE_URL=DATABASE_URL:latest,SESSION_SECRET=SESSION_SECRET:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,SENDGRID_API_KEY=SENDGRID_API_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,AVIATION_STACK_API_KEY=AVIATION_STACK_API_KEY:latest"
 ```
 
 #### With Cloud SQL Connection
@@ -347,8 +394,8 @@ gcloud run deploy $SERVICE_NAME \
   --max-instances 10 \
   --min-instances 1 \
   --add-cloudsql-instances PROJECT_ID:REGION:pgc-postgres \
-  --set-env-vars "NODE_ENV=production,VITE_GOOGLE_CLIENT_ID=your-client-id" \
-  --set-secrets "DATABASE_URL=DATABASE_URL:latest,SESSION_SECRET=SESSION_SECRET:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,SENDGRID_API_KEY=SENDGRID_API_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,VITE_GOOGLE_MAPS_API_KEY=VITE_GOOGLE_MAPS_API_KEY:latest"
+  --set-env-vars "NODE_ENV=production,VITE_GOOGLE_CLIENT_ID=your-google-client-id,VITE_GOOGLE_MAPS_API_KEY=your-google-maps-key" \
+  --set-secrets "DATABASE_URL=DATABASE_URL:latest,SESSION_SECRET=SESSION_SECRET:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,SENDGRID_API_KEY=SENDGRID_API_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,AVIATION_STACK_API_KEY=AVIATION_STACK_API_KEY:latest"
 ```
 
 ### 7. Run Database Migrations
@@ -580,19 +627,39 @@ app.get('/api/health', (req, res) => {
 
 ## Production Checklist
 
-- [ ] All environment variables configured in Secret Manager
+### Pre-Deployment
+- [ ] All required environment variables configured (DATABASE_URL, SESSION_SECRET, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, VITE_GOOGLE_CLIENT_ID, VITE_GOOGLE_MAPS_API_KEY)
+- [ ] Optional secrets created if using features (SENDGRID_API_KEY, OPENAI_API_KEY, AVIATION_STACK_API_KEY)
 - [ ] Cloud SQL instance created and accessible
-- [ ] Database migrations run successfully
-- [ ] OAuth callback URLs updated with production domain
-- [ ] Custom domain mapped and DNS configured
-- [ ] Health check endpoint responding
+- [ ] Database migrations run successfully (`npm run db:push`)
+
+### OAuth Configuration
+- [ ] Google OAuth redirect URIs updated in Google Cloud Console:
+  - `https://your-app.run.app/api/auth/google/callback`
+  - `https://your-custom-domain.com/api/auth/google/callback` (if using custom domain)
+- [ ] Authorized JavaScript origins added:
+  - `https://your-app.run.app`
+  - `https://your-custom-domain.com` (if using custom domain)
+- [ ] Test OAuth login flow after deployment
+
+### Infrastructure
+- [ ] Custom domain mapped and DNS configured (if applicable)
+- [ ] Health check endpoint responding (`/api/health`)
 - [ ] Monitoring and alerting configured
 - [ ] Error logging and tracking set up
-- [ ] File uploads configured for Cloud Storage
+- [ ] File uploads configured for Cloud Storage (if needed for persistence)
 - [ ] Min instances set to 1 for reduced cold starts
 - [ ] HTTPS enforced (automatic with Cloud Run)
 - [ ] Rate limiting configured (if needed)
 - [ ] Backup strategy for database in place
+
+### Post-Deployment Validation
+- [ ] Verify all core features work (auth, maps, calendar, trips)
+- [ ] Test WebSocket connections (real-time updates)
+- [ ] Confirm email invitations work (if SendGrid configured)
+- [ ] Validate AI features (if OpenAI configured)
+- [ ] Check browser console for errors
+- [ ] Monitor initial traffic and performance
 
 ---
 
