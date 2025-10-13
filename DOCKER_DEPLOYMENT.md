@@ -30,12 +30,7 @@ VITE_GOOGLE_MAPS_API_KEY=your-google-maps-api-key
 # AVIATION_STACK_API_KEY=your-aviationstack-api-key
 ```
 
-**Also update `docker-compose.yml`** with your frontend env vars:
-```yaml
-environment:
-  - VITE_GOOGLE_CLIENT_ID=your-actual-client-id
-  - VITE_GOOGLE_MAPS_API_KEY=your-actual-maps-key
-```
+**Note:** All environment variables (including frontend VITE_ variables) are loaded from `.env.docker`. Docker Compose reads this file and passes all variables to the container.
 
 ### 2. Build and Run
 
