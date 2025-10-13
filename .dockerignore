@@ -1,0 +1,58 @@
+# Node modules
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build output (will be created during build)
+dist/
+
+# Development files
+.env
+.env.local
+.env.*.local
+
+# Git
+.git/
+.gitignore
+
+# Replit specific
+.replit
+replit.nix
+.config/
+.cache/
+.upm/
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Temporary files
+.DS_Store
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Database files (use external DB)
+*.sqlite
+*.db
+
+# Logs
+logs/
+*.log
+
+# Uploads (will be created at runtime)
+server/uploads/*
+
+# Attached assets
+attached_assets/
+
+# Other
+.npmrc
