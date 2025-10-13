@@ -1,0 +1,425 @@
+{
+  "users": {
+    "collection": "users",
+    "schema": {
+      "id": "ObjectId",
+      "username": "String",
+      "email": "String",
+      "password": "String (hashed)",
+      "name": "String",
+      "avatar": "String (URL)",
+      "bio": "String",
+      "preferences": {
+        "theme": "String (light/dark)",
+        "currency": "String",
+        "language": "String",
+        "notifications": "Boolean"
+      },
+      "createdAt": "Date",
+      "updatedAt": "Date"
+    },
+    "indexes": [
+      { "field": "email", "options": { "unique": true } },
+      { "field": "username", "options": { "unique": true } }
+    ]
+  },
+  
+  "trips": {
+    "collection": "trips",
+    "schema": {
+      "id": "ObjectId",
+      "title": "String",
+      "description": "String",
+      "startDate": "Date",
+      "endDate": "Date",
+      "ownerId": "ObjectId (ref: users)",
+      "coverImage": "String (URL)",
+      "status": "String (planned/active/completed/cancelled)",
+      "isPublic": "Boolean",
+      "shareToken": "String",
+      "locations": [
+        {
+          "name": "String",
+          "description": "String",
+          "coordinates": {
+            "lat": "Number",
+            "lng": "Number"
+          },
+          "startDate": "Date",
+          "endDate": "Date"
+        }
+      ],
+      "participants": [
+        {
+          "userId": "ObjectId (ref: users)",
+          "role": "String (owner/editor/viewer)",
+          "joinedAt": "Date",
+          "status": "String (pending/accepted)"
+        }
+      ],
+      "budget": {
+        "total": "Number",
+        "currency": "String",
+        "categories": {
+          "accommodation": "Number",
+          "transportation": "Number",
+          "food": "Number",
+          "activities": "Number",
+          "other": "Number"
+        }
+      },
+      "createdAt": "Date",
+      "updatedAt": "Date"
+    },
+    "indexes": [
+      { "field": "ownerId", "options": {} },
+      { "field": "shareToken", "options": { "unique": true, "sparse": true } },
+      { "field": "participants.userId", "options": {} }
+    ]
+  },
+  
+  "destinations": {
+    "collection": "destinations",
+    "schema": {
+      "id": "ObjectId",
+      "tripId": "ObjectId (ref: trips)",
+      "name": "String",
+      "description": "String",
+      "coordinates": {
+        "lat": "Number",
+        "lng": "Number"
+      },
+      "arrivalDate": "Date",
+      "departureDate": "Date",
+      "notes": "String",
+      "createdAt": "Date",
+      "updatedAt": "Date"
+    },
+    "indexes": [
+      { "field": "tripId", "options": {} }
+    ]
+  },
+  
+  "activities": {
+    "collection": "activities",
+    "schema": {
+      "id": "ObjectId",
+      "tripId": "ObjectId (ref: trips)",
+      "destinationId": "ObjectId (ref: destinations)",
+      "title": "String",
+      "description": "String",
+      "startTime": "Date",
+      "endTime": "Date",
+      "location": "String",
+      "coordinates": {
+        "lat": "Number",
+        "lng": "Number"
+      },
+      "type": "String (sightseeing/food/entertainment/etc)",
+      "cost": "Number",
+      "currency": "String",
+      "bookingUrl": "String",
+      "bookingStatus": "String (booked/pending/not-booked)",
+      "createdBy": "ObjectId (ref: users)",
+      "images": ["String (URL)"],
+      "createdAt": "Date",
+      "updatedAt": "Date"
+    },
+    "indexes": [
+      { "field": "tripId", "options": {} },
+      { "field": "destinationId", "options": {} }
+    ]
+  },
+  
+  "accommodations": {
+    "collection": "accommodations",
+    "schema": {
+      "id": "ObjectId",
+      "tripId": "ObjectId (ref: trips)",
+      "destinationId": "ObjectId (ref: destinations)",
+      "name": "String",
+      "type": "String (hotel/hostel/apartment/etc)",
+      "address": "String",
+      "coordinates": {
+        "lat": "Number",
+        "lng": "Number"
+      },
+      "checkInDate": "Date",
+      "checkOutDate": "Date",
+      "checkInTime": "String",
+      "checkOutTime": "String",
+      "price": "Number",
+      "currency": "String",
+      "roomType": "String",
+      "numberOfRooms": "Number",
+      "numberOfGuests": "Number",
+      "contactInfo": "String",
+      "bookingConfirmation": "String",
+      "bookingUrl": "String",
+      "bookingStatus": "String (booked/pending/not-booked)",
+      "notes": "String",
+      "createdAt": "Date",
+      "updatedAt": "Date"
+    },
+    "indexes": [
+      { "field": "tripId", "options": {} },
+      { "field": "destinationId", "options": {} }
+    ]
+  },
+  
+  "transportation": {
+    "collection": "transportation",
+    "schema": {
+      "id": "ObjectId",
+      "tripId": "ObjectId (ref: trips)",
+      "type": "String (flight/train/bus/car/boat/etc)",
+      "fromDestinationId": "ObjectId (ref: destinations)",
+      "toDestinationId": "ObjectId (ref: destinations)",
+      "departureTime": "Date",
+      "arrivalTime": "Date",
+      "company": "String",
+      "bookingReference": "String",
+      "bookingUrl": "String",
+      "bookingStatus": "String (booked/pending/not-booked)",
+      "price": "Number",
+      "currency": "String",
+      "departureLocation": {
+        "name": "String",
+        "address": "String",
+        "coordinates": {
+          "lat": "Number",
+          "lng": "Number"
+        }
+      },
+      "arrivalLocation": {
+        "name": "String",
+        "address": "String",
+        "coordinates": {
+          "lat": "Number",
+          "lng": "Number"
+        }
+      },
+      "additionalInfo": {
+        "flightNumber": "String",
+        "terminal": "String",
+        "gate": "String",
+        "seat": "String",
+        "class": "String",
+        "luggage": "String"
+      },
+      "createdAt": "Date",
+      "updatedAt": "Date"
+    },
+    "indexes": [
+      { "field": "tripId", "options": {} },
+      { "field": "fromDestinationId", "options": {} },
+      { "field": "toDestinationId", "options": {} }
+    ]
+  },
+  
+  "pinnedPlaces": {
+    "collection": "pinnedPlaces",
+    "schema": {
+      "id": "ObjectId",
+      "tripId": "ObjectId (ref: trips)",
+      "destinationId": "ObjectId (ref: destinations)",
+      "name": "String",
+      "description": "String",
+      "address": "String",
+      "placeId": "String (Google PlaceID)",
+      "coordinates": {
+        "lat": "Number",
+        "lng": "Number"
+      },
+      "category": "String",
+      "rating": "Number",
+      "types": ["String"],
+      "phone": "String",
+      "website": "String",
+      "openingHours": ["String"],
+      "priceLevel": "Number",
+      "photos": ["String (URL)"],
+      "notes": "String",
+      "visitPlanned": "Boolean",
+      "plannedVisitTime": "Date",
+      "createdBy": "ObjectId (ref: users)",
+      "createdAt": "Date",
+      "updatedAt": "Date"
+    },
+    "indexes": [
+      { "field": "tripId", "options": {} },
+      { "field": "destinationId", "options": {} },
+      { "field": "placeId", "options": {} }
+    ]
+  },
+  
+  "checklist": {
+    "collection": "checklist",
+    "schema": {
+      "id": "ObjectId",
+      "tripId": "ObjectId (ref: trips)",
+      "title": "String",
+      "description": "String",
+      "items": [
+        {
+          "id": "ObjectId",
+          "text": "String",
+          "isCompleted": "Boolean",
+          "assignedTo": "ObjectId (ref: users)",
+          "priority": "String (high/medium/low)",
+          "createdBy": "ObjectId (ref: users)",
+          "createdAt": "Date",
+          "updatedAt": "Date"
+        }
+      ],
+      "createdBy": "ObjectId (ref: users)",
+      "createdAt": "Date",
+      "updatedAt": "Date"
+    },
+    "indexes": [
+      { "field": "tripId", "options": {} }
+    ]
+  },
+  
+  "travelGuides": {
+    "collection": "travelGuides",
+    "schema": {
+      "id": "ObjectId",
+      "destinationId": "ObjectId (ref: destinations)",
+      "title": "String",
+      "content": "String",
+      "author": "String",
+      "source": "String",
+      "sourceUrl": "String",
+      "tags": ["String"],
+      "images": ["String (URL)"],
+      "createdAt": "Date",
+      "updatedAt": "Date"
+    },
+    "indexes": [
+      { "field": "destinationId", "options": {} }
+    ]
+  },
+  
+  "expenses": {
+    "collection": "expenses",
+    "schema": {
+      "id": "ObjectId",
+      "tripId": "ObjectId (ref: trips)",
+      "title": "String",
+      "description": "String",
+      "amount": "Number",
+      "currency": "String",
+      "category": "String (accommodation/transportation/food/activities/other)",
+      "date": "Date",
+      "paidBy": "ObjectId (ref: users)",
+      "splitBetween": [
+        {
+          "userId": "ObjectId (ref: users)",
+          "amount": "Number",
+          "isPaid": "Boolean"
+        }
+      ],
+      "receipt": "String (URL)",
+      "createdAt": "Date",
+      "updatedAt": "Date"
+    },
+    "indexes": [
+      { "field": "tripId", "options": {} },
+      { "field": "paidBy", "options": {} }
+    ]
+  },
+  
+  "messages": {
+    "collection": "messages",
+    "schema": {
+      "id": "ObjectId",
+      "tripId": "ObjectId (ref: trips)",
+      "content": "String",
+      "type": "String (text/image/link/location)",
+      "attachment": "String (URL)",
+      "senderId": "ObjectId (ref: users)",
+      "readBy": ["ObjectId (ref: users)"],
+      "createdAt": "Date",
+      "updatedAt": "Date"
+    },
+    "indexes": [
+      { "field": "tripId", "options": {} },
+      { "field": "senderId", "options": {} },
+      { "field": "createdAt", "options": {} }
+    ]
+  },
+  
+  "polls": {
+    "collection": "polls",
+    "schema": {
+      "id": "ObjectId",
+      "tripId": "ObjectId (ref: trips)",
+      "title": "String",
+      "description": "String",
+      "options": [
+        {
+          "id": "ObjectId",
+          "text": "String",
+          "votes": ["ObjectId (ref: users)"]
+        }
+      ],
+      "status": "String (active/closed)",
+      "expiresAt": "Date",
+      "createdBy": "ObjectId (ref: users)",
+      "createdAt": "Date",
+      "updatedAt": "Date"
+    },
+    "indexes": [
+      { "field": "tripId", "options": {} },
+      { "field": "createdBy", "options": {} }
+    ]
+  },
+  
+  "travelPreferences": {
+    "collection": "travelPreferences",
+    "schema": {
+      "id": "ObjectId",
+      "userId": "ObjectId (ref: users)",
+      "preferences": {
+        "accommodationTypes": ["String"],
+        "budgetRange": {
+          "min": "Number",
+          "max": "Number",
+          "currency": "String"
+        },
+        "travelStyles": ["String"],
+        "interests": ["String"],
+        "cuisinePreferences": ["String"],
+        "transportationPreferences": ["String"],
+        "accessibility": ["String"]
+      },
+      "createdAt": "Date",
+      "updatedAt": "Date"
+    },
+    "indexes": [
+      { "field": "userId", "options": { "unique": true } }
+    ]
+  },
+  
+  "notifications": {
+    "collection": "notifications",
+    "schema": {
+      "id": "ObjectId",
+      "userId": "ObjectId (ref: users)",
+      "type": "String (trip-invite/trip-update/message/poll/etc)",
+      "title": "String",
+      "content": "String",
+      "referenceId": "ObjectId",
+      "referenceType": "String (trip/message/poll/etc)",
+      "isRead": "Boolean",
+      "createdAt": "Date",
+      "updatedAt": "Date"
+    },
+    "indexes": [
+      { "field": "userId", "options": {} },
+      { "field": "isRead", "options": {} },
+      { "field": "createdAt", "options": {} }
+    ]
+  }
+}
