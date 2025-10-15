@@ -11,16 +11,19 @@ DATABASE_URL=postgresql://user:password@host:5432/database
 - **Format:** Standard PostgreSQL connection string
 - **Example:** `postgresql://pgc_user:mypassword@localhost:5432/pgc_db`
 
-### Session Management (REQUIRED - One of)
+### Session Management (REQUIRED)
 ```bash
 SESSION_SECRET=your-random-secret-here
-# OR
-REPL_ID=your-repl-id
 ```
 - **Purpose:** Session encryption and signing
 - **Used in:** `server/auth.ts`
-- **Default fallback:** Uses `REPL_ID` if `SESSION_SECRET` not set
 - **Generate:** `openssl rand -base64 32`
+- **Fallback hierarchy:**
+  1. `SESSION_SECRET` (recommended for all deployments)
+  2. `REPL_ID` (auto-provided on Replit)
+  3. Dev fallback (development only)
+- **⚠️ IMPORTANT:** `SESSION_SECRET` is **REQUIRED** in production environments
+- **Security:** Must be random, minimum 32 characters
 
 ### Google OAuth (REQUIRED)
 ```bash
@@ -81,15 +84,21 @@ AVIATION_STACK_API_KEY=your-aviationstack-api-key
 - **Features enabled:** Flight status, delays, and information lookup
 - **Get from:** [AviationStack](https://aviationstack.com/)
 
-### Application URL (OPTIONAL)
+### Application URL (RECOMMENDED)
 ```bash
 BASE_URL=https://your-app-domain.com
-# OR auto-generated from headers
 ```
-- **Purpose:** OAuth callbacks and email links
-- **Used in:** `server/routes.ts` (trip sharing links)
-- **Default:** Auto-generated from request headers if not set
-- **Required for:** Production OAuth redirects
+- **Purpose:** OAuth callbacks, webhook URLs, and email links
+- **Used in:** 
+  - `server/google-calendar-sync.ts` (Google Calendar OAuth callbacks)
+  - `server/routes.ts` (trip sharing links)
+- **Fallback hierarchy:**
+  1. `BASE_URL` (explicit, recommended)
+  2. Replit auto-detection (`REPL_SLUG` + `REPLIT_CLUSTER`)
+  3. `http://localhost:5000` (development only)
+- **⚠️ HIGHLY RECOMMENDED:** Set explicitly for Cloud Run/Docker deployments
+- **Example:** `https://pgc-app-xyz123-uc.a.run.app`
+- **Why:** Ensures OAuth callbacks work correctly across all platforms
 
 ---
 
@@ -106,13 +115,16 @@ NODE_ENV=production
 
 ### Replit-Specific (Auto-provided on Replit)
 ```bash
-REPL_ID=auto-provided
-REPL_SLUG=auto-provided
-REPLIT_CLUSTER=auto-provided
+REPL_ID=auto-provided           # Fallback for SESSION_SECRET
+REPL_SLUG=auto-provided         # Used for BASE_URL construction
+REPLIT_CLUSTER=auto-provided    # Used for BASE_URL construction
 ```
 - **Purpose:** Replit platform integration
-- **Used in:** `server/auth.ts` (session secret), `server/google-calendar-sync.ts` (OAuth callbacks)
-- **Note:** Only available when running on Replit
+- **Used in:** 
+  - `REPL_ID`: Session secret fallback in `server/auth.ts`
+  - `REPL_SLUG` + `REPLIT_CLUSTER`: BASE_URL fallback in `server/google-calendar-sync.ts`
+- **Note:** Only available when running on Replit platform
+- **⚠️ WARNING:** Not available in Docker/Cloud Run - set `SESSION_SECRET` and `BASE_URL` explicitly
 
 ---
 
