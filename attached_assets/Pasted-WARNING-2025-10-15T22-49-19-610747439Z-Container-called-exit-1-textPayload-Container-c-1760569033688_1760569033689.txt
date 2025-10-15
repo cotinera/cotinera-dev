@@ -1,0 +1,45 @@
+WARNING 2025-10-15T22:49:19.610747439Z Container called exit(1).
+  {
+    "textPayload": "Container called exit(1).",
+    "insertId": "68f024ef000951d91159e63d",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-west1",
+        "project_id": "core-guard-449421-v8",
+        "configuration_name": "pgc-app",
+        "service_name": "pgc-app",
+        "revision_name": "pgc-app-00005-pqs"
+      }
+    },
+    "timestamp": "2025-10-15T22:49:19.610747439Z",
+    "severity": "WARNING",
+    "labels": {
+      "container_name": "pgc-app-1",
+      "instanceId": "0069c7a9888b8c12853c338e655403107442889624cafb3760147d4aab959ff8776c0aae52909159d4157d3f49f906fb114d40dee1ec4a92a8745328ab1f919d2deeaf7dbdf4f23a470169ae9ad008"
+    },
+    "logName": "projects/core-guard-449421-v8/logs/run.googleapis.com%2Fvarlog%2Fsystem",
+    "receiveTimestamp": "2025-10-15T22:49:19.717199889Z"
+  }
+ERROR 2025-10-15T22:49:19.726661Z Default STARTUP TCP probe failed 1 time consecutively for container "pgc-app-1" on port 5000. The instance was not started. Connection failed with status CANCELLED.
+  {
+    "textPayload": "Default STARTUP TCP probe failed 1 time consecutively for container \"pgc-app-1\" on port 5000. The instance was not started.\nConnection failed with status CANCELLED.",
+    "insertId": "68f024ef000b1685484a5c18",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "pgc-app",
+        "project_id": "core-guard-449421-v8",
+        "configuration_name": "pgc-app",
+        "location": "us-west1",
+        "revision_name": "pgc-app-00005-pqs"
+      }
+    },
+    "timestamp": "2025-10-15T22:49:19.726661Z",
+    "severity": "ERROR",
+    "labels": {
+      "instanceId": "0069c7a9888b8c12853c338e655403107442889624cafb3760147d4aab959ff8776c0aae52909159d4157d3f49f906fb114d40dee1ec4a92a8745328ab1f919d2deeaf7dbdf4f23a470169ae9ad008"
+    },
+    "logName": "projects/core-guard-449421-v8/logs/run.googleapis.com%2Fvarlog%2Fsystem",
+    "receiveTimestamp": "2025-10-15T22:49:20.049448047Z"
+  }

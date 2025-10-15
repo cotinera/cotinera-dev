@@ -56,8 +56,9 @@ RUN groupadd -r nodejs && useradd -r -g nodejs nodejs
 # Copy package files
 COPY package*.json ./
 
-# Install production dependencies only
-RUN npm ci --only=production && npm cache clean --force
+# Install all dependencies (including dev) because server imports vite
+# Even though vite is only used in development, the import statement runs in production
+RUN npm ci && npm cache clean --force
 
 # Copy built assets from builder stage
 COPY --from=builder /app/dist ./dist
