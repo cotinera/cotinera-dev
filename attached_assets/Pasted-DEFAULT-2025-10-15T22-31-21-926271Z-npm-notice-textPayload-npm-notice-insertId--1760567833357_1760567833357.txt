@@ -1,0 +1,278 @@
+DEFAULT 2025-10-15T22:31:21.926271Z npm notice
+  {
+    "textPayload": "npm notice",
+    "insertId": "68f020b9000e223f9d64cf54",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "core-guard-449421-v8",
+        "service_name": "pgc-app",
+        "revision_name": "pgc-app-00003-x5m",
+        "configuration_name": "pgc-app",
+        "location": "us-west1"
+      }
+    },
+    "timestamp": "2025-10-15T22:31:21.926271Z",
+    "labels": {
+      "instanceId": "0069c7a988e7bf631159173423343ad9c264bc5914d28f9d890a511233829055a7c547d5fc8dad0f703569cdecec74e96e24011e55cfc4c0d6c9215476c0db0bfc7fd5318290c9948467b4a5b48e"
+    },
+    "logName": "projects/core-guard-449421-v8/logs/run.googleapis.com%2Fstderr",
+    "receiveTimestamp": "2025-10-15T22:31:22.229920272Z"
+  }
+WARNING 2025-10-15T22:31:22.316743658Z Container called exit(1).
+  {
+    "textPayload": "Container called exit(1).",
+    "insertId": "68f020ba0004d58d0d06360d",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "pgc-app",
+        "revision_name": "pgc-app-00003-x5m",
+        "project_id": "core-guard-449421-v8",
+        "location": "us-west1",
+        "service_name": "pgc-app"
+      }
+    },
+    "timestamp": "2025-10-15T22:31:22.316743658Z",
+    "severity": "WARNING",
+    "labels": {
+      "container_name": "pgc-app-1",
+      "instanceId": "0069c7a988e7bf631159173423343ad9c264bc5914d28f9d890a511233829055a7c547d5fc8dad0f703569cdecec74e96e24011e55cfc4c0d6c9215476c0db0bfc7fd5318290c9948467b4a5b48e"
+    },
+    "logName": "projects/core-guard-449421-v8/logs/run.googleapis.com%2Fvarlog%2Fsystem",
+    "receiveTimestamp": "2025-10-15T22:31:22.407616488Z"
+  }
+ERROR 2025-10-15T22:31:22.399918Z Default STARTUP TCP probe failed 1 time consecutively for container "pgc-app-1" on port 5000. The instance was not started. Connection failed with status CANCELLED.
+  {
+    "textPayload": "Default STARTUP TCP probe failed 1 time consecutively for container \"pgc-app-1\" on port 5000. The instance was not started.\nConnection failed with status CANCELLED.",
+    "insertId": "68f020ba00061a2e997ef640",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "pgc-app",
+        "revision_name": "pgc-app-00003-x5m",
+        "service_name": "pgc-app",
+        "project_id": "core-guard-449421-v8",
+        "location": "us-west1"
+      }
+    },
+    "timestamp": "2025-10-15T22:31:22.399918Z",
+    "severity": "ERROR",
+    "labels": {
+      "instanceId": "0069c7a988e7bf631159173423343ad9c264bc5914d28f9d890a511233829055a7c547d5fc8dad0f703569cdecec74e96e24011e55cfc4c0d6c9215476c0db0bfc7fd5318290c9948467b4a5b48e"
+    },
+    "logName": "projects/core-guard-449421-v8/logs/run.googleapis.com%2Fvarlog%2Fsystem",
+    "receiveTimestamp": "2025-10-15T22:31:22.407616488Z"
+  }
+ERROR 2025-10-15T22:31:22.411334Z [protoPayload.serviceName: Cloud Run] [protoPayload.methodName: ReplaceService] [protoPayload.resourceName: pgc-app-00003-x5m] Ready condition status changed to False for Revision pgc-app-00003-x5m with message: The user-provided container failed to start and listen on the port defined provided by the PORT=5000 environment variable within the allocated timeout. This can happen when the container port is misconfigured or if the timeout is too short. The health check timeout can be extended. Logs for this revision might contain more information. Logs URL: https://console.cloud.google.com/logs/viewer?project=core-guard-449421-v8&resource=cloud_run_revision/service_name/pgc-app/revision_name/pgc-app-00003-x5m&advancedFilter=resource.type%3D%22cloud_run_revision%22%0Aresource.labels.service_name%3D%22pgc-app%22%0Aresource.labels.revision_name%3D%22pgc-app-00003-x5m%22 For more troubleshooting guidance, see https://cloud.google.com/run/docs/troubleshooting#container-failed-to-start
+  {
+    "protoPayload": {
+      "@type": "type.googleapis.com/google.cloud.audit.AuditLog",
+      "status": {
+        "code": 9,
+        "message": "Ready condition status changed to False for Revision pgc-app-00003-x5m with message: The user-provided container failed to start and listen on the port defined provided by the PORT=5000 environment variable within the allocated timeout. This can happen when the container port is misconfigured or if the timeout is too short. The health check timeout can be extended. Logs for this revision might contain more information.\n\nLogs URL: https://console.cloud.google.com/logs/viewer?project=core-guard-449421-v8&resource=cloud_run_revision/service_name/pgc-app/revision_name/pgc-app-00003-x5m&advancedFilter=resource.type%3D%22cloud_run_revision%22%0Aresource.labels.service_name%3D%22pgc-app%22%0Aresource.labels.revision_name%3D%22pgc-app-00003-x5m%22 \nFor more troubleshooting guidance, see https://cloud.google.com/run/docs/troubleshooting#container-failed-to-start"
+      },
+      "serviceName": "run.googleapis.com",
+      "methodName": "/Services.ReplaceService",
+      "resourceName": "namespaces/core-guard-449421-v8/revisions/pgc-app-00003-x5m",
+      "response": {
+        "metadata": {
+          "name": "pgc-app-00003-x5m",
+          "namespace": "549060992911",
+          "selfLink": "/apis/serving.knative.dev/v1/namespaces/549060992911/revisions/pgc-app-00003-x5m",
+          "uid": "ba823e9f-65c2-4dce-878a-f815bba94f62",
+          "resourceVersion": "AAZBOg9kO9A",
+          "generation": 1,
+          "creationTimestamp": "2025-10-15T22:30:58.107901Z",
+          "labels": {
+            "client.knative.dev/nonce": "mmvhaopuzp",
+            "serving.knative.dev/configuration": "pgc-app",
+            "serving.knative.dev/configurationGeneration": "3",
+            "serving.knative.dev/service": "pgc-app",
+            "serving.knative.dev/serviceUid": "eb757e9c-ea91-4321-bc8a-aa5f32511972",
+            "serving.knative.dev/route": "pgc-app",
+            "cloud.googleapis.com/location": "us-west1",
+            "run.googleapis.com/startupProbeType": "Default"
+          },
+          "annotations": {
+            "autoscaling.knative.dev/maxScale": "10",
+            "run.googleapis.com/client-name": "gcloud",
+            "run.googleapis.com/client-version": "543.0.0",
+            "run.googleapis.com/cloudsql-instances": "core-guard-449421-v8:us-west1:cotinera-db-us-west-1",
+            "serving.knative.dev/creator": "cotinera-dev-sa@core-guard-449421-v8.iam.gserviceaccount.com",
+            "run.googleapis.com/operation-id": "514eb0aa-e076-4231-9674-67c972dcda2e",
+            "run.googleapis.com/startup-cpu-boost": "true"
+          },
+          "ownerReferences": [
+            {
+              "kind": "Configuration",
+              "name": "pgc-app",
+              "uid": "44a77095-7378-446e-8b27-e230c2944b2a",
+              "apiVersion": "serving.knative.dev/v1",
+              "controller": true,
+              "blockOwnerDeletion": true
+            }
+          ]
+        },
+        "apiVersion": "serving.knative.dev/v1",
+        "kind": "Revision",
+        "spec": {
+          "containerConcurrency": 80,
+          "timeoutSeconds": 300,
+          "serviceAccountName": "cotinera-dev-sa@core-guard-449421-v8.iam.gserviceaccount.com",
+          "containers": [
+            {
+              "name": "pgc-app-1",
+              "image": "us-west1-docker.pkg.dev/core-guard-449421-v8/cotinera-dev-repo/pgc-app@sha256:b19a2ab514f6c3f5b026a7d40dd879c73cc0708a326a055bc946e6155e078993",
+              "ports": [
+                {
+                  "name": "http1",
+                  "containerPort": 5000
+                }
+              ],
+              "env": [
+                {
+                  "name": "NODE_ENV",
+                  "value": "production"
+                },
+                {
+                  "name": "BASE_URL"
+                },
+                {
+                  "name": "DATABASE_URL",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "latest",
+                      "name": "DATABASE_URL"
+                    }
+                  }
+                },
+                {
+                  "name": "SESSION_SECRET",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "latest",
+                      "name": "SESSION_SECRET"
+                    }
+                  }
+                },
+                {
+                  "name": "GOOGLE_CLIENT_ID",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "latest",
+                      "name": "GOOGLE_CLIENT_ID"
+                    }
+                  }
+                },
+                {
+                  "name": "GOOGLE_CLIENT_SECRET",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "latest",
+                      "name": "GOOGLE_CLIENT_SECRET"
+                    }
+                  }
+                },
+                {
+                  "name": "VITE_GOOGLE_CLIENT_ID",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "latest",
+                      "name": "VITE_GOOGLE_CLIENT_ID"
+                    }
+                  }
+                },
+                {
+                  "name": "VITE_GOOGLE_MAPS_API_KEY",
+                  "valueFrom": {
+                    "secretKeyRef": {
+                      "key": "latest",
+                      "name": "VITE_GOOGLE_MAPS_API_KEY"
+                    }
+                  }
+                }
+              ],
+              "resources": {
+                "limits": {
+                  "cpu": "1",
+                  "memory": "1Gi"
+                }
+              },
+              "startupProbe": {
+                "timeoutSeconds": 240,
+                "periodSeconds": 240,
+                "failureThreshold": 1,
+                "tcpSocket": {
+                  "port": 5000
+                }
+              }
+            }
+          ]
+        },
+        "status": {
+          "observedGeneration": 1,
+          "conditions": [
+            {
+              "type": "Ready",
+              "status": "False",
+              "reason": "HealthCheckContainerError",
+              "message": "The user-provided container failed to start and listen on the port defined provided by the PORT=5000 environment variable within the allocated timeout. This can happen when the container port is misconfigured or if the timeout is too short. The health check timeout can be extended. Logs for this revision might contain more information.\n\nLogs URL: https://console.cloud.google.com/logs/viewer?project=core-guard-449421-v8&resource=cloud_run_revision/service_name/pgc-app/revision_name/pgc-app-00003-x5m&advancedFilter=resource.type%3D%22cloud_run_revision%22%0Aresource.labels.service_name%3D%22pgc-app%22%0Aresource.labels.revision_name%3D%22pgc-app-00003-x5m%22 \nFor more troubleshooting guidance, see https://cloud.google.com/run/docs/troubleshooting#container-failed-to-start",
+              "lastTransitionTime": "2025-10-15T22:31:22.399696Z"
+            },
+            {
+              "type": "ContainerHealthy",
+              "status": "False",
+              "reason": "HealthCheckContainerError",
+              "message": "The user-provided container failed to start and listen on the port defined provided by the PORT=5000 environment variable within the allocated timeout. This can happen when the container port is misconfigured or if the timeout is too short. The health check timeout can be extended. Logs for this revision might contain more information.\n\nLogs URL: https://console.cloud.google.com/logs/viewer?project=core-guard-449421-v8&resource=cloud_run_revision/service_name/pgc-app/revision_name/pgc-app-00003-x5m&advancedFilter=resource.type%3D%22cloud_run_revision%22%0Aresource.labels.service_name%3D%22pgc-app%22%0Aresource.labels.revision_name%3D%22pgc-app-00003-x5m%22 \nFor more troubleshooting guidance, see https://cloud.google.com/run/docs/troubleshooting#container-failed-to-start",
+              "lastTransitionTime": "2025-10-15T22:31:22.399696Z"
+            },
+            {
+              "type": "ContainerReady",
+              "status": "True",
+              "message": "Container image import completed in 19.28s.",
+              "lastTransitionTime": "2025-10-15T22:31:17.947401Z"
+            },
+            {
+              "type": "ResourcesAvailable",
+              "status": "True",
+              "message": "Provisioning imported containers completed in 2.04s. Checking container health. This will wait for up to 4m for the configured startup probe, including an initial delay of 0s.",
+              "lastTransitionTime": "2025-10-15T22:31:19.986582Z"
+            },
+            {
+              "type": "Retry",
+              "status": "True",
+              "reason": "ImmediateRetry",
+              "message": "System will retry after 0:00:00 from lastTransitionTime for attempt 0.",
+              "lastTransitionTime": "2025-10-15T22:31:19.986582Z",
+              "severity": "Info"
+            }
+          ],
+          "logUrl": "https://console.cloud.google.com/logs/viewer?project=core-guard-449421-v8&resource=cloud_run_revision/service_name/pgc-app/revision_name/pgc-app-00003-x5m&advancedFilter=resource.type%3D%22cloud_run_revision%22%0Aresource.labels.service_name%3D%22pgc-app%22%0Aresource.labels.revision_name%3D%22pgc-app-00003-x5m%22",
+          "imageDigest": "us-west1-docker.pkg.dev/core-guard-449421-v8/cotinera-dev-repo/pgc-app@sha256:b19a2ab514f6c3f5b026a7d40dd879c73cc0708a326a055bc946e6155e078993",
+          "containerStatuses": [
+            {
+              "name": "pgc-app-1",
+              "imageDigest": "us-west1-docker.pkg.dev/core-guard-449421-v8/cotinera-dev-repo/pgc-app@sha256:b19a2ab514f6c3f5b026a7d40dd879c73cc0708a326a055bc946e6155e078993"
+            }
+          ]
+        },
+        "@type": "type.googleapis.com/google.cloud.run.v1.Revision"
+      }
+    },
+    "insertId": "chqucoe11vtk",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "core-guard-449421-v8",
+        "location": "us-west1",
+        "configuration_name": "pgc-app",
+        "revision_name": "pgc-app-00003-x5m",
+        "service_name": "pgc-app"
+      }
+    },
+    "timestamp": "2025-10-15T22:31:22.411334Z",
+    "severity": "ERROR",
+    "logName": "projects/core-guard-449421-v8/logs/cloudaudit.googleapis.com%2Fsystem_event",
+    "receiveTimestamp": "2025-10-15T22:31:23.263345806Z"
+  }
