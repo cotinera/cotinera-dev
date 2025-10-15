@@ -70,8 +70,7 @@ jobs:
             --max-instances 10 \
             --min-instances 0 \
             --port 5000 \
-            --startup-cpu-boost \
-            --no-cpu-throttling
+            --cpu-boost
 
       - name: Run Database Migrations
         run: |
