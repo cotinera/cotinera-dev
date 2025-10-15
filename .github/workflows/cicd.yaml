@@ -1,0 +1,134 @@
+name: Deploy to Google Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+      - production
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: core-guard-449421-v8
+  REGION: us-west1
+  SERVICE_NAME: pgc-app
+  CLOUD_SQL_INSTANCE: core-guard-449421-v8:us-west1:cotinera-db-us-west-1
+
+jobs:
+  deploy:
+    name: Build and Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --build-arg BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+            --build-arg VERSION=${{ github.sha }} \
+            -t gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+            -t gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:latest \
+            .
+
+      - name: Push Docker image to GCR
+        run: |
+          docker push gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          docker push gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --service-account cotinera-dev-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com \
+            --add-cloudsql-instances ${{ env.CLOUD_SQL_INSTANCE }} \
+            --set-env-vars "NODE_ENV=production,BASE_URL=${{ secrets.BASE_URL }}" \
+            --set-secrets "DATABASE_URL=DATABASE_URL:latest,SESSION_SECRET=SESSION_SECRET:latest,GOOGLE_CLIENT_ID=GOOGLE_CLIENT_ID:latest,GOOGLE_CLIENT_SECRET=GOOGLE_CLIENT_SECRET:latest,VITE_GOOGLE_CLIENT_ID=VITE_GOOGLE_CLIENT_ID:latest,VITE_GOOGLE_MAPS_API_KEY=VITE_GOOGLE_MAPS_API_KEY:latest,SENDGRID_API_KEY=SENDGRID_API_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest" \
+            --memory 1Gi \
+            --cpu 1 \
+            --timeout 300 \
+            --max-instances 10 \
+            --min-instances 0 \
+            --port 5000
+
+      - name: Run Database Migrations
+        run: |
+          # Install Cloud SQL Proxy
+          curl -o cloud-sql-proxy https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.8.0/cloud-sql-proxy.linux.amd64
+          chmod +x cloud-sql-proxy
+          
+          # Start proxy in background
+          ./cloud-sql-proxy ${{ env.CLOUD_SQL_INSTANCE }} --port 5432 &
+          PROXY_PID=$!
+          
+          # Wait for proxy to be ready
+          sleep 5
+          
+          # Install dependencies
+          npm ci
+          
+          # Run migrations with local proxy connection
+          export DATABASE_URL="postgresql://postgres:cotineraofficialaccdev@localhost:5432/appdb"
+          npm run db:push
+          
+          # Kill proxy
+          kill $PROXY_PID
+
+      - name: Get Service URL
+        id: service-url
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} \
+            --region ${{ env.REGION }} \
+            --format 'value(status.url)')
+          echo "url=$SERVICE_URL" >> $GITHUB_OUTPUT
+          echo "::notice::Deployed to $SERVICE_URL"
+
+      - name: Verify Deployment
+        run: |
+          # Wait for service to be ready
+          sleep 10
+          
+          # Check health endpoint
+          HEALTH_URL="${{ steps.service-url.outputs.url }}/api/health"
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" $HEALTH_URL)
+          
+          if [ $HTTP_CODE -eq 200 ]; then
+            echo "✅ Health check passed: $HEALTH_URL returned $HTTP_CODE"
+          else
+            echo "❌ Health check failed: $HEALTH_URL returned $HTTP_CODE"
+            exit 1
+          fi
+
+      - name: Deployment Summary
+        run: |
+          echo "## 🚀 Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Service:** ${{ env.SERVICE_NAME }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Region:** ${{ env.REGION }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** ${{ steps.service-url.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image:** gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Database" >> $GITHUB_STEP_SUMMARY
+          echo "- **Instance:** ${{ env.CLOUD_SQL_INSTANCE }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Migrations:** ✅ Applied" >> $GITHUB_STEP_SUMMARY
