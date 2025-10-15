@@ -82,8 +82,16 @@ export function setupAuth(app: Express) {
     }
   }));
   const MemoryStore = createMemoryStore(session);
+  
+  // Require SESSION_SECRET in production, use REPL_ID for Replit dev, or fallback for local dev
+  const sessionSecret = process.env.SESSION_SECRET || process.env.REPL_ID;
+  
+  if (!sessionSecret && process.env.NODE_ENV === 'production') {
+    throw new Error('SESSION_SECRET environment variable must be set in production');
+  }
+  
   const sessionSettings: session.SessionOptions = {
-    secret: process.env.REPL_ID || "porygon-supremacy",
+    secret: sessionSecret || "dev-secret-change-in-production",
     resave: false,
     saveUninitialized: false,
     cookie: {

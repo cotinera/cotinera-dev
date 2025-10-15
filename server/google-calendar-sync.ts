@@ -5,12 +5,28 @@ import { eq, and } from 'drizzle-orm';
 
 const calendar = google.calendar('v3');
 
+// Get base URL for callbacks
+function getBaseUrl(): string {
+  // 1. Use explicit BASE_URL if set
+  if (process.env.BASE_URL) {
+    return process.env.BASE_URL;
+  }
+  
+  // 2. Construct from Replit environment if available
+  if (process.env.REPL_SLUG && process.env.REPLIT_CLUSTER) {
+    return `https://${process.env.REPL_SLUG}.${process.env.REPLIT_CLUSTER}.replit.dev`;
+  }
+  
+  // 3. Fallback to localhost for development
+  return 'http://localhost:5000';
+}
+
 // Initialize OAuth2 client
 function getOAuth2Client() {
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    `${process.env.REPL_SLUG ? `https://${process.env.REPL_SLUG}.${process.env.REPLIT_CLUSTER}.replit.dev` : 'http://localhost:5000'}/api/google/calendar/callback`
+    `${getBaseUrl()}/api/google/calendar/callback`
   );
 }
 
@@ -278,7 +294,7 @@ export async function setupGoogleCalendarWebhook(
     oauth2Client.setCredentials({ access_token: accessToken });
 
     const channelId = `trip-${tripId}-${Date.now()}`;
-    const webhookUrl = `${process.env.REPL_SLUG ? `https://${process.env.REPL_SLUG}.${process.env.REPLIT_CLUSTER}.replit.dev` : 'http://localhost:5000'}/api/google/calendar/webhook`;
+    const webhookUrl = `${getBaseUrl()}/api/google/calendar/webhook`;
 
     const response = await calendar.events.watch({
       auth: oauth2Client,
